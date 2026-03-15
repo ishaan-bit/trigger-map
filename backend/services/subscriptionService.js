@@ -1,0 +1,120 @@
+import { google } from "googleapis";
+import { pipeline, redisKey } from "./redisClient.js";
+
+function shouldStubSubscriptionVerification() {
+  return !process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || !process.env.GOOGLE_PLAY_PACKAGE_NAME;
+}
+
+function getGoogleAuthClient() {
+  if (!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON) {
+    throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON missing");
+  }
+
+  const credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON);
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+}
+
+function mapSubscriptionState(subscriptionPurchase) {
+  const expiryTime = Number(subscriptionPurchase.expiryTimeMillis || 0);
+  const now = Date.now();
+  const cancelReason = subscriptionPurchase.cancelReason;
+  const paymentState = subscriptionPurchase.paymentState;
+
+  if (cancelReason) {
+    return "cancelled";
+  }
+
+  if (expiryTime && expiryTime < now) {
+    return "expired";
+  }
+
+  if (paymentState === 0 || paymentState === 1) {
+    return "active";
+  }
+
+  if (subscriptionPurchase.autoResumeTimeMillis) {
+    return "grace_period";
+  }
+
+  return "expired";
+}
+
+export async function verifyAndStoreSubscription({ userId, subscriptionId, purchaseToken }) {
+  if (shouldStubSubscriptionVerification()) {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    await pipeline([
+      [
+        "HSET",
+        redisKey("subscription", userId),
+        "status",
+        "grace_period",
+        "subscriptionId",
+        subscriptionId,
+        "purchaseToken",
+        purchaseToken,
+        "expiresAt",
+        expiresAt,
+        "updatedAt",
+        now.toISOString(),
+        "stubbed",
+        "true",
+      ],
+      ["EXPIRE", redisKey("subscription", userId), String(60 * 60 * 24 * 30)],
+    ]);
+
+    return {
+      status: "grace_period",
+      subscriptionId,
+      expiresAt,
+      autoRenewing: false,
+      stubbed: true,
+    };
+  }
+
+  const auth = await getGoogleAuthClient();
+  const androidpublisher = google.androidpublisher({ version: "v3", auth });
+  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME;
+
+  if (!packageName) {
+    throw new Error("GOOGLE_PLAY_PACKAGE_NAME missing");
+  }
+
+  const { data } = await androidpublisher.purchases.subscriptions.get({
+    packageName,
+    subscriptionId,
+    token: purchaseToken,
+  });
+
+  const status = mapSubscriptionState(data);
+  const expiresAt = data.expiryTimeMillis ? new Date(Number(data.expiryTimeMillis)).toISOString() : null;
+
+  await pipeline([
+    [
+      "HSET",
+      redisKey("subscription", userId),
+      "status",
+      status,
+      "subscriptionId",
+      subscriptionId,
+      "purchaseToken",
+      purchaseToken,
+      "expiresAt",
+      expiresAt || "",
+      "updatedAt",
+      new Date().toISOString(),
+    ],
+    ["EXPIRE", redisKey("subscription", userId), String(60 * 60 * 24 * 90)],
+  ]);
+
+  return {
+    status,
+    subscriptionId,
+    expiresAt,
+    autoRenewing: Boolean(data.autoRenewing),
+  };
+}

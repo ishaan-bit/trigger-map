@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@triggermap/shared": ["./shared/index.js"],
+      "@triggermap/shared/*": ["./shared/*"]
+    }
+  }
+}

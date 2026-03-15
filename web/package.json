@@ -1,0 +1,21 @@
+{
+  "name": "trigger-map-web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@triggermap/shared": "file:../shared",
+    "next": "16.1.6",
+    "next-pwa": "^5.6.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.38.0",
+    "eslint-config-next": "16.1.6"
+  }
+}

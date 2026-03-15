@@ -1,0 +1,12 @@
+{
+  "name": "@triggermap/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./constants": "./constants/index.js",
+    "./constants/*": "./constants/*.js",
+    "./types": "./types/index.js"
+  }
+}

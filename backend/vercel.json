@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "pages/api/**/*.js": {
+      "maxDuration": 10
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/weeklyReport?mode=scheduled",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

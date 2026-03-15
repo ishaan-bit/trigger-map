@@ -1,0 +1,13 @@
+{
+  "name": "trigger-map",
+  "private": true,
+  "scripts": {
+    "dev:mobile": "npm --prefix mobile run start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix web run dev",
+    "build:mobile": "npm --prefix mobile run build:aab",
+    "build:backend": "npm --prefix backend run build",
+    "build:web": "npm --prefix web run build",
+    "lint": "npm --prefix mobile run lint && npm --prefix backend run lint && npm --prefix web run lint"
+  }
+}

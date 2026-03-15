@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "9ecd4eb5-fc3f-494e-9898-14ce2c700912"
+      }
+    },
+    "android": {
+      "package": "com.qdenxp.triggermap"
+    }
+  }
+}

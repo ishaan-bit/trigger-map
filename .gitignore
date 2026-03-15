@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.expo/
+dist/
+coverage/
+.vercel/
+.turbo/
+*.log
+.env
+.env.local
+mobile/.expo/
+mobile/android/
+mobile/ios/
+.vercel
+.env*.local

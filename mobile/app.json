@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "TriggerMap",
+    "slug": "triggermap",
+    "scheme": "triggermap",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0b1220"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#0b1220"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
+      "./plugins/withReactNativeIapPlayStore",
+      "expo-asset",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.triggermap.app",
+      "versionCode": 13,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-padded.png",
+        "backgroundColor": "#0b1220"
+      }
+    },
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "01260807-2248-498b-8b5d-06a347fa911b"
+      }
+    },
+    "owner": "qdenxp"
+  }
+}
