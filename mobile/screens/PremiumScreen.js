@@ -122,7 +122,7 @@ export function PremiumScreen() {
 const styles = StyleSheet.create({
   hero: {
     marginTop: 8,
-    marginHorizontal: -24,
+    marginHorizontal: -20,
     borderRadius: 0,
     overflow: "hidden",
     height: 200,

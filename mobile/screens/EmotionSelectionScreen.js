@@ -62,7 +62,7 @@ export function EmotionSelectionScreen() {
           numberOfLines={3}
           onChangeText={setNote}
           placeholder="What happened right before this?"
-          placeholderTextColor="#4e6077"
+          placeholderTextColor={palette.muted}
           style={styles.input}
           value={note}
         />
@@ -94,10 +94,10 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: palette.accent,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 1.2,
-    textTransform: "capitalize",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
   },
   prompt: {
     color: palette.text,

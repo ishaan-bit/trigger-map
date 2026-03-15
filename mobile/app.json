@@ -13,7 +13,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#0b1220"
+      "backgroundColor": "#060a12"
     },
     "plugins": [
       "expo-router",
@@ -25,7 +25,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 1024,
           "resizeMode": "cover",
-          "backgroundColor": "#0b1220"
+          "backgroundColor": "#060a12"
         }
       ],
       [
@@ -51,7 +51,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-padded.png",
-        "backgroundColor": "#0b1220"
+        "backgroundColor": "#060a12"
       }
     },
     "experiments": {

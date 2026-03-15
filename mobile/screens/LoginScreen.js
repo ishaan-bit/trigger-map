@@ -72,14 +72,18 @@ export function LoginScreen() {
 
   return (
     <ScreenShell>
-      <Text style={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</Text>
-      <Text style={styles.subtitle}>Anonymous mode stays available even if you skip this.</Text>
+      <View style={styles.header}>
+        <Text style={styles.brand}>TriggerMap</Text>
+        <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
+        <Text style={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</Text>
+        <Text style={styles.subtitle}>Anonymous mode stays available even if you skip this.</Text>
+      </View>
 
       {mode === "register" ? (
         <TextInput
           onChangeText={setName}
           placeholder="Name"
-          placeholderTextColor="#627388"
+          placeholderTextColor={palette.muted}
           style={styles.input}
           value={name}
         />
@@ -90,7 +94,7 @@ export function LoginScreen() {
         keyboardType="email-address"
         onChangeText={setEmail}
         placeholder="Email"
-        placeholderTextColor="#627388"
+        placeholderTextColor={palette.muted}
         style={styles.input}
         value={email}
       />
@@ -98,7 +102,7 @@ export function LoginScreen() {
         autoCapitalize="none"
         onChangeText={setPassword}
         placeholder="Password"
-        placeholderTextColor="#627388"
+        placeholderTextColor={palette.muted}
         secureTextEntry
         style={styles.input}
         value={password}
@@ -116,15 +120,35 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    gap: 6,
+    marginTop: 12,
+  },
+  brand: {
+    color: palette.accent,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  kicker: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
   title: {
     color: palette.text,
-    fontSize: 30,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: "700",
-    marginTop: 16,
   },
   subtitle: {
     color: palette.muted,
-    marginBottom: 6,
+    fontSize: 14,
+    lineHeight: 20,
   },
   input: {
     minHeight: 56,

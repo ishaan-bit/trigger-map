@@ -70,7 +70,7 @@ export function SettingsScreen() {
               }
             }}
             value={reminderEnabled}
-            trackColor={{ false: "rgba(255,255,255,0.08)", true: "rgba(123,201,216,0.35)" }}
+            trackColor={{ false: palette.glass, true: palette.accentGlow }}
             thumbColor={reminderEnabled ? palette.accent : palette.muted}
           />
         </View>
@@ -111,7 +111,7 @@ export function SettingsScreen() {
               ]
             );
           }}
-          secondary
+          danger
         />
       </Section>
 
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.glass,
   },
   statusBadgePremium: {
-    backgroundColor: "rgba(123,201,216,0.15)",
+    backgroundColor: palette.accentSoft,
   },
   statusText: {
     color: palette.muted,

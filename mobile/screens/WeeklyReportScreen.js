@@ -28,8 +28,8 @@ const EMOTION_EMOJIS = {
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
 const ENERGY_COLORS = {
-  steady: "#88d498", balanced: "#7bc9d8", tense: "#f0b96a",
-  drained: "#f07f84", uplifted: "#a78bfa",
+  steady: palette.success, balanced: palette.accent, tense: palette.warning,
+  drained: palette.danger, uplifted: palette.purple,
 };
 
 function topEntries(record, limit = 5) {
@@ -220,7 +220,7 @@ export function WeeklyReportScreen() {
                   <SectionHeader label="Emotion frequency" />
                   <View style={s.card}>
                     {emotionEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={emotionMax} color="#f0b96a" icon={EMOTION_EMOJIS[key]} />
+                      <HBar key={key} label={key} value={value} max={emotionMax} color={palette.warning} icon={EMOTION_EMOJIS[key]} />
                     ))}
                   </View>
                 </View>
@@ -232,7 +232,7 @@ export function WeeklyReportScreen() {
                   <SectionHeader label="Time of day" />
                   <View style={s.card}>
                     {timeEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={timeMax} color="#e8d44d" icon={TIME_ICONS[key]} />
+                      <HBar key={key} label={key} value={value} max={timeMax} color={palette.warning} icon={TIME_ICONS[key]} />
                     ))}
                   </View>
                 </View>
@@ -286,7 +286,7 @@ export function WeeklyReportScreen() {
                     <Text style={[s.aiSummary, { color: palette.muted }]}>
                       Your week was shaped by "{report.topTrigger || "..."}" triggers, feeling mostly {report.topEmotion || "..."}.
                     </Text>
-                    <Text style={[s.aiSuggestion, { color: "rgba(149,166,189,0.5)" }]}>
+                    <Text style={[s.aiSuggestion, { color: palette.muted }]}>
                       Deeper observations about trigger patterns and emotional trends are available when you sign in.
                     </Text>
                   </View>
@@ -381,14 +381,14 @@ export function WeeklyReportScreen() {
                 >
                   <View style={[s.aiCard, { opacity: 0.5 }]}>
                     <View style={s.aiLabelRow}>
-                      <View style={[s.aiLabelPill, { backgroundColor: "rgba(160,120,216,0.12)" }]}>
-                        <Text style={[s.aiLabelText, { color: "#a78bfa" }]}>AI reflection</Text>
+                      <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                        <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
                       </View>
                     </View>
                     <Text style={[s.aiSummary, { color: palette.muted }]}>
                       Your emotional patterns this week reveal a recurring theme connecting "{report.topTrigger || "..."}" to how you feel...
                     </Text>
-                    <Text style={[s.aiSuggestion, { color: "rgba(149,166,189,0.4)" }]}>
+                    <Text style={[s.aiSuggestion, { color: palette.muted }]}>
                       AI-generated narrative analysis is available with Premium. Get personalised reflections that track your growth over weeks.
                     </Text>
                   </View>
@@ -399,10 +399,10 @@ export function WeeklyReportScreen() {
                 <View style={s.section}>
                   <SectionHeader label="Personalised AI Reflection" />
                   {hasLlmInsight ? (
-                    <View style={[s.aiCard, { borderColor: "rgba(167,139,250,0.22)" }]}>
+                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
                       <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: "rgba(160,120,216,0.12)" }]}>
-                          <Text style={[s.aiLabelText, { color: "#a78bfa" }]}>AI reflection</Text>
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
                         </View>
                       </View>
                       <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
@@ -410,8 +410,8 @@ export function WeeklyReportScreen() {
                   ) : (
                     <View style={s.card}>
                       <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: "rgba(160,120,216,0.12)" }]}>
-                          <Text style={[s.aiLabelText, { color: "#a78bfa" }]}>AI reflection</Text>
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
                         </View>
                       </View>
                       <Text style={s.aiSuggestion}>Your personalised AI reflection will be generated when enough data is available. Keep logging moments.</Text>
@@ -475,7 +475,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.8, textTransform: "uppercase",
   },
   metricValue: { color: palette.text, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
-  metricHint: { color: "rgba(149,166,189,0.7)", fontSize: 11 },
+  metricHint: { color: palette.muted, fontSize: 11 },
 
   /* ─ Generic section / card ─ */
   section: { gap: 8 },
@@ -573,7 +573,7 @@ const s = StyleSheet.create({
   lockedCta: {
     marginTop: 4, paddingHorizontal: 20, paddingVertical: 11,
     borderRadius: radius.pill,
-    backgroundColor: "rgba(61,142,160,0.85)",
+    backgroundColor: palette.accentStrong,
   },
   lockedCtaText: { color: palette.text, fontSize: 14, fontWeight: "700" },
 

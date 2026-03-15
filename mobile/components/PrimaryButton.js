@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   label: {
-    color: "#ffffff",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.3,

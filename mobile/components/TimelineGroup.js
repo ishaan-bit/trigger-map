@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   emotionIcon: {
     fontSize: 12,

@@ -7,6 +7,7 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const SLIDE_WIDTH = SCREEN_WIDTH - 40;
 
 const slides = [
   {
@@ -81,7 +82,7 @@ export function OnboardingScreen() {
           setCurrentIndex(index);
         }}
         style={styles.list}
-        getItemLayout={(_, index) => ({ length: SCREEN_WIDTH - 48, offset: (SCREEN_WIDTH - 48) * index, index })}
+        getItemLayout={(_, index) => ({ length: SLIDE_WIDTH, offset: SLIDE_WIDTH * index, index })}
       />
 
       <View style={styles.dots}>
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   slide: {
-    width: SCREEN_WIDTH - 48,
+    width: SLIDE_WIDTH,
     justifyContent: "center",
     gap: 18,
     paddingVertical: 32,

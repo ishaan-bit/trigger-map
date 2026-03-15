@@ -99,7 +99,7 @@ export function EditMomentModal({ visible, moment, onSave, onClose }) {
               value={note}
               onChangeText={setNote}
               placeholder="What happened right before this?"
-              placeholderTextColor="#4e6077"
+              placeholderTextColor={palette.muted}
               style={s.input}
             />
           </ScrollView>
