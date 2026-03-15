@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -131,11 +131,11 @@ const s = StyleSheet.create({
   },
   sheet: {
     backgroundColor: palette.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     maxHeight: "85%",
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     borderBottomWidth: 0,
   },
   header: {
@@ -146,7 +146,7 @@ const s = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: palette.border,
+    borderBottomColor: palette.glassBorder,
   },
   title: {
     color: palette.text,
@@ -182,13 +182,13 @@ const s = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.sm,
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   chipActive: {
-    backgroundColor: "rgba(123,201,216,0.15)",
+    backgroundColor: palette.accentSoft,
     borderColor: palette.accent,
   },
   chipIcon: {
@@ -205,10 +205,10 @@ const s = StyleSheet.create({
   },
   input: {
     minHeight: 80,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: palette.glassBorder,
+    backgroundColor: palette.glass,
     color: palette.text,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -221,17 +221,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: palette.glassBorder,
   },
   cancelBtn: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   cancelText: {
     color: palette.muted,
@@ -241,7 +241,7 @@ const s = StyleSheet.create({
   saveBtn: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: palette.accentStrong,

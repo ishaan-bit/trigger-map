@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
-export function PrimaryButton({ label, onPress, disabled = false, secondary = false }) {
+export function PrimaryButton({ label, onPress, disabled = false, secondary = false, danger = false }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -9,50 +9,59 @@ export function PrimaryButton({ label, onPress, disabled = false, secondary = fa
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        secondary ? styles.secondaryButton : styles.primaryButton,
+        secondary ? styles.secondaryButton : danger ? styles.dangerButton : styles.primaryButton,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.label, secondary ? styles.secondaryLabel : null]}>{label}</Text>
+      <Text style={[styles.label, secondary && styles.secondaryLabel, danger && styles.dangerLabel]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 56,
-    borderRadius: 22,
+    minHeight: 54,
+    borderRadius: radius.md,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
   },
   primaryButton: {
     backgroundColor: palette.accentStrong,
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
+    shadowColor: palette.accent,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    elevation: 8,
   },
   secondaryButton: {
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
+  },
+  dangerButton: {
+    backgroundColor: palette.dangerSoft,
+    borderWidth: 1,
+    borderColor: "rgba(255,107,122,0.20)",
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
   label: {
-    color: palette.text,
-    fontSize: 17,
+    color: "#ffffff",
+    fontSize: 16,
     fontWeight: "700",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
   secondaryLabel: {
-    color: "#dbe3ef",
+    color: palette.textSecondary,
+  },
+  dangerLabel: {
+    color: palette.danger,
   },
 });

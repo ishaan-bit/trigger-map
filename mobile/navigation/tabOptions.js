@@ -6,8 +6,8 @@ export function createTabOptions(iconName, label) {
     title: label,
     headerShown: false,
     tabBarStyle: {
-      backgroundColor: "#0a1018",
-      borderTopColor: "rgba(255,255,255,0.04)",
+      backgroundColor: palette.background,
+      borderTopColor: palette.glassBorder,
       borderTopWidth: 1,
       height: 72,
       paddingTop: 8,
@@ -15,7 +15,7 @@ export function createTabOptions(iconName, label) {
       elevation: 0,
     },
     tabBarActiveTintColor: palette.accent,
-    tabBarInactiveTintColor: "#5a6b80",
+    tabBarInactiveTintColor: palette.muted,
     tabBarLabelStyle: {
       fontSize: 11,
       fontWeight: "600",

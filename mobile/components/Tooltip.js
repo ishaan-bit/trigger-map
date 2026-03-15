@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const PREFIX = "triggermap.tooltip.seen.";
 
@@ -57,10 +57,10 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: "rgba(123,201,216,0.12)",
+    borderRadius: radius.sm,
+    backgroundColor: palette.accentSoft,
     borderWidth: 1,
-    borderColor: "rgba(123,201,216,0.20)",
+    borderColor: palette.accentMedium,
   },
   text: {
     flex: 1,

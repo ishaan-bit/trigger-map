@@ -16,7 +16,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { trackEvent } from "@/services/analyticsService";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -447,14 +447,14 @@ const s = StyleSheet.create({
 
   /* ─ AI / insight card ─ */
   aiCard: {
-    borderRadius: 18, padding: 18, gap: 10,
-    backgroundColor: palette.cardGlow,
-    borderWidth: 1, borderColor: "rgba(123,201,216,0.22)",
+    borderRadius: radius.md, padding: 18, gap: 10,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1, borderColor: palette.accentMedium,
   },
   aiLabelRow: { flexDirection: "row" },
   aiLabelPill: {
-    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999,
-    backgroundColor: "rgba(123,201,216,0.12)",
+    paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill,
+    backgroundColor: palette.accentSoft,
   },
   aiLabelText: {
     color: palette.accent, fontSize: 11, fontWeight: "700",
@@ -466,9 +466,9 @@ const s = StyleSheet.create({
   /* ─ Metrics grid ─ */
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   metricCard: {
-    width: (screenWidth - 64 - 8) / 2, borderRadius: 16, padding: 14, gap: 4,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: palette.border,
+    width: (screenWidth - 64 - 8) / 2, borderRadius: radius.md, padding: 14, gap: 4,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
   metricLabel: {
     color: palette.muted, fontSize: 10, fontWeight: "700",
@@ -486,20 +486,20 @@ const s = StyleSheet.create({
   },
   sectionExtra: { color: palette.muted, fontSize: 11 },
   card: {
-    borderRadius: 16, padding: 14, gap: 10,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: palette.border,
+    borderRadius: radius.md, padding: 14, gap: 10,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
 
   /* ─ Horizontal bar ─ */
   hbarRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   hbarLabel: { width: 80, color: palette.text, fontSize: 13, textTransform: "capitalize" },
   hbarTrack: {
-    flex: 1, height: 8, borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    flex: 1, height: 8, borderRadius: radius.pill,
+    backgroundColor: palette.glass,
     overflow: "hidden",
   },
-  hbarFill: { height: "100%", borderRadius: 999 },
+  hbarFill: { height: "100%", borderRadius: radius.pill },
   hbarValue: { width: 26, color: palette.muted, fontSize: 12, textAlign: "right" },
 
   /* ─ Trajectory ─ */
@@ -507,8 +507,8 @@ const s = StyleSheet.create({
   trajectoryDay: {
     alignItems: "center", gap: 4, minWidth: 56,
     paddingVertical: 12, paddingHorizontal: 8,
-    borderRadius: 16, backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: palette.border,
+    borderRadius: radius.md, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
   trajectoryEmoji: { fontSize: 20 },
   trajectoryScore: { color: palette.text, fontSize: 14, fontWeight: "700" },
@@ -521,25 +521,25 @@ const s = StyleSheet.create({
   correlationRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     paddingBottom: 8, borderBottomWidth: 1,
-    borderBottomColor: "rgba(197,214,235,0.05)",
+    borderBottomColor: palette.glassBorder,
   },
   correlationTrigger: { width: 70, color: palette.text, fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
   correlationChips: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   correlationChip: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1, borderColor: palette.border,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
   correlationChipText: { color: palette.text, fontSize: 11, textTransform: "capitalize" },
 
   /* ─ Locked section (blur + gradient overlay) ─ */
   lockedWrap: {
     position: "relative",
-    borderRadius: 18,
+    borderRadius: radius.md,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: palette.glassBorder,
+    backgroundColor: palette.glass,
   },
   lockedContent: {
     opacity: 0.3,
@@ -559,10 +559,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 28,
   },
   lockedIcon: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 44, height: 44, borderRadius: radius.sm,
     alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(123,201,216,0.10)",
-    borderWidth: 1, borderColor: "rgba(123,201,216,0.20)",
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1, borderColor: palette.accentMedium,
   },
   lockedTitle: {
     color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center",
@@ -572,16 +572,16 @@ const s = StyleSheet.create({
   },
   lockedCta: {
     marginTop: 4, paddingHorizontal: 20, paddingVertical: 11,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     backgroundColor: "rgba(61,142,160,0.85)",
   },
   lockedCtaText: { color: palette.text, fontSize: 14, fontWeight: "700" },
 
   /* ─ State cards ─ */
   stateCard: {
-    borderRadius: 18, padding: 20, gap: 10,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: palette.border,
+    borderRadius: radius.md, padding: 20, gap: 10,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
   emptyStateCard: { alignItems: "center", paddingVertical: 32 },
   emptyIllustration: { width: 120, height: 120, marginBottom: 8, opacity: 0.9 },

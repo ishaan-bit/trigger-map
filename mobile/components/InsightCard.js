@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 export function InsightCard({ title, body, tone = "default", footer = null, compact = false }) {
   return (
@@ -13,22 +13,22 @@ export function InsightCard({ title, body, tone = "default", footer = null, comp
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: radius.md,
     padding: 18,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     gap: 6,
   },
   compact: {
     padding: 14,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     flex: 1,
     gap: 4,
   },
   accent: {
-    backgroundColor: palette.cardGlow,
-    borderColor: "rgba(123,201,216,0.18)",
+    backgroundColor: palette.accentSoft,
+    borderColor: palette.accentMedium,
   },
   title: {
     color: palette.muted,

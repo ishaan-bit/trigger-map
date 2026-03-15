@@ -10,7 +10,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 function groupByDay(moments) {
   const groups = {};
@@ -191,14 +191,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingBottom: 2,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(197,214,235,0.06)",
+    borderBottomColor: palette.glassBorder,
   },
   stateCard: {
-    borderRadius: 18,
+    borderRadius: radius.md,
     padding: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     gap: 10,
   },
   stateTitle: {

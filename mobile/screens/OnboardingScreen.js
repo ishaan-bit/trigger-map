@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: palette.glassBorder,
   },
   dotActive: {
     backgroundColor: palette.accent,

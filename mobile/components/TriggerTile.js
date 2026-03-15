@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const TRIGGER_ICONS = {
   work: "🏢",
@@ -14,13 +14,27 @@ const TRIGGER_ICONS = {
   other: "📌",
 };
 
+const TRIGGER_TINTS = {
+  work: "rgba(167, 139, 250, 0.10)",
+  social: "rgba(86, 208, 224, 0.10)",
+  money: "rgba(255, 179, 71, 0.10)",
+  family: "rgba(94, 230, 160, 0.10)",
+  exercise: "rgba(86, 208, 224, 0.10)",
+  health: "rgba(255, 107, 122, 0.10)",
+  sleep: "rgba(167, 139, 250, 0.10)",
+  partner: "rgba(255, 179, 71, 0.10)",
+  alone: "rgba(94, 230, 160, 0.10)",
+  other: "rgba(148, 180, 224, 0.08)",
+};
+
 export function TriggerTile({ label, onPress }) {
+  const tint = TRIGGER_TINTS[label] || TRIGGER_TINTS.other;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Log ${label} trigger`}
       onPress={onPress}
-      style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.tile, { backgroundColor: tint }, pressed && styles.pressed]}
     >
       <View style={styles.iconWrap}>
         <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
@@ -33,39 +47,38 @@ export function TriggerTile({ label, onPress }) {
 const styles = StyleSheet.create({
   tile: {
     width: "30%",
-    aspectRatio: 0.88,
-    borderRadius: 22,
+    aspectRatio: 0.85,
+    borderRadius: radius.lg,
     paddingVertical: 14,
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: palette.border,
-    gap: 8,
+    borderColor: palette.glassBorder,
+    gap: 10,
   },
   pressed: {
-    backgroundColor: palette.cardGlow,
-    borderColor: "rgba(123,201,216,0.28)",
-    transform: [{ scale: 0.96 }],
+    borderColor: palette.accent,
+    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: radius.sm,
     backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
   },
   icon: {
-    fontSize: 24,
+    fontSize: 26,
   },
   label: {
     color: palette.text,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     textTransform: "capitalize",
     textAlign: "center",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });

@@ -1,8 +1,8 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const TRIGGER_ICONS = {
-  work: "�", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
+  work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
   health: "💊", sleep: "😴", partner: "💛", alone: "🧘", other: "📌",
 };
 
@@ -31,18 +31,18 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
   return (
     <View style={styles.card}>
       <View style={styles.row}>
-        <View style={styles.iconWrap}>
+        <View style={[styles.iconWrap, { backgroundColor: `${emotionColor}12` }]}>
           <Text style={styles.icon}>{TRIGGER_ICONS[moment.trigger] || "📌"}</Text>
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
             <Text style={styles.trigger}>{moment.trigger}</Text>
-            <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}22` }]}>
+            <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}18` }]}>
               <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || "•"}</Text>
               <Text style={[styles.emotionLabel, { color: emotionColor }]}>{moment.emotion}</Text>
             </View>
           </View>
-          {moment.note ? <Text style={styles.note} numberOfLines={1}>{moment.note}</Text> : null}
+          {moment.note ? <Text style={styles.note} numberOfLines={2}>{moment.note}</Text> : null}
         </View>
         <Text style={styles.time}>
           {new Date(moment.timestamp).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
@@ -59,7 +59,7 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
           {onDelete ? (
             <Pressable style={styles.actionBtn} onPress={handleDelete} hitSlop={8}>
               <Text style={styles.actionIcon}>🗑️</Text>
-              <Text style={styles.actionLabel}>Delete</Text>
+              <Text style={[styles.actionLabel, { color: palette.danger }]}>Delete</Text>
             </Pressable>
           ) : null}
         </View>
@@ -70,12 +70,12 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: radius.md,
     paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 16,
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     gap: 10,
   },
   row: {
@@ -84,15 +84,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    width: 42,
+    height: 42,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },
   icon: {
-    fontSize: 18,
+    fontSize: 20,
   },
   content: {
     flex: 1,
@@ -106,7 +105,7 @@ const styles = StyleSheet.create({
   trigger: {
     color: palette.text,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     textTransform: "capitalize",
   },
   emotionBadge: {
@@ -114,7 +113,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   emotionIcon: {
@@ -122,31 +121,31 @@ const styles = StyleSheet.create({
   },
   emotionLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     textTransform: "capitalize",
   },
   note: {
-    color: "#8396ad",
+    color: palette.muted,
     fontSize: 13,
     lineHeight: 18,
   },
   time: {
     color: palette.muted,
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   actions: {
     flexDirection: "row",
-    gap: 16,
-    paddingTop: 2,
+    gap: 20,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: "rgba(197,214,235,0.06)",
-    paddingHorizontal: 4,
+    borderTopColor: palette.glassBorder,
+    paddingHorizontal: 2,
   },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     paddingVertical: 4,
   },
   actionIcon: {

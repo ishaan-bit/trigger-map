@@ -161,11 +161,16 @@ export function SessionProvider({ children }) {
         trackEvent("login_completed", { provider: "google" });
       },
       async signOut() {
-        // Revoke Google session so a different account can be picked next time
+        // Fully revoke Google session so fresh credentials are used next time
+        try {
+          await GoogleSignin.revokeAccess();
+        } catch {
+          // Not signed in via Google — safe to ignore
+        }
         try {
           await GoogleSignin.signOut();
         } catch {
-          // Not signed in via Google or SDK not initialised — safe to ignore
+          // SDK not initialised — safe to ignore
         }
         await clearSessionToken();
         setToken(null);

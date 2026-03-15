@@ -5,7 +5,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getWebBaseUrl } from "@/services/api";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 function Section({ icon, title, children }) {
   return (
@@ -154,10 +154,10 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
     padding: 16,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.md,
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   sectionTitleRow: {
     flexDirection: "row",
@@ -184,8 +184,8 @@ const styles = StyleSheet.create({
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: radius.pill,
+    backgroundColor: palette.glass,
   },
   statusBadgePremium: {
     backgroundColor: "rgba(123,201,216,0.15)",

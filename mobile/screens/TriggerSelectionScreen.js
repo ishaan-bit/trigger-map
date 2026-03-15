@@ -6,7 +6,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 export function TriggerSelectionScreen() {
   const router = useRouter();

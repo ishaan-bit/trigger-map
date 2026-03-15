@@ -10,7 +10,7 @@ import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 export function LoginScreen() {
   const router = useRouter();
@@ -21,13 +21,14 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // webClientId tells the native SDK to request an id_token whose audience
-    // matches the Web client ID — this is what the backend verifies.
-    // The Android client ID is matched automatically via package name + SHA-1.
+  function configureGoogleSignIn() {
     GoogleSignin.configure({
       webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
     });
+  }
+
+  useEffect(() => {
+    configureGoogleSignIn();
   }, []);
 
   async function submit() {
@@ -48,6 +49,8 @@ export function LoginScreen() {
 
   async function handleGoogle() {
     try {
+      // Re-configure every time to ensure fresh state after sign-out
+      configureGoogleSignIn();
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
       if (!isSuccessResponse(response)) return;
@@ -125,19 +128,19 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 56,
-    borderRadius: 18,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: palette.glassBorder,
+    backgroundColor: palette.glass,
     color: palette.text,
     paddingHorizontal: 16,
     fontSize: 16,
   },
   noticeBox: {
-    borderRadius: 18,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: palette.glassBorder,
+    backgroundColor: palette.glass,
     padding: 14,
   },
   noticeText: {

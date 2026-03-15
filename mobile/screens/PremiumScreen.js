@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 
 const tiers = [
@@ -159,16 +159,16 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   tierCard: {
-    borderRadius: 18,
+    borderRadius: radius.md,
     padding: 18,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     gap: 10,
   },
   tierHighlight: {
     borderColor: palette.accent,
-    backgroundColor: "rgba(123,201,216,0.08)",
+    backgroundColor: palette.accentSoft,
   },
   tierHeader: {
     marginBottom: 4,
@@ -215,9 +215,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   activeCard: {
-    borderRadius: 16,
+    borderRadius: radius.md,
     padding: 16,
-    backgroundColor: "rgba(136,212,152,0.08)",
+    backgroundColor: palette.successSoft,
     borderWidth: 1,
     borderColor: palette.success,
     flexDirection: "row",

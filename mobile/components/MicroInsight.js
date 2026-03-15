@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 export function MicroInsight({ text }) {
   return (
@@ -16,10 +16,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
     padding: 14,
-    borderRadius: 16,
-    backgroundColor: "rgba(123,201,216,0.06)",
+    borderRadius: radius.md,
+    backgroundColor: palette.accentSoft,
     borderWidth: 1,
-    borderColor: "rgba(123,201,216,0.15)",
+    borderColor: palette.accentMedium,
   },
   icon: {
     fontSize: 16,

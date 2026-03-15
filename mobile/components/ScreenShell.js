@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const LOADING_TIMEOUT_MS = 3000;
 
@@ -52,9 +52,11 @@ export function ScreenShell({
   );
 
   return (
-    <LinearGradient colors={["#0c1420", "#070c14", "#04070d"]} style={styles.gradient}>
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+    <LinearGradient colors={["#080e1a", "#060a12", "#040710"]} style={styles.gradient}>
+      {/* Ambient glow orbs — cinematic depth */}
+      <View style={styles.glowTopRight} />
+      <View style={styles.glowMidLeft} />
+      <View style={styles.glowBottomCenter} />
       <SafeAreaView style={styles.safeArea}>
         {scroll ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -72,33 +74,42 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  glowTop: {
+  glowTopRight: {
     position: "absolute",
-    top: -140,
-    right: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: "rgba(123, 201, 216, 0.06)",
+    top: -100,
+    right: -80,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: "rgba(86, 208, 224, 0.05)",
   },
-  glowBottom: {
+  glowMidLeft: {
     position: "absolute",
-    bottom: -170,
-    left: -80,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: "rgba(61, 142, 160, 0.07)",
+    top: "35%",
+    left: -120,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(167, 139, 250, 0.04)",
+  },
+  glowBottomCenter: {
+    position: "absolute",
+    bottom: -140,
+    alignSelf: "center",
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: "rgba(46, 147, 168, 0.06)",
   },
   safeArea: {
     flex: 1,
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 32,
-    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 36,
+    gap: 20,
   },
   loaderWrap: {
     flex: 1,
@@ -113,9 +124,9 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: palette.cardGlow,
+    backgroundColor: palette.accentSoft,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   loaderTitle: {
     color: palette.text,
@@ -141,23 +152,23 @@ const styles = StyleSheet.create({
   placeholderCardLarge: {
     width: "100%",
     height: 96,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.lg,
+    backgroundColor: palette.cardGlow,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   placeholderCardSmall: {
     flex: 1,
     height: 120,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.md,
+    backgroundColor: palette.cardGlow,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
   },
   retryButton: {
     minHeight: 48,
     paddingHorizontal: 18,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: palette.accentStrong,

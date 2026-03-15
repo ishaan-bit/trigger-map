@@ -5,7 +5,7 @@ import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { ScreenShell } from "@/components/ScreenShell";
 import { EmotionChip } from "@/components/EmotionChip";
 import { useAppSession } from "@/hooks/useAppSession";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 function showToast(message) {
   if (Platform.OS === "android") {
@@ -118,10 +118,10 @@ const styles = StyleSheet.create({
   },
   noteCard: {
     padding: 16,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.md,
+    backgroundColor: palette.glass,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.glassBorder,
     gap: 8,
   },
   noteLabel: {
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 54,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: palette.accentStrong,
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   saveButtonDisabled: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: palette.glass,
     shadowOpacity: 0,
     elevation: 0,
   },

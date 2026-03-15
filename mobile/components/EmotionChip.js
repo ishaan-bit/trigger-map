@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { palette } from "@/utils/theme";
+import { palette, radius } from "@/utils/theme";
 
 const EMOTION_ICONS = {
   calm: "😌",
@@ -10,15 +10,24 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_TINTS = {
-  calm: "rgba(136,212,152,0.14)",
-  neutral: "rgba(149,166,189,0.14)",
-  anxious: "rgba(240,185,106,0.14)",
-  frustrated: "rgba(240,127,132,0.14)",
-  energized: "rgba(123,201,216,0.14)",
+  calm: { bg: "rgba(94,230,160,0.08)", border: "rgba(94,230,160,0.18)", active: "rgba(94,230,160,0.20)" },
+  neutral: { bg: "rgba(148,180,224,0.08)", border: "rgba(148,180,224,0.14)", active: "rgba(148,180,224,0.18)" },
+  anxious: { bg: "rgba(255,179,71,0.08)", border: "rgba(255,179,71,0.18)", active: "rgba(255,179,71,0.20)" },
+  frustrated: { bg: "rgba(255,107,122,0.08)", border: "rgba(255,107,122,0.18)", active: "rgba(255,107,122,0.20)" },
+  energized: { bg: "rgba(86,208,224,0.08)", border: "rgba(86,208,224,0.18)", active: "rgba(86,208,224,0.20)" },
+};
+
+const EMOTION_ACCENT = {
+  calm: palette.success,
+  neutral: palette.muted,
+  anxious: palette.warning,
+  frustrated: palette.danger,
+  energized: palette.accent,
 };
 
 export function EmotionChip({ label, active, onPress }) {
-  const tint = EMOTION_TINTS[label] || "rgba(255,255,255,0.04)";
+  const tint = EMOTION_TINTS[label] || EMOTION_TINTS.neutral;
+  const accentColor = EMOTION_ACCENT[label] || palette.muted;
   return (
     <Pressable
       onPress={onPress}
@@ -26,15 +35,14 @@ export function EmotionChip({ label, active, onPress }) {
       accessibilityLabel={`Select ${label} emotion`}
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: active ? "rgba(113,197,212,0.18)" : tint },
-        active && styles.activeChip,
+        { backgroundColor: active ? tint.active : tint.bg, borderColor: active ? accentColor : tint.border },
         pressed && styles.pressed,
       ]}
     >
-      <View style={styles.iconWrap}>
+      <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}22` : "rgba(255,255,255,0.06)" }]}>
         <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
       </View>
-      <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
+      <Text style={[styles.label, active && { color: accentColor }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -42,27 +50,22 @@ export function EmotionChip({ label, active, onPress }) {
 const styles = StyleSheet.create({
   chip: {
     minHeight: 52,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: palette.border,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  activeChip: {
-    borderColor: palette.accent,
   },
   pressed: {
     opacity: 0.85,
     transform: [{ scale: 0.97 }],
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -72,10 +75,7 @@ const styles = StyleSheet.create({
   label: {
     color: palette.text,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     textTransform: "capitalize",
-  },
-  activeLabel: {
-    color: palette.accent,
   },
 });
