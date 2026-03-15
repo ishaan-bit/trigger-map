@@ -80,6 +80,10 @@ export async function migrateLocalMoments(token, deviceId) {
   return moments;
 }
 
+export async function clearLocalMoments() {
+  await AsyncStorage.removeItem(STORAGE_KEY);
+}
+
 /**
  * Build a basic weekly report from local moments.
  */
@@ -111,7 +115,7 @@ export function buildLocalReport(moments) {
 
   return {
     insights: topTrigger && topEmotion
-      ? [`${topTrigger} was your most common trigger, often paired with feeling ${topEmotion}.`]
+      ? [`This week, ${topTrigger} was your most common trigger — and it usually came with feeling ${topEmotion}.`]
       : [],
     topTrigger,
     topEmotion,

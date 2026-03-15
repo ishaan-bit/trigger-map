@@ -1,4 +1,4 @@
-import { Alert, Image, Linking, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -28,7 +28,6 @@ export function SettingsScreen() {
 
   return (
     <ScreenShell scroll>
-      <Image source={require("@/assets/timeline-empty.png")} style={styles.bgImage} resizeMode="cover" accessible={false} />
 
       <View style={styles.header}>
         <Text style={styles.kicker}>Preferences</Text>
@@ -38,7 +37,14 @@ export function SettingsScreen() {
 
       <Section icon="👤" title="Account">
         <Text style={styles.rowText}>{user ? user.email : "Anonymous"}</Text>
-        <PrimaryButton label={user ? "Sign out" : "Sign in"} onPress={user ? signOut : () => router.push("/login")} secondary />
+        <PrimaryButton
+          label={user ? "Sign out" : "Sign in"}
+          onPress={user ? async () => {
+            await signOut();
+            router.replace("/login");
+          } : () => router.push("/login")}
+          secondary
+        />
       </Section>
 
       <Section icon="✦" title="Subscription">
@@ -82,33 +88,31 @@ export function SettingsScreen() {
           }}
           secondary
         />
-        {user ? (
-          <PrimaryButton
-            label="Delete all data"
-            onPress={() => {
-              Alert.alert(
-                "Delete all data?",
-                "This will permanently remove all your moments, reports, and insights. This cannot be undone.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Delete everything",
-                    style: "destructive",
-                    onPress: async () => {
-                      try {
-                        await deleteAllUserData();
-                        Alert.alert("Done", "All your data has been deleted. You have been signed out.");
-                      } catch (error) {
-                        Alert.alert("Delete failed", error.message);
-                      }
-                    },
+        <PrimaryButton
+          label="Delete all data"
+          onPress={() => {
+            Alert.alert(
+              "Delete all data?",
+              "This will permanently remove all your moments, reports, and insights. This cannot be undone.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete everything",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await deleteAllUserData();
+                      Alert.alert("Done", "All your data has been deleted.");
+                    } catch (error) {
+                      Alert.alert("Delete failed", error.message);
+                    }
                   },
-                ]
-              );
-            }}
-            secondary
-          />
-        ) : null}
+                },
+              ]
+            );
+          }}
+          secondary
+        />
       </Section>
 
       <Section icon="📄" title="Legal">
@@ -125,16 +129,6 @@ export function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: -24,
-    right: -24,
-    bottom: 0,
-    width: undefined,
-    height: undefined,
-    opacity: 0.04,
-  },
   header: {
     gap: 4,
     marginTop: 12,

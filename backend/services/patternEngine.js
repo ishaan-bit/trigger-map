@@ -147,16 +147,16 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
 
   const insights = [
     totalMoments
-      ? `${topTrigger} showed up most often this week, usually leading to ${topEmotion} moments.`
-      : "Log a few moments this week to unlock pattern insights.",
+      ? `This week, ${topTrigger} came up the most — and when it did, you tended to feel ${topEmotion}.`
+      : "Start logging a few moments this week and your personal patterns will appear here.",
     strongestCorrelationTrigger !== "none"
-      ? `${strongestCorrelationTrigger} most often paired with ${strongestCorrelationEmotion}.`
-      : "Trigger and emotion correlation will appear after more logs.",
-    `${busiestTime} carried the highest emotional activity in the last seven days.`,
-    `${topEntry(energyDistribution)} was the dominant energy state across your entries.`,
+      ? `There's a noticeable link between ${strongestCorrelationTrigger} and feeling ${strongestCorrelationEmotion}. Worth paying attention to.`
+      : "Once you log more, we'll spot which triggers and emotions tend to travel together.",
+    `Most of your emotional activity happened in the ${busiestTime}. That might be when stress or decisions pile up.`,
+    `Your overall energy leaned ${topEntry(energyDistribution)} this week — consider what may have influenced that rhythm.`,
     mostStableDay !== "Not enough data yet"
-      ? `${mostStableDay} looked like your most stable day.`
-      : "Your most stable day will appear after a fuller week of data.",
+      ? `${mostStableDay} was your calmest day. What was different about it?`
+      : "After a full week of entries, we'll highlight your most balanced day.",
   ];
 
   return {

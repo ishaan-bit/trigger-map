@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
   clearSessionToken,
   getOnboardingComplete,
@@ -31,6 +32,7 @@ import {
   updateLocalMoment,
   migrateLocalMoments,
   buildLocalReport,
+  clearLocalMoments,
 } from "@/services/localStore";
 import { trackEvent } from "@/services/analyticsService";
 import { captureMobileError } from "@/services/crashService";
@@ -159,6 +161,12 @@ export function SessionProvider({ children }) {
         trackEvent("login_completed", { provider: "google" });
       },
       async signOut() {
+        // Revoke Google session so a different account can be picked next time
+        try {
+          await GoogleSignin.signOut();
+        } catch {
+          // Not signed in via Google or SDK not initialised — safe to ignore
+        }
         await clearSessionToken();
         setToken(null);
         setUser(null);
@@ -265,7 +273,16 @@ export function SessionProvider({ children }) {
       },
       async exportLogs() {
         const activeDeviceId = await ensureDeviceIdentity();
-        const contents = await downloadExport(activeDeviceId, token);
+
+        let contents;
+        if (token) {
+          contents = await downloadExport(activeDeviceId, token);
+        } else {
+          // Export local moments for anonymous users
+          const localMoments = await getLocalMoments();
+          contents = JSON.stringify(localMoments, null, 2);
+        }
+
         const fileUri = `${FileSystem.cacheDirectory}triggermap-export.json`;
         await FileSystem.writeAsStringAsync(fileUri, contents, { encoding: FileSystem.EncodingType.UTF8 });
         if (await Sharing.isAvailableAsync()) {
@@ -288,14 +305,14 @@ export function SessionProvider({ children }) {
         return result;
       },
       async deleteAllUserData() {
-        if (!token) {
-          throw new Error("Sign in to delete your data");
+        if (token) {
+          await deleteAllData(token);
+          await clearSessionToken();
+          setToken(null);
+          setUser(null);
+          setSubscription(null);
         }
-        await deleteAllData(token);
-        await clearSessionToken();
-        setToken(null);
-        setUser(null);
-        setSubscription(null);
+        await clearLocalMoments();
       },
     }),
     [deviceId, ensureDeviceIdentity, onboardingComplete, ready, reminderEnabled, subscription, token, user]

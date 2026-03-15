@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -37,7 +37,6 @@ export function EmotionSelectionScreen() {
 
   return (
     <ScreenShell scroll>
-      <Image source={require("@/assets/timeline-empty.png")} style={styles.bgImage} resizeMode="cover" accessible={false} />
 
       <View style={styles.header}>
         <Text style={styles.kicker}>{trigger}</Text>
@@ -89,16 +88,6 @@ export function EmotionSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: -24,
-    right: -24,
-    bottom: 0,
-    width: undefined,
-    height: undefined,
-    opacity: 0.04,
-  },
   header: {
     gap: 6,
     marginTop: 12,

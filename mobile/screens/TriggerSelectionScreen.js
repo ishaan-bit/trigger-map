@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -32,7 +32,6 @@ export function TriggerSelectionScreen() {
 
   return (
     <ScreenShell scroll={false}>
-      <Image source={require("@/assets/timeline-empty.png")} style={styles.bgImage} resizeMode="cover" accessible={false} />
 
       <View style={styles.header}>
         <Text style={styles.kicker}>Quick log</Text>
@@ -63,16 +62,6 @@ export function TriggerSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: -24,
-    right: -24,
-    bottom: 0,
-    width: undefined,
-    height: undefined,
-    opacity: 0.04,
-  },
   header: {
     gap: 6,
     marginTop: 12,
@@ -100,9 +89,8 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 14,
-    columnGap: 0,
+    justifyContent: "flex-start",
+    gap: 10,
     paddingBottom: 8,
   },
 });

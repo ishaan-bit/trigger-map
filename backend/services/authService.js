@@ -4,7 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { SignJWT, jwtVerify } from "jose";
 import { hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID?.trim());
 const encoder = new TextEncoder();
 const sessionLifetimeSeconds = 60 * 60 * 24 * 30;
 
@@ -118,21 +118,29 @@ export async function loginEmailUser({ email, password }) {
 }
 
 export async function verifyGoogleIdToken(idToken) {
-  if (!process.env.GOOGLE_CLIENT_ID) {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  if (!clientId) {
     throw new Error("GOOGLE_AUTH_NOT_CONFIGURED");
   }
 
   // Accept tokens issued to the Web client (implicit/web flow) or the
   // Android client (authorization-code + PKCE flow from mobile).
-  const allowedAudiences = [process.env.GOOGLE_CLIENT_ID];
-  if (process.env.GOOGLE_ANDROID_CLIENT_ID) {
-    allowedAudiences.push(process.env.GOOGLE_ANDROID_CLIENT_ID);
+  const allowedAudiences = [clientId];
+  const androidId = process.env.GOOGLE_ANDROID_CLIENT_ID?.trim();
+  if (androidId) {
+    allowedAudiences.push(androidId);
   }
 
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: allowedAudiences,
-  });
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: allowedAudiences,
+    });
+  } catch (err) {
+    console.error("Google token verification failed:", err.message);
+    throw new Error("INVALID_GOOGLE_TOKEN");
+  }
 
   const payload = ticket.getPayload();
   if (!payload?.sub || !payload.email) {

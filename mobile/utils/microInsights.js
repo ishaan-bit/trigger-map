@@ -36,7 +36,7 @@ export function generateMicroInsights(moments) {
 
   if (topPair && topPairCount >= 2) {
     const [trigger, emotion] = topPair.split("→");
-    insights.push(`"${trigger}" triggered "${emotion}" ${topPairCount} times this week.`);
+    insights.push(`When ${trigger} comes up, you often end up feeling ${emotion}. That pattern showed ${topPairCount} times recently.`);
   }
 
   // Find dominant emotion
@@ -45,7 +45,7 @@ export function generateMicroInsights(moments) {
     const [topEmotion, topCount] = sortedEmotions[0];
     const pct = Math.round((topCount / moments.length) * 100);
     if (pct >= 40) {
-      insights.push(`You felt "${topEmotion}" ${pct}% of the time.`);
+      insights.push(`You've been feeling ${topEmotion} about ${pct}% of the time — it's your dominant state lately.`);
     }
   }
 
@@ -63,7 +63,7 @@ export function generateMicroInsights(moments) {
     const newer = newerTriggers[trigger] || 0;
     const older = olderTriggers[trigger] || 0;
     if (newer >= 3 && newer > older * 2) {
-      insights.push(`"${trigger}" has been coming up more often recently.`);
+      insights.push(`${trigger} has been showing up more often recently — something may have shifted.`);
       break;
     }
   }

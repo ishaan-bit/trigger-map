@@ -1,17 +1,16 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Image, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TimelineGroup } from "@/components/TimelineGroup";
+import { EditMomentModal } from "@/components/EditMomentModal";
 import { MicroInsight } from "@/components/MicroInsight";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
 import { palette } from "@/utils/theme";
-import { TRIGGERS } from "@triggermap/shared/constants/triggers";
-import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 
 function groupByDay(moments) {
   const groups = {};
@@ -31,6 +30,7 @@ export function TimelineScreen() {
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editingMoment, setEditingMoment] = useState(null);
 
   const dayGroups = useMemo(() => groupByDay(moments), [moments]);
   const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
@@ -57,26 +57,17 @@ export function TimelineScreen() {
   );
 
   const handleEdit = useCallback((moment) => {
-    const triggerOptions = TRIGGERS.map((t) => ({
-      text: t === moment.trigger ? `${t} ✓` : t,
-      onPress: () => {
-        const emotionOptions = EMOTIONS.map((e) => ({
-          text: e === moment.emotion ? `${e} ✓` : e,
-          onPress: async () => {
-            try {
-              await updateMoment(moment.id, { trigger: t, emotion: e });
-              await load();
-            } catch (err) {
-              Alert.alert("Edit failed", err.message);
-            }
-          },
-        }));
-        emotionOptions.push({ text: "Cancel", style: "cancel" });
-        Alert.alert("Choose emotion", null, emotionOptions);
-      },
-    }));
-    triggerOptions.push({ text: "Cancel", style: "cancel" });
-    Alert.alert("Choose trigger", null, triggerOptions);
+    setEditingMoment(moment);
+  }, []);
+
+  const handleSaveEdit = useCallback(async (momentId, updates) => {
+    try {
+      await updateMoment(momentId, updates);
+      setEditingMoment(null);
+      await load();
+    } catch (err) {
+      Alert.alert("Edit failed", err.message);
+    }
   }, [updateMoment, load]);
 
   const handleDelete = useCallback(async (moment) => {
@@ -97,8 +88,6 @@ export function TimelineScreen() {
       onRetry={load}
       scroll
     >
-      <Image source={require("@/assets/timeline-empty.png")} style={styles.bgImage} resizeMode="cover" accessible={false} />
-
       <View style={styles.header}>
         <Text style={styles.kicker}>Past 7 days</Text>
         <Text style={styles.title}>Timeline</Text>
@@ -145,33 +134,27 @@ export function TimelineScreen() {
       ))}
 
       {!moments.length && !loading && !error ? (
-        <View style={[styles.stateCard, styles.emptyStateCard]}>
-          <Image
-            source={require("@/assets/timeline-empty.png")}
-            style={styles.emptyIllustration}
-            resizeMode="contain"
-            accessible={false}
-          />
-          <Text style={styles.stateTitle}>No moments yet</Text>
-          <Text style={styles.stateBody}>Your timeline will appear after your first saved moment.</Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>📝</Text>
+          <Text style={styles.emptyTitle}>No moments yet</Text>
+          <Text style={styles.emptyBody}>
+            Start logging triggers and emotions to see{"\n"}your timeline come to life.
+          </Text>
           <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
         </View>
       ) : null}
+
+      <EditMomentModal
+        visible={!!editingMoment}
+        moment={editingMoment}
+        onSave={handleSaveEdit}
+        onClose={() => setEditingMoment(null)}
+      />
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: -24,
-    right: -24,
-    bottom: 0,
-    width: undefined,
-    height: undefined,
-    opacity: 0.04,
-  },
   header: {
     gap: 4,
     marginTop: 12,
@@ -218,14 +201,6 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     gap: 10,
   },
-  emptyStateCard: {
-    alignItems: "center",
-  },
-  emptyIllustration: {
-    width: 140,
-    height: 140,
-    marginBottom: 4,
-  },
   stateTitle: {
     color: palette.text,
     fontSize: 18,
@@ -237,5 +212,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 48,
+    paddingBottom: 32,
+    gap: 14,
+  },
+  emptyEmoji: {
+    fontSize: 56,
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    color: palette.text,
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  emptyBody: {
+    color: palette.muted,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    maxWidth: 260,
+    marginBottom: 8,
   },
 });

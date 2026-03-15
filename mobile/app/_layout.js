@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ToastAndroid } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as SplashScreen from "expo-splash-screen";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
 import { setLastOpenedAt } from "@/services/deviceService";
@@ -12,6 +13,7 @@ import { fetchHealth, getApiOrigin } from "@/services/api";
 
 initCrashMonitoring();
 initAnalytics();
+SplashScreen.preventAutoHideAsync().catch(() => null);
 
 export default function RootLayout() {
   useEffect(() => {
@@ -32,6 +34,9 @@ export default function RootLayout() {
           console.warn(`[TriggerMap] Startup validation failed: ${error.message}`);
           ToastAndroid.show("Backend unavailable", ToastAndroid.SHORT);
         }
+      } finally {
+        // Hide splash after startup validation completes
+        SplashScreen.hideAsync().catch(() => null);
       }
     }
 
