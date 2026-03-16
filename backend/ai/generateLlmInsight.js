@@ -21,7 +21,7 @@
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
-const REQUEST_TIMEOUT_MS = 120_000;
+const REQUEST_TIMEOUT_MS = 300_000;
 
 function buildPrompt({ weeklyReport, historicalReports, userTrends }) {
   const currentWeek = JSON.stringify(weeklyReport, null, 2);

@@ -13,6 +13,7 @@
     "@sentry/node": "^9.47.1",
     "@triggermap/shared": "file:../shared",
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
     "google-auth-library": "^10.5.0",
     "googleapis": "^150.0.1",
     "jose": "^6.1.0",
