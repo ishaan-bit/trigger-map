@@ -43,7 +43,7 @@ import {
   scheduleReflectionReminder,
   scheduleInactivityNudge,
 } from "@/services/notificationService";
-import { startSubscriptionFlow } from "@/services/subscriptionService";
+import { startSubscriptionFlow, restoreSubscriptionFlow } from "@/services/subscriptionService";
 
 const SessionContext = createContext(null);
 
@@ -93,6 +93,7 @@ export function SessionProvider({ children }) {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [firstAiFreeAvailable, setFirstAiFreeAvailable] = useState(false);
   const [onboardingComplete, setOnboardingCompleteState] = useState(false);
   const [reminderEnabled, setReminderEnabledState] = useState(false);
 
@@ -115,6 +116,7 @@ export function SessionProvider({ children }) {
           setToken(storedToken);
           setUser(session.user);
           setSubscription(session.subscription || null);
+          setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
         }
       } catch (error) {
         captureMobileError(error, { source: "bootstrap" });
@@ -149,6 +151,7 @@ export function SessionProvider({ children }) {
       token,
       user,
       subscription,
+      firstAiFreeAvailable,
       onboardingComplete,
       reminderEnabled,
       async completeOnboarding() {
@@ -206,6 +209,7 @@ export function SessionProvider({ children }) {
         setToken(null);
         setUser(null);
         setSubscription(null);
+        setFirstAiFreeAvailable(false);
       },
       async refreshSession() {
         if (!token) {
@@ -214,6 +218,7 @@ export function SessionProvider({ children }) {
         const session = await fetchMe(token);
         setUser(session.user);
         setSubscription(session.subscription || null);
+        setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
         return session;
       },
       async saveMoment(payload) {
@@ -339,6 +344,11 @@ export function SessionProvider({ children }) {
         setSubscription(result);
         return result;
       },
+      async restoreSubscription() {
+        const result = await restoreSubscriptionFlow(token);
+        if (result) setSubscription(result);
+        return result;
+      },
       async deleteAllUserData() {
         if (token) {
           await deleteAllData(token);
@@ -350,7 +360,7 @@ export function SessionProvider({ children }) {
         await clearLocalMoments();
       },
     }),
-    [deviceId, ensureDeviceIdentity, onboardingComplete, ready, reminderEnabled, subscription, token, user]
+    [deviceId, ensureDeviceIdentity, firstAiFreeAvailable, onboardingComplete, ready, reminderEnabled, subscription, token, user]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

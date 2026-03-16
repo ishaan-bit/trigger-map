@@ -7,7 +7,7 @@ import { getStoredWeeklyInsight, getStoredLlmInsight } from "@/services/reportSt
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
-import { validateSession } from "@/services/authService.js";
+import { validateSession, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
 import { checkFeatureAccess, isPremiumActive } from "@/services/premiumService.js";
 
 export default async function handler(req, res) {
@@ -47,11 +47,16 @@ export default async function handler(req, res) {
     const hasPremium = isAuthenticated ? await isPremiumActive(ownerId) : false;
     const report = generateWeeklyReport({ aggregates, aiInsight: canViewRuleBased ? aiInsight : null });
 
-    // Attach LLM insight for premium users
-    if (hasPremium) {
+    // Attach LLM insight for premium users OR first-free eligible users
+    const firstFreeAvailable = isAuthenticated && !hasPremium ? await isFirstAiFreeAvailable(ownerId) : false;
+    if (hasPremium || firstFreeAvailable) {
       const llmInsight = await getStoredLlmInsight(ownerId);
       if (llmInsight) {
         report.llmInsight = llmInsight;
+        if (firstFreeAvailable) {
+          report.llmInsight.firstFree = true;
+          await markFirstAiFreeUsed(ownerId);
+        }
       }
     }
 

@@ -26,6 +26,7 @@ const tiers = [
       "Everything in Anonymous",
       "Cloud backup + sync",
       "Weekly pattern observations",
+      "First AI insight report free",
       "Edit & delete moments",
       "Export your data",
     ],
@@ -37,7 +38,7 @@ const tiers = [
     description: PREMIUM_PRICE_LABEL,
     features: [
       "Everything in Free",
-      "AI-written personal reflections",
+      "Weekly AI-written reflections",
       "Multi-week trend tracking",
       "Priority support",
     ],
@@ -103,7 +104,12 @@ export function PremiumScreen() {
               await subscribe();
               Alert.alert("Premium enabled", "Your subscription is active.");
             } catch (error) {
-              Alert.alert("Subscription error", error.message);
+              const msg = error?.message || "Something went wrong";
+              if (msg.includes("not found") || msg.includes("unavailable") || msg.includes("No subscription")) {
+                Alert.alert("Not available yet", "Premium subscriptions are not yet available in your region. Check back soon.");
+              } else {
+                Alert.alert("Subscription error", msg);
+              }
             }
           }}
         />

@@ -1,4 +1,4 @@
-import { getSubscription, validateSession } from "@/services/authService.js";
+import { getSubscription, isFirstAiFreeAvailable, validateSession } from "@/services/authService.js";
 import enableCors from "@/lib/cors.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { sendError, sendSuccess } from "@/services/response.js";
@@ -20,8 +20,11 @@ export default async function handler(req, res) {
     }
 
     const user = await validateSession(token);
-    const subscription = await getSubscription(user.id);
-    return sendSuccess(res, { user, subscription });
+    const [subscription, firstAiFreeAvailable] = await Promise.all([
+      getSubscription(user.id),
+      isFirstAiFreeAvailable(user.id),
+    ]);
+    return sendSuccess(res, { user, subscription, firstAiFreeAvailable });
   } catch (error) {
     captureServerError(error, { route: "me" });
     return sendError(res, 401, "UNAUTHORIZED", "Session is invalid");

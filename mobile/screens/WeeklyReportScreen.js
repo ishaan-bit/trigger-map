@@ -396,8 +396,28 @@ export function WeeklyReportScreen() {
                 </>
               )}
 
-              {/* --- 6. PREMIUM PATTERN READ --- */}
-              {isSignedIn && !isPremium && confidence !== "low" ? (
+              {/* --- 6. PATTERN READ --- */}
+              {hasLlmInsight ? (
+                <View style={s.section}>
+                  <SectionHeader label="Pattern read" />
+                  <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
+                    <View style={s.aiLabelRow}>
+                      <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                        <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
+                      </View>
+                      {report.llmInsight.firstFree ? (
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 6 }]}>
+                          <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
+                    {report.llmInsight.firstFree ? (
+                      <Text style={s.firstFreeHint}>Future AI insights require Premium.</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ) : isSignedIn && !isPremium && confidence !== "low" ? (
                 <LockedSection
                   title="Pattern read"
                   teaser="A concise AI analysis grounded in your actual data, not generic advice."
@@ -410,26 +430,6 @@ export function WeeklyReportScreen() {
                     </Text>
                   </View>
                 </LockedSection>
-              ) : null}
-
-              {isPremium ? (
-                <View style={s.section}>
-                  <SectionHeader label="Pattern read" />
-                  {hasLlmInsight ? (
-                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
-                      <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
-                        </View>
-                      </View>
-                      <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
-                    </View>
-                  ) : (
-                    <View style={s.card}>
-                      <Text style={s.aiSuggestion}>Your pattern read will appear here after enough data has accumulated.</Text>
-                    </View>
-                  )}
-                </View>
               ) : null}
 
               {/* --- 7. DATA QUALITY NUDGE --- */}
@@ -503,6 +503,7 @@ const s = StyleSheet.create({
   },
   aiSummary: { color: palette.text, fontSize: 15, lineHeight: 23, fontWeight: "600" },
   aiSuggestion: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+  firstFreeHint: { color: palette.muted, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4 },
 
   /* Micro-experiment */
   experimentCard: {

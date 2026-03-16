@@ -240,3 +240,12 @@ export async function validateSession(token) {
 export async function getSubscription(userId) {
   return hgetallObject(redisKey("subscription", userId));
 }
+
+export async function isFirstAiFreeAvailable(userId) {
+  const claimed = await redis(["GET", redisKey("first_ai_claimed", userId)]);
+  return !claimed;
+}
+
+export async function markFirstAiFreeUsed(userId) {
+  await redis(["SET", redisKey("first_ai_claimed", userId), "1"]);
+}

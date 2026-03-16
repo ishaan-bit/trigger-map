@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK + AAB
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -34,16 +34,30 @@ jobs:
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
-      - name: Build APK locally
+      - name: Build APK (preview)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           cd mobile
           eas build --platform android --profile preview --local --non-interactive --output ./build.apk
 
+      - name: Build AAB (production)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          cd mobile
+          eas build --platform android --profile production --local --non-interactive --output ./build.aab
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: triggermap-preview
+          name: triggermap-preview-apk
           path: mobile/build.apk
+          retention-days: 30
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: triggermap-production-aab
+          path: mobile/build.aab
           retention-days: 30
