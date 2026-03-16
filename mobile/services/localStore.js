@@ -86,6 +86,7 @@ export async function clearLocalMoments() {
 
 /**
  * Build a basic weekly report from local moments.
+ * Matches the output shape of the backend patternEngine.
  */
 export function buildLocalReport(moments) {
   const weekAgo = new Date();
@@ -110,24 +111,55 @@ export function buildLocalReport(moments) {
     else timeOfDayPatterns.night++;
   }
 
-  const topTrigger = Object.entries(triggerFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
-  const topEmotion = Object.entries(emotionFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
+  const sortedTriggers = Object.entries(triggerFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const sortedEmotions = Object.entries(emotionFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  const triggerMax = sortedTriggers[0]?.[1] || 0;
+  const emotionMax = sortedEmotions[0]?.[1] || 0;
+  const tiedTriggers = sortedTriggers.filter(([, v]) => v === triggerMax).map(([k]) => k);
+  const tiedEmotions = sortedEmotions.filter(([, v]) => v === emotionMax).map(([k]) => k);
+  const hasDominantTrigger = tiedTriggers.length === 1;
+  const hasDominantEmotion = tiedEmotions.length === 1;
+
+  const totalMoments = weekMoments.length;
+  const daysLogged = new Set(weekMoments.map((m) => m.timestamp?.slice(0, 10))).size;
+  const confidence = totalMoments < 3 ? "too_early" : totalMoments < 5 ? "low" : daysLogged < 3 ? "emerging" : "moderate";
 
   return {
-    insights: topTrigger && topEmotion
-      ? [`This week, ${topTrigger} was your most common trigger, and it usually came with feeling ${topEmotion}.`]
-      : [],
-    topTrigger,
-    topEmotion,
+    topTrigger: hasDominantTrigger ? tiedTriggers[0] : null,
+    topEmotion: hasDominantEmotion ? tiedEmotions[0] : null,
+    tiedTriggers,
+    tiedEmotions,
+    hasDominantTrigger,
+    hasDominantEmotion,
     topPair: { trigger: "none", emotion: "none", count: 0 },
-    totalMoments: weekMoments.length,
+    totalMoments,
     timeOfDayPatterns,
     triggerFrequency,
     emotionFrequency,
+    correlations: {},
+    energyDistribution: {},
+    regulators: [],
+    frictionZones: [],
+    pairings: [],
+    triggerConcentration: 0,
+    emotionConcentration: 0,
+    mostStableDay: null,
+    volatilityScore: null,
+    trajectoryNote: null,
     weeklyEmotionTrajectory: [],
-    volatilityScore: 0,
-    volatilityChange: "Not enough data yet",
-    mostStableDay: "Not enough data yet",
+    busiestTime: null,
+    dataQuality: {
+      totalMoments,
+      daysLogged,
+      uniqueTriggers: Object.keys(triggerFrequency).length,
+      uniqueEmotions: Object.keys(emotionFrequency).length,
+      confidence,
+      hasEnoughForPairings: false,
+      hasEnoughForRhythm: false,
+      hasEnoughForTrajectory: false,
+      hasEnoughForStability: false,
+    },
     aiInsight: null,
   };
 }

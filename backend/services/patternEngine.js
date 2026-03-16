@@ -1,21 +1,14 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
 
-function topEntry(record, fallback = "none") {
-  const entries = Object.entries(record).sort(
-    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0])
-  );
-  return entries[0]?.[0] || fallback;
-}
+// --- Confidence thresholds ---
+const MIN_LOGS_FOR_PATTERNS = 5;
+const MIN_LOGS_FOR_PAIRINGS = 8;
+const MIN_PAIR_REPEATS = 2;
+const MIN_DAYS_FOR_RHYTHM = 3;
+const MIN_LOGS_FOR_TRAJECTORY = 3;
+const MIN_LOGS_FOR_STABILITY = 5;
 
-/** Return all keys tied for the highest count. */
-function topTied(record) {
-  const entries = Object.entries(record).sort(
-    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0])
-  );
-  if (!entries.length) return [];
-  const maxVal = entries[0][1];
-  return entries.filter(([, v]) => v === maxVal).map(([k]) => k);
-}
+// --- Helpers ---
 
 function pairFromKey(pairKey) {
   const [trigger = "none", emotion = "none"] = pairKey.split("|");
@@ -28,70 +21,103 @@ function mergeCounts(target, source) {
   }
 }
 
-function scoreDistribution(emotions) {
+function sortedEntries(record) {
+  return Object.entries(record || {}).sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+  );
+}
+
+function topEntry(record, fallback = "none") {
+  const entries = sortedEntries(record);
+  return entries[0]?.[0] || fallback;
+}
+
+function topTied(record) {
+  const entries = sortedEntries(record);
+  if (!entries.length) return [];
+  const maxVal = entries[0][1];
+  return entries.filter(([, v]) => v === maxVal).map(([k]) => k);
+}
+
+function emotionAvgScore(emotions) {
   let total = 0;
   let weighted = 0;
-
   for (const [emotion, count] of Object.entries(emotions)) {
-    const numericCount = Number(count || 0);
-    total += numericCount;
-    weighted += (EMOTION_SCORE[emotion] || 3) * numericCount;
+    const n = Number(count || 0);
+    total += n;
+    weighted += (EMOTION_SCORE[emotion] || 3) * n;
   }
-
   return total ? weighted / total : 0;
 }
 
 function varianceForDay(emotions) {
-  const mean = scoreDistribution(emotions);
-  const counts = Object.values(emotions).reduce((sum, count) => sum + Number(count || 0), 0);
-  if (!counts) {
-    return 0;
-  }
-
-  let totalVariance = 0;
+  const mean = emotionAvgScore(emotions);
+  const counts = Object.values(emotions).reduce((sum, c) => sum + Number(c || 0), 0);
+  if (!counts) return 0;
+  let v = 0;
   for (const [emotion, count] of Object.entries(emotions)) {
     const diff = (EMOTION_SCORE[emotion] || 3) - mean;
-    totalVariance += diff * diff * Number(count || 0);
+    v += diff * diff * Number(count || 0);
   }
-
-  return totalVariance / counts;
+  return v / counts;
 }
 
-function buildVolatilityChange(trajectory) {
-  if (trajectory.length < 2) {
-    return "Not enough data yet";
-  }
-
-  const first = trajectory[0].score;
-  const last = trajectory[trajectory.length - 1].score;
-  const delta = last - first;
-
-  if (Math.abs(delta) < 0.25) {
-    return "Mostly steady across the week";
-  }
-
-  return delta > 0 ? "Settled toward calmer energy" : "Tilted toward higher emotional strain";
+// --- Confidence model ---
+// Returns: "too_early" | "low" | "emerging" | "moderate" | "strong"
+function computeConfidence(totalMoments, daysLogged) {
+  if (totalMoments < 3) return "too_early";
+  if (totalMoments < MIN_LOGS_FOR_PATTERNS || daysLogged < 2) return "low";
+  if (totalMoments < MIN_LOGS_FOR_PAIRINGS || daysLogged < MIN_DAYS_FOR_RHYTHM) return "emerging";
+  if (totalMoments < 15 || daysLogged < 5) return "moderate";
+  return "strong";
 }
+
+// --- Regulators & friction detection ---
+
+function classifyPairings(correlations) {
+  const regulators = [];
+  const frictionZones = [];
+  const pairings = [];
+
+  for (const [trigger, emotions] of Object.entries(correlations)) {
+    for (const [emotion, count] of Object.entries(emotions)) {
+      if (count < MIN_PAIR_REPEATS) continue;
+      const score = EMOTION_SCORE[emotion] || 3;
+      const entry = { trigger, emotion, count };
+      pairings.push(entry);
+      if (score >= 4) regulators.push(entry);
+      if (score <= 2) frictionZones.push(entry);
+    }
+  }
+
+  regulators.sort((a, b) => b.count - a.count);
+  frictionZones.sort((a, b) => b.count - a.count);
+  pairings.sort((a, b) => b.count - a.count);
+
+  return { regulators, frictionZones, pairings };
+}
+
+// --- Concentration / diversity (Herfindahl-style) ---
+
+function concentrationIndex(record) {
+  const entries = Object.values(record);
+  const total = entries.reduce((s, v) => s + v, 0);
+  if (!total) return 0;
+  let sumSq = 0;
+  for (const v of entries) { const share = v / total; sumSq += share * share; }
+  return Number(sumSq.toFixed(3));
+}
+
+// --- Main generator ---
 
 export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {}) {
-  const filledAggregates = aggregates.filter((snapshot) => snapshot && snapshot.date);
+  const filledAggregates = aggregates.filter((s) => s && s.date);
 
   const triggerFrequency = {};
   const emotionFrequency = {};
   const correlations = {};
-  const timeOfDayPatterns = {
-    morning: 0,
-    afternoon: 0,
-    evening: 0,
-    night: 0,
-  };
-  const energyDistribution = {
-    steady: 0,
-    balanced: 0,
-    tense: 0,
-    drained: 0,
-    uplifted: 0,
-  };
+  const timeOfDayPatterns = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+  const energyDistribution = { steady: 0, balanced: 0, tense: 0, drained: 0, uplifted: 0 };
   const pairFrequency = {};
   const weeklyEmotionTrajectory = [];
   const stableDayCandidates = [];
@@ -110,15 +136,13 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
 
     for (const [pairKey, count] of Object.entries(snapshot.pairs || {})) {
       const { trigger, emotion } = pairFromKey(pairKey);
-      if (!correlations[trigger]) {
-        correlations[trigger] = {};
-      }
+      if (!correlations[trigger]) correlations[trigger] = {};
       correlations[trigger][emotion] = (correlations[trigger][emotion] || 0) + Number(count || 0);
     }
 
     weeklyEmotionTrajectory.push({
       date: snapshot.date,
-      score: Number(scoreDistribution(snapshot.emotions).toFixed(2)),
+      score: Number(emotionAvgScore(snapshot.emotions).toFixed(2)),
       dominantEmotion: topEntry(snapshot.emotions, "neutral"),
     });
 
@@ -129,70 +153,84 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     });
   }
 
+  const daysLogged = filledAggregates.filter((s) => Number(s.total || 0) > 0).length;
+  const uniqueTriggers = Object.keys(triggerFrequency).length;
+  const uniqueEmotions = Object.keys(emotionFrequency).length;
+  const confidence = computeConfidence(totalMoments, daysLogged);
+
   const tiedTriggers = topTied(triggerFrequency);
-  const topTrigger = topEntry(triggerFrequency);
-  const topEmotion = topEntry(emotionFrequency);
+  const tiedEmotions = topTied(emotionFrequency);
+  const hasDominantTrigger = tiedTriggers.length === 1;
+  const hasDominantEmotion = tiedEmotions.length === 1;
+  const topTrigger = hasDominantTrigger ? tiedTriggers[0] : null;
+  const topEmotion = hasDominantEmotion ? tiedEmotions[0] : null;
+
   const topPairKey = topEntry(pairFrequency, "none|none");
-  const topPair = {
-    ...pairFromKey(topPairKey),
-    count: Number(pairFrequency[topPairKey] || 0),
+  const topPair = { ...pairFromKey(topPairKey), count: Number(pairFrequency[topPairKey] || 0) };
+
+  const { regulators, frictionZones, pairings } = classifyPairings(correlations);
+
+  const busiestTime = daysLogged >= MIN_DAYS_FOR_RHYTHM ? topEntry(timeOfDayPatterns) : null;
+
+  const triggerConcentration = concentrationIndex(triggerFrequency);
+  const emotionConcentration = concentrationIndex(emotionFrequency);
+
+  const validDays = stableDayCandidates.filter((e) => e.total > 0);
+  const mostStableDay = validDays.length >= 2
+    ? validDays.sort((a, b) => a.variance - b.variance)[0]?.date || null
+    : null;
+  const volatilityScore = validDays.length >= 2
+    ? Number((validDays.reduce((sum, e) => sum + e.variance, 0) / validDays.length).toFixed(2))
+    : null;
+
+  let trajectoryNote = null;
+  if (weeklyEmotionTrajectory.length >= MIN_LOGS_FOR_TRAJECTORY) {
+    const first = weeklyEmotionTrajectory[0].score;
+    const last = weeklyEmotionTrajectory[weeklyEmotionTrajectory.length - 1].score;
+    const delta = last - first;
+    if (Math.abs(delta) < 0.25) trajectoryNote = "Mostly steady across the days you logged.";
+    else if (delta > 0) trajectoryNote = "Emotional tone shifted toward calmer energy over the week.";
+    else trajectoryNote = "Emotional tone shifted toward more strain over the week.";
+  }
+
+  const dataQuality = {
+    totalMoments,
+    daysLogged,
+    uniqueTriggers,
+    uniqueEmotions,
+    confidence,
+    hasEnoughForPairings: totalMoments >= MIN_LOGS_FOR_PAIRINGS,
+    hasEnoughForRhythm: daysLogged >= MIN_DAYS_FOR_RHYTHM,
+    hasEnoughForTrajectory: weeklyEmotionTrajectory.length >= MIN_LOGS_FOR_TRAJECTORY,
+    hasEnoughForStability: totalMoments >= MIN_LOGS_FOR_STABILITY && validDays.length >= 2,
   };
-  const strongestCorrelationTrigger = topEntry(
-    Object.fromEntries(
-      Object.entries(correlations).map(([trigger, emotions]) => [
-        trigger,
-        Math.max(...Object.values(emotions)),
-      ])
-    )
-  );
-  const strongestCorrelationEmotion = strongestCorrelationTrigger === "none"
-    ? "none"
-    : topEntry(correlations[strongestCorrelationTrigger]);
-  const busiestTime = topEntry(timeOfDayPatterns);
-  const mostStableDay = stableDayCandidates
-    .filter((entry) => entry.total > 0)
-    .sort((left, right) => left.variance - right.variance)[0]?.date || "Not enough data yet";
-  const volatilityScore = Number(
-    (stableDayCandidates.filter((entry) => entry.total > 0).reduce((sum, entry) => sum + entry.variance, 0)
-      / Math.max(stableDayCandidates.filter((entry) => entry.total > 0).length, 1)).toFixed(2)
-  );
-  const volatilityChange = buildVolatilityChange(weeklyEmotionTrajectory);
-
-  const tiedTriggerNote = tiedTriggers.length > 1
-    ? `This week, ${tiedTriggers.join(" and ")} were equally present. Your emotions leaned ${topEmotion} overall.`
-    : `This week, ${topTrigger} came up the most, and when it did, you tended to feel ${topEmotion}.`;
-
-  const insights = [
-    totalMoments
-      ? tiedTriggerNote
-      : "Start logging a few moments this week and your personal patterns will appear here.",
-    strongestCorrelationTrigger !== "none"
-      ? `There's a noticeable link between ${strongestCorrelationTrigger} and feeling ${strongestCorrelationEmotion}. Worth paying attention to.`
-      : "Once you log more, we'll spot which triggers and emotions tend to travel together.",
-    `Most of your emotional activity happened in the ${busiestTime}. That might be when stress or decisions pile up.`,
-    `Your overall energy leaned ${topEntry(energyDistribution)} this week. Consider what may have influenced that rhythm.`,
-    mostStableDay !== "Not enough data yet"
-      ? `${mostStableDay} was your calmest day. What was different about it?`
-      : "After a full week of entries, we'll highlight your most balanced day.",
-  ];
 
   return {
     topTrigger,
     topEmotion,
+    tiedTriggers,
+    tiedEmotions,
+    hasDominantTrigger,
+    hasDominantEmotion,
     topPair,
     triggerFrequency,
     emotionFrequency,
     correlations,
     timeOfDayPatterns,
     energyDistribution,
-    weeklyEmotionTrajectory,
-    volatilityScore,
-    volatilityChange,
+    regulators,
+    frictionZones,
+    pairings,
+    triggerConcentration,
+    emotionConcentration,
     mostStableDay,
+    volatilityScore,
+    trajectoryNote,
+    weeklyEmotionTrajectory,
+    busiestTime,
+    dataQuality,
+    totalMoments,
     dailyAggregates: filledAggregates,
     aiInsight,
-    insights,
-    totalMoments,
-    tiedTriggers,
   };
 }

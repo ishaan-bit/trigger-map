@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
-import { InsightCard } from "@/components/InsightCard";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -21,15 +20,23 @@ import { palette, radius } from "@/utils/theme";
 const screenWidth = Dimensions.get("window").width;
 
 const EMOTION_EMOJIS = {
-  angry: "🔥", anxious: "⚡", sad: "🌧", calm: "🍃", happy: "☀️",
-  numb: "🌫", ashamed: "🫧", hopeful: "🌱", frustrated: "💢", grateful: "✨",
+  frustrated: "\uD83D\uDCA2", anxious: "\u26A1", neutral: "\uD83C\uDF2B\uFE0F",
+  calm: "\uD83C\uDF43", energized: "\u2600\uFE0F",
 };
 
-const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
+const TIME_ICONS = { morning: "\uD83C\uDF05", afternoon: "\u2600\uFE0F", evening: "\uD83C\uDF06", night: "\uD83C\uDF19" };
 
 const ENERGY_COLORS = {
   steady: palette.success, balanced: palette.accent, tense: palette.warning,
   drained: palette.danger, uplifted: palette.purple,
+};
+
+const CONFIDENCE_LABELS = {
+  too_early: "Just getting started",
+  low: "Early patterns",
+  emerging: "Taking shape",
+  moderate: "Solid picture",
+  strong: "High confidence",
 };
 
 function topEntries(record, limit = 5) {
@@ -37,6 +44,8 @@ function topEntries(record, limit = 5) {
     .sort(([, a], [, b]) => b - a)
     .slice(0, limit);
 }
+
+/* -- Shared components -- */
 
 function HBar({ label, value, max, color = palette.accent, icon }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
@@ -62,20 +71,17 @@ function SectionHeader({ label, extra }) {
   );
 }
 
-/** Locked section with blur, lock icon, gradient overlay and CTA */
 function LockedSection({ title, teaser, ctaLabel, onPress, children }) {
   return (
     <View style={s.lockedWrap}>
-      <View style={s.lockedContent} pointerEvents="none">
-        {children}
-      </View>
+      <View style={s.lockedContent} pointerEvents="none">{children}</View>
       <LinearGradient
         colors={["transparent", "rgba(11,18,32,0.92)", "rgba(11,18,32,0.98)"]}
         locations={[0, 0.45, 1]}
         style={s.lockedGradient}
       />
       <View style={s.lockedOverlay}>
-        <View style={s.lockedIcon}><Text style={{ fontSize: 18 }}>🔒</Text></View>
+        <View style={s.lockedIcon}><Text style={{ fontSize: 18 }}>{"\uD83D\uDD12"}</Text></View>
         <Text style={s.lockedTitle}>{title}</Text>
         <Text style={s.lockedTeaser}>{teaser}</Text>
         <Pressable style={s.lockedCta} onPress={onPress} accessibilityRole="button">
@@ -85,6 +91,20 @@ function LockedSection({ title, teaser, ctaLabel, onPress, children }) {
     </View>
   );
 }
+
+function PairingChip({ trigger, emotion, count, positive }) {
+  const bg = positive ? (palette.successSoft || palette.glass) : (palette.dangerSoft || palette.glass);
+  const border = positive ? (palette.success + "44") : (palette.danger + "44");
+  return (
+    <View style={[s.pairingChip, { backgroundColor: bg, borderColor: border }]}>
+      <Text style={s.pairingText}>
+        {trigger} {"\u2192"} {emotion} {"\u00D7"}{count}
+      </Text>
+    </View>
+  );
+}
+
+/* -- Main screen -- */
 
 export function WeeklyReportScreen() {
   const { loadWeeklyReport, refreshSession, subscription, user, token } = useAppSession();
@@ -96,10 +116,6 @@ export function WeeklyReportScreen() {
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
 
-  // Use refs for callbacks to avoid infinite re-render loops.
-  // refreshSession updates user/subscription state in the provider, which
-  // recreates every context function via useMemo, which would retrigger
-  // useFocusEffect if those functions were listed as deps.
   const callbacksRef = useRef({});
   callbacksRef.current = { loadWeeklyReport, refreshSession, token, isPremium, isSignedIn };
 
@@ -119,11 +135,13 @@ export function WeeklyReportScreen() {
 
   useFocusEffect(useCallback(() => {
     load();
-    const { token: t, refreshSession: rs, isPremium: p, isSignedIn: s } = callbacksRef.current;
+    const { token: t, refreshSession: rs, isPremium: p, isSignedIn: si } = callbacksRef.current;
     if (t) rs().catch(() => null);
-    trackEvent("report_screen_viewed", { tier: p ? "premium" : s ? "signed" : "anonymous" });
+    trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
   }, [load]));
 
+  const dq = report?.dataQuality || {};
+  const confidence = dq.confidence || "too_early";
   const hasRuleInsight = !!report?.aiInsight?.summary;
   const hasLlmInsight = !!report?.llmInsight?.narrative;
 
@@ -136,15 +154,8 @@ export function WeeklyReportScreen() {
   const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
   const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
 
-  function handleSignInUnlock() {
-    trackEvent("report_signin_unlock_tapped", {});
-    router.push("/login");
-  }
-
-  function handlePremiumUnlock() {
-    trackEvent("report_premium_unlock_tapped", {});
-    router.push("/(tabs)/premium");
-  }
+  function handleSignIn() { trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
+  function handlePremium() { trackEvent("report_premium_unlock_tapped", {}); router.push("/(tabs)/premium"); }
 
   return (
     <ScreenShell
@@ -159,19 +170,46 @@ export function WeeklyReportScreen() {
         <Image source={require("@/assets/report-bg.png")} style={s.bgImage} resizeMode="cover" accessible={false} />
 
         <View style={s.content}>
-          {/* ─── HEADER ─── */}
+
+          {/* --- 1. AT A GLANCE HERO --- */}
           <View style={s.header}>
             <Text style={s.kicker}>Weekly patterns</Text>
-            <Text style={s.title}>Your Insights</Text>
+            <Text style={s.title}>Your Week</Text>
             {report?.totalMoments ? (
-              <Text style={s.subtitle}>{report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} this week</Text>
+              <Text style={s.subtitle}>
+                {report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} across {dq.daysLogged || "-"} day{(dq.daysLogged || 0) !== 1 ? "s" : ""}
+              </Text>
+            ) : null}
+            {report?.totalMoments ? (
+              <View style={s.heroRow}>
+                <View style={s.heroPill}>
+                  <Text style={s.heroPillEmoji}>
+                    {report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "\u2022") : "\uD83C\uDF00"}
+                  </Text>
+                  <Text style={s.heroPillLabel}>
+                    {report.topEmotion || "Mixed"}
+                  </Text>
+                </View>
+                <View style={s.heroPill}>
+                  <Text style={s.heroPillEmoji}>{"\uD83C\uDFAF"}</Text>
+                  <Text style={s.heroPillLabel}>
+                    {report.topTrigger || (report.tiedTriggers?.length ? "Split" : "-")}
+                  </Text>
+                </View>
+                <View style={[s.heroPill, s.confidencePill]}>
+                  <Text style={s.heroPillLabel}>{CONFIDENCE_LABELS[confidence] || confidence}</Text>
+                </View>
+              </View>
+            ) : null}
+            {hasRuleInsight ? (
+              <Text style={s.takeaway}>{report.aiInsight.summary}</Text>
             ) : null}
             {report?.aiInsight?.generatedAt ? (
               <Text style={s.freshness}>Updated {new Date(report.aiInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</Text>
             ) : null}
           </View>
 
-          <Tooltip id="report_tooltip" text="Insights appear after you've logged a few moments this week." />
+          <Tooltip id="report_tooltip" text="Insights sharpen as you log more moments throughout the week." />
 
           {error ? (
             <View style={s.stateCard}>
@@ -183,201 +221,84 @@ export function WeeklyReportScreen() {
 
           {report && !error ? (
             <>
-              {/* ── Summary strip ── */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.summaryStrip}>
-                <View style={s.summaryPill}>
-                  <Text style={s.summaryPillEmoji}>{EMOTION_EMOJIS[report.topEmotion] || "•"}</Text>
-                  <Text style={s.summaryPillLabel}>{report.topEmotion || "-"}</Text>
-                </View>
-                <View style={s.summaryPill}>
-                  <Text style={s.summaryPillEmoji}>🎯</Text>
-                  <Text style={s.summaryPillLabel}>{report.topTrigger || "-"}</Text>
-                </View>
-                {report.mostStableDay && report.mostStableDay !== "Not enough data yet" ? (
-                  <View style={s.summaryPill}>
-                    <Text style={s.summaryPillEmoji}>🧘</Text>
-                    <Text style={s.summaryPillLabel}>{report.mostStableDay}</Text>
-                  </View>
-                ) : null}
-                <View style={s.summaryPill}>
-                  <Text style={s.summaryPillEmoji}>{report.volatilityScore <= 1 ? "🟢" : report.volatilityScore <= 2 ? "🟡" : "🔴"}</Text>
-                  <Text style={s.summaryPillLabel}>Stability {report.volatilityScore ?? "-"}</Text>
-                </View>
-              </ScrollView>
+              {/* --- 2. WHAT SHOWED UP --- */}
+              <SectionHeader label="What showed up" extra={`${dq.uniqueEmotions || 0} emotions \u00B7 ${dq.uniqueTriggers || 0} triggers`} />
 
-              {/* ════════════════════════════════════════════════════
-                  SECTION 1 — Weekly Patterns (visible to ALL users)
-                  ════════════════════════════════════════════════════ */}
-              <SectionHeader label="Weekly patterns" extra={`${report.totalMoments || 0} moments`} />
-
-              {/* Key metrics — always visible */}
-              <View style={s.metricsGrid}>
-                <View style={s.metricCard}>
-                  <Text style={s.metricLabel}>Top trigger</Text>
-                  <Text style={s.metricValue}>{report.topTrigger || "-"}</Text>
-                  {report.topPair?.count > 0 ? (
-                    <Text style={s.metricHint}>→ {report.topPair.emotion} ({report.topPair.count}×)</Text>
-                  ) : null}
-                </View>
-                <View style={s.metricCard}>
-                  <Text style={s.metricLabel}>Top emotion</Text>
-                  <Text style={s.metricValue}>
-                    {EMOTION_EMOJIS[report.topEmotion] || ""} {report.topEmotion || "-"}
-                  </Text>
-                </View>
-                <View style={s.metricCard}>
-                  <Text style={s.metricLabel}>Volatility</Text>
-                  <Text style={s.metricValue}>{report.volatilityChange || "-"}</Text>
-                  <Text style={s.metricHint}>Score: {report.volatilityScore ?? "-"}</Text>
-                </View>
-                <View style={s.metricCard}>
-                  <Text style={s.metricLabel}>Stable day</Text>
-                  <Text style={s.metricValue}>{report.mostStableDay || "-"}</Text>
-                </View>
-              </View>
-
-              {/* Trigger frequency — always visible */}
-              {triggerEntries.length ? (
-                <View style={s.section}>
-                  <SectionHeader label="Trigger frequency" />
-                  <View style={s.card}>
-                    {triggerEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={triggerMax} color={palette.accent} />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Emotion frequency — always visible */}
               {emotionEntries.length ? (
-                <View style={s.section}>
-                  <SectionHeader label="Emotion frequency" />
-                  <View style={s.card}>
-                    {emotionEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={emotionMax} color={palette.warning} icon={EMOTION_EMOJIS[key]} />
-                    ))}
-                  </View>
+                <View style={s.card}>
+                  {emotionEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={emotionMax} color={palette.warning} icon={EMOTION_EMOJIS[key]} />
+                  ))}
                 </View>
               ) : null}
 
-              {/* Time of day — always visible */}
-              {timeEntries.length ? (
-                <View style={s.section}>
-                  <SectionHeader label="Time of day" />
-                  <View style={s.card}>
-                    {timeEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={timeMax} color={palette.warning} icon={TIME_ICONS[key]} />
-                    ))}
-                  </View>
+              {triggerEntries.length ? (
+                <View style={s.card}>
+                  {triggerEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={triggerMax} color={palette.accent} />
+                  ))}
                 </View>
               ) : null}
 
-              {/* Energy distribution — always visible */}
-              {energyEntries.length ? (
-                <View style={s.section}>
-                  <SectionHeader label="Energy distribution" />
-                  <View style={s.card}>
-                    {energyEntries.map(([key, value]) => (
-                      <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || palette.accent} />
-                    ))}
-                  </View>
+              {/* Time of day � conditional on rhythm data */}
+              {dq.hasEnoughForRhythm && timeEntries.length ? (
+                <View style={s.card}>
+                  <Text style={s.cardLabel}>When you logged</Text>
+                  {timeEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={timeMax} color={palette.warning} icon={TIME_ICONS[key]} />
+                  ))}
                 </View>
               ) : null}
 
-              {/* Weekly emotion trajectory — always visible */}
-              {report.weeklyEmotionTrajectory?.length > 1 ? (
-                <View style={s.section}>
-                  <SectionHeader label="Emotion trajectory" />
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-                    {report.weeklyEmotionTrajectory.map((day) => (
-                      <View style={s.trajectoryDay} key={day.date}>
-                        <Text style={s.trajectoryEmoji}>{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</Text>
-                        <Text style={s.trajectoryScore}>{day.score}</Text>
-                        <Text style={s.trajectoryDate}>
-                          {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
-                        </Text>
+              {/* --- 3. WHAT HELPED / WHAT DRAINED --- */}
+              {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
+                <>
+                  <SectionHeader label="What helped \u00B7 What drained" />
+                  <View style={s.card}>
+                    {report.regulators?.length ? (
+                      <View style={s.pairingGroup}>
+                        <Text style={s.pairingGroupLabel}>{"\uD83C\uDF3F"} Regulators</Text>
+                        <View style={s.pairingList}>
+                          {report.regulators.slice(0, 4).map((r) => (
+                            <PairingChip key={`${r.trigger}-${r.emotion}`} trigger={r.trigger} emotion={r.emotion} count={r.count} positive />
+                          ))}
+                        </View>
                       </View>
-                    ))}
-                  </ScrollView>
-                </View>
+                    ) : null}
+                    {report.frictionZones?.length ? (
+                      <View style={s.pairingGroup}>
+                        <Text style={s.pairingGroupLabel}>{"\uD83D\uDD25"} Friction zones</Text>
+                        <View style={s.pairingList}>
+                          {report.frictionZones.slice(0, 4).map((f) => (
+                            <PairingChip key={`${f.trigger}-${f.emotion}`} trigger={f.trigger} emotion={f.emotion} count={f.count} positive={false} />
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                </>
               ) : null}
 
-              {/* ════════════════════════════════════════════════════
-                  SECTION 2 — Insight Summary (locked for anonymous)
-                  ════════════════════════════════════════════════════ */}
+              {/* --- 4. PATTERNS & PAIRINGS (conditional) --- */}
               {!isSignedIn ? (
                 <LockedSection
-                  title="Your personal insights are waiting"
-                  teaser="Create a free account to unlock pattern observations, emotional correlations, and weekly reflections."
+                  title="Patterns and pairings"
+                  teaser="Create a free account to see emotional correlations, energy flow, and weekly trajectory."
                   ctaLabel="Sign in to unlock"
-                  onPress={handleSignInUnlock}
+                  onPress={handleSignIn}
                 >
-                  {/* Placeholder content behind the blur */}
                   <View style={s.card}>
-                    <View style={s.aiLabelRow}>
-                      <View style={s.aiLabelPill}><Text style={s.aiLabelText}>Pattern insight</Text></View>
-                    </View>
                     <Text style={[s.aiSummary, { color: palette.muted }]}>
-                      Your week was shaped by "{report.topTrigger || "..."}" triggers, feeling mostly {report.topEmotion || "..."}.
-                    </Text>
-                    <Text style={[s.aiSuggestion, { color: palette.muted }]}>
-                      Deeper observations about trigger patterns and emotional trends are available when you sign in.
+                      Deeper correlations between triggers and emotions appear here once you sign in.
                     </Text>
                   </View>
-                  {Object.keys(report.correlations || {}).length ? (
-                    <View style={[s.card, { marginTop: 8 }]}>
-                      {Object.entries(report.correlations).slice(0, 3).map(([trigger, emotions]) => (
-                        <View style={s.correlationRow} key={trigger}>
-                          <Text style={s.correlationTrigger}>{trigger}</Text>
-                          <View style={s.correlationChips}>
-                            {Object.entries(emotions).sort(([, a], [, b]) => b - a).slice(0, 2).map(([emo, count]) => (
-                              <View style={s.correlationChip} key={emo}>
-                                <Text style={s.correlationChipText}>
-                                  {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
                 </LockedSection>
               ) : (
                 <>
-                  <SectionHeader label="Insight summary" />
-
-                  {/* Rule-based insight — unlocked for signed-in */}
-                  {hasRuleInsight ? (
-                    <View style={s.aiCard}>
-                      <View style={s.aiLabelRow}>
-                        <View style={s.aiLabelPill}><Text style={s.aiLabelText}>Pattern insight</Text></View>
-                      </View>
-                      <Text style={s.aiSummary}>{report.aiInsight.summary}</Text>
-                      {report.aiInsight.suggestion ? <Text style={s.aiSuggestion}>{report.aiInsight.suggestion}</Text> : null}
-                    </View>
-                  ) : (
-                    <View style={s.card}>
-                      <Text style={s.aiSuggestion}>Your weekly observations will appear here once a few more moments are logged.</Text>
-                    </View>
-                  )}
-
-                  {/* Micro-experiment — try-this-week card */}
-                  {report.aiInsight?.microExperiment ? (
-                    <View style={s.experimentCard}>
-                      <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
-                          <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
-                        </View>
-                      </View>
-                      <Text style={s.experimentText}>{report.aiInsight.microExperiment}</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Correlations — unlocked for signed-in */}
-                  {Object.keys(report.correlations || {}).length ? (
+                  {/* Correlations */}
+                  {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Trigger → Emotion" />
+                      <SectionHeader label="Trigger \u2192 Emotion" />
                       <View style={s.card}>
                         {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
                           <View style={s.correlationRow} key={trigger}>
@@ -386,7 +307,7 @@ export function WeeklyReportScreen() {
                               {Object.entries(emotions).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
                                 <View style={s.correlationChip} key={emo}>
                                   <Text style={s.correlationChipText}>
-                                    {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
+                                    {EMOTION_EMOJIS[emo] || ""} {emo} {"\u00D7"}{count}
                                   </Text>
                                 </View>
                               ))}
@@ -397,45 +318,89 @@ export function WeeklyReportScreen() {
                     </View>
                   ) : null}
 
-                  {/* Observations — unlocked for signed-in */}
-                  {report.insights?.length ? (
+                  {/* Energy distribution */}
+                  {energyEntries.length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Observations" extra={`${report.insights.length} pattern${report.insights.length !== 1 ? "s" : ""}`} />
-                      {report.insights.map((insight, idx) => (
-                        <InsightCard key={idx} body={insight} tone={idx === 0 ? "accent" : "default"} title={`Observation ${idx + 1}`} />
-                      ))}
+                      <SectionHeader label="Energy flow" />
+                      <View style={s.card}>
+                        {energyEntries.map(([key, value]) => (
+                          <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || palette.accent} />
+                        ))}
+                      </View>
                     </View>
                   ) : null}
 
-                  <InsightCard
-                    title="Weekly stability"
-                    body={report.volatilityChange || "Not enough data yet."}
-                    footer={`Score: ${report.volatilityScore ?? 0} · Most steady: ${report.mostStableDay || "-"}`}
-                  />
+                  {/* --- 5. TIME & RHYTHM (conditional) --- */}
+                  {dq.hasEnoughForStability ? (
+                    <View style={s.section}>
+                      <SectionHeader label="Stability" />
+                      <View style={s.metricsRow}>
+                        {report.volatilityScore !== null ? (
+                          <View style={s.metricCard}>
+                            <Text style={s.metricLabel}>Volatility</Text>
+                            <Text style={s.metricValue}>
+                              {report.volatilityScore < 0.5 ? "\uD83D\uDFE2" : report.volatilityScore < 1.5 ? "\uD83D\uDFE1" : "\uD83D\uDD34"} {report.volatilityScore}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {report.mostStableDay ? (
+                          <View style={s.metricCard}>
+                            <Text style={s.metricLabel}>Steadiest day</Text>
+                            <Text style={s.metricValue}>
+                              {new Date(report.mostStableDay).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Trajectory */}
+                  {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
+                    <View style={s.section}>
+                      <SectionHeader label="Emotion trajectory" />
+                      {report.trajectoryNote ? (
+                        <Text style={s.trajectoryNote}>{report.trajectoryNote}</Text>
+                      ) : null}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
+                        {report.weeklyEmotionTrajectory.map((day) => (
+                          <View style={s.trajectoryDay} key={day.date}>
+                            <Text style={s.trajectoryEmoji}>{EMOTION_EMOJIS[day.dominantEmotion] || "\u2022"}</Text>
+                            <Text style={s.trajectoryScore}>{day.score}</Text>
+                            <Text style={s.trajectoryDate}>
+                              {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+
+                  {/* Micro-experiment */}
+                  {report.aiInsight?.microExperiment ? (
+                    <View style={s.experimentCard}>
+                      <View style={s.aiLabelRow}>
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
+                          <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
+                        </View>
+                      </View>
+                      <Text style={s.experimentText}>{report.aiInsight.microExperiment}</Text>
+                    </View>
+                  ) : null}
                 </>
               )}
 
-              {/* ════════════════════════════════════════════════════
-                  SECTION 3 — Personalised AI Reflection (premium only)
-                  ════════════════════════════════════════════════════ */}
+              {/* --- 6. PREMIUM PATTERN READ --- */}
               {isSignedIn && !isPremium ? (
                 <LockedSection
-                  title="Personalised AI reflection"
-                  teaser="A deeper narrative about your emotional patterns, written by AI and tailored to your journey."
+                  title="Pattern read"
+                  teaser="A concise AI analysis grounded in your actual data, not generic advice."
                   ctaLabel="Unlock Premium"
-                  onPress={handlePremiumUnlock}
+                  onPress={handlePremium}
                 >
                   <View style={[s.aiCard, { opacity: 0.5 }]}>
-                    <View style={s.aiLabelRow}>
-                      <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                        <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
-                      </View>
-                    </View>
                     <Text style={[s.aiSummary, { color: palette.muted }]}>
-                      Your emotional patterns this week reveal a recurring theme connecting "{report.topTrigger || "..."}" to how you feel...
-                    </Text>
-                    <Text style={[s.aiSuggestion, { color: palette.muted }]}>
-                      Premium members receive a personalised reflection that evolves as you log more moments.
+                      Your patterns suggest a connection between how you spend your energy and how you feel afterward...
                     </Text>
                   </View>
                 </LockedSection>
@@ -443,32 +408,37 @@ export function WeeklyReportScreen() {
 
               {isPremium ? (
                 <View style={s.section}>
-                  <SectionHeader label="Weekly Insight" />
+                  <SectionHeader label="Pattern read" />
                   {hasLlmInsight ? (
-                    <>
-                      {(report.llmInsight.segments?.length ? report.llmInsight.segments : [report.llmInsight.narrative]).map((paragraph, idx) => (
-                        <View key={idx} style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
-                          {idx === 0 ? (
-                            <View style={s.aiLabelRow}>
-                              <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                                <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
-                              </View>
-                            </View>
-                          ) : null}
-                          <Text style={s.aiSummary}>{paragraph}</Text>
-                        </View>
-                      ))}
-                    </>
-                  ) : (
-                    <View style={s.card}>
+                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
                       <View style={s.aiLabelRow}>
                         <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
+                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
                         </View>
                       </View>
-                      <Text style={s.aiSuggestion}>Your personalised reflection will appear here once enough patterns have formed. Keep logging moments.</Text>
+                      <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
+                    </View>
+                  ) : (
+                    <View style={s.card}>
+                      <Text style={s.aiSuggestion}>Your pattern read will appear here after enough data has accumulated.</Text>
                     </View>
                   )}
+                </View>
+              ) : null}
+
+              {/* --- 7. DATA QUALITY NUDGE --- */}
+              {confidence === "too_early" || confidence === "low" ? (
+                <View style={s.nudgeCard}>
+                  <Text style={s.nudgeTitle}>
+                    {confidence === "too_early" ? "A few more moments to go" : "Patterns are forming"}
+                  </Text>
+                  <Text style={s.nudgeBody}>
+                    {confidence === "too_early"
+                      ? "Log at least 3 moments for us to start spotting patterns. The more days you cover, the sharper the picture."
+                      : `${dq.totalMoments} moments across ${dq.daysLogged} day${dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.`
+                    }
+                  </Text>
+                  <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
                 </View>
               ) : null}
             </>
@@ -488,17 +458,34 @@ export function WeeklyReportScreen() {
   );
 }
 
+/* ----------------------------------------------------------
+   Styles
+   ---------------------------------------------------------- */
+
 const s = StyleSheet.create({
   canvas: { position: "relative", minHeight: 1 },
   bgImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined, opacity: 0.05 },
   content: { gap: 16 },
-  header: { gap: 4, marginTop: 12 },
+
+  /* Header / hero */
+  header: { gap: 6, marginTop: 12 },
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   title: { color: palette.text, fontSize: 26, fontWeight: "700" },
   subtitle: { color: palette.muted, fontSize: 13, marginTop: 2 },
   freshness: { color: palette.muted, fontSize: 11, marginTop: 4, fontStyle: "italic" },
+  heroRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  heroPill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: radius.pill, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
+  heroPillEmoji: { fontSize: 14 },
+  heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
+  takeaway: { color: palette.text, fontSize: 15, lineHeight: 22, marginTop: 8 },
 
-  /* ─ AI / insight card ─ */
+  /* AI / insight */
   aiCard: {
     borderRadius: radius.md, padding: 18, gap: 10,
     backgroundColor: palette.accentSoft,
@@ -513,23 +500,10 @@ const s = StyleSheet.create({
     color: palette.accent, fontSize: 11, fontWeight: "700",
     textTransform: "uppercase", letterSpacing: 0.6,
   },
-  aiSummary: { color: palette.text, fontSize: 16, lineHeight: 24, fontWeight: "600" },
+  aiSummary: { color: palette.text, fontSize: 15, lineHeight: 23, fontWeight: "600" },
   aiSuggestion: { color: palette.muted, fontSize: 14, lineHeight: 20 },
 
-  /* ─ Summary strip ─ */
-  summaryStrip: { gap: 8, paddingVertical: 2 },
-  summaryPill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: radius.pill, backgroundColor: palette.glass,
-    borderWidth: 1, borderColor: palette.glassBorder,
-  },
-  summaryPillEmoji: { fontSize: 14 },
-  summaryPillLabel: {
-    color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize",
-  },
-
-  /* ─ Micro-experiment card ─ */
+  /* Micro-experiment */
   experimentCard: {
     borderRadius: radius.md, padding: 18, gap: 10,
     backgroundColor: palette.glass,
@@ -537,10 +511,10 @@ const s = StyleSheet.create({
   },
   experimentText: { color: palette.text, fontSize: 14, lineHeight: 21 },
 
-  /* ─ Metrics grid ─ */
-  metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  /* Metrics */
+  metricsRow: { flexDirection: "row", gap: 8 },
   metricCard: {
-    width: (screenWidth - 64 - 8) / 2, borderRadius: radius.md, padding: 14, gap: 4,
+    flex: 1, borderRadius: radius.md, padding: 14, gap: 4,
     backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.glassBorder,
   },
@@ -549,9 +523,8 @@ const s = StyleSheet.create({
     letterSpacing: 0.8, textTransform: "uppercase",
   },
   metricValue: { color: palette.text, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
-  metricHint: { color: palette.muted, fontSize: 11 },
 
-  /* ─ Generic section / card ─ */
+  /* Section / card */
   section: { gap: 8 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionKicker: {
@@ -564,8 +537,12 @@ const s = StyleSheet.create({
     backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.glassBorder,
   },
+  cardLabel: {
+    color: palette.muted, fontSize: 10, fontWeight: "700",
+    letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 2,
+  },
 
-  /* ─ Horizontal bar ─ */
+  /* Horizontal bar */
   hbarRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   hbarLabel: { width: 80, color: palette.text, fontSize: 13, textTransform: "capitalize" },
   hbarTrack: {
@@ -576,7 +553,19 @@ const s = StyleSheet.create({
   hbarFill: { height: "100%", borderRadius: radius.pill },
   hbarValue: { width: 26, color: palette.muted, fontSize: 12, textAlign: "right" },
 
-  /* ─ Trajectory ─ */
+  /* Pairings */
+  pairingGroup: { gap: 6 },
+  pairingGroupLabel: {
+    color: palette.text, fontSize: 13, fontWeight: "700",
+  },
+  pairingList: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  pairingChip: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  pairingText: { color: palette.text, fontSize: 12, textTransform: "capitalize" },
+
+  /* Trajectory */
   trajectoryScroll: { gap: 8, paddingVertical: 4 },
   trajectoryDay: {
     alignItems: "center", gap: 4, minWidth: 56,
@@ -590,8 +579,9 @@ const s = StyleSheet.create({
     color: palette.muted, fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.4,
   },
+  trajectoryNote: { color: palette.muted, fontSize: 13, lineHeight: 19, fontStyle: "italic" },
 
-  /* ─ Correlation ─ */
+  /* Correlation */
   correlationRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     paddingBottom: 8, borderBottomWidth: 1,
@@ -606,56 +596,43 @@ const s = StyleSheet.create({
   },
   correlationChipText: { color: palette.text, fontSize: 11, textTransform: "capitalize" },
 
-  /* ─ Locked section (blur + gradient overlay) ─ */
+  /* Locked */
   lockedWrap: {
-    position: "relative",
-    borderRadius: radius.md,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    backgroundColor: palette.glass,
+    position: "relative", borderRadius: radius.md, overflow: "hidden",
+    borderWidth: 1, borderColor: palette.glassBorder, backgroundColor: palette.glass,
   },
-  lockedContent: {
-    opacity: 0.3,
-    padding: 14,
-    gap: 8,
-  },
-  lockedGradient: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
+  lockedContent: { opacity: 0.3, padding: 14, gap: 8 },
+  lockedGradient: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   lockedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    zIndex: 2,
-    paddingHorizontal: 28,
+    ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center",
+    gap: 10, zIndex: 2, paddingHorizontal: 28,
   },
   lockedIcon: {
     width: 44, height: 44, borderRadius: radius.sm,
     alignItems: "center", justifyContent: "center",
-    backgroundColor: palette.accentSoft,
-    borderWidth: 1, borderColor: palette.accentMedium,
+    backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
   },
-  lockedTitle: {
-    color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center",
-  },
-  lockedTeaser: {
-    color: palette.muted, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280,
-  },
+  lockedTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
+  lockedTeaser: { color: palette.muted, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280 },
   lockedCta: {
     marginTop: 4, paddingHorizontal: 20, paddingVertical: 11,
-    borderRadius: radius.pill,
-    backgroundColor: palette.accentStrong,
+    borderRadius: radius.pill, backgroundColor: palette.accentStrong,
   },
   lockedCtaText: { color: palette.text, fontSize: 14, fontWeight: "700" },
 
-  /* ─ State cards ─ */
+  /* Data quality nudge */
+  nudgeCard: {
+    borderRadius: radius.md, padding: 20, gap: 10,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
+  nudgeBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+
+  /* State cards */
   stateCard: {
     borderRadius: radius.md, padding: 20, gap: 10,
-    backgroundColor: palette.glass,
-    borderWidth: 1, borderColor: palette.glassBorder,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
   },
   emptyStateCard: { alignItems: "center", paddingVertical: 32 },
   emptyIllustration: { width: 120, height: 120, marginBottom: 8, opacity: 0.9 },

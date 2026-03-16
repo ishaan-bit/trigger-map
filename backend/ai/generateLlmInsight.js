@@ -1,70 +1,90 @@
 /**
- * LLM-based personalized insight generator.
+ * LLM-based premium insight generator.
  *
- * Designed to run LOCALLY — calls a local OpenAI-compatible API
- * (e.g. llama.cpp server, Ollama, or LM Studio).
+ * Runs against a local OpenAI-compatible API (Ollama, llama.cpp, LM Studio).
+ * Receives structured signals from the rebuilt patternEngine � never raw JSON dumps.
  *
- * Recommended model: Mistral-7B-Instruct (GGUF Q4_K_M)
- *   - Free, high-quality summarization + narrative analysis
- *   - Intel Arc GPU supported via llama.cpp SYCL backend or Ollama
- *   - ~4.4 GB VRAM at Q4_K_M quantization
- *
- * Setup options:
- *   1. Ollama:       ollama run mistral
- *   2. llama.cpp:    ./server -m mistral-7b-instruct-v0.3.Q4_K_M.gguf --port 8080
- *   3. LM Studio:    Load Mistral 7B, enable local server on port 1234
- *
- * Environment:
- *   LLM_API_URL  — local endpoint (default: http://localhost:11434/v1)
- *   LLM_MODEL    — model name   (default: mistral)
+ * Output: 1 compact paragraph OR 3 sharp bullets + 1 micro-experiment.
+ * Tone: calm, observant, grounded. No essays, no fake-therapeutic language.
  */
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
 const REQUEST_TIMEOUT_MS = 300_000;
 
-function buildPrompt({ weeklyReport, historicalReports, userTrends }) {
-  const currentWeek = JSON.stringify(weeklyReport, null, 2);
-  const history = historicalReports?.length
-    ? historicalReports.map((r, i) => `Week ${i + 1}: top trigger=${r.topTrigger}, top emotion=${r.topEmotion}, moments=${r.totalMoments}`).join("\n")
-    : "No historical data available yet.";
+function buildSignals(report) {
+  const lines = [];
+  const dq = report.dataQuality || {};
 
-  const trends = userTrends
-    ? `Behavioral trends: ${JSON.stringify(userTrends)}`
-    : "";
+  lines.push(`Moments logged: ${dq.totalMoments || 0} over ${dq.daysLogged || 0} days.`);
+  lines.push(`Confidence: ${dq.confidence || "unknown"}.`);
 
-  return `You are a behavioral pattern analyst for TriggerMap, a journaling app where users log emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  if (report.topTrigger) {
+    lines.push(`Dominant trigger: ${report.topTrigger}.`);
+  } else if (report.tiedTriggers?.length) {
+    lines.push(`Tied triggers (no dominant): ${report.tiedTriggers.join(", ")}.`);
+  }
 
-Analyze this user's week with clinical depth and personal specificity. Your job is not to comfort but to illuminate. Identify:
-- Cross-trigger emotional cascades (e.g. work stress spilling into partner interactions)
-- Time-based behavioral rhythms (when certain triggers cluster and what that implies)
-- Emotional asymmetries (triggers that provoke outsized reactions vs ones that stay stable)
-- Avoidance or displacement patterns (conspicuous absences of certain triggers)
-- Week-over-week drift if historical data exists (escalation, recovery, stagnation)
+  if (report.topEmotion) {
+    lines.push(`Dominant emotion: ${report.topEmotion}.`);
+  } else if (report.tiedEmotions?.length) {
+    lines.push(`Tied emotions: ${report.tiedEmotions.join(", ")}.`);
+  }
 
-CURRENT WEEK DATA:
-${currentWeek}
+  if (report.regulators?.length) {
+    const regs = report.regulators.slice(0, 3).map(r => `${r.trigger} + ${r.emotion} (${r.count}x)`);
+    lines.push(`Regulators (positive pairings): ${regs.join("; ")}.`);
+  }
 
-HISTORICAL SUMMARIES:
-${history}
+  if (report.frictionZones?.length) {
+    const fz = report.frictionZones.slice(0, 3).map(f => `${f.trigger} + ${f.emotion} (${f.count}x)`);
+    lines.push(`Friction zones (negative pairings): ${fz.join("; ")}.`);
+  }
 
-${trends}
+  if (report.volatilityScore !== null && report.volatilityScore !== undefined) {
+    lines.push(`Volatility score: ${report.volatilityScore} (${report.volatilityScore < 0.5 ? "steady" : report.volatilityScore < 1.5 ? "moderate swings" : "high swings"}).`);
+  }
 
-Rules:
-- Write 3 to 4 flowing paragraphs, no bullet points, no headers
-- Address the user as "you"
-- Never use em dashes. Use commas, semicolons, or periods instead
-- Reference specific triggers and emotions from the data, not generic advice
-- Include one precise, actionable micro-experiment the user could try next week
-- Keep it under 280 words
-- Sound like a sharp, perceptive counselor, not a greeting card`;
+  if (report.trajectoryNote) {
+    lines.push(`Trajectory: ${report.trajectoryNote}`);
+  }
+
+  if (report.busiestTime) {
+    lines.push(`Busiest time of day: ${report.busiestTime}.`);
+  }
+
+  if (report.triggerConcentration !== undefined) {
+    lines.push(`Trigger diversity: ${report.triggerConcentration < 0.3 ? "spread broadly" : report.triggerConcentration < 0.5 ? "moderately concentrated" : "dominated by few"}.`);
+  }
+
+  return lines.join("\n");
 }
 
-export async function generateLlmInsight({ weeklyReport, historicalReports, userTrends }) {
+function buildPrompt(report) {
+  const signals = buildSignals(report);
+
+  return `You are a behavioral pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+
+Below are structured signals from the user's past week. Only reference what appears here.
+
+${signals}
+
+Write a compact pattern read. Rules:
+- Either one short paragraph (4-5 sentences max) OR three sharp bullet points.
+- End with one concrete micro-experiment the user could try this week.
+- Reference specific triggers and emotions from the signals above.
+- Do not invent data that is not in the signals.
+- Do not contradict the signals (e.g. do not call a week calm if volatility is high).
+- Never use em dashes. Use commas, semicolons, or periods.
+- Tone: calm, direct, perceptive. Not warm, not clinical, not poetic.
+- Stay under 150 words.`;
+}
+
+export async function generateLlmInsight({ weeklyReport }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
 
-  const prompt = buildPrompt({ weeklyReport, historicalReports, userTrends });
+  const prompt = buildPrompt(weeklyReport);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -76,11 +96,11 @@ export async function generateLlmInsight({ weeklyReport, historicalReports, user
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a sharp behavioral pattern analyst. Write incisive, data-grounded reflections that reveal hidden emotional dynamics. Never use em dashes." },
+          { role: "system", content: "You are a concise behavioral pattern reader. Write grounded, compact observations from structured data. Never use em dashes." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.75,
-        max_tokens: 600,
+        temperature: 0.7,
+        max_tokens: 350,
       }),
       signal: controller.signal,
     });
@@ -97,18 +117,11 @@ export async function generateLlmInsight({ weeklyReport, historicalReports, user
       throw new Error("LLM returned empty response");
     }
 
-    // Strip any em dashes that slipped through
+    // Strip any em dashes the model sneaks through
     content = content.replace(/\u2014/g, ",").replace(/\u2013/g, ",");
-
-    // Split the narrative into readable segments (paragraphs)
-    const segments = content
-      .split(/\n\s*\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
 
     return {
       narrative: content,
-      segments,
       model: `llm-${model}`,
       generatedAt: new Date().toISOString(),
     };

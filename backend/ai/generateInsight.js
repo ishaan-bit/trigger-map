@@ -1,126 +1,169 @@
-const TRIGGER_SUGGESTIONS = {
-  work: "Consider setting boundaries around work hours to protect your downtime.",
-  social: "Social energy varies. Try balancing group time with quiet recovery.",
-  money: "Financial stress often eases with even a small budgeting step each week.",
-  family: "Family dynamics can be complex. Naming what you feel is already progress.",
-  exercise: "Movement affects mood. Notice whether exercise lifts or drains you.",
-  health: "Health concerns carry emotional weight, so be patient with yourself.",
-  sleep: "Sleep and mood are tightly linked. A consistent wind-down routine may help.",
-  partner: "Relationship triggers often reveal unspoken needs worth exploring.",
-  other: "Unnamed triggers still matter. Try journaling to find more specific patterns.",
-};
+import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 
-const EMOTION_INSIGHTS = {
-  calm: "Calm moments are your anchors. Notice what conditions create them.",
-  neutral: "Neutral isn't empty. It may mean things are steady, or feelings are muted.",
-  anxious: "Anxiety often points to uncertainty. Identifying the source can reduce its grip.",
-  frustrated: "Frustration usually signals a blocked need. What were you hoping for?",
-  energized: "High energy is a resource. Channel it before it fades.",
-};
+/**
+ * Confidence-aware rule-based insight generator.
+ *
+ * Consumes the structured output from the rebuilt patternEngine
+ * and generates grounded, honest observations — never faking
+ * certainty when data is thin.
+ */
 
 const MICRO_EXPERIMENTS = {
   work: [
-    "This week, try closing your laptop at a set time each evening and notice how it feels.",
-    "Pick one work task you've been avoiding and give it just 10 minutes today.",
+    "Close your laptop at a fixed time one evening this week and notice the shift.",
+    "Give a task you have been avoiding just 10 focused minutes.",
     "Before your next meeting, take three slow breaths and set one intention.",
   ],
   social: [
-    "This week, try saying no to one social invite and see how your energy shifts.",
-    "Reach out to someone you haven't spoken to in a while with a short, honest message.",
-    "After your next social event, jot down one word for how you feel.",
+    "Decline one invite this week and track how your energy responds.",
+    "After your next social outing, write one word for how you feel.",
+    "Reach out to someone you have not spoken to in a while.",
   ],
   money: [
-    "Write down three things you spent money on this week and rate how each made you feel.",
-    "Set a 24-hour waiting rule before your next non-essential purchase.",
-    "Spend five minutes reviewing one subscription you're unsure about.",
+    "Rate three purchases from this week on a felt-good scale.",
+    "Apply a 24-hour wait before your next non-essential purchase.",
+    "Review one subscription you are unsure about for 5 minutes.",
   ],
   family: [
-    "This week, try naming one emotion out loud during a family conversation.",
-    "Write a short note to a family member, even if you don't send it.",
-    "Before a family gathering, decide on one boundary you want to keep.",
+    "Name one emotion out loud during a family conversation this week.",
+    "Before a gathering, pick one boundary you want to keep.",
+    "Write a short note to a family member, even if you do not send it.",
   ],
   exercise: [
-    "Log your mood right before and right after your next workout and compare.",
-    "Try replacing one intense session with a 20-minute walk this week.",
-    "Pick a time of day you don't usually exercise and try a short stretch routine.",
+    "Log your mood before and after your next workout and compare.",
+    "Swap one intense session for a 20-minute walk this week.",
+    "Try a stretch routine at a time of day you normally skip.",
   ],
   health: [
-    "Track one health habit (water, sleep, or meals) for three days and note your mood alongside it.",
-    "Replace screen time with 10 minutes of quiet before bed tonight.",
-    "Write down one health concern you've been putting off and take one small step toward it.",
+    "Track one health habit for three days and note your mood alongside.",
+    "Replace 10 minutes of screen time with quiet before bed tonight.",
+    "Take one small step toward a health concern you have postponed.",
   ],
   sleep: [
-    "Set a phone-down time 30 minutes before bed for three nights and notice any difference.",
-    "Try waking up at the same time for five days, regardless of when you fall asleep.",
-    "Keep a one-sentence sleep journal each morning: how rested do you feel?",
+    "Put your phone down 30 minutes before bed for three nights.",
+    "Wake at the same time for five days regardless of bedtime.",
+    "Each morning, rate how rested you feel in one sentence.",
   ],
   partner: [
-    "This week, try asking your partner one open-ended question and just listen.",
-    "Notice when you feel a reaction during a conversation and pause before responding.",
-    "Write down one thing you appreciate about your partner, even on a hard day.",
+    "Ask your partner one open-ended question and just listen.",
+    "When you feel a reaction mid-conversation, pause before responding.",
+    "Write down one thing you appreciate about your partner today.",
   ],
   other: [
-    "Spend five minutes this week writing freely about whatever is on your mind.",
-    "Try labeling your emotion the next time something unexpected happens.",
-    "Pick one moment today and describe it to yourself as if telling a friend.",
+    "Spend 5 minutes writing freely about whatever is on your mind.",
+    "Label your emotion the next time something unexpected happens.",
+    "Describe one moment today as if telling a close friend.",
   ],
 };
 
-export function buildInsightPrompt({ triggerData, emotionData, volatility, stableDay }) {
-  return { triggerData, emotionData, volatility, stableDay };
+function pickExperiment(trigger) {
+  const pool = MICRO_EXPERIMENTS[trigger] || MICRO_EXPERIMENTS.other;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export async function generateInsight(input) {
-  const { triggerData, emotionData, volatility, stableDay } = input;
+function buildTooEarlySummary() {
+  return "Still early days. A few more moments will give us enough to spot real patterns.";
+}
 
-  const topTrigger = parseTopEntry(triggerData);
-  const topEmotion = parseTopEntry(emotionData);
+function buildLowSummary(report) {
+  const n = report.dataQuality.totalMoments;
+  const frag = report.topTrigger
+    ? `"${report.topTrigger}" appeared the most so far`
+    : "no single trigger stands out yet";
+  return `${n} moments logged — ${frag}. Keep going; patterns sharpen with a few more days.`;
+}
 
-  const summaryParts = [];
-  if (topTrigger && topEmotion) {
-    summaryParts.push(
-      `This week, "${topTrigger}" came up most often, and when it did, you tended to feel ${topEmotion}.`
-    );
+function buildEmergingSummary(report) {
+  const parts = [];
+  if (report.topTrigger) {
+    parts.push(`"${report.topTrigger}" came up the most.`);
+  } else {
+    parts.push(`Triggers were spread across ${report.tiedTriggers.length} areas equally.`);
   }
-  if (volatility && !volatility.includes("Not enough")) {
-    summaryParts.push(`Emotional flow: ${volatility}.`);
+  if (report.topEmotion) {
+    parts.push(`Dominant feeling: ${report.topEmotion}.`);
   }
-  if (stableDay && !stableDay.includes("Not enough")) {
-    summaryParts.push(`${stableDay} felt the most balanced.`);
+  if (report.regulators.length) {
+    const r = report.regulators[0];
+    parts.push(`${r.trigger} paired with ${r.emotion} ${r.count} times — a possible stabilizer.`);
+  }
+  return parts.join(" ");
+}
+
+function buildModerateSummary(report) {
+  const parts = [];
+  if (report.topTrigger) {
+    parts.push(`"${report.topTrigger}" dominated this week.`);
+  } else {
+    parts.push(`No single trigger dominated — ${report.tiedTriggers.join(", ")} were equally present.`);
+  }
+  if (report.frictionZones.length) {
+    const f = report.frictionZones[0];
+    parts.push(`${f.trigger} + ${f.emotion} repeated ${f.count} times — worth watching.`);
+  }
+  if (report.regulators.length) {
+    const r = report.regulators[0];
+    parts.push(`${r.trigger} kept linking to ${r.emotion}, which might be a regulator.`);
+  }
+  if (report.trajectoryNote) {
+    parts.push(report.trajectoryNote);
+  }
+  return parts.join(" ");
+}
+
+function buildStrongSummary(report) {
+  const parts = [];
+  if (report.topTrigger) {
+    parts.push(`"${report.topTrigger}" was the clearest theme this week.`);
+  } else {
+    parts.push(`No single trigger led — your attention was split across ${report.tiedTriggers.join(", ")}.`);
+  }
+  if (report.frictionZones.length) {
+    const f = report.frictionZones[0];
+    parts.push(`Friction zone: ${f.trigger} ? ${f.emotion} (${f.count}×).`);
+  }
+  if (report.regulators.length) {
+    const r = report.regulators[0];
+    parts.push(`Regulator: ${r.trigger} ? ${r.emotion} (${r.count}×).`);
+  }
+  if (report.volatilityScore !== null) {
+    parts.push(report.volatilityScore < 0.5 ? "Emotionally steady overall." : "Noticeable emotional swings this week.");
+  }
+  if (report.trajectoryNote) {
+    parts.push(report.trajectoryNote);
+  }
+  return parts.join(" ");
+}
+
+export async function generateInsight(report) {
+  const confidence = report.dataQuality?.confidence || "too_early";
+
+  let summary;
+  switch (confidence) {
+    case "too_early":
+      summary = buildTooEarlySummary();
+      break;
+    case "low":
+      summary = buildLowSummary(report);
+      break;
+    case "emerging":
+      summary = buildEmergingSummary(report);
+      break;
+    case "moderate":
+      summary = buildModerateSummary(report);
+      break;
+    default:
+      summary = buildStrongSummary(report);
   }
 
-  const summary = summaryParts.join(" ") || "Keep logging; patterns will emerge with more data.";
-
-  const suggestion =
-    TRIGGER_SUGGESTIONS[topTrigger] ||
-    EMOTION_INSIGHTS[topEmotion] ||
-    "Try logging at least once a day to build a clearer picture of your patterns.";
-
-  const experiments = MICRO_EXPERIMENTS[topTrigger] || MICRO_EXPERIMENTS.other;
-  const microExperiment = experiments[Math.floor(Math.random() * experiments.length)];
+  const trigger = report.topTrigger || report.tiedTriggers?.[0] || "other";
+  const microExperiment = confidence !== "too_early" ? pickExperiment(trigger) : null;
 
   return {
     summary,
-    suggestion,
     microExperiment,
-    model: "rule-based-v1",
-    raw: `${summary}\n\n${suggestion}`,
+    confidence,
+    model: "rule-based-v2",
+    generatedAt: new Date().toISOString(),
   };
-}
-
-function parseTopEntry(text) {
-  if (!text) return null;
-  try {
-    const obj = JSON.parse(text);
-    if (typeof obj === "object" && obj !== null) {
-      const sorted = Object.entries(obj).sort(
-        (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
-      );
-      return sorted[0]?.[0]?.toLowerCase() || null;
-    }
-  } catch {
-    // not JSON, try plain text
-  }
-  const match = String(text).match(/^[\s-]*(\w+)/m);
-  return match ? match[1].toLowerCase() : null;
 }

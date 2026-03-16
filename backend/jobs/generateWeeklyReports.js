@@ -6,14 +6,8 @@ import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportSt
 
 const INSIGHT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Returns true when this owner's 7-day window has elapsed since their last
- * generated report. Also returns true when no report exists yet.
- */
 function windowElapsed(existing) {
-  if (!existing?.generatedAt) {
-    return true;
-  }
+  if (!existing?.generatedAt) return true;
   return Date.now() - new Date(existing.generatedAt).getTime() >= INSIGHT_WINDOW_MS;
 }
 
@@ -25,7 +19,6 @@ export async function runGenerateWeeklyReports() {
     try {
       const existing = await getStoredWeeklyInsight(ownerId);
 
-      // Only process users whose rolling 7-day window has just completed
       if (!windowElapsed(existing)) {
         results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
         continue;
@@ -38,15 +31,9 @@ export async function runGenerateWeeklyReports() {
         continue;
       }
 
-      // Generate rule-based insights for ALL users with data
       let insight;
       try {
-        insight = await generateInsight({
-          triggerData: JSON.stringify(report.triggerFrequency),
-          emotionData: JSON.stringify(report.emotionFrequency),
-          volatility: report.volatilityChange,
-          stableDay: report.mostStableDay,
-        });
+        insight = await generateInsight(report);
       } catch (aiError) {
         results.push({ ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` });
         continue;
@@ -55,10 +42,10 @@ export async function runGenerateWeeklyReports() {
       const payload = {
         windowEnd: new Date().toISOString().slice(0, 10),
         summary: insight.summary,
-        suggestion: insight.suggestion,
         microExperiment: insight.microExperiment || null,
+        confidence: insight.confidence,
         model: insight.model,
-        generatedAt: new Date().toISOString(),
+        generatedAt: insight.generatedAt,
       };
 
       await storeWeeklyInsight(ownerId, payload);
