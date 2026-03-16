@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -35,12 +35,15 @@ export function TimelineScreen() {
   const dayGroups = useMemo(() => groupByDay(moments), [moments]);
   const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
 
+  const loadTimelineRef = useRef(loadTimeline);
+  loadTimelineRef.current = loadTimeline;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const result = await loadTimeline();
+      const result = await loadTimelineRef.current();
       setMoments(Array.isArray(result) ? result : []);
     } catch {
       setMoments([]);
@@ -48,7 +51,7 @@ export function TimelineScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loadTimeline]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -96,11 +96,18 @@ export function WeeklyReportScreen() {
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
 
+  // Use refs for callbacks to avoid infinite re-render loops.
+  // refreshSession updates user/subscription state in the provider, which
+  // recreates every context function via useMemo, which would retrigger
+  // useFocusEffect if those functions were listed as deps.
+  const callbacksRef = useRef({});
+  callbacksRef.current = { loadWeeklyReport, refreshSession, token, isPremium, isSignedIn };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const nextReport = await loadWeeklyReport();
+      const nextReport = await callbacksRef.current.loadWeeklyReport();
       setReport(nextReport);
     } catch {
       setReport(null);
@@ -108,14 +115,14 @@ export function WeeklyReportScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loadWeeklyReport]);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     load();
-    // Refresh session to pick up subscription changes
-    if (token) refreshSession().catch(() => null);
-    trackEvent("report_screen_viewed", { tier: isPremium ? "premium" : isSignedIn ? "signed" : "anonymous" });
-  }, [load, isPremium, isSignedIn, token, refreshSession]));
+    const { token: t, refreshSession: rs, isPremium: p, isSignedIn: s } = callbacksRef.current;
+    if (t) rs().catch(() => null);
+    trackEvent("report_screen_viewed", { tier: p ? "premium" : s ? "signed" : "anonymous" });
+  }, [load]));
 
   const hasRuleInsight = !!report?.aiInsight?.summary;
   const hasLlmInsight = !!report?.llmInsight?.narrative;

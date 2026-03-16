@@ -27,9 +27,9 @@
           "backgroundColor": "#060a12",
           "android": {
             "image": "./assets/adaptive-icon-padded.png",
-            "resizeMode": "contain",
+            "resizeMode": "native",
             "backgroundColor": "#060a12",
-            "imageWidth": 250
+            "imageWidth": 288
           }
         }
       ],

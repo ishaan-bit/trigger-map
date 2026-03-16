@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
@@ -12,11 +12,13 @@ export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
   const [todayCount, setTodayCount] = useState(0);
+  const loadTimelineRef = useRef(loadTimeline);
+  loadTimelineRef.current = loadTimeline;
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadTimeline()
+      loadTimelineRef.current()
         .then((moments) => {
           if (!active) return;
           const today = new Date().toDateString();
@@ -27,7 +29,7 @@ export function TriggerSelectionScreen() {
         })
         .catch(() => {});
       return () => { active = false; };
-    }, [loadTimeline])
+    }, [])
   );
 
   return (
