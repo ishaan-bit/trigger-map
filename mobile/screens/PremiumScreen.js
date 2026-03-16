@@ -112,7 +112,7 @@ export function PremiumScreen() {
       {isActive && (
         <View style={styles.activeCard}>
           <Text style={styles.activeIcon}>✓</Text>
-          <Text style={styles.activeText}>Premium is active. Thank you for supporting QuietDen.</Text>
+          <Text style={styles.activeText}>Premium is active. Thank you for supporting TriggerMap.</Text>
         </View>
       )}
     </ScreenShell>

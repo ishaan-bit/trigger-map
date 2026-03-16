@@ -45,7 +45,7 @@ export function generateMicroInsights(moments) {
     const [topEmotion, topCount] = sortedEmotions[0];
     const pct = Math.round((topCount / moments.length) * 100);
     if (pct >= 40) {
-      insights.push(`You've been feeling ${topEmotion} about ${pct}% of the time — it's your dominant state lately.`);
+      insights.push(`You've been feeling ${topEmotion} about ${pct}% of the time. It's your dominant state lately.`);
     }
   }
 
@@ -63,7 +63,7 @@ export function generateMicroInsights(moments) {
     const newer = newerTriggers[trigger] || 0;
     const older = olderTriggers[trigger] || 0;
     if (newer >= 3 && newer > older * 2) {
-      insights.push(`${trigger} has been showing up more often recently — something may have shifted.`);
+      insights.push(`${trigger} has been showing up more often recently. Something may have shifted.`);
       break;
     }
   }

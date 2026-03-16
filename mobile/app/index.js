@@ -9,7 +9,7 @@ export default function IndexRoute() {
     return (
       <ScreenShell
         loading
-        loadingTitle="Preparing QuietDen"
+        loadingTitle="Preparing TriggerMap"
         loadingMessage="Loading your session and running checks."
         timeoutMessage="Still loading. Check your connection if this persists."
       />

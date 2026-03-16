@@ -73,7 +73,7 @@ export function LoginScreen() {
   return (
     <ScreenShell>
       <View style={styles.header}>
-        <Text style={styles.brand}>QuietDen</Text>
+        <Text style={styles.brand}>TriggerMap</Text>
         <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
         <Text style={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</Text>
         <Text style={styles.subtitle}>Sign in to sync your data and unlock deeper insights.</Text>

@@ -152,7 +152,7 @@ export function SettingsScreen() {
 
       {/* ── About ── */}
       <Section icon="ℹ️" title="About">
-        <Text style={styles.aboutName}>QuietDen Experience</Text>
+        <Text style={styles.aboutName}>TriggerMap</Text>
         <Text style={styles.aboutBody}>
           Log moments, reflect on emotional triggers, and understand weekly patterns over time.
         </Text>

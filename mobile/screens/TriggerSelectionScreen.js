@@ -32,47 +32,54 @@ export function TriggerSelectionScreen() {
 
   return (
     <ScreenShell scroll={false}>
-
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Quick log</Text>
-        <Text style={styles.prompt}>What triggered{"\n"}this moment?</Text>
-        <Text style={styles.hint}>
-          {todayCount > 0
-            ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
-            : "Tap a trigger to start logging"}
-        </Text>
-      </View>
-
-      <Tooltip
-        id="log_tooltip"
-        text="Logging a few moments each day reveals your emotional patterns."
-      />
-
-      <View style={styles.grid}>
-        {TRIGGERS.map((trigger) => (
-          <TriggerTile
-            key={trigger}
-            label={trigger}
-            onPress={() => router.push(`/emotion?trigger=${trigger}`)}
-          />
-        ))}
-      </View>
-
-      {todayCount > 0 && (
-        <View style={styles.progressCard}>
-          <Text style={styles.progressEmoji}>✨</Text>
-          <Text style={styles.progressText}>
-            {todayCount >= 3
-              ? "Nice pattern data building up. Check your report later."
-              : `${3 - todayCount} more to unlock stronger observations this week.`}
+      <View style={styles.top}>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>Quick log</Text>
+          <Text style={styles.prompt}>What triggered{"\n"}this moment?</Text>
+          <Text style={styles.hint}>
+            {todayCount > 0
+              ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
+              : "Tap a trigger to start logging"}
           </Text>
         </View>
-      )}
+
+        <Tooltip
+          id="log_tooltip"
+          text="Logging a few moments each day reveals your emotional patterns."
+        />
+
+        <View style={styles.grid}>
+          {TRIGGERS.map((trigger) => (
+            <TriggerTile
+              key={trigger}
+              label={trigger}
+              onPress={() => router.push(`/emotion?trigger=${trigger}`)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.bottomCard}>
+        <Text style={styles.bottomEmoji}>
+          {todayCount >= 3 ? "✨" : todayCount > 0 ? "🔥" : "🌱"}
+        </Text>
+        <Text style={styles.bottomText}>
+          {todayCount >= 3
+            ? "Nice pattern data building up. Check your report later."
+            : todayCount > 0
+              ? `${3 - todayCount} more to unlock stronger observations this week.`
+              : "Each moment you log sharpens your weekly pattern report."}
+        </Text>
+      </View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  top: {
+    flex: 1,
+    gap: 20,
+  },
   header: {
     gap: 6,
     marginTop: 8,
@@ -104,7 +111,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingBottom: 4,
   },
-  progressCard: {
+  bottomCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -114,10 +121,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.accentMedium,
   },
-  progressEmoji: {
+  bottomEmoji: {
     fontSize: 18,
   },
-  progressText: {
+  bottomText: {
     color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,

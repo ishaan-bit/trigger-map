@@ -182,7 +182,7 @@ export function WeeklyReportScreen() {
               <View style={s.metricsGrid}>
                 <View style={s.metricCard}>
                   <Text style={s.metricLabel}>Top trigger</Text>
-                  <Text style={s.metricValue}>{report.topTrigger || "—"}</Text>
+                  <Text style={s.metricValue}>{report.topTrigger || "-"}</Text>
                   {report.topPair?.count > 0 ? (
                     <Text style={s.metricHint}>→ {report.topPair.emotion} ({report.topPair.count}×)</Text>
                   ) : null}
@@ -190,17 +190,17 @@ export function WeeklyReportScreen() {
                 <View style={s.metricCard}>
                   <Text style={s.metricLabel}>Top emotion</Text>
                   <Text style={s.metricValue}>
-                    {EMOTION_EMOJIS[report.topEmotion] || ""} {report.topEmotion || "—"}
+                    {EMOTION_EMOJIS[report.topEmotion] || ""} {report.topEmotion || "-"}
                   </Text>
                 </View>
                 <View style={s.metricCard}>
                   <Text style={s.metricLabel}>Volatility</Text>
-                  <Text style={s.metricValue}>{report.volatilityChange || "—"}</Text>
-                  <Text style={s.metricHint}>Score: {report.volatilityScore ?? "—"}</Text>
+                  <Text style={s.metricValue}>{report.volatilityChange || "-"}</Text>
+                  <Text style={s.metricHint}>Score: {report.volatilityScore ?? "-"}</Text>
                 </View>
                 <View style={s.metricCard}>
                   <Text style={s.metricLabel}>Stable day</Text>
-                  <Text style={s.metricValue}>{report.mostStableDay || "—"}</Text>
+                  <Text style={s.metricValue}>{report.mostStableDay || "-"}</Text>
                 </View>
               </View>
 
@@ -366,7 +366,7 @@ export function WeeklyReportScreen() {
                   <InsightCard
                     title="Weekly stability"
                     body={report.volatilityChange || "Not enough data yet."}
-                    footer={`Score: ${report.volatilityScore ?? 0} · Most steady: ${report.mostStableDay || "—"}`}
+                    footer={`Score: ${report.volatilityScore ?? 0} · Most steady: ${report.mostStableDay || "-"}`}
                   />
                 </>
               )}

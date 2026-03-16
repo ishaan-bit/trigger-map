@@ -33,9 +33,14 @@ function buildPrompt({ weeklyReport, historicalReports, userTrends }) {
     ? `Behavioral trends: ${JSON.stringify(userTrends)}`
     : "";
 
-  return `You are a compassionate behavioral pattern analyst for a mental health journaling app called QuietDen Experience. Users log emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  return `You are a behavioral pattern analyst for TriggerMap, a journaling app where users log emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
 
-Your task: Write a warm, personalized 3-4 paragraph narrative insight for this user's week. Be reflective, not judgmental. Reference specific patterns. Offer one concrete, actionable suggestion.
+Analyze this user's week with clinical depth and personal specificity. Your job is not to comfort but to illuminate. Identify:
+- Cross-trigger emotional cascades (e.g. work stress spilling into partner interactions)
+- Time-based behavioral rhythms (when certain triggers cluster and what that implies)
+- Emotional asymmetries (triggers that provoke outsized reactions vs ones that stay stable)
+- Avoidance or displacement patterns (conspicuous absences of certain triggers)
+- Week-over-week drift if historical data exists (escalation, recovery, stagnation)
 
 CURRENT WEEK DATA:
 ${currentWeek}
@@ -45,7 +50,14 @@ ${history}
 
 ${trends}
 
-Write the insight now. Address the user as "you". Keep it under 250 words. Do not use bullet points — write flowing paragraphs.`;
+Rules:
+- Write 3 to 4 flowing paragraphs, no bullet points, no headers
+- Address the user as "you"
+- Never use em dashes. Use commas, semicolons, or periods instead
+- Reference specific triggers and emotions from the data, not generic advice
+- Include one precise, actionable micro-experiment the user could try next week
+- Keep it under 280 words
+- Sound like a sharp, perceptive counselor, not a greeting card`;
 }
 
 export async function generateLlmInsight({ weeklyReport, historicalReports, userTrends }) {
@@ -64,11 +76,11 @@ export async function generateLlmInsight({ weeklyReport, historicalReports, user
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a compassionate behavioral pattern analyst. Write warm, reflective insights." },
+          { role: "system", content: "You are a sharp behavioral pattern analyst. Write incisive, data-grounded reflections that reveal hidden emotional dynamics. Never use em dashes." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.7,
-        max_tokens: 500,
+        temperature: 0.75,
+        max_tokens: 600,
       }),
       signal: controller.signal,
     });
@@ -79,11 +91,14 @@ export async function generateLlmInsight({ weeklyReport, historicalReports, user
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
+    let content = data.choices?.[0]?.message?.content?.trim();
 
     if (!content) {
       throw new Error("LLM returned empty response");
     }
+
+    // Strip any em dashes that slipped through
+    content = content.replace(/\u2014/g, ",").replace(/\u2013/g, ",");
 
     return {
       narrative: content,

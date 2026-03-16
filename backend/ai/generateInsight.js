@@ -1,17 +1,17 @@
 const TRIGGER_SUGGESTIONS = {
   work: "Consider setting boundaries around work hours to protect your downtime.",
-  social: "Social energy varies — try balancing group time with quiet recovery.",
+  social: "Social energy varies. Try balancing group time with quiet recovery.",
   money: "Financial stress often eases with even a small budgeting step each week.",
   family: "Family dynamics can be complex. Naming what you feel is already progress.",
   exercise: "Movement affects mood. Notice whether exercise lifts or drains you.",
-  health: "Health concerns carry emotional weight — be patient with yourself.",
+  health: "Health concerns carry emotional weight, so be patient with yourself.",
   sleep: "Sleep and mood are tightly linked. A consistent wind-down routine may help.",
   partner: "Relationship triggers often reveal unspoken needs worth exploring.",
   other: "Unnamed triggers still matter. Try journaling to find more specific patterns.",
 };
 
 const EMOTION_INSIGHTS = {
-  calm: "Calm moments are your anchors — notice what conditions create them.",
+  calm: "Calm moments are your anchors. Notice what conditions create them.",
   neutral: "Neutral isn't empty. It may mean things are steady, or feelings are muted.",
   anxious: "Anxiety often points to uncertainty. Identifying the source can reduce its grip.",
   frustrated: "Frustration usually signals a blocked need. What were you hoping for?",
@@ -31,7 +31,7 @@ export async function generateInsight(input) {
   const summaryParts = [];
   if (topTrigger && topEmotion) {
     summaryParts.push(
-      `This week, "${topTrigger}" came up most often — and when it did, you tended to feel ${topEmotion}.`
+      `This week, "${topTrigger}" came up most often, and when it did, you tended to feel ${topEmotion}.`
     );
   }
   if (volatility && !volatility.includes("Not enough")) {
@@ -41,7 +41,7 @@ export async function generateInsight(input) {
     summaryParts.push(`${stableDay} felt the most balanced.`);
   }
 
-  const summary = summaryParts.join(" ") || "Keep logging — patterns will emerge with more data.";
+  const summary = summaryParts.join(" ") || "Keep logging; patterns will emerge with more data.";
 
   const suggestion =
     TRIGGER_SUGGESTIONS[topTrigger] ||

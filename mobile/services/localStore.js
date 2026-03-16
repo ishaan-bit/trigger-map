@@ -115,7 +115,7 @@ export function buildLocalReport(moments) {
 
   return {
     insights: topTrigger && topEmotion
-      ? [`This week, ${topTrigger} was your most common trigger — and it usually came with feeling ${topEmotion}.`]
+      ? [`This week, ${topTrigger} was your most common trigger, and it usually came with feeling ${topEmotion}.`]
       : [],
     topTrigger,
     topEmotion,

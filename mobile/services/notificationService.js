@@ -18,7 +18,7 @@ export async function enableWeeklyReminder() {
   await ensureNotificationAccess();
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  return scheduleWeeklyInsightRelease("Your latest QuietDen report is ready to review.");
+  return scheduleWeeklyInsightRelease("Your latest TriggerMap report is ready to review.");
 }
 
 export async function disableWeeklyReminder() {
@@ -137,7 +137,7 @@ export async function notifyAiInsightReady() {
 
   return scheduleNotification({
     type: NOTIFICATION_TYPES.AI_INSIGHT_READY,
-    body: "Your personalized QuietDen insight is ready.",
+    body: "Your personalized TriggerMap insight is ready.",
     trigger: null,
   });
 }

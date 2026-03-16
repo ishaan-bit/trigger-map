@@ -32,7 +32,7 @@ export default function RootLayout() {
       } catch (error) {
         if (active) {
           console.warn(`[QuietDen] Startup validation failed: ${error.message}`);
-          ToastAndroid.show("Offline mode — data saved locally", ToastAndroid.SHORT);
+          ToastAndroid.show("Offline mode, data saved locally", ToastAndroid.SHORT);
         }
       } finally {
         // Hide splash after startup validation completes

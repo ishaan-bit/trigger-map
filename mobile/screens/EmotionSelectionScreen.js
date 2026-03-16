@@ -29,7 +29,7 @@ export function EmotionSelectionScreen() {
       showToast("Moment logged");
       router.back();
     } catch {
-      showToast("Save failed — try again");
+      showToast("Save failed. Try again.");
     } finally {
       setSaving(false);
     }

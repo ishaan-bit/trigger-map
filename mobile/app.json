@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "QuietDen Experience",
+    "name": "TriggerMap",
     "slug": "triggermap",
     "scheme": "triggermap",
     "version": "1.0.0",
@@ -24,7 +24,13 @@
         {
           "image": "./assets/splash.png",
           "resizeMode": "cover",
-          "backgroundColor": "#060a12"
+          "backgroundColor": "#060a12",
+          "android": {
+            "image": "./assets/adaptive-icon-padded.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#060a12",
+            "imageWidth": 250
+          }
         }
       ],
       [
