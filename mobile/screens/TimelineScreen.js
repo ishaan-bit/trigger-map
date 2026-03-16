@@ -104,6 +104,7 @@ export function TimelineScreen() {
       <Tooltip
         id="timeline_tooltip"
         text="Your timeline shows how triggers connect to emotions over time."
+        hidden={microInsights.length > 0}
       />
 
       {microInsights.length > 0 ? (
@@ -159,8 +160,8 @@ export function TimelineScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    gap: 4,
-    marginTop: 12,
+    gap: 6,
+    marginTop: 10,
   },
   kicker: {
     color: palette.accent,

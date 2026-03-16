@@ -42,6 +42,9 @@ export const radius = {
   pill: 999,
 };
 
+/** Height of the bottom tab bar (matches tabOptions) */
+export const TAB_BAR_HEIGHT = 72;
+
 export const type = {
   hero: { fontSize: 34, lineHeight: 40, fontWeight: "800", letterSpacing: -0.5 },
   title: { fontSize: 26, lineHeight: 32, fontWeight: "700", letterSpacing: -0.3 },

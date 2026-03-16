@@ -11,15 +11,20 @@ const OPTIONS = [
   { key: "energized", emoji: "☀️", label: "Energized" },
 ];
 
-export function DailyPrediction() {
+export function DailyPrediction({ onVisibilityChange }) {
   const [prediction, setPrediction] = useState(undefined); // undefined = loading
 
   useEffect(() => {
     getDailyPrediction().then((p) => setPrediction(p));
   }, []);
 
-  if (prediction !== null && prediction !== undefined) return null; // already predicted today
-  if (prediction === undefined) return null; // still loading
+  const isVisible = prediction === null;
+
+  useEffect(() => {
+    if (onVisibilityChange) onVisibilityChange(isVisible);
+  }, [isVisible, onVisibilityChange]);
+
+  if (!isVisible) return null;
 
   async function handlePick(key) {
     setPrediction(key);

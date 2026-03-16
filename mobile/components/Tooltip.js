@@ -7,11 +7,12 @@ const PREFIX = "triggermap.tooltip.seen.";
 
 const AUTO_DISMISS_MS = 4000;
 
-export function Tooltip({ id, text }) {
+export function Tooltip({ id, text, hidden = false }) {
   const [visible, setVisible] = useState(false);
   const opacity = useState(() => new Animated.Value(0))[0];
 
   useEffect(() => {
+    if (hidden) return;
     let active = true;
     let timer;
     AsyncStorage.getItem(`${PREFIX}${id}`).then((seen) => {
@@ -37,7 +38,7 @@ export function Tooltip({ id, text }) {
       });
     });
     return () => { active = false; clearTimeout(timer); };
-  }, [id, opacity]);
+  }, [id, opacity, hidden]);
 
   function dismiss() {
     Animated.timing(opacity, {
@@ -48,7 +49,7 @@ export function Tooltip({ id, text }) {
     AsyncStorage.setItem(`${PREFIX}${id}`, "1");
   }
 
-  if (!visible) return null;
+  if (!visible || hidden) return null;
 
   return (
     <Animated.View style={[styles.container, { opacity }]}>

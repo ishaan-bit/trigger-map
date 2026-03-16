@@ -12,7 +12,6 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
@@ -204,12 +203,7 @@ export function WeeklyReportScreen() {
             {hasRuleInsight ? (
               <Text style={s.takeaway}>{report.aiInsight.summary}</Text>
             ) : null}
-            {report?.aiInsight?.generatedAt ? (
-              <Text style={s.freshness}>Updated {new Date(report.aiInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</Text>
-            ) : null}
           </View>
-
-          <Tooltip id="report_tooltip" text="Insights sharpen as you log more moments throughout the week." />
 
           {error ? (
             <View style={s.stateCard}>
@@ -219,7 +213,19 @@ export function WeeklyReportScreen() {
             </View>
           ) : null}
 
-          {report && !error ? (
+          {report && !error && confidence === "too_early" ? (
+            /* ---------- STARTER STATE (0-2 moments) ---------- */
+            <View style={s.starterCard}>
+              <Text style={s.starterEmoji}>{"\uD83C\uDF31"}</Text>
+              <Text style={s.starterTitle}>A few more moments to go</Text>
+              <Text style={s.starterBody}>
+                Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture.
+              </Text>
+              <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+            </View>
+          ) : null}
+
+          {report && !error && confidence !== "too_early" ? (
             <>
               {/* --- 2. WHAT SHOWED UP --- */}
               <SectionHeader label="What showed up" extra={`${dq.uniqueEmotions || 0} emotions \u00B7 ${dq.uniqueTriggers || 0} triggers`} />
@@ -280,7 +286,7 @@ export function WeeklyReportScreen() {
               ) : null}
 
               {/* --- 4. PATTERNS & PAIRINGS (conditional) --- */}
-              {!isSignedIn ? (
+              {!isSignedIn && confidence !== "low" ? (
                 <LockedSection
                   title="Patterns and pairings"
                   teaser="Create a free account to see emotional correlations, energy flow, and weekly trajectory."
@@ -391,7 +397,7 @@ export function WeeklyReportScreen() {
               )}
 
               {/* --- 6. PREMIUM PATTERN READ --- */}
-              {isSignedIn && !isPremium ? (
+              {isSignedIn && !isPremium && confidence !== "low" ? (
                 <LockedSection
                   title="Pattern read"
                   teaser="A concise AI analysis grounded in your actual data, not generic advice."
@@ -427,16 +433,11 @@ export function WeeklyReportScreen() {
               ) : null}
 
               {/* --- 7. DATA QUALITY NUDGE --- */}
-              {confidence === "too_early" || confidence === "low" ? (
+              {confidence === "low" ? (
                 <View style={s.nudgeCard}>
-                  <Text style={s.nudgeTitle}>
-                    {confidence === "too_early" ? "A few more moments to go" : "Patterns are forming"}
-                  </Text>
+                  <Text style={s.nudgeTitle}>Patterns are forming</Text>
                   <Text style={s.nudgeBody}>
-                    {confidence === "too_early"
-                      ? "Log at least 3 moments for us to start spotting patterns. The more days you cover, the sharper the picture."
-                      : `${dq.totalMoments} moments across ${dq.daysLogged} day${dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.`
-                    }
+                    {`${dq.totalMoments} moments across ${dq.daysLogged} day${dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.`}
                   </Text>
                   <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
                 </View>
@@ -468,7 +469,7 @@ const s = StyleSheet.create({
   content: { gap: 16 },
 
   /* Header / hero */
-  header: { gap: 6, marginTop: 12 },
+  header: { gap: 6, marginTop: 10 },
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   title: { color: palette.text, fontSize: 26, fontWeight: "700" },
   subtitle: { color: palette.muted, fontSize: 13, marginTop: 2 },
@@ -628,6 +629,16 @@ const s = StyleSheet.create({
   },
   nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
   nudgeBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+
+  /* Starter state (too_early) */
+  starterCard: {
+    alignItems: "center", gap: 14, paddingVertical: 40, paddingHorizontal: 24,
+    borderRadius: radius.md, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  starterEmoji: { fontSize: 40 },
+  starterTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
+  starterBody: { color: palette.muted, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
 
   /* State cards */
   stateCard: {

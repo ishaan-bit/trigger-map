@@ -13,6 +13,7 @@ export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
   const [todayCount, setTodayCount] = useState(0);
+  const [predictionDone, setPredictionDone] = useState(true);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
 
@@ -49,9 +50,10 @@ export function TriggerSelectionScreen() {
         <Tooltip
           id="log_tooltip"
           text="Logging a few moments each day reveals your emotional patterns."
+          hidden={!predictionDone}
         />
 
-        <DailyPrediction />
+        <DailyPrediction onVisibilityChange={(vis) => setPredictionDone(!vis)} />
 
         <View style={styles.grid}>
           {TRIGGERS.map((trigger) => (
@@ -87,7 +89,7 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
-    marginTop: 8,
+    marginTop: 10,
     marginBottom: 0,
   },
   kicker: {

@@ -171,8 +171,8 @@ export function SettingsScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    gap: 4,
-    marginTop: 12,
+    gap: 6,
+    marginTop: 10,
     marginBottom: 4,
   },
   kicker: {

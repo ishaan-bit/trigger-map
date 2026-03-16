@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 36,
+    paddingBottom: 48,
     gap: 20,
   },
   loaderWrap: {

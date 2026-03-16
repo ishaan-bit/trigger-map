@@ -90,7 +90,7 @@ export function EmotionSelectionScreen() {
 const styles = StyleSheet.create({
   header: {
     gap: 6,
-    marginTop: 12,
+    marginTop: 10,
   },
   kicker: {
     color: palette.accent,
