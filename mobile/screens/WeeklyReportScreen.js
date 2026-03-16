@@ -87,7 +87,7 @@ function LockedSection({ title, teaser, ctaLabel, onPress, children }) {
 }
 
 export function WeeklyReportScreen() {
-  const { loadWeeklyReport, subscription, user, token } = useAppSession();
+  const { loadWeeklyReport, refreshSession, subscription, user, token } = useAppSession();
   const router = useRouter();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -112,8 +112,10 @@ export function WeeklyReportScreen() {
 
   useFocusEffect(useCallback(() => {
     load();
+    // Refresh session to pick up subscription changes
+    if (token) refreshSession().catch(() => null);
     trackEvent("report_screen_viewed", { tier: isPremium ? "premium" : isSignedIn ? "signed" : "anonymous" });
-  }, [load, isPremium, isSignedIn]));
+  }, [load, isPremium, isSignedIn, token, refreshSession]));
 
   const hasRuleInsight = !!report?.aiInsight?.summary;
   const hasLlmInsight = !!report?.llmInsight?.narrative;
