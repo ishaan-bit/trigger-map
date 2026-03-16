@@ -33,7 +33,7 @@ function buildPrompt({ weeklyReport, historicalReports, userTrends }) {
     ? `Behavioral trends: ${JSON.stringify(userTrends)}`
     : "";
 
-  return `You are a compassionate behavioral pattern analyst for a mental health journaling app called TriggerMap. Users log emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  return `You are a compassionate behavioral pattern analyst for a mental health journaling app called QuietDen Experience. Users log emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
 
 Your task: Write a warm, personalized 3-4 paragraph narrative insight for this user's week. Be reflective, not judgmental. Reference specific patterns. Offer one concrete, actionable suggestion.
 

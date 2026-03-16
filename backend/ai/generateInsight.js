@@ -31,14 +31,14 @@ export async function generateInsight(input) {
   const summaryParts = [];
   if (topTrigger && topEmotion) {
     summaryParts.push(
-      `Your week was most shaped by "${topTrigger}" triggers, and you often felt ${topEmotion}.`
+      `This week, "${topTrigger}" came up most often — and when it did, you tended to feel ${topEmotion}.`
     );
   }
   if (volatility && !volatility.includes("Not enough")) {
-    summaryParts.push(`Emotional volatility: ${volatility}.`);
+    summaryParts.push(`Emotional flow: ${volatility}.`);
   }
   if (stableDay && !stableDay.includes("Not enough")) {
-    summaryParts.push(`Your most balanced day was ${stableDay}.`);
+    summaryParts.push(`${stableDay} felt the most balanced.`);
   }
 
   const summary = summaryParts.join(" ") || "Keep logging — patterns will emerge with more data.";

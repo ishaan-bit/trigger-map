@@ -49,7 +49,7 @@ export function Layout({ title, children, actions = null }) {
       <div className="shellGlow shellGlowTwo" />
       <header className="hero">
         <div className="heroCopy">
-          <p className="eyebrow">TriggerMap</p>
+          <p className="eyebrow">QuietDen</p>
           <h1>{title}</h1>
           <p className="lede">Log a moment, review your timeline, and open your weekly report — from any browser.</p>
           <div className="statusRow">

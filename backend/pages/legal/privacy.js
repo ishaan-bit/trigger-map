@@ -21,11 +21,11 @@ export default function PrivacyPolicyPage() {
     <main style={shell}>
       <article style={card}>
         <p style={{ color: "#85a9ff", textTransform: "uppercase", letterSpacing: 2, fontSize: 12 }}>
-          TriggerMap Privacy Policy
+          QuietDen Privacy Policy
         </p>
         <h1>Privacy Policy</h1>
         <p>
-          TriggerMap collects trigger logs, selected emotions, optional notes, subscription status, device identifiers,
+          QuietDen Experience collects trigger logs, selected emotions, optional notes, subscription status, device identifiers,
           and account details that you choose to provide. Anonymous use is supported by generating a local device ID.
         </p>
         <h2>What we collect</h2>
@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
         </ul>
         <h2>Your choices</h2>
         <ul>
-          <li>You can use TriggerMap anonymously by default</li>
+          <li>You can use QuietDen anonymously by default</li>
           <li>You can create an account later and migrate anonymous data</li>
           <li>You can export your logs from the settings screen</li>
           <li>You can request account deletion through support workflows</li>

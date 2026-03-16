@@ -5,7 +5,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>TriggerMap Web</title>
+        <title>QuietDen Web</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0b1220" />
         <meta name="description" content="Track emotional triggers, review your timeline, and get a weekly pattern report from any browser." />

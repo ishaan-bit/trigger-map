@@ -114,7 +114,7 @@ export async function runGenerateLlmInsights() {
 
 // CLI entry point
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  console.log("=== TriggerMap LLM Insight Generator ===");
+  console.log("=== QuietDen LLM Insight Generator ===");
   console.log(`LLM endpoint: ${process.env.LLM_API_URL || "http://localhost:11434/v1"}`);
   console.log(`Model: ${process.env.LLM_MODEL || "mistral"}`);
   console.log("");

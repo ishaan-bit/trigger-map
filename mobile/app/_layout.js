@@ -23,16 +23,16 @@ export default function RootLayout() {
       try {
         await setLastOpenedAt();
         const apiOrigin = getApiOrigin();
-        console.info(`[TriggerMap] API origin: ${apiOrigin}`);
+        console.info(`[QuietDen] API origin: ${apiOrigin}`);
         const health = await fetchHealth();
         if (active) {
-          console.info("TriggerMap backend reachable");
-          console.info("TriggerMap: health checked", health);
+          console.info("QuietDen backend reachable");
+          console.info("QuietDen: health checked", health);
         }
       } catch (error) {
         if (active) {
-          console.warn(`[TriggerMap] Startup validation failed: ${error.message}`);
-          ToastAndroid.show("Backend unavailable", ToastAndroid.SHORT);
+          console.warn(`[QuietDen] Startup validation failed: ${error.message}`);
+          ToastAndroid.show("Offline mode — data saved locally", ToastAndroid.SHORT);
         }
       } finally {
         // Hide splash after startup validation completes

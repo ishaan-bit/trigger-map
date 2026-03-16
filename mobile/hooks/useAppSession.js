@@ -132,6 +132,14 @@ export function SessionProvider({ children }) {
       async completeOnboarding() {
         await setOnboardingComplete(true);
         setOnboardingCompleteState(true);
+        // Enable weekly reminder by default on first launch
+        try {
+          await enableWeeklyReminder();
+          await setReminderEnabled(true);
+          setReminderEnabledState(true);
+        } catch {
+          // Permission denied or scheduling failed — leave disabled
+        }
       },
       async signInWithEmail(email, password) {
         const activeDeviceId = await ensureDeviceIdentity();
@@ -214,7 +222,7 @@ export function SessionProvider({ children }) {
           },
           token
         );
-        console.info("TriggerMap: moment logged", {
+        console.info("QuietDen: moment logged", {
           id: response.moment?.id,
           trigger: response.moment?.trigger,
           emotion: response.moment?.emotion,
@@ -238,7 +246,7 @@ export function SessionProvider({ children }) {
         }
 
         const response = await fetchTimeline(activeDeviceId, token);
-        console.info("TriggerMap: timeline fetched", { count: response.moments?.length ?? 0 });
+        console.info("QuietDen: timeline fetched", { count: response.moments?.length ?? 0 });
         return response.moments || [];
       },
       async updateMoment(momentId, updates) {
@@ -272,7 +280,7 @@ export function SessionProvider({ children }) {
 
         const response = await fetchWeeklyReport(activeDeviceId, token);
         const report = response.report || createEmptyReport();
-        console.info("TriggerMap: report generated", { totalMoments: report.totalMoments ?? 0 });
+        console.info("QuietDen: report generated", { totalMoments: report.totalMoments ?? 0 });
         trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments });
         return report;
       },
@@ -288,7 +296,7 @@ export function SessionProvider({ children }) {
           contents = JSON.stringify(localMoments, null, 2);
         }
 
-        const fileUri = `${FileSystem.cacheDirectory}triggermap-export.json`;
+        const fileUri = `${FileSystem.cacheDirectory}quietden-export.json`;
         await FileSystem.writeAsStringAsync(fileUri, contents, { encoding: FileSystem.EncodingType.UTF8 });
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(fileUri);

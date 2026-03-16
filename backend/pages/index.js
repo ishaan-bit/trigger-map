@@ -19,7 +19,7 @@ export default function HomePage() {
       <div style={{ maxWidth: 860, margin: "0 auto", display: "grid", gap: 20 }}>
         <section style={sectionStyle}>
           <p style={{ color: "#8fb2ff", letterSpacing: 2, textTransform: "uppercase", fontSize: 12 }}>
-            TriggerMap Backend
+            QuietDen Backend
           </p>
           <h1 style={{ fontSize: 42, margin: "12px 0" }}>Discover what triggers your emotions.</h1>
           <p style={{ color: "#afbdd1", maxWidth: 640, lineHeight: 1.6 }}>

@@ -9,9 +9,9 @@ export default function IndexRoute() {
     return (
       <ScreenShell
         loading
-        loadingTitle="Preparing TriggerMap"
-        loadingMessage="Loading your device session and health checks."
-        timeoutMessage="Still preparing TriggerMap. Check connection if this keeps happening."
+        loadingTitle="Preparing QuietDen"
+        loadingMessage="Loading your session and running checks."
+        timeoutMessage="Still loading. Check your connection if this persists."
       />
     );
   }

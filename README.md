@@ -1,6 +1,6 @@
-# TriggerMap
+# QuietDen Experience
 
-TriggerMap is a production-oriented monorepo with an Expo mobile app and a Next.js API backend backed by Redis.
+QuietDen Experience is a production-oriented monorepo with an Expo mobile app and a Next.js API backend backed by Redis.
 
 ## Stack
 

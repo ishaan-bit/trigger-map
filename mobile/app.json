@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TriggerMap",
+    "name": "QuietDen Experience",
     "slug": "triggermap",
     "scheme": "triggermap",
     "version": "1.0.0",
@@ -23,7 +23,6 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "imageWidth": 1024,
           "resizeMode": "cover",
           "backgroundColor": "#060a12"
         }

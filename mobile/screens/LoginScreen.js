@@ -73,10 +73,10 @@ export function LoginScreen() {
   return (
     <ScreenShell>
       <View style={styles.header}>
-        <Text style={styles.brand}>TriggerMap</Text>
+        <Text style={styles.brand}>QuietDen</Text>
         <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
         <Text style={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</Text>
-        <Text style={styles.subtitle}>Anonymous mode stays available even if you skip this.</Text>
+        <Text style={styles.subtitle}>Sign in to sync your data and unlock deeper insights.</Text>
       </View>
 
       {mode === "register" ? (
@@ -115,6 +115,15 @@ export function LoginScreen() {
         onPress={() => setMode(mode === "login" ? "register" : "login")}
         secondary
       />
+
+      <View style={styles.divider} />
+
+      <PrimaryButton
+        label="Continue anonymously"
+        onPress={() => router.replace("/(tabs)/log")}
+        secondary
+      />
+      <Text style={styles.anonHint}>No account needed. Your data stays on this device.</Text>
     </ScreenShell>
   );
 }
@@ -170,5 +179,16 @@ const styles = StyleSheet.create({
   noticeText: {
     color: palette.muted,
     lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: palette.glassBorder,
+    marginVertical: 4,
+  },
+  anonHint: {
+    color: palette.muted,
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 16,
   },
 });

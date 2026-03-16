@@ -18,7 +18,7 @@ export async function enableWeeklyReminder() {
   await ensureNotificationAccess();
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  return scheduleWeeklyInsightRelease("Your latest TriggerMap report is ready to review.");
+  return scheduleWeeklyInsightRelease("Your latest QuietDen report is ready to review.");
 }
 
 export async function disableWeeklyReminder() {
@@ -33,7 +33,7 @@ export async function scheduleReflectionReminder() {
 
   return scheduleNotification({
     type: NOTIFICATION_TYPES.REFLECTION_REMINDER,
-    body: "Take a minute to log the strongest moment from today.",
+    body: "How did today feel? A quick log helps your pattern map stay current.",
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: 20,
@@ -125,7 +125,7 @@ export async function notifyReportReady() {
 
   return scheduleNotification({
     type: NOTIFICATION_TYPES.REPORT_READY,
-    body: "Your weekly pattern report is ready. See what your triggers revealed this week.",
+    body: "Your weekly emotional patterns are ready to explore.",
     trigger: null,
   });
 }
@@ -137,7 +137,7 @@ export async function notifyAiInsightReady() {
 
   return scheduleNotification({
     type: NOTIFICATION_TYPES.AI_INSIGHT_READY,
-    body: "A new personalized insight is waiting for you based on your recent patterns.",
+    body: "Your personalized QuietDen insight is ready.",
     trigger: null,
   });
 }
@@ -156,7 +156,7 @@ export async function scheduleInactivityNudge() {
 
   return scheduleNotification({
     type: NOTIFICATION_TYPES.INACTIVITY_NUDGE,
-    body: "A quick moment log keeps your patterns accurate. Just one tap to capture how you're feeling.",
+    body: "How has your day been? Log a moment to keep your pattern map current.",
     trigger: null,
   });
 }

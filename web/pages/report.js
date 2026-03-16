@@ -281,7 +281,7 @@ export default function ReportPage() {
         <div className="card feedbackPanel stack emptyStatePanel">
           <Image src="/assets/report-empty.png" alt="Weekly report empty state" width={220} height={220} loading="lazy" className="emptyStateArt" />
           <strong>Not enough data yet</strong>
-          <p className="feedback">Log a few moments this week and TriggerMap will generate your first report.</p>
+          <p className="feedback">Log a few moments this week and QuietDen will generate your first report.</p>
           <a className="primaryButton inlineButton" href="/">Log a moment</a>
         </div>
       ) : null}

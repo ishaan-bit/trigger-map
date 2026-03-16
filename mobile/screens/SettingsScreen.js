@@ -19,12 +19,22 @@ function Section({ icon, title, children }) {
   );
 }
 
+function Row({ label, value }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue}>{value}</Text>
+    </View>
+  );
+}
+
 export function SettingsScreen() {
   const router = useRouter();
   const { exportLogs, deleteAllUserData, reminderEnabled, signOut, subscription, toggleReminder, user } = useAppSession();
   const baseUrl = getWebBaseUrl();
 
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
+  const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
 
   return (
     <ScreenShell scroll>
@@ -35,8 +45,12 @@ export function SettingsScreen() {
         <Text style={styles.subtitle}>Manage your account, notifications, and data.</Text>
       </View>
 
+      {/* ── Account ── */}
       <Section icon="👤" title="Account">
-        <Text style={styles.rowText}>{user ? user.email : "Anonymous"}</Text>
+        <Row label="Status" value={user ? user.email : "Anonymous"} />
+        {!user && (
+          <Text style={styles.hintText}>Sign in to sync your data and unlock deeper insights.</Text>
+        )}
         <PrimaryButton
           label={user ? "Sign out" : "Sign in"}
           onPress={user ? async () => {
@@ -47,20 +61,30 @@ export function SettingsScreen() {
         />
       </Section>
 
+      {/* ── Subscription ── */}
       <Section icon="✦" title="Subscription">
-        <View style={styles.subscriptionRow}>
-          <View style={[styles.statusBadge, isPremium && styles.statusBadgePremium]}>
-            <Text style={[styles.statusText, isPremium && styles.statusTextPremium]}>
-              {isPremium ? "Premium" : "Free"}
-            </Text>
+        <View style={styles.planRow}>
+          <View style={[styles.planBadge, isPremium && styles.planBadgePremium]}>
+            <Text style={[styles.planBadgeText, isPremium && styles.planBadgeTextPremium]}>{planLabel}</Text>
           </View>
         </View>
-        <PrimaryButton label="Manage subscription" onPress={() => router.push("/(tabs)/premium")} secondary />
+        {isPremium ? (
+          <Text style={styles.hintText}>Personalized AI insights and detailed charts unlocked.</Text>
+        ) : user ? (
+          <Text style={styles.hintText}>Upgrade to Premium for AI narrative insights and advanced analytics.</Text>
+        ) : (
+          <Text style={styles.hintText}>Create a free account to sync, or go Premium for AI insights.</Text>
+        )}
+        <PrimaryButton label="View plans" onPress={() => router.push("/(tabs)/premium")} secondary />
       </Section>
 
+      {/* ── Notifications ── */}
       <Section icon="🔔" title="Notifications">
         <View style={styles.switchRow}>
-          <Text style={styles.rowText}>Weekly report reminder</Text>
+          <View style={styles.switchLabel}>
+            <Text style={styles.rowLabel}>Weekly report reminder</Text>
+            <Text style={styles.switchHint}>Get notified when your weekly report is ready.</Text>
+          </View>
           <Switch
             onValueChange={async (value) => {
               try {
@@ -76,6 +100,7 @@ export function SettingsScreen() {
         </View>
       </Section>
 
+      {/* ── Data ── */}
       <Section icon="📂" title="Data">
         <PrimaryButton
           label="Export logs"
@@ -88,6 +113,9 @@ export function SettingsScreen() {
           }}
           secondary
         />
+        {user && (
+          <Text style={styles.hintText}>Exports include all synced and local moments.</Text>
+        )}
         <PrimaryButton
           label="Delete all data"
           onPress={() => {
@@ -115,15 +143,28 @@ export function SettingsScreen() {
         />
       </Section>
 
+      {/* ── Legal ── */}
       <Section icon="📄" title="Legal">
         <PrimaryButton label="Privacy policy" onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
         <PrimaryButton label="Terms and conditions" onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
+        <Row label="Support" value="qdenxp@gmail.com" />
       </Section>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>TriggerMap v{Constants.expoConfig?.version || "1.0.0"}</Text>
-        <Text style={styles.footerMuted}>Built with care for your well-being</Text>
-      </View>
+      {/* ── About ── */}
+      <Section icon="ℹ️" title="About">
+        <Text style={styles.aboutName}>QuietDen Experience</Text>
+        <Text style={styles.aboutBody}>
+          Log moments, reflect on emotional triggers, and understand weekly patterns over time.
+        </Text>
+        <View style={styles.aboutMeta}>
+          <Row label="Version" value={`v${Constants.expoConfig?.version || "1.0.0"}`} />
+          <Row label="Developer" value="QuietDen (OPC) Pvt. Ltd." />
+          <Row label="Website" value="qdenxp.com" />
+          <Row label="Phone" value="+91 9798784610" />
+        </View>
+        <Text style={styles.aboutFooter}>Registered December 2025, India</Text>
+      </Section>
+
     </ScreenShell>
   );
 }
@@ -132,7 +173,7 @@ const styles = StyleSheet.create({
   header: {
     gap: 4,
     marginTop: 12,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   kicker: {
     color: palette.accent,
@@ -174,51 +215,86 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
-  rowText: {
-    color: palette.text,
-    fontSize: 16,
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 28,
   },
-  subscriptionRow: {
+  rowLabel: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  rowValue: {
+    color: palette.textSecondary,
+    fontSize: 14,
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  hintText: {
+    color: palette.muted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  planRow: {
     flexDirection: "row",
   },
-  statusBadge: {
+  planBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: radius.pill,
     backgroundColor: palette.glass,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
   },
-  statusBadgePremium: {
+  planBadgePremium: {
     backgroundColor: palette.accentSoft,
+    borderColor: palette.accentMedium,
   },
-  statusText: {
+  planBadgeText: {
     color: palette.muted,
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  statusTextPremium: {
+  planBadgeTextPremium: {
     color: palette.accent,
   },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
   },
-  footer: {
-    alignItems: "center",
-    gap: 4,
-    paddingTop: 8,
-    paddingBottom: 16,
-    opacity: 0.5,
+  switchLabel: {
+    flex: 1,
+    gap: 2,
   },
-  footerText: {
+  switchHint: {
     color: palette.muted,
     fontSize: 12,
-    fontWeight: "600",
+    lineHeight: 16,
   },
-  footerMuted: {
+  aboutName: {
+    color: palette.text,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  aboutBody: {
     color: palette.muted,
-    fontSize: 11,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  aboutMeta: {
+    gap: 4,
+    marginTop: 4,
+  },
+  aboutFooter: {
+    color: palette.muted,
+    fontSize: 12,
+    marginTop: 4,
+    opacity: 0.7,
   },
 });

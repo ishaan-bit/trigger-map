@@ -14,7 +14,7 @@ const tiers = [
     features: [
       "Log triggers + emotions",
       "On-device timeline",
-      "Basic weekly report",
+      "Basic weekly charts",
     ],
     highlight: false,
   },
@@ -25,7 +25,7 @@ const tiers = [
     features: [
       "Everything in Anonymous",
       "Cloud backup + sync",
-      "Pattern insights (rule-based)",
+      "Weekly pattern observations",
       "Edit & delete moments",
       "Export your data",
     ],
@@ -37,8 +37,8 @@ const tiers = [
     description: PREMIUM_PRICE_LABEL,
     features: [
       "Everything in Free",
-      "Personalized AI narrative insights",
-      "Detailed pattern charts",
+      "AI-written personal reflections",
+      "Multi-week trend tracking",
       "Priority support",
     ],
     highlight: true,
@@ -112,7 +112,7 @@ export function PremiumScreen() {
       {isActive && (
         <View style={styles.activeCard}>
           <Text style={styles.activeIcon}>✓</Text>
-          <Text style={styles.activeText}>Premium is active. Thank you for supporting TriggerMap.</Text>
+          <Text style={styles.activeText}>Premium is active. Thank you for supporting QuietDen.</Text>
         </View>
       )}
     </ScreenShell>

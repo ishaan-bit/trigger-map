@@ -18,7 +18,7 @@ const slides = [
   {
     icon: "📊",
     title: "Discover your\npatterns",
-    body: "TriggerMap spots recurring connections between triggers and emotions — so you can understand yourself better.",
+    body: "QuietDen spots recurring connections between triggers and emotions — so you can understand yourself better.",
   },
   {
     icon: "🔒",
@@ -60,7 +60,7 @@ export function OnboardingScreen() {
   return (
     <ScreenShell scroll={false}>
       <View style={styles.top}>
-        <Text style={styles.brand}>TriggerMap</Text>
+        <Text style={styles.brand}>QuietDen</Text>
         {!isLast && (
           <Pressable onPress={handleSkip} hitSlop={12} accessibilityRole="button">
             <Text style={styles.skip}>Skip</Text>

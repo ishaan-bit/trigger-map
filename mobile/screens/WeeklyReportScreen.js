@@ -273,8 +273,8 @@ export function WeeklyReportScreen() {
                   ════════════════════════════════════════════════════ */}
               {!isSignedIn ? (
                 <LockedSection
-                  title="Your weekly insight is ready."
-                  teaser="Sign in with Google to unlock your weekly pattern insight."
+                  title="Your personal insights are waiting"
+                  teaser="Create a free account to unlock pattern observations, emotional correlations, and weekly reflections."
                   ctaLabel="Sign in to unlock"
                   onPress={handleSignInUnlock}
                 >
@@ -324,7 +324,7 @@ export function WeeklyReportScreen() {
                     </View>
                   ) : (
                     <View style={s.card}>
-                      <Text style={s.aiSuggestion}>Insights will appear once you have a few more moments this week.</Text>
+                      <Text style={s.aiSuggestion}>Your weekly observations will appear here once a few more moments are logged.</Text>
                     </View>
                   )}
 
@@ -354,17 +354,17 @@ export function WeeklyReportScreen() {
                   {/* Observations — unlocked for signed-in */}
                   {report.insights?.length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Observations" extra={`${report.insights.length} insights`} />
+                      <SectionHeader label="Observations" extra={`${report.insights.length} pattern${report.insights.length !== 1 ? "s" : ""}`} />
                       {report.insights.map((insight, idx) => (
-                        <InsightCard key={idx} body={insight} tone={idx === 0 ? "accent" : "default"} title={`Pattern ${idx + 1}`} />
+                        <InsightCard key={idx} body={insight} tone={idx === 0 ? "accent" : "default"} title={`Observation ${idx + 1}`} />
                       ))}
                     </View>
                   ) : null}
 
                   <InsightCard
-                    title="Stability"
+                    title="Weekly stability"
                     body={report.volatilityChange || "Not enough data yet."}
-                    footer={`Score: ${report.volatilityScore ?? 0} · Most stable: ${report.mostStableDay || "—"}`}
+                    footer={`Score: ${report.volatilityScore ?? 0} · Most steady: ${report.mostStableDay || "—"}`}
                   />
                 </>
               )}
@@ -374,8 +374,8 @@ export function WeeklyReportScreen() {
                   ════════════════════════════════════════════════════ */}
               {isSignedIn && !isPremium ? (
                 <LockedSection
-                  title="Personalised AI Reflection"
-                  teaser="Deeper insights generated using AI across multiple weeks of your patterns. Upgrade to Premium to unlock."
+                  title="Personalised AI reflection"
+                  teaser="A deeper narrative about your emotional patterns, written by AI and tailored to your journey."
                   ctaLabel="Unlock Premium"
                   onPress={handlePremiumUnlock}
                 >
@@ -389,7 +389,7 @@ export function WeeklyReportScreen() {
                       Your emotional patterns this week reveal a recurring theme connecting "{report.topTrigger || "..."}" to how you feel...
                     </Text>
                     <Text style={[s.aiSuggestion, { color: palette.muted }]}>
-                      AI-generated narrative analysis is available with Premium. Get personalised reflections that track your growth over weeks.
+                      Premium members receive a personalised reflection that evolves as you log more moments.
                     </Text>
                   </View>
                 </LockedSection>
@@ -414,7 +414,7 @@ export function WeeklyReportScreen() {
                           <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
                         </View>
                       </View>
-                      <Text style={s.aiSuggestion}>Your personalised AI reflection will be generated when enough data is available. Keep logging moments.</Text>
+                      <Text style={s.aiSuggestion}>Your personalised reflection will appear here once enough patterns have formed. Keep logging moments.</Text>
                     </View>
                   )}
                 </View>
@@ -425,8 +425,8 @@ export function WeeklyReportScreen() {
           {!report && !loading && !error ? (
             <View style={[s.stateCard, s.emptyStateCard]}>
               <Image source={require("@/assets/report-empty.png")} style={s.emptyIllustration} resizeMode="contain" accessible={false} />
-              <Text style={s.stateTitle}>Not enough data yet</Text>
-              <Text style={s.stateBody}>Log a few moments this week to see your first report.</Text>
+              <Text style={s.stateTitle}>Your first report is on its way</Text>
+              <Text style={s.stateBody}>Log a few moments this week and your patterns will appear here.</Text>
               <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
             </View>
           ) : null}

@@ -17,7 +17,7 @@ function initIfNeeded() {
 
 export function captureServerError(error, context = {}) {
   initIfNeeded();
-  console.error("[TriggerMap]", error, context);
+  console.error("[QuietDen]", error, context);
 
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(error, { extra: context });

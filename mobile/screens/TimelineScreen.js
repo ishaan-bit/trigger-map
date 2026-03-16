@@ -94,7 +94,7 @@ export function TimelineScreen() {
         <Text style={styles.subtitle}>
           {moments.length
             ? `${moments.length} moment${moments.length !== 1 ? "s" : ""} this week`
-            : "Your trigger moments, grouped by day."}
+            : "Your moments, grouped by day."}
         </Text>
       </View>
 

@@ -59,8 +59,8 @@ async function request(path, options = {}) {
     }
 
     if (error?.message === "Failed to fetch" || error?.message === "Load failed") {
-      console.error("TriggerMap API unreachable:", `${API_BASE_URL}/api${path}`, error.message);
-      throw new Error("TriggerMap cannot reach the server. Please try again.");
+      console.error("QuietDen API unreachable:", `${API_BASE_URL}/api${path}`, error.message);
+      throw new Error("Unable to reach the server. Please try again.");
     }
 
     throw new Error(error?.message || "Request failed");

@@ -39,13 +39,13 @@ export function TriggerSelectionScreen() {
         <Text style={styles.hint}>
           {todayCount > 0
             ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
-            : "Tap a trigger to start"}
+            : "Tap a trigger to start logging"}
         </Text>
       </View>
 
       <Tooltip
         id="log_tooltip"
-        text="Logging moments regularly helps reveal patterns."
+        text="Logging a few moments each day reveals your emotional patterns."
       />
 
       <View style={styles.grid}>
@@ -57,6 +57,17 @@ export function TriggerSelectionScreen() {
           />
         ))}
       </View>
+
+      {todayCount > 0 && (
+        <View style={styles.progressCard}>
+          <Text style={styles.progressEmoji}>✨</Text>
+          <Text style={styles.progressText}>
+            {todayCount >= 3
+              ? "Nice pattern data building up. Check your report later."
+              : `${3 - todayCount} more to unlock stronger observations this week.`}
+          </Text>
+        </View>
+      )}
     </ScreenShell>
   );
 }
@@ -64,8 +75,8 @@ export function TriggerSelectionScreen() {
 const styles = StyleSheet.create({
   header: {
     gap: 6,
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 0,
   },
   kicker: {
     color: palette.accent,
@@ -91,6 +102,25 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "flex-start",
     gap: 10,
-    paddingBottom: 8,
+    paddingBottom: 4,
+  },
+  progressCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: radius.md,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+  },
+  progressEmoji: {
+    fontSize: 18,
+  },
+  progressText: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
   },
 });

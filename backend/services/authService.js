@@ -40,7 +40,7 @@ function serializeUser(record) {
   return {
     id: record.id,
     email: record.email || null,
-    name: record.name || "TriggerMap User",
+    name: record.name || "QuietDen User",
     provider: record.provider || "email",
     createdAt: record.createdAt,
   };
@@ -173,7 +173,7 @@ export async function loginGoogleUser({ idToken }) {
       "email",
       email,
       "name",
-      payload.name || "TriggerMap User",
+      payload.name || "QuietDen User",
       "provider",
       "google",
       "googleSub",

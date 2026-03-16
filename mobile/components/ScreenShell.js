@@ -11,7 +11,7 @@ export function ScreenShell({
   scroll = true,
   loading = false,
   loadingTitle = "Loading",
-  loadingMessage = "Fetching the latest TriggerMap data.",
+  loadingMessage = "Loading your latest data.",
   timeoutMessage = "This is taking longer than expected. Check connection and try again.",
   onRetry,
 }) {

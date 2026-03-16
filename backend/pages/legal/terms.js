@@ -21,11 +21,11 @@ export default function TermsPage() {
     <main style={shell}>
       <article style={card}>
         <p style={{ color: "#85a9ff", textTransform: "uppercase", letterSpacing: 2, fontSize: 12 }}>
-          TriggerMap Terms of Service
+          QuietDen Terms of Service
         </p>
         <h1>Terms of Service</h1>
         <p>
-          TriggerMap is a self-reflection tool designed to help users identify emotional trigger patterns. It is not a
+          QuietDen Experience is a self-reflection tool designed to help users identify emotional trigger patterns. It is not a
           medical device and does not replace professional mental health care.
         </p>
         <h2>Usage</h2>

@@ -8,12 +8,12 @@ export const NOTIFICATION_TYPES = {
 };
 
 export const NOTIFICATION_TITLES = {
-  [NOTIFICATION_TYPES.REFLECTION_REMINDER]: "Reflection reminder",
-  [NOTIFICATION_TYPES.PATTERN_ALERT]: "Pattern alert",
-  [NOTIFICATION_TYPES.WEEKLY_INSIGHT]: "Weekly insight ready",
+  [NOTIFICATION_TYPES.REFLECTION_REMINDER]: "Time to reflect",
+  [NOTIFICATION_TYPES.PATTERN_ALERT]: "Pattern noticed",
+  [NOTIFICATION_TYPES.WEEKLY_INSIGHT]: "Your weekly patterns are ready",
   [NOTIFICATION_TYPES.REPORT_READY]: "Your weekly report is ready",
   [NOTIFICATION_TYPES.AI_INSIGHT_READY]: "New personalized insight",
-  [NOTIFICATION_TYPES.INACTIVITY_NUDGE]: "We miss you",
+  [NOTIFICATION_TYPES.INACTIVITY_NUDGE]: "How has your week been?",
 };
 
 export const INACTIVITY_THRESHOLD_DAYS = 3;

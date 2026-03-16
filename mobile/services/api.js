@@ -8,7 +8,7 @@ function getConfiguredApiUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_URL || extra.apiUrl;
 
   if (!configuredUrl) {
-    throw new Error("TriggerMap API URL is not configured");
+    throw new Error("API URL is not configured");
   }
 
   return configuredUrl.replace(/\/$/, "");
@@ -22,7 +22,7 @@ const API_URL = (() => {
   }
 })();
 
-console.log("TriggerMap API URL:", API_URL);
+console.log("QuietDen API URL:", API_URL);
 console.log("Loaded API URL:", process.env.EXPO_PUBLIC_API_URL);
 
 function getBaseUrl() {
@@ -46,7 +46,7 @@ async function parseJson(response) {
 
 async function fetchJson(path, options = {}) {
   if (!API_URL) {
-    throw new Error("TriggerMap API URL is not configured");
+    throw new Error("API URL is not configured");
   }
 
   const apiUrl = getBaseUrl();
@@ -55,7 +55,7 @@ async function fetchJson(path, options = {}) {
   let response;
 
   try {
-    console.log("TriggerMap request:", path, options.body || options.query || null);
+    console.log("QuietDen request:", path, options.body || options.query || null);
     response = await fetch(`${apiUrl}${path}`, {
       headers: {
         "Content-Type": "application/json",
@@ -69,8 +69,8 @@ async function fetchJson(path, options = {}) {
     if (error.name === "AbortError") {
       throw new Error("Request timed out. Check connection and try again.");
     }
-    console.error("TriggerMap API unreachable:", `${apiUrl}${path}`, error.message);
-    throw new Error("TriggerMap cannot reach the server. Please try again.");
+    console.error("QuietDen API unreachable:", `${apiUrl}${path}`, error.message);
+    throw new Error("Cannot reach the server. Please try again.");
   } finally {
     clearTimeout(timeout);
   }
@@ -85,7 +85,7 @@ async function fetchJson(path, options = {}) {
 }
 
 export function logMoment(payload, token) {
-  console.log("TriggerMap request:", "/logMoment", payload);
+  console.log("QuietDen request:", "/logMoment", payload);
   return fetchJson("/logMoment", { method: "POST", body: payload, token });
 }
 
@@ -131,7 +131,7 @@ export async function downloadExport(deviceId, token) {
   let response;
 
   try {
-    console.log("TriggerMap request:", "/export", { deviceId });
+    console.log("QuietDen request:", "/export", { deviceId });
     response = await fetch(`${apiUrl}/export${query}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       signal: controller.signal,
@@ -140,8 +140,8 @@ export async function downloadExport(deviceId, token) {
     if (error.name === "AbortError") {
       throw new Error("Request timed out. Check connection and try again.");
     }
-    console.error("TriggerMap API unreachable:", `${apiUrl}/export`, error.message);
-    throw new Error("TriggerMap cannot reach the server. Please try again.");
+    console.error("QuietDen API unreachable:", `${apiUrl}/export`, error.message);
+    throw new Error("Cannot reach the server. Please try again.");
   } finally {
     clearTimeout(timeout);
   }
@@ -163,7 +163,7 @@ export function deleteAllData(token) {
 
 export function getApiOrigin() {
   if (!API_URL) {
-    throw new Error("TriggerMap API URL is not configured");
+    throw new Error("API URL is not configured");
   }
 
   return getConfiguredApiUrl().replace(/\/api\/?$/, "");
