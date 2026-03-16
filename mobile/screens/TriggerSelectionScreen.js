@@ -35,7 +35,7 @@ export function TriggerSelectionScreen() {
   );
 
   return (
-    <ScreenShell scroll={false}>
+    <ScreenShell scroll>
       <View style={styles.top}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Quick log</Text>
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "flex-start",
-    gap: 10,
+    gap: 8,
     paddingBottom: 4,
   },
   bottomCard: {

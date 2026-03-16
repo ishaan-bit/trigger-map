@@ -47,15 +47,15 @@ export function TriggerTile({ label, onPress }) {
 const styles = StyleSheet.create({
   tile: {
     width: "30%",
-    aspectRatio: 0.85,
+    aspectRatio: 1.1,
     borderRadius: radius.lg,
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: palette.glassBorder,
-    gap: 10,
+    gap: 6,
   },
   pressed: {
     borderColor: palette.accent,
@@ -63,15 +63,15 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   iconWrap: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: radius.sm,
     backgroundColor: palette.glass,
     alignItems: "center",
     justifyContent: "center",
   },
   icon: {
-    fontSize: 26,
+    fontSize: 22,
   },
   label: {
     color: palette.text,

@@ -64,9 +64,8 @@ export function Tooltip({ id, text, hidden = false }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: -8,
-  },
+  container: {},
+
   content: {
     flexDirection: "row",
     alignItems: "center",
