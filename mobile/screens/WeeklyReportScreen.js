@@ -240,7 +240,7 @@ export function WeeklyReportScreen() {
                 </View>
               ) : null}
 
-              {/* Time of day — conditional on rhythm data */}
+              {/* Time of day â€” conditional on rhythm data */}
               {dq.hasEnoughForRhythm && timeEntries.length ? (
                 <View style={s.card}>
                   <Text style={s.cardLabel}>When you logged</Text>

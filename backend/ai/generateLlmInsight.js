@@ -2,7 +2,7 @@
  * LLM-based premium insight generator.
  *
  * Runs against a local OpenAI-compatible API (Ollama, llama.cpp, LM Studio).
- * Receives structured signals from the rebuilt patternEngine — never raw JSON dumps.
+ * Receives structured signals from the rebuilt patternEngine â€” never raw JSON dumps.
  *
  * Output: 1 compact paragraph OR 3 sharp bullets + 1 micro-experiment.
  * Tone: calm, observant, grounded. No essays, no fake-therapeutic language.
