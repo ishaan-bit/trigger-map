@@ -75,7 +75,7 @@ function HBar({ label, value, max, color = palette.accent, icon }) {
 function SectionHeader({ label, extra }) {
   return (
     <View style={s.sectionHeader}>
-      <Text style={s.sectionKicker}>{label}</Text>
+      <Text style={s.sectionKicker}>{label.toUpperCase()}</Text>
       {extra ? <Text style={s.sectionExtra}>{extra}</Text> : null}
     </View>
   );
@@ -321,7 +321,7 @@ export function WeeklyReportScreen() {
                           <View style={s.correlationRow} key={trigger}>
                             <Text style={s.correlationTrigger}>{trigger}</Text>
                             <View style={s.correlationChips}>
-                              {Object.entries(emotions).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
+                              {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
                                 <View style={s.correlationChip} key={emo}>
                                   <Text style={s.correlationChipText}>
                                     {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
@@ -551,7 +551,7 @@ const s = StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionKicker: {
     color: palette.accent, fontSize: 11, fontWeight: "700",
-    letterSpacing: 1.2, textTransform: "uppercase",
+    letterSpacing: 1.2,
   },
   sectionExtra: { color: palette.muted, fontSize: 11 },
   card: {
@@ -610,7 +610,7 @@ const s = StyleSheet.create({
     borderBottomColor: palette.glassBorder,
   },
   correlationTrigger: { width: 70, color: palette.text, fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
-  correlationChips: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  correlationChips: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 4 },
   correlationChip: {
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
     backgroundColor: palette.glass,
