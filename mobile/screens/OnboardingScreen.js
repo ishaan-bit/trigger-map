@@ -7,7 +7,7 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SLIDE_WIDTH = SCREEN_WIDTH - 40;
+const SLIDE_WIDTH = SCREEN_WIDTH;
 
 const slides = [
   {
@@ -85,9 +85,9 @@ export function OnboardingScreen() {
         getItemLayout={(_, index) => ({ length: SLIDE_WIDTH, offset: SLIDE_WIDTH * index, index })}
       />
 
-      <View style={styles.dots}>
+      <View style={styles.dots} accessibilityRole="tablist">
         {slides.map((_, i) => (
-          <View key={i} style={[styles.dot, i === currentIndex && styles.dotActive]} />
+          <View key={i} style={[styles.dot, i === currentIndex && styles.dotActive]} accessibilityRole="tab" accessibilityLabel={`Slide ${i + 1} of ${slides.length}`} accessibilityState={{ selected: i === currentIndex }} />
         ))}
       </View>
 
@@ -108,9 +108,9 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: palette.accent,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
   },
   skip: {
@@ -126,6 +126,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 18,
     paddingVertical: 32,
+    paddingHorizontal: 20,
   },
   slideIcon: {
     fontSize: 52,

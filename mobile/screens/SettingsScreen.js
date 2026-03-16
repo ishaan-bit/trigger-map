@@ -54,8 +54,12 @@ export function SettingsScreen() {
         <PrimaryButton
           label={user ? "Sign out" : "Sign in"}
           onPress={user ? async () => {
-            await signOut();
-            router.replace("/login");
+            try {
+              await signOut();
+              router.replace("/login");
+            } catch {
+              Alert.alert("Sign out failed", "Please try again.");
+            }
           } : () => router.push("/login")}
           secondary
         />
@@ -185,6 +189,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: "700",
   },
   subtitle: {
@@ -295,6 +300,5 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 12,
     marginTop: 4,
-    opacity: 0.7,
   },
 });

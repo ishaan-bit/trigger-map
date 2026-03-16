@@ -81,6 +81,7 @@ export function LoginScreen() {
 
       {mode === "register" ? (
         <TextInput
+          accessibilityLabel="Name"
           onChangeText={setName}
           placeholder="Name"
           placeholderTextColor={palette.muted}
@@ -90,6 +91,7 @@ export function LoginScreen() {
       ) : null}
 
       <TextInput
+        accessibilityLabel="Email"
         autoCapitalize="none"
         keyboardType="email-address"
         onChangeText={setEmail}
@@ -99,6 +101,7 @@ export function LoginScreen() {
         value={email}
       />
       <TextInput
+        accessibilityLabel="Password"
         autoCapitalize="none"
         onChangeText={setPassword}
         placeholder="Password"
@@ -108,12 +111,13 @@ export function LoginScreen() {
         value={password}
       />
 
-      <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} />
-      <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary />
+      <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
+      <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary disabled={loading} />
       <PrimaryButton
         label={mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
         onPress={() => setMode(mode === "login" ? "register" : "login")}
         secondary
+        disabled={loading}
       />
 
       <View style={styles.divider} />
@@ -139,7 +143,7 @@ const styles = StyleSheet.create({
     color: palette.accent,
     fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 1.6,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
     marginBottom: 8,
   },
@@ -171,17 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  noticeBox: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    backgroundColor: palette.glass,
-    padding: 14,
-  },
-  noticeText: {
-    color: palette.muted,
-    lineHeight: 20,
-  },
+
   divider: {
     height: 1,
     backgroundColor: palette.glassBorder,

@@ -51,5 +51,5 @@ export const type = {
   heading: { fontSize: 20, lineHeight: 26, fontWeight: "700" },
   body: { fontSize: 15, lineHeight: 22 },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "600" },
-  kicker: { fontSize: 11, fontWeight: "700", letterSpacing: 1.6, textTransform: "uppercase" },
+  kicker: { fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
 };

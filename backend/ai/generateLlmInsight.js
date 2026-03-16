@@ -62,22 +62,32 @@ function buildSignals(report) {
 
 function buildPrompt(report) {
   const signals = buildSignals(report);
+  const sparse = (report.dataQuality?.totalMoments || 0) < 8;
 
-  return `You are a behavioral pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
 
-Below are structured signals from the user's past week. Only reference what appears here.
+Below are structured signals from the user's past week. ONLY reference what appears here.
 
 ${signals}
 
-Write a compact pattern read. Rules:
-- Either one short paragraph (4-5 sentences max) OR three sharp bullet points.
-- End with one concrete micro-experiment the user could try this week.
-- Reference specific triggers and emotions from the signals above.
-- Do not invent data that is not in the signals.
-- Do not contradict the signals (e.g. do not call a week calm if volatility is high).
-- Never use em dashes. Use commas, semicolons, or periods.
-- Tone: calm, direct, perceptive. Not warm, not clinical, not poetic.
-- Stay under 150 words.`;
+Write a pattern read using EXACTLY this structure:
+
+**What stood out**
+One or two sentences about the most notable pattern or shift this week. Be specific.
+
+**What may be contributing**
+One sentence connecting a trigger-emotion pairing to a possible cause. ${sparse ? "Acknowledge the data is limited." : "Be grounded in the numbers."}
+
+**One thing to try**
+A single concrete, small experiment for next week. Make it specific to their top trigger.
+
+Rules:
+- Total length: 60-90 words. Do not exceed 100 words.
+- Do not invent data. Do not repeat raw numbers already visible on screen.
+- Do not moralize, lecture, or use therapeutic language.
+- Do not use em dashes, colons in headers, or bullet markers.
+- Tone: calm, direct, perceptive. Like a sharp friend, not a therapist.
+- ${sparse ? "This user has limited data. Be honest about what you can and cannot see." : "Be confident but not certain."}`;
 }
 
 export async function generateLlmInsight({ weeklyReport }) {
@@ -96,11 +106,11 @@ export async function generateLlmInsight({ weeklyReport }) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise behavioral pattern reader. Write grounded, compact observations from structured data. Never use em dashes." },
+          { role: "system", content: "You are a concise behavioral pattern reader. Write structured, grounded observations from data. Use plain sentences. Never use em dashes, bullet points, or numbered lists. Keep total output under 100 words." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.7,
-        max_tokens: 350,
+        temperature: 0.6,
+        max_tokens: 250,
       }),
       signal: controller.signal,
     });
@@ -117,8 +127,14 @@ export async function generateLlmInsight({ weeklyReport }) {
       throw new Error("LLM returned empty response");
     }
 
-    // Strip any em dashes the model sneaks through
-    content = content.replace(/\u2014/g, ",").replace(/\u2013/g, ",");
+    // Clean up formatting artifacts the model may produce
+    content = content
+      .replace(/\u2014/g, ", ")
+      .replace(/\u2013/g, ", ")
+      .replace(/\*\*/g, "")          // strip markdown bold
+      .replace(/^[-*]\s+/gm, "")     // strip bullet markers
+      .replace(/\n{3,}/g, "\n\n")    // collapse excess newlines
+      .trim();
 
     return {
       narrative: content,

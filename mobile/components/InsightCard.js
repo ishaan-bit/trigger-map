@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   compactTitle: {
-    fontSize: 10,
+    fontSize: 11,
   },
   body: {
     color: palette.text,
@@ -49,7 +49,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "600",
-    textTransform: "capitalize",
   },
   footer: {
     color: palette.muted,

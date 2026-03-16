@@ -18,12 +18,23 @@ import { palette, radius } from "@/utils/theme";
 
 const screenWidth = Dimensions.get("window").width;
 
+/** Strip encoding artifacts from any backend/stored text */
+function cleanText(str) {
+  if (typeof str !== "string") return str;
+  return str
+    .replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\n/g, "\n")
+    .replace(/\u2014/g, ", ")
+    .replace(/\u2013/g, ", ")
+    .trim();
+}
+
 const EMOTION_EMOJIS = {
-  frustrated: "\uD83D\uDCA2", anxious: "\u26A1", neutral: "\uD83C\uDF2B\uFE0F",
-  calm: "\uD83C\uDF43", energized: "\u2600\uFE0F",
+  frustrated: "💢", anxious: "⚡", neutral: "🌫️",
+  calm: "🍃", energized: "☀️",
 };
 
-const TIME_ICONS = { morning: "\uD83C\uDF05", afternoon: "\u2600\uFE0F", evening: "\uD83C\uDF06", night: "\uD83C\uDF19" };
+const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
 const ENERGY_COLORS = {
   steady: palette.success, balanced: palette.accent, tense: palette.warning,
@@ -80,7 +91,7 @@ function LockedSection({ title, teaser, ctaLabel, onPress, children }) {
         style={s.lockedGradient}
       />
       <View style={s.lockedOverlay}>
-        <View style={s.lockedIcon}><Text style={{ fontSize: 18 }}>{"\uD83D\uDD12"}</Text></View>
+        <View style={s.lockedIcon}><Text style={{ fontSize: 18 }}>🔒</Text></View>
         <Text style={s.lockedTitle}>{title}</Text>
         <Text style={s.lockedTeaser}>{teaser}</Text>
         <Pressable style={s.lockedCta} onPress={onPress} accessibilityRole="button">
@@ -97,7 +108,7 @@ function PairingChip({ trigger, emotion, count, positive }) {
   return (
     <View style={[s.pairingChip, { backgroundColor: bg, borderColor: border }]}>
       <Text style={s.pairingText}>
-        {trigger} {"\u2192"} {emotion} {"\u00D7"}{count}
+        {trigger} → {emotion} ×{count}
       </Text>
     </View>
   );
@@ -183,16 +194,16 @@ export function WeeklyReportScreen() {
               <View style={s.heroRow}>
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>
-                    {report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "\u2022") : "\uD83C\uDF00"}
+                    {report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}
                   </Text>
                   <Text style={s.heroPillLabel}>
                     {report.topEmotion || "Mixed"}
                   </Text>
                 </View>
                 <View style={s.heroPill}>
-                  <Text style={s.heroPillEmoji}>{"\uD83C\uDFAF"}</Text>
+                  <Text style={s.heroPillEmoji}>🎯</Text>
                   <Text style={s.heroPillLabel}>
-                    {report.topTrigger || (report.tiedTriggers?.length ? "Split" : "-")}
+                    {report.topTrigger || (report.tiedTriggers?.length > 1 ? `${report.tiedTriggers.length} areas` : "-")}
                   </Text>
                 </View>
                 <View style={[s.heroPill, s.confidencePill]}>
@@ -201,7 +212,7 @@ export function WeeklyReportScreen() {
               </View>
             ) : null}
             {hasRuleInsight ? (
-              <Text style={s.takeaway}>{report.aiInsight.summary}</Text>
+              <Text style={s.takeaway}>{cleanText(report.aiInsight.summary)}</Text>
             ) : null}
           </View>
 
@@ -216,7 +227,7 @@ export function WeeklyReportScreen() {
           {report && !error && confidence === "too_early" ? (
             /* ---------- STARTER STATE (0-2 moments) ---------- */
             <View style={s.starterCard}>
-              <Text style={s.starterEmoji}>{"\uD83C\uDF31"}</Text>
+              <Text style={s.starterEmoji}>🌱</Text>
               <Text style={s.starterTitle}>A few more moments to go</Text>
               <Text style={s.starterBody}>
                 Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture.
@@ -228,7 +239,7 @@ export function WeeklyReportScreen() {
           {report && !error && confidence !== "too_early" ? (
             <>
               {/* --- 2. WHAT SHOWED UP --- */}
-              <SectionHeader label="What showed up" extra={`${dq.uniqueEmotions || 0} emotions \u00B7 ${dq.uniqueTriggers || 0} triggers`} />
+              <SectionHeader label="What showed up" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
 
               {emotionEntries.length ? (
                 <View style={s.card}>
@@ -259,11 +270,11 @@ export function WeeklyReportScreen() {
               {/* --- 3. WHAT HELPED / WHAT DRAINED --- */}
               {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
                 <>
-                  <SectionHeader label="What helped \u00B7 What drained" />
+                  <SectionHeader label="What helped · What drained" />
                   <View style={s.card}>
                     {report.regulators?.length ? (
                       <View style={s.pairingGroup}>
-                        <Text style={s.pairingGroupLabel}>{"\uD83C\uDF3F"} Regulators</Text>
+                        <Text style={s.pairingGroupLabel}>🌿 Regulators</Text>
                         <View style={s.pairingList}>
                           {report.regulators.slice(0, 4).map((r) => (
                             <PairingChip key={`${r.trigger}-${r.emotion}`} trigger={r.trigger} emotion={r.emotion} count={r.count} positive />
@@ -273,7 +284,7 @@ export function WeeklyReportScreen() {
                     ) : null}
                     {report.frictionZones?.length ? (
                       <View style={s.pairingGroup}>
-                        <Text style={s.pairingGroupLabel}>{"\uD83D\uDD25"} Friction zones</Text>
+                        <Text style={s.pairingGroupLabel}>🔥 Friction zones</Text>
                         <View style={s.pairingList}>
                           {report.frictionZones.slice(0, 4).map((f) => (
                             <PairingChip key={`${f.trigger}-${f.emotion}`} trigger={f.trigger} emotion={f.emotion} count={f.count} positive={false} />
@@ -304,7 +315,7 @@ export function WeeklyReportScreen() {
                   {/* Correlations */}
                   {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Trigger \u2192 Emotion" />
+                      <SectionHeader label="Trigger → Emotion" />
                       <View style={s.card}>
                         {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
                           <View style={s.correlationRow} key={trigger}>
@@ -313,7 +324,7 @@ export function WeeklyReportScreen() {
                               {Object.entries(emotions).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
                                 <View style={s.correlationChip} key={emo}>
                                   <Text style={s.correlationChipText}>
-                                    {EMOTION_EMOJIS[emo] || ""} {emo} {"\u00D7"}{count}
+                                    {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
                                   </Text>
                                 </View>
                               ))}
@@ -345,7 +356,7 @@ export function WeeklyReportScreen() {
                           <View style={s.metricCard}>
                             <Text style={s.metricLabel}>Volatility</Text>
                             <Text style={s.metricValue}>
-                              {report.volatilityScore < 0.5 ? "\uD83D\uDFE2" : report.volatilityScore < 1.5 ? "\uD83D\uDFE1" : "\uD83D\uDD34"} {report.volatilityScore}
+                              {report.volatilityScore < 0.5 ? "🟢" : report.volatilityScore < 1.5 ? "🟡" : "🔴"} {report.volatilityScore}
                             </Text>
                           </View>
                         ) : null}
@@ -366,7 +377,7 @@ export function WeeklyReportScreen() {
                     <View style={s.section}>
                       <SectionHeader label="Emotion trajectory" />
                       {report.trajectoryNote ? (
-                        <Text style={s.trajectoryNote}>{report.trajectoryNote}</Text>
+                        <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
                       ) : null}
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
                         {report.weeklyEmotionTrajectory.map((day) => (
@@ -383,18 +394,20 @@ export function WeeklyReportScreen() {
                   ) : null}
 
                   {/* Micro-experiment */}
-                  {report.aiInsight?.microExperiment ? (
-                    <View style={s.experimentCard}>
-                      <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
-                          <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
-                        </View>
-                      </View>
-                      <Text style={s.experimentText}>{report.aiInsight.microExperiment}</Text>
-                    </View>
-                  ) : null}
                 </>
               )}
+
+              {/* --- 5b. TRY THIS WEEK (all users) --- */}
+              {report.aiInsight?.microExperiment ? (
+                <View style={s.experimentCard}>
+                  <View style={s.aiLabelRow}>
+                    <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
+                      <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
+                    </View>
+                  </View>
+                  <Text style={s.experimentText}>{cleanText(report.aiInsight.microExperiment)}</Text>
+                </View>
+              ) : null}
 
               {/* --- 6. PATTERN READ --- */}
               {hasLlmInsight ? (
@@ -411,7 +424,7 @@ export function WeeklyReportScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
+                    <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>
                     {report.llmInsight.firstFree ? (
                       <Text style={s.firstFreeHint}>Future AI insights require Premium.</Text>
                     ) : null}
@@ -466,7 +479,7 @@ export function WeeklyReportScreen() {
 const s = StyleSheet.create({
   canvas: { position: "relative", minHeight: 1 },
   bgImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined, opacity: 0.05 },
-  content: { gap: 16 },
+  content: { gap: 14 },
 
   /* Header / hero */
   header: { gap: 6, marginTop: 10 },
@@ -484,7 +497,13 @@ const s = StyleSheet.create({
   confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
   heroPillEmoji: { fontSize: 14 },
   heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
-  takeaway: { color: palette.text, fontSize: 15, lineHeight: 22, marginTop: 8 },
+  takeaway: {
+    color: palette.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 6,
+    paddingVertical: 10, paddingHorizontal: 14,
+    borderRadius: radius.sm, backgroundColor: palette.glass,
+    borderLeftWidth: 3, borderLeftColor: palette.accent,
+    overflow: "hidden",
+  },
 
   /* AI / insight */
   aiCard: {
@@ -501,17 +520,18 @@ const s = StyleSheet.create({
     color: palette.accent, fontSize: 11, fontWeight: "700",
     textTransform: "uppercase", letterSpacing: 0.6,
   },
-  aiSummary: { color: palette.text, fontSize: 15, lineHeight: 23, fontWeight: "600" },
+  aiSummary: { color: palette.text, fontSize: 14, lineHeight: 22 },
   aiSuggestion: { color: palette.muted, fontSize: 14, lineHeight: 20 },
   firstFreeHint: { color: palette.muted, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4 },
 
   /* Micro-experiment */
   experimentCard: {
-    borderRadius: radius.md, padding: 18, gap: 10,
+    borderRadius: radius.md, padding: 16, gap: 8,
     backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.glassBorder,
+    borderLeftWidth: 3, borderLeftColor: palette.success,
   },
-  experimentText: { color: palette.text, fontSize: 14, lineHeight: 21 },
+  experimentText: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
 
   /* Metrics */
   metricsRow: { flexDirection: "row", gap: 8 },

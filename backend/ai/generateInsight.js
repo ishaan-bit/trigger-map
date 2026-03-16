@@ -75,27 +75,37 @@ function buildLowSummary(report) {
 
 function buildEmergingSummary(report) {
   const parts = [];
-  if (report.topTrigger) {
-    parts.push(`"${report.topTrigger}" came up the most.`);
-  } else {
-    parts.push(`Triggers were spread across ${report.tiedTriggers.length} areas equally.`);
+  const triggerEntries = Object.entries(report.triggerFrequency || {}).sort(([, a], [, b]) => b - a);
+  const topCount = triggerEntries[0]?.[1] || 0;
+  if (report.topTrigger && topCount >= 3) {
+    parts.push(`"${report.topTrigger}" came up the most (${topCount} times).`);
+  } else if (report.topTrigger) {
+    parts.push(`"${report.topTrigger}" appeared more than other triggers, though still early.`);
+  } else if (report.tiedTriggers?.length) {
+    parts.push(`${report.tiedTriggers.join(", ")} appeared equally this week.`);
   }
   if (report.topEmotion) {
-    parts.push(`Dominant feeling: ${report.topEmotion}.`);
+    parts.push(`Most common feeling: ${report.topEmotion}.`);
+  } else if (report.tiedEmotions?.length) {
+    parts.push(`Emotions were mixed: ${report.tiedEmotions.join(", ")}.`);
   }
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`${r.trigger} paired with ${r.emotion} ${r.count} times — a possible stabilizer.`);
+    parts.push(`${r.trigger} paired with ${r.emotion} ${r.count} times, a possible stabilizer.`);
   }
   return parts.join(" ");
 }
 
 function buildModerateSummary(report) {
   const parts = [];
-  if (report.topTrigger) {
-    parts.push(`"${report.topTrigger}" dominated this week.`);
+  const triggerEntries = Object.entries(report.triggerFrequency || {}).sort(([, a], [, b]) => b - a);
+  const topCount = triggerEntries[0]?.[1] || 0;
+  if (report.topTrigger && topCount >= 3) {
+    parts.push(`"${report.topTrigger}" stood out this week (${topCount} times).`);
+  } else if (report.topTrigger) {
+    parts.push(`"${report.topTrigger}" appeared slightly more than others.`);
   } else {
-    parts.push(`No single trigger dominated — ${report.tiedTriggers.join(", ")} were equally present.`);
+    parts.push(`No single trigger dominated. ${report.tiedTriggers.join(", ")} were equally present.`);
   }
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
@@ -120,11 +130,11 @@ function buildStrongSummary(report) {
   }
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    parts.push(`Friction zone: ${f.trigger} ? ${f.emotion} (${f.count}×).`);
+    parts.push(`Friction zone: ${f.trigger} + ${f.emotion} (${f.count}x).`);
   }
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`Regulator: ${r.trigger} ? ${r.emotion} (${r.count}×).`);
+    parts.push(`Regulator: ${r.trigger} + ${r.emotion} (${r.count}x).`);
   }
   if (report.volatilityScore !== null) {
     parts.push(report.volatilityScore < 0.5 ? "Emotionally steady overall." : "Noticeable emotional swings this week.");

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Alert, Image, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -48,7 +49,8 @@ const tiers = [
 
 export function PremiumScreen() {
   const router = useRouter();
-  const { subscribe, subscription, user } = useAppSession();
+  const { subscribe, restoreSubscription, subscription, user } = useAppSession();
+  const [busy, setBusy] = useState(false);
   const isActive = subscription?.status === "active" || subscription?.status === "grace_period";
 
   return (
@@ -97,22 +99,48 @@ export function PremiumScreen() {
           onPress={() => router.push("/login")}
         />
       ) : !isActive ? (
-        <PrimaryButton
-          label="Upgrade to Premium"
-          onPress={async () => {
-            try {
-              await subscribe();
-              Alert.alert("Premium enabled", "Your subscription is active.");
-            } catch (error) {
-              const msg = error?.message || "Something went wrong";
-              if (msg.includes("not found") || msg.includes("unavailable") || msg.includes("No subscription")) {
-                Alert.alert("Not available yet", "Premium subscriptions are not yet available in your region. Check back soon.");
-              } else {
-                Alert.alert("Subscription error", msg);
+        <>
+          <PrimaryButton
+            label={busy ? "Please wait..." : "Upgrade to Premium"}
+            disabled={busy}
+            onPress={async () => {
+              try {
+                setBusy(true);
+                await subscribe();
+                Alert.alert("Premium enabled", "Your subscription is active.");
+              } catch (error) {
+                const msg = error?.message || "Something went wrong";
+                if (msg.includes("not found") || msg.includes("unavailable") || msg.includes("No subscription")) {
+                  Alert.alert("Not available yet", "Premium subscriptions are not yet available in your region. Check back soon.");
+                } else {
+                  Alert.alert("Subscription error", msg);
+                }
+              } finally {
+                setBusy(false);
               }
-            }
-          }}
-        />
+            }}
+          />
+          <PrimaryButton
+            label="Restore purchase"
+            secondary
+            disabled={busy}
+            onPress={async () => {
+              try {
+                setBusy(true);
+                const result = await restoreSubscription();
+                if (result) {
+                  Alert.alert("Restored", "Your premium subscription has been restored.");
+                } else {
+                  Alert.alert("No subscription found", "We couldn't find an active subscription for this account.");
+                }
+              } catch {
+                Alert.alert("Restore failed", "Something went wrong. Please try again.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </>
       ) : null}
 
       {isActive && (

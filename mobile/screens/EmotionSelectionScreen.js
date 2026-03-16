@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -11,6 +11,10 @@ function showToast(message) {
   if (Platform.OS === "android") {
     ToastAndroid.show(message, ToastAndroid.SHORT);
   }
+}
+
+function showError(title, message) {
+  Alert.alert(title, message);
 }
 
 export function EmotionSelectionScreen() {
@@ -29,7 +33,7 @@ export function EmotionSelectionScreen() {
       showToast("Moment logged");
       router.back();
     } catch {
-      showToast("Save failed. Try again.");
+      showError("Save failed", "Could not log this moment. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -140,7 +144,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 54,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: palette.accentStrong,

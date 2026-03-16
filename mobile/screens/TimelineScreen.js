@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: "700",
   },
   subtitle: {
