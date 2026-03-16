@@ -18,12 +18,12 @@ const slides = [
   {
     icon: "📊",
     title: "Discover your\npatterns",
-    body: "TriggerMap spots recurring connections between triggers and emotions so you can understand yourself better.",
+    body: "TriggerMap connects your triggers and emotions over time, surfacing patterns you might not notice on your own.",
   },
   {
     icon: "🔒",
     title: "Private by default",
-    body: "Your data stays on your device until you choose to create an account.\nNo sign-up required to start.",
+    body: "Everything stays on your device unless you sign in.\nNo account required to start logging.",
   },
 ];
 

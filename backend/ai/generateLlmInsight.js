@@ -100,8 +100,15 @@ export async function generateLlmInsight({ weeklyReport, historicalReports, user
     // Strip any em dashes that slipped through
     content = content.replace(/\u2014/g, ",").replace(/\u2013/g, ",");
 
+    // Split the narrative into readable segments (paragraphs)
+    const segments = content
+      .split(/\n\s*\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     return {
       narrative: content,
+      segments,
       model: `llm-${model}`,
       generatedAt: new Date().toISOString(),
     };

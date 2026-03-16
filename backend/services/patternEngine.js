@@ -1,8 +1,20 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
 
 function topEntry(record, fallback = "none") {
-  const entries = Object.entries(record).sort((left, right) => right[1] - left[1]);
+  const entries = Object.entries(record).sort(
+    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0])
+  );
   return entries[0]?.[0] || fallback;
+}
+
+/** Return all keys tied for the highest count. */
+function topTied(record) {
+  const entries = Object.entries(record).sort(
+    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0])
+  );
+  if (!entries.length) return [];
+  const maxVal = entries[0][1];
+  return entries.filter(([, v]) => v === maxVal).map(([k]) => k);
 }
 
 function pairFromKey(pairKey) {
@@ -117,6 +129,7 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     });
   }
 
+  const tiedTriggers = topTied(triggerFrequency);
   const topTrigger = topEntry(triggerFrequency);
   const topEmotion = topEntry(emotionFrequency);
   const topPairKey = topEntry(pairFrequency, "none|none");
@@ -145,15 +158,19 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
   );
   const volatilityChange = buildVolatilityChange(weeklyEmotionTrajectory);
 
+  const tiedTriggerNote = tiedTriggers.length > 1
+    ? `This week, ${tiedTriggers.join(" and ")} were equally present. Your emotions leaned ${topEmotion} overall.`
+    : `This week, ${topTrigger} came up the most, and when it did, you tended to feel ${topEmotion}.`;
+
   const insights = [
     totalMoments
-      ? `This week, ${topTrigger} came up the most — and when it did, you tended to feel ${topEmotion}.`
+      ? tiedTriggerNote
       : "Start logging a few moments this week and your personal patterns will appear here.",
     strongestCorrelationTrigger !== "none"
       ? `There's a noticeable link between ${strongestCorrelationTrigger} and feeling ${strongestCorrelationEmotion}. Worth paying attention to.`
       : "Once you log more, we'll spot which triggers and emotions tend to travel together.",
     `Most of your emotional activity happened in the ${busiestTime}. That might be when stress or decisions pile up.`,
-    `Your overall energy leaned ${topEntry(energyDistribution)} this week — consider what may have influenced that rhythm.`,
+    `Your overall energy leaned ${topEntry(energyDistribution)} this week. Consider what may have influenced that rhythm.`,
     mostStableDay !== "Not enough data yet"
       ? `${mostStableDay} was your calmest day. What was different about it?`
       : "After a full week of entries, we'll highlight your most balanced day.",
@@ -176,5 +193,6 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     aiInsight,
     insights,
     totalMoments,
+    tiedTriggers,
   };
 }

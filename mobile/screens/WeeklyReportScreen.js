@@ -162,7 +162,7 @@ export function WeeklyReportScreen() {
           {/* ─── HEADER ─── */}
           <View style={s.header}>
             <Text style={s.kicker}>Weekly patterns</Text>
-            <Text style={s.title}>Your Report</Text>
+            <Text style={s.title}>Your Insights</Text>
             {report?.totalMoments ? (
               <Text style={s.subtitle}>{report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} this week</Text>
             ) : null}
@@ -180,6 +180,28 @@ export function WeeklyReportScreen() {
 
           {report && !error ? (
             <>
+              {/* ── Summary strip ── */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.summaryStrip}>
+                <View style={s.summaryPill}>
+                  <Text style={s.summaryPillEmoji}>{EMOTION_EMOJIS[report.topEmotion] || "•"}</Text>
+                  <Text style={s.summaryPillLabel}>{report.topEmotion || "-"}</Text>
+                </View>
+                <View style={s.summaryPill}>
+                  <Text style={s.summaryPillEmoji}>🎯</Text>
+                  <Text style={s.summaryPillLabel}>{report.topTrigger || "-"}</Text>
+                </View>
+                {report.mostStableDay && report.mostStableDay !== "Not enough data yet" ? (
+                  <View style={s.summaryPill}>
+                    <Text style={s.summaryPillEmoji}>🧘</Text>
+                    <Text style={s.summaryPillLabel}>{report.mostStableDay}</Text>
+                  </View>
+                ) : null}
+                <View style={s.summaryPill}>
+                  <Text style={s.summaryPillEmoji}>{report.volatilityScore <= 1 ? "🟢" : report.volatilityScore <= 2 ? "🟡" : "🔴"}</Text>
+                  <Text style={s.summaryPillLabel}>Stability {report.volatilityScore ?? "-"}</Text>
+                </View>
+              </ScrollView>
+
               {/* ════════════════════════════════════════════════════
                   SECTION 1 — Weekly Patterns (visible to ALL users)
                   ════════════════════════════════════════════════════ */}
@@ -337,6 +359,18 @@ export function WeeklyReportScreen() {
                     </View>
                   )}
 
+                  {/* Micro-experiment — try-this-week card */}
+                  {report.aiInsight?.microExperiment ? (
+                    <View style={s.experimentCard}>
+                      <View style={s.aiLabelRow}>
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
+                          <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
+                        </View>
+                      </View>
+                      <Text style={s.experimentText}>{report.aiInsight.microExperiment}</Text>
+                    </View>
+                  ) : null}
+
                   {/* Correlations — unlocked for signed-in */}
                   {Object.keys(report.correlations || {}).length ? (
                     <View style={s.section}>
@@ -406,16 +440,22 @@ export function WeeklyReportScreen() {
 
               {isPremium ? (
                 <View style={s.section}>
-                  <SectionHeader label="Personalised AI Reflection" />
+                  <SectionHeader label="Weekly Insight" />
                   {hasLlmInsight ? (
-                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
-                      <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
+                    <>
+                      {(report.llmInsight.segments?.length ? report.llmInsight.segments : [report.llmInsight.narrative]).map((paragraph, idx) => (
+                        <View key={idx} style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
+                          {idx === 0 ? (
+                            <View style={s.aiLabelRow}>
+                              <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                                <Text style={[s.aiLabelText, { color: palette.purple }]}>AI reflection</Text>
+                              </View>
+                            </View>
+                          ) : null}
+                          <Text style={s.aiSummary}>{paragraph}</Text>
                         </View>
-                      </View>
-                      <Text style={s.aiSummary}>{report.llmInsight.narrative}</Text>
-                    </View>
+                      ))}
+                    </>
                   ) : (
                     <View style={s.card}>
                       <View style={s.aiLabelRow}>
@@ -434,8 +474,8 @@ export function WeeklyReportScreen() {
           {!report && !loading && !error ? (
             <View style={[s.stateCard, s.emptyStateCard]}>
               <Image source={require("@/assets/report-empty.png")} style={s.emptyIllustration} resizeMode="contain" accessible={false} />
-              <Text style={s.stateTitle}>Your first report is on its way</Text>
-              <Text style={s.stateBody}>Log a few moments this week and your patterns will appear here.</Text>
+              <Text style={s.stateTitle}>Your first insight is on its way</Text>
+              <Text style={s.stateBody}>Log a few moments this week and we will surface the patterns behind your emotions.</Text>
               <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
             </View>
           ) : null}
@@ -471,6 +511,27 @@ const s = StyleSheet.create({
   },
   aiSummary: { color: palette.text, fontSize: 16, lineHeight: 24, fontWeight: "600" },
   aiSuggestion: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+
+  /* ─ Summary strip ─ */
+  summaryStrip: { gap: 8, paddingVertical: 2 },
+  summaryPill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: radius.pill, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  summaryPillEmoji: { fontSize: 14 },
+  summaryPillLabel: {
+    color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize",
+  },
+
+  /* ─ Micro-experiment card ─ */
+  experimentCard: {
+    borderRadius: radius.md, padding: 18, gap: 10,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  experimentText: { color: palette.text, fontSize: 14, lineHeight: 21 },
 
   /* ─ Metrics grid ─ */
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

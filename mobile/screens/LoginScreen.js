@@ -123,7 +123,9 @@ export function LoginScreen() {
         onPress={() => router.replace("/(tabs)/log")}
         secondary
       />
-      <Text style={styles.anonHint}>No account needed. Your data stays on this device.</Text>
+      <Text style={styles.anonHint}>
+        Anonymous mode keeps everything on-device. Sign in to sync across devices and unlock weekly insights.
+      </Text>
     </ScreenShell>
   );
 }

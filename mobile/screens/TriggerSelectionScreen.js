@@ -5,6 +5,7 @@ import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { ScreenShell } from "@/components/ScreenShell";
 import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
+import { DailyPrediction } from "@/components/DailyPrediction";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
@@ -49,6 +50,8 @@ export function TriggerSelectionScreen() {
           id="log_tooltip"
           text="Logging a few moments each day reveals your emotional patterns."
         />
+
+        <DailyPrediction />
 
         <View style={styles.grid}>
           {TRIGGERS.map((trigger) => (

@@ -9,6 +9,7 @@ const ONBOARDING_KEY = "triggermap.onboarding-complete";
 const REMINDER_KEY = "triggermap.reminder-enabled";
 const LAST_OPENED_AT_KEY = "triggermap.last-opened-at";
 const LAST_LOGGED_AT_KEY = "triggermap.last-logged-at";
+const DAILY_PREDICTION_KEY = "triggermap.daily-prediction";
 
 export async function getOrCreateDeviceId() {
   const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
@@ -70,4 +71,21 @@ export async function getLastLoggedAt() {
 
 export async function setLastLoggedAt(value = new Date().toISOString()) {
   return AsyncStorage.setItem(LAST_LOGGED_AT_KEY, value);
+}
+
+/** Save today's prediction (e.g. "calm", "neutral", "stressful"). */
+export async function saveDailyPrediction(prediction) {
+  const entry = JSON.stringify({ prediction, date: new Date().toISOString().slice(0, 10) });
+  return AsyncStorage.setItem(DAILY_PREDICTION_KEY, entry);
+}
+
+/** Get today's prediction if one exists, otherwise null. */
+export async function getDailyPrediction() {
+  const raw = await AsyncStorage.getItem(DAILY_PREDICTION_KEY);
+  if (!raw) return null;
+  try {
+    const { prediction, date } = JSON.parse(raw);
+    if (date === new Date().toISOString().slice(0, 10)) return prediction;
+  } catch { /* corrupted */ }
+  return null;
 }

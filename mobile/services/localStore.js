@@ -110,8 +110,8 @@ export function buildLocalReport(moments) {
     else timeOfDayPatterns.night++;
   }
 
-  const topTrigger = Object.entries(triggerFrequency).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-  const topEmotion = Object.entries(emotionFrequency).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const topTrigger = Object.entries(triggerFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
+  const topEmotion = Object.entries(emotionFrequency).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
 
   return {
     insights: topTrigger && topEmotion
