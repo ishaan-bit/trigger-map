@@ -5,12 +5,15 @@ import { palette, radius } from "@/utils/theme";
 
 const PREFIX = "triggermap.tooltip.seen.";
 
+const AUTO_DISMISS_MS = 4000;
+
 export function Tooltip({ id, text }) {
   const [visible, setVisible] = useState(false);
   const opacity = useState(() => new Animated.Value(0))[0];
 
   useEffect(() => {
     let active = true;
+    let timer;
     AsyncStorage.getItem(`${PREFIX}${id}`).then((seen) => {
       if (!active || seen) return;
       setVisible(true);
@@ -18,9 +21,22 @@ export function Tooltip({ id, text }) {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        if (!active) return;
+        timer = setTimeout(() => {
+          if (!active) return;
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }).start(() => {
+            if (active) setVisible(false);
+          });
+          AsyncStorage.setItem(`${PREFIX}${id}`, "1");
+        }, AUTO_DISMISS_MS);
+      });
     });
-    return () => { active = false; };
+    return () => { active = false; clearTimeout(timer); };
   }, [id, opacity]);
 
   function dismiss() {

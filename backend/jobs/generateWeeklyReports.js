@@ -56,6 +56,7 @@ export async function runGenerateWeeklyReports() {
         windowEnd: new Date().toISOString().slice(0, 10),
         summary: insight.summary,
         suggestion: insight.suggestion,
+        microExperiment: insight.microExperiment || null,
         model: insight.model,
         generatedAt: new Date().toISOString(),
       };

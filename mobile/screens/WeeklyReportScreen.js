@@ -166,6 +166,9 @@ export function WeeklyReportScreen() {
             {report?.totalMoments ? (
               <Text style={s.subtitle}>{report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} this week</Text>
             ) : null}
+            {report?.aiInsight?.generatedAt ? (
+              <Text style={s.freshness}>Updated {new Date(report.aiInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</Text>
+            ) : null}
           </View>
 
           <Tooltip id="report_tooltip" text="Insights appear after you've logged a few moments this week." />
@@ -493,6 +496,7 @@ const s = StyleSheet.create({
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   title: { color: palette.text, fontSize: 26, fontWeight: "700" },
   subtitle: { color: palette.muted, fontSize: 13, marginTop: 2 },
+  freshness: { color: palette.muted, fontSize: 11, marginTop: 4, fontStyle: "italic" },
 
   /* ─ AI / insight card ─ */
   aiCard: {

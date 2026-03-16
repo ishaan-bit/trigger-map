@@ -6,7 +6,9 @@ import { palette, radius } from "@/utils/theme";
 const OPTIONS = [
   { key: "calm", emoji: "🍃", label: "Calm" },
   { key: "neutral", emoji: "⚖️", label: "Neutral" },
-  { key: "stressful", emoji: "⚡", label: "Stressful" },
+  { key: "anxious", emoji: "⚡", label: "Anxious" },
+  { key: "frustrated", emoji: "💢", label: "Frustrated" },
+  { key: "energized", emoji: "☀️", label: "Energized" },
 ];
 
 export function DailyPrediction() {
@@ -62,10 +64,11 @@ const styles = StyleSheet.create({
   option: {
     alignItems: "center",
     gap: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: radius.sm,
     backgroundColor: palette.accentSoft,
+    minWidth: 54,
   },
   emoji: { fontSize: 20 },
   label: {

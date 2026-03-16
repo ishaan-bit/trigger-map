@@ -67,6 +67,7 @@ async function main() {
     windowEnd: new Date().toISOString().slice(0, 10),
     summary: ruleInsight.summary,
     suggestion: ruleInsight.suggestion,
+    microExperiment: ruleInsight.microExperiment || null,
     model: ruleInsight.model,
     generatedAt: new Date().toISOString(),
   });
