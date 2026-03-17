@@ -9,5 +9,8 @@
       "path": "/api/weeklyReport?mode=scheduled",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }
