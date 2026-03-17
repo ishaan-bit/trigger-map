@@ -3,7 +3,7 @@ import { palette, radius } from "@/utils/theme";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
-  health: "💊", sleep: "😴", partner: "💛", alone: "🧘", other: "📌",
+  health: "💊", sleep: "😴", partner: "💛", alone: "🧘", travel: "📍", other: "📌",
 };
 
 const EMOTION_COLORS = {
@@ -29,7 +29,7 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
   const emotionColor = EMOTION_COLORS[moment.emotion] || palette.muted;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: emotionColor }]}>
       <View style={styles.row}>
         <View style={[styles.iconWrap, { backgroundColor: `${emotionColor}12` }]}>
           <Text style={styles.icon}>{TRIGGER_ICONS[moment.trigger] || "📌"}</Text>
@@ -51,13 +51,13 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
       {(onEdit || onDelete) ? (
         <View style={styles.actions}>
           {onEdit ? (
-            <Pressable style={styles.actionBtn} onPress={() => onEdit(moment)} hitSlop={8}>
+            <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]} onPress={() => onEdit(moment)} hitSlop={8}>
               <Text style={styles.actionIcon}>✏️</Text>
               <Text style={styles.actionLabel}>Edit</Text>
             </Pressable>
           ) : null}
           {onDelete ? (
-            <Pressable style={styles.actionBtn} onPress={handleDelete} hitSlop={8}>
+            <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]} onPress={handleDelete} hitSlop={8}>
               <Text style={styles.actionIcon}>🗑️</Text>
               <Text style={[styles.actionLabel, { color: palette.danger }]}>Delete</Text>
             </Pressable>
@@ -155,5 +155,9 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 12,
     fontWeight: "600",
+  },
+  actionPressed: {
+    opacity: 0.6,
+    transform: [{ scale: 0.95 }],
   },
 });

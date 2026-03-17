@@ -5,8 +5,8 @@ export const TRIGGERS = [
   "family",
   "exercise",
   "health",
-  "sleep",
-  "partner",
+  "travel",
+  "alone",
   "other",
 ];
 
@@ -17,7 +17,7 @@ export const TRIGGER_KEYWORDS = {
   family: ["family", "mother", "father", "parent", "sister", "brother", "home"],
   exercise: ["gym", "workout", "exercise", "run", "yoga", "lifting"],
   health: ["doctor", "sick", "ill", "health", "therapy", "medicine"],
-  sleep: ["sleep", "insomnia", "tired", "nap", "rest", "fatigue"],
-  partner: ["partner", "relationship", "spouse", "boyfriend", "girlfriend"],
+  travel: ["travel", "commute", "trip", "flight", "drive", "train", "bus"],
+  alone: ["alone", "lonely", "solitude", "quiet", "isolation", "me time"],
   other: ["other", "misc", "random"],
 };

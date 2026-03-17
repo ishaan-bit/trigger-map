@@ -11,6 +11,7 @@ const TRIGGER_ICONS = {
   sleep: "😴",
   partner: "💛",
   alone: "🧘",
+  travel: "📍",
   other: "📌",
 };
 
@@ -24,6 +25,7 @@ const TRIGGER_TINTS = {
   sleep: "rgba(167, 139, 250, 0.10)",
   partner: "rgba(255, 179, 71, 0.10)",
   alone: "rgba(94, 230, 160, 0.10)",
+  travel: "rgba(86, 208, 224, 0.10)",
   other: "rgba(148, 180, 224, 0.08)",
 };
 
