@@ -123,12 +123,16 @@ export async function verifyGoogleIdToken(idToken) {
     throw new Error("GOOGLE_AUTH_NOT_CONFIGURED");
   }
 
-  // Accept tokens issued to the Web client (implicit/web flow) or the
-  // Android client (authorization-code + PKCE flow from mobile).
+  // Accept tokens issued to the primary client, the Android client,
+  // or the dedicated Web client.
   const allowedAudiences = [clientId];
   const androidId = process.env.GOOGLE_ANDROID_CLIENT_ID?.trim();
   if (androidId) {
     allowedAudiences.push(androidId);
+  }
+  const webId = process.env.GOOGLE_WEB_CLIENT_ID?.trim();
+  if (webId) {
+    allowedAudiences.push(webId);
   }
 
   let ticket;

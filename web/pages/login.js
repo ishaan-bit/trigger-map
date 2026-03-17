@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 
-const GOOGLE_CLIENT_ID = "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "773449945543-us407jhg1th314nvpheg51svdb44e03b.apps.googleusercontent.com";
 
 export default function LoginPage() {
   const router = useRouter();
