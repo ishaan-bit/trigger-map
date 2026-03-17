@@ -10,8 +10,7 @@ import { fileURLToPath } from "node:url";
 import { generateLlmInsight } from "../ai/generateLlmInsight.js";
 import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationService.js";
 import { generateWeeklyReport } from "../services/patternEngine.js";
-import { isPremiumActive } from "../services/premiumService.js";
-import { getUserById, isFirstAiFreeAvailable } from "../services/authService.js";
+import { getUserById } from "../services/authService.js";
 import { redis, redisKey } from "../services/redisClient.js";
 import { getStoredLlmInsight, getLlmInsightKey } from "../services/reportStore.js";
 
@@ -34,10 +33,6 @@ export async function runGenerateLlmInsights() {
     try {
       const user = await getUserById(ownerId);
       if (!user) { skipped++; continue; }
-
-      const premium = await isPremiumActive(ownerId);
-      const firstFreeAvailable = !premium && await isFirstAiFreeAvailable(ownerId);
-      if (!premium && !firstFreeAvailable) { skipped++; continue; }
 
       const existing = await getStoredLlmInsight(ownerId);
       if (existing?.generatedAt) {

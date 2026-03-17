@@ -64,7 +64,7 @@ function buildPrompt(report) {
   const signals = buildSignals(report);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
 
-  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, sleep, partner) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, travel, alone) and how each made them feel (calm, neutral, anxious, frustrated, energized).
 
 Below are structured signals from the user's past week. ONLY reference what appears here.
 

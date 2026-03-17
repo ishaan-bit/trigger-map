@@ -17,6 +17,7 @@ const schema = z.object({
   notes: z.string().max(280).optional(),
   occurredAt: z.string().optional(),
   timestamp: z.string().optional(),
+  prediction: z.string().min(1).max(30).optional(),
 });
 
 export default async function handler(req, res) {
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
       note: result.data.notes ?? result.data.note,
       occurredAt: result.data.timestamp ?? result.data.occurredAt,
       isAnonymous: !user,
+      prediction: result.data.prediction,
     });
 
     await appendMoment(moment);

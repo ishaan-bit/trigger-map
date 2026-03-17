@@ -72,10 +72,19 @@ function HBar({ label, value, max, color = palette.accent, icon }) {
   );
 }
 
-function SectionHeader({ label, extra }) {
+function SectionHeader({ label, extra, badge }) {
   return (
     <View style={s.sectionHeader}>
-      <Text style={s.sectionKicker}>{label.toUpperCase()}</Text>
+      <View style={s.sectionHeaderLeft}>
+        <Text style={s.sectionKicker}>{label.toUpperCase()}</Text>
+        {badge ? (
+          <View style={[s.freqBadge, badge === "weekly" && s.freqBadgeWeekly]}>
+            <Text style={[s.freqBadgeText, badge === "weekly" && s.freqBadgeTextWeekly]}>
+              {badge === "weekly" ? "WEEKLY" : "LIVE"}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       {extra ? <Text style={s.sectionExtra}>{extra}</Text> : null}
     </View>
   );
@@ -154,6 +163,7 @@ export function WeeklyReportScreen() {
   const confidence = dq.confidence || "too_early";
   const hasRuleInsight = !!report?.aiInsight?.summary;
   const hasLlmInsight = !!report?.llmInsight?.narrative;
+  const hasLlmTeaser = !!report?.llmTeaser?.narrative;
 
   const triggerEntries = topEntries(report?.triggerFrequency, 6);
   const emotionEntries = topEntries(report?.emotionFrequency, 6);
@@ -239,7 +249,7 @@ export function WeeklyReportScreen() {
           {report && !error && confidence !== "too_early" ? (
             <>
               {/* --- 2. WHAT SHOWED UP --- */}
-              <SectionHeader label="What showed up" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
+              <SectionHeader label="What showed up" badge="live" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
 
               {emotionEntries.length ? (
                 <View style={s.card}>
@@ -270,7 +280,7 @@ export function WeeklyReportScreen() {
               {/* --- 3. WHAT HELPED / WHAT DRAINED --- */}
               {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
                 <>
-                  <SectionHeader label="What helped · What drained" />
+                  <SectionHeader label="What helped · What drained" badge="live" />
                   <View style={s.card}>
                     {report.regulators?.length ? (
                       <View style={s.pairingGroup}>
@@ -315,7 +325,7 @@ export function WeeklyReportScreen() {
                   {/* Correlations */}
                   {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Trigger → Emotion" />
+                      <SectionHeader label="Trigger → Emotion" badge="live" />
                       <View style={s.card}>
                         {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
                           <View style={s.correlationRow} key={trigger}>
@@ -338,7 +348,7 @@ export function WeeklyReportScreen() {
                   {/* Energy distribution */}
                   {energyEntries.length ? (
                     <View style={s.section}>
-                      <SectionHeader label="Energy flow" />
+                      <SectionHeader label="Energy flow" badge="live" />
                       <View style={s.card}>
                         {energyEntries.map(([key, value]) => (
                           <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || palette.accent} />
@@ -350,7 +360,7 @@ export function WeeklyReportScreen() {
                   {/* --- 5. TIME & RHYTHM (conditional) --- */}
                   {dq.hasEnoughForStability ? (
                     <View style={s.section}>
-                      <SectionHeader label="Stability" />
+                      <SectionHeader label="Stability" badge="weekly" />
                       <View style={s.metricsRow}>
                         {report.volatilityScore !== null ? (
                           <View style={s.metricCard}>
@@ -375,7 +385,7 @@ export function WeeklyReportScreen() {
                   {/* Trajectory */}
                   {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
                     <View style={s.section}>
-                      <SectionHeader label="Emotion trajectory" />
+                      <SectionHeader label="Emotion trajectory" badge="live" />
                       {report.trajectoryNote ? (
                         <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
                       ) : null}
@@ -394,6 +404,32 @@ export function WeeklyReportScreen() {
                   ) : null}
 
                   {/* Micro-experiment */}
+
+                  {/* Gut check — prediction accuracy */}
+                  {report.predictionAccuracy ? (
+                    <View style={s.section}>
+                      <SectionHeader label="Gut check" badge="live" />
+                      <View style={s.card}>
+                        <View style={s.gutCheckRow}>
+                          <Text style={s.gutCheckEmoji}>
+                            {report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}
+                          </Text>
+                          <View style={s.gutCheckContent}>
+                            <Text style={s.gutCheckTitle}>
+                              {report.predictionAccuracy.correct} of {report.predictionAccuracy.daysCompared} days
+                            </Text>
+                            <Text style={s.gutCheckBody}>
+                              {report.predictionAccuracy.rate >= 0.6
+                                ? "Your morning gut feeling matched how the day actually went. Strong self-awareness."
+                                : report.predictionAccuracy.rate >= 0.3
+                                  ? "Your predictions were a mixed bag. Your days may hold more surprises than you expect."
+                                  : "Your days unfolded differently than expected. Not a bad thing — it means you're adapting."}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ) : null}
                 </>
               )}
 
@@ -409,10 +445,10 @@ export function WeeklyReportScreen() {
                 </View>
               ) : null}
 
-              {/* --- 6. PATTERN READ --- */}
+              {/* --- 6. WEEKLY INSIGHT (was Pattern Read) --- */}
               {hasLlmInsight ? (
                 <View style={s.section}>
-                  <SectionHeader label="Pattern read" />
+                  <SectionHeader label="Weekly insight" badge="weekly" />
                   <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
                     <View style={s.aiLabelRow}>
                       <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
@@ -430,9 +466,34 @@ export function WeeklyReportScreen() {
                     ) : null}
                   </View>
                 </View>
+              ) : hasLlmTeaser ? (
+                <View style={s.section}>
+                  <SectionHeader label="Weekly insight" badge="weekly" />
+                  <View style={s.teaserWrap}>
+                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
+                      <View style={s.aiLabelRow}>
+                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
+                        </View>
+                      </View>
+                      <Text style={s.aiSummary}>{cleanText(report.llmTeaser.narrative)}</Text>
+                    </View>
+                    <LinearGradient
+                      colors={["transparent", "rgba(11,18,32,0.95)"]}
+                      locations={[0, 0.8]}
+                      style={s.teaserGradient}
+                    />
+                    <View style={s.teaserCta}>
+                      <Text style={s.teaserCtaText}>Subscribe for the full weekly insight</Text>
+                      <Pressable style={s.lockedCta} onPress={handlePremium} accessibilityRole="button">
+                        <Text style={s.lockedCtaText}>Unlock Premium</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
               ) : isSignedIn && !isPremium && confidence !== "low" ? (
                 <LockedSection
-                  title="Pattern read"
+                  title="Weekly insight"
                   teaser="A concise AI analysis grounded in your actual data, not generic advice."
                   ctaLabel="Unlock Premium"
                   onPress={handlePremium}
@@ -549,11 +610,25 @@ const s = StyleSheet.create({
   /* Section / card */
   section: { gap: 8 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sectionHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionKicker: {
     color: palette.accent, fontSize: 11, fontWeight: "700",
     letterSpacing: 1.2,
   },
   sectionExtra: { color: palette.muted, fontSize: 11 },
+  freqBadge: {
+    paddingHorizontal: 5, paddingVertical: 1, borderRadius: radius.pill,
+    backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)",
+  },
+  freqBadgeWeekly: {
+    backgroundColor: palette.purpleSoft || "rgba(175,130,255,0.12)",
+  },
+  freqBadgeText: {
+    color: palette.success || "#34C759", fontSize: 8, fontWeight: "800", letterSpacing: 0.5,
+  },
+  freqBadgeTextWeekly: {
+    color: palette.purple || "#AF82FF",
+  },
   card: {
     borderRadius: radius.md, padding: 14, gap: 10,
     backgroundColor: palette.glass,
@@ -670,4 +745,24 @@ const s = StyleSheet.create({
   emptyIllustration: { width: 120, height: 120, marginBottom: 8, opacity: 0.9 },
   stateTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
   stateBody: { color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260 },
+
+  /* Gut check (prediction accuracy) */
+  gutCheckRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  gutCheckEmoji: { fontSize: 28, marginTop: 2 },
+  gutCheckContent: { flex: 1, gap: 4 },
+  gutCheckTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
+  gutCheckBody: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+
+  /* Strava-style teaser */
+  teaserWrap: { position: "relative", borderRadius: radius.md, overflow: "hidden" },
+  teaserGradient: {
+    position: "absolute", left: 0, right: 0, bottom: 0, height: 80,
+    zIndex: 1,
+  },
+  teaserCta: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    alignItems: "center", gap: 8, paddingBottom: 16, paddingTop: 8,
+    zIndex: 2,
+  },
+  teaserCtaText: { color: palette.muted, fontSize: 12, fontWeight: "600" },
 });

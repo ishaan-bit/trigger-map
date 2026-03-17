@@ -49,6 +49,16 @@ const MICRO_EXPERIMENTS = {
     "When you feel a reaction mid-conversation, pause before responding.",
     "Write down one thing you appreciate about your partner today.",
   ],
+  travel: [
+    "On your next trip, note one moment when the environment shifted your mood.",
+    "Before traveling, write down what you hope to feel by the end.",
+    "After arriving somewhere new, spend five minutes watching your surroundings silently.",
+  ],
+  alone: [
+    "Block 30 minutes of solo time this week with no screens.",
+    "During your next stretch of alone time, label the emotion you feel halfway through.",
+    "Notice whether solitude charges or drains you at different times of day.",
+  ],
   other: [
     "Spend 5 minutes writing freely about whatever is on your mind.",
     "Label your emotion the next time something unexpected happens.",

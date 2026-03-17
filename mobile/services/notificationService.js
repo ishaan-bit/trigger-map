@@ -18,7 +18,17 @@ export async function enableWeeklyReminder() {
   await ensureNotificationAccess();
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  return scheduleWeeklyInsightRelease("Your latest TriggerMap report is ready to review.");
+  // Schedule recurring weekly notification — no daily gate for scheduled notifications
+  return scheduleRecurringNotification({
+    type: NOTIFICATION_TYPES.WEEKLY_INSIGHT,
+    body: "Your weekly patterns are ready — see what stands out this week.",
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: 1,
+      hour: 19,
+      minute: 0,
+    },
+  });
 }
 
 export async function disableWeeklyReminder() {
@@ -26,12 +36,10 @@ export async function disableWeeklyReminder() {
 }
 
 export async function scheduleReflectionReminder() {
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) {
-    return null;
-  }
+  await ensureNotificationAccess();
 
-  return scheduleNotification({
+  // Recurring daily notification — schedule directly, no daily gate
+  return scheduleRecurringNotification({
     type: NOTIFICATION_TYPES.REFLECTION_REMINDER,
     body: "How did today feel? A quick log helps your pattern map stay current.",
     trigger: {
@@ -56,12 +64,9 @@ export async function schedulePatternAlert(message) {
 }
 
 export async function scheduleWeeklyInsightRelease(message) {
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) {
-    return null;
-  }
+  await ensureNotificationAccess();
 
-  return scheduleNotification({
+  return scheduleRecurringNotification({
     type: NOTIFICATION_TYPES.WEEKLY_INSIGHT,
     body: message,
     trigger: {
@@ -116,6 +121,17 @@ async function scheduleNotification({ type, body, trigger }) {
   const notificationId = await Notifications.scheduleNotificationAsync({ content, trigger });
   await AsyncStorage.setItem(LAST_NOTIFICATION_DATE_KEY, new Date().toISOString().slice(0, 10));
   return notificationId;
+}
+
+/** Schedule a recurring notification (daily/weekly) — bypasses daily rate limit */
+async function scheduleRecurringNotification({ type, body, trigger }) {
+  const content = {
+    title: NOTIFICATION_TITLES[type],
+    body,
+    data: { type },
+  };
+
+  return Notifications.scheduleNotificationAsync({ content, trigger });
 }
 
 /** Notify when a rule-based weekly report has been generated */

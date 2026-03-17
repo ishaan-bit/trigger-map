@@ -48,15 +48,26 @@ export default async function handler(req, res) {
     const report = generateWeeklyReport({ aggregates, aiInsight: canViewRuleBased ? aiInsight : null });
 
     // Attach LLM insight for premium users OR first-free eligible users
+    // For Strava-style gating: non-premium see a truncated teaser
     const firstFreeAvailable = isAuthenticated && !hasPremium ? await isFirstAiFreeAvailable(ownerId) : false;
-    if (hasPremium || firstFreeAvailable) {
-      const llmInsight = await getStoredLlmInsight(ownerId);
-      if (llmInsight) {
+    const llmInsight = await getStoredLlmInsight(ownerId);
+    if (llmInsight) {
+      if (hasPremium || firstFreeAvailable) {
         report.llmInsight = llmInsight;
         if (firstFreeAvailable) {
           report.llmInsight.firstFree = true;
           await markFirstAiFreeUsed(ownerId);
         }
+      } else if (isAuthenticated) {
+        // Strava-style: show first 2-3 lines as teaser
+        const lines = (llmInsight.narrative || "").split("\n").filter(Boolean);
+        const teaser = lines.slice(0, 3).join("\n");
+        report.llmTeaser = {
+          narrative: teaser,
+          truncated: true,
+          model: llmInsight.model,
+          generatedAt: llmInsight.generatedAt,
+        };
       }
     }
 

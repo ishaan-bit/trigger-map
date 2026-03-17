@@ -34,6 +34,7 @@ function parseAggregateHash(record, date) {
   const snapshot = {
     date,
     total: Number(record.total || 0),
+    prediction: record.prediction || null,
     triggers: {},
     emotions: {},
     pairs: {},
@@ -68,7 +69,7 @@ export async function appendDailyAggregate(moment) {
   const timeBucket = bucketForTimestamp(moment.timestamp);
   const pairKey = `${moment.trigger}|${moment.emotion}`;
 
-  await pipeline([
+  const cmds = [
     ["HINCRBY", key, "total", "1"],
     ["HINCRBY", key, `trigger:${moment.trigger}`, "1"],
     ["HINCRBY", key, `emotion:${moment.emotion}`, "1"],
@@ -77,7 +78,14 @@ export async function appendDailyAggregate(moment) {
     ["HSET", key, "date", date],
     ["EXPIRE", key, String(AGGREGATE_TTL_SECONDS)],
     ["SADD", getOwnerIndexKey(), moment.ownerId],
-  ]);
+  ];
+
+  // Store daily prediction (first one per day wins)
+  if (moment.prediction) {
+    cmds.push(["HSETNX", key, "prediction", moment.prediction]);
+  }
+
+  await pipeline(cmds);
 }
 
 export async function getDailyAggregate(ownerId, date) {

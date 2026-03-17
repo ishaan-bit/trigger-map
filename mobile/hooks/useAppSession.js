@@ -9,6 +9,7 @@ import {
   setLastLoggedAt,
   getReminderEnabled,
   getSessionToken,
+  getDailyPrediction,
   setOnboardingComplete,
   setReminderEnabled,
   setSessionToken,
@@ -225,6 +226,7 @@ export function SessionProvider({ children }) {
         const activeDeviceId = await ensureDeviceIdentity();
         const notes = payload.notes ?? payload.note ?? "";
         const timestamp = payload.timestamp || new Date().toISOString();
+        const prediction = await getDailyPrediction().catch(() => null);
 
         if (!token) {
           const localMoment = await saveLocalMoment({
@@ -246,6 +248,7 @@ export function SessionProvider({ children }) {
             note: notes,
             notes,
             timestamp,
+            ...(prediction ? { prediction } : {}),
           },
           token
         );

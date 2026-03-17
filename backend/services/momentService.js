@@ -24,7 +24,7 @@ export function getMomentsKey(ownerId) {
   return redisKey("moments", ownerId);
 }
 
-export function createMomentPayload({ ownerId, trigger, emotion, note, occurredAt, isAnonymous }) {
+export function createMomentPayload({ ownerId, trigger, emotion, note, occurredAt, isAnonymous, prediction }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "other";
   const finalEmotion = EMOTIONS.includes(emotion) ? emotion : "neutral";
 
@@ -36,6 +36,7 @@ export function createMomentPayload({ ownerId, trigger, emotion, note, occurredA
     note: sanitizeText(note || ""),
     timestamp: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
     isAnonymous: Boolean(isAnonymous),
+    ...(prediction ? { prediction } : {}),
   };
 }
 
