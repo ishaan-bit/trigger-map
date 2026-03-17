@@ -83,6 +83,16 @@ export default function TimelinePage() {
       title="Timeline"
       actions={<button className="ghostButton" onClick={load} type="button">Refresh</button>}
     >
+      <div className="card cardFeature stack">
+        <p className="sectionKicker">Past 7 days</p>
+        <h2>Timeline</h2>
+        <p className="muted">
+          {moments.length
+            ? `${moments.length} moment${moments.length !== 1 ? "s" : ""} this week`
+            : "Your moments, grouped by day."}
+        </p>
+      </div>
+
       {loading ? <div className="card loadingCard">Loading your latest moments...</div> : null}
       {error ? (
         <div className="card feedbackPanel stack">

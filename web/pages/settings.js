@@ -31,10 +31,10 @@ export default function SettingsPage() {
   return (
     <Layout title="Settings">
       <div className="stack">
-        <div className="card stack">
+        <div className="card cardFeature stack">
           <p className="sectionKicker">Preferences</p>
           <h2>Settings</h2>
-          <p className="muted">Manage your account, data, and about info.</p>
+          <p className="muted">Manage your account, notifications, and data.</p>
         </div>
 
         {/* Account */}
@@ -72,6 +72,7 @@ export default function SettingsPage() {
           }}>
             Export logs
           </button>
+          {user ? <p className="muted" style={{ fontSize: 13 }}>Exports include all synced and local moments.</p> : null}
           <button className="ghostButton dangerButton" type="button" onClick={async () => {
             if (!confirm("Delete all data? This will permanently remove all your moments, reports, and insights. This cannot be undone.")) return;
             try {

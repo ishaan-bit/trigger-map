@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { Layout } from "../components/Layout";
@@ -14,13 +14,23 @@ const EMOTION_EMOJIS = {
 };
 
 export default function HomePage() {
-  const { saveMoment } = useSession();
+  const { saveMoment, loadTimeline } = useSession();
   const [step, setStep] = useState("trigger");
   const [trigger, setTrigger] = useState(null);
   const [emotion, setEmotion] = useState(null);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [todayCount, setTodayCount] = useState(0);
+
+  useEffect(() => {
+    loadTimeline()
+      .then((moments) => {
+        const today = new Date().toDateString();
+        setTodayCount(moments.filter((m) => new Date(m.timestamp).toDateString() === today).length);
+      })
+      .catch(() => {});
+  }, []);
 
   function reset() {
     setStep("trigger");
@@ -36,6 +46,7 @@ export default function HomePage() {
       setLoading(true);
       const response = await saveMoment({ trigger, emotion, note, notes: note });
       setMessage(response?.patternFeedback || response?.smartReflectionPrompt || "Moment saved ✓");
+      setTodayCount((c) => c + 1);
       setTimeout(reset, 1800);
     } catch (error) {
       setMessage(error.message || "Unable to save. Check connection.");
@@ -50,9 +61,13 @@ export default function HomePage() {
       {step === "trigger" ? (
         <section className="stack">
           <article className="card cardFeature stack">
-            <p className="sectionKicker">Quick capture</p>
+            <p className="sectionKicker">Quick log</p>
             <h2>What triggered this moment?</h2>
-            <p className="muted">Tap the area of life that affected you. Each entry updates your timeline and feeds the weekly report.</p>
+            <p className="muted">
+              {todayCount > 0
+                ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
+                : "Tap a trigger to start logging"}
+            </p>
           </article>
           <div className="tileGrid">
             {TRIGGERS.map((t) => (
@@ -66,6 +81,18 @@ export default function HomePage() {
                 <span className="triggerTileLabel">{t}</span>
               </button>
             ))}
+          </div>
+          <div className="bottomCard">
+            <span style={{ fontSize: 18 }}>
+              {todayCount >= 3 ? "✨" : todayCount > 0 ? "🔥" : "🌱"}
+            </span>
+            <p className="muted" style={{ margin: 0, flex: 1, fontSize: 13, lineHeight: 1.4 }}>
+              {todayCount >= 3
+                ? "Nice pattern data building up. Check your report later."
+                : todayCount > 0
+                  ? `${3 - todayCount} more to unlock stronger observations this week.`
+                  : "Each moment you log sharpens your weekly pattern report."}
+            </p>
           </div>
         </section>
       ) : null}

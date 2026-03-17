@@ -1,17 +1,49 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 
+const GOOGLE_CLIENT_ID = "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com";
+
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithEmail, registerWithEmail } = useSession();
+  const { signInWithEmail, registerWithEmail, signInWithGoogle } = useSession();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const googleBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.google?.accounts?.id) return;
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleResponse,
+    });
+    window.google.accounts.id.renderButton(googleBtnRef.current, {
+      type: "standard",
+      theme: "filled_black",
+      size: "large",
+      text: "continue_with",
+      width: 320,
+    });
+  });
+
+  async function handleGoogleResponse(response) {
+    if (!response.credential) return;
+    try {
+      setLoading(true);
+      setError("");
+      await signInWithGoogle(response.credential);
+      router.push("/timeline");
+    } catch (err) {
+      setError(err.message || "Google sign-in failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -37,6 +69,11 @@ export default function LoginPage() {
         <p className="sectionKicker">{mode === "login" ? "Welcome back" : "Get started"}</p>
         <h2>{mode === "login" ? "Sign in" : "Create account"}</h2>
         <p className="muted">Sign in to sync your data and unlock deeper insights.</p>
+
+        {/* Google Sign-In button */}
+        <div ref={googleBtnRef} className="googleBtnWrap" />
+
+        <div className="loginDivider" />
 
         <form className="stack" onSubmit={submit}>
           {mode === "register" ? (
