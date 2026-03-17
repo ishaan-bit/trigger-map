@@ -10,7 +10,5 @@
       "schedule": "0 3 * * *"
     }
   ],
-  "git": {
-    "deploymentEnabled": false
-  }
+  "ignoreCommand": "exit 0"
 }
