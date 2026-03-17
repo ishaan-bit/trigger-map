@@ -1,9 +1,10 @@
 import { getWeeklyAggregates } from "@/services/aggregationService.js";
 import { generateWeeklyReport } from "@/services/patternEngine.js";
+import { generateInsight } from "@/ai/generateInsight.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredWeeklyInsight, getStoredLlmInsight } from "@/services/reportStore.js";
+import { getStoredLlmInsight } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -37,15 +38,18 @@ export default async function handler(req, res) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
     }
 
-    const [aggregates, aiInsight] = await Promise.all([
-      getWeeklyAggregates(ownerId),
-      getStoredWeeklyInsight(ownerId),
-    ]);
+    const aggregates = await getWeeklyAggregates(ownerId);
 
     const isAuthenticated = Boolean(user);
     const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated });
     const hasPremium = isAuthenticated ? await isPremiumActive(ownerId) : false;
-    const report = generateWeeklyReport({ aggregates, aiInsight: canViewRuleBased ? aiInsight : null });
+
+    // Always compute the rule-based insight from fresh aggregate data
+    // so the summary text matches the live charts.
+    const report = generateWeeklyReport({ aggregates });
+    if (canViewRuleBased && report.totalMoments) {
+      report.aiInsight = await generateInsight(report);
+    }
 
     // Attach LLM insight for premium users OR first-free eligible users
     // For Strava-style gating: non-premium see a truncated teaser

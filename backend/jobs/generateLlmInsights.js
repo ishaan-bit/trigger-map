@@ -3,6 +3,7 @@
  *
  * Run manually:
  *   node backend/jobs/generateLlmInsights.js
+ *   node backend/jobs/generateLlmInsights.js --force --min-moments=5
  */
 
 import "dotenv/config";
@@ -16,39 +17,55 @@ import { getStoredLlmInsight, getLlmInsightKey } from "../services/reportStore.j
 
 const LLM_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
+function parseCliFlags(argv) {
+  const flags = { force: false, minMoments: 1 };
+  for (const arg of argv.slice(2)) {
+    if (arg === "--force") flags.force = true;
+    if (arg.startsWith("--min-moments=")) {
+      const n = parseInt(arg.split("=")[1], 10);
+      if (n > 0) flags.minMoments = n;
+    }
+  }
+  return flags;
+}
+
 async function storeLlmInsight(ownerId, payload) {
   await redis(["SET", getLlmInsightKey(ownerId), JSON.stringify(payload)]);
   return payload;
 }
 
-export async function runGenerateLlmInsights() {
+export async function runGenerateLlmInsights({ force = false, minMoments = 1 } = {}) {
   const owners = await listOwnerIds();
   const results = [];
   let processed = 0;
   let skipped = 0;
 
   console.log(`Found ${owners.length} total owners. Filtering for eligible users...`);
+  if (force) console.log("--force: ignoring cooldown window");
+  if (minMoments > 1) console.log(`--min-moments=${minMoments}: skipping users below threshold`);
 
   for (const ownerId of owners) {
     try {
       const user = await getUserById(ownerId);
       if (!user) { skipped++; continue; }
 
-      const existing = await getStoredLlmInsight(ownerId);
-      if (existing?.generatedAt) {
-        const elapsed = Date.now() - new Date(existing.generatedAt).getTime();
-        if (elapsed < LLM_WINDOW_MS) {
-          results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
-          skipped++;
-          continue;
+      if (!force) {
+        const existing = await getStoredLlmInsight(ownerId);
+        if (existing?.generatedAt) {
+          const elapsed = Date.now() - new Date(existing.generatedAt).getTime();
+          if (elapsed < LLM_WINDOW_MS) {
+            results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
+            skipped++;
+            continue;
+          }
         }
       }
 
       const aggregates = await getWeeklyAggregates(ownerId);
       const weeklyReport = generateWeeklyReport({ aggregates });
 
-      if (!weeklyReport.totalMoments) {
-        results.push({ ownerId, skipped: true, reason: "no-data" });
+      if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
+        results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });
         skipped++;
         continue;
       }
@@ -72,12 +89,13 @@ export async function runGenerateLlmInsights() {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const flags = parseCliFlags(process.argv);
   console.log("=== QuietDen LLM Insight Generator ===");
   console.log(`LLM endpoint: ${process.env.LLM_API_URL || "http://localhost:11434/v1"}`);
   console.log(`Model: ${process.env.LLM_MODEL || "mistral"}`);
   console.log("");
 
-  runGenerateLlmInsights()
+  runGenerateLlmInsights(flags)
     .then(({ processed, skipped, results }) => {
       console.log("");
       console.log(`Done. Generated: ${processed}, Skipped: ${skipped}`);
