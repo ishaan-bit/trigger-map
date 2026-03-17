@@ -12,6 +12,7 @@ body {
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -21,6 +22,7 @@ a {
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .shell {
@@ -28,6 +30,9 @@ a {
   max-width: 860px;
   margin: 0 auto;
   padding: 28px 24px 56px;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 
 .shellGlow {
@@ -144,8 +149,11 @@ a {
   border: 1px solid rgba(197, 214, 235, 0.08);
   border-radius: 999px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: -webkit-sticky;
   position: sticky;
-  top: 10px;
+  top: max(10px, env(safe-area-inset-top, 10px));
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   z-index: 10;
 }
@@ -547,6 +555,19 @@ button,
   text-transform: uppercase;
   letter-spacing: 0.12em;
   width: fit-content;
+  width: -webkit-fit-content;
+}
+
+/* ─── Tablet breakpoint ─── */
+@media (max-width: 768px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gridHero,
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -579,6 +600,11 @@ button,
   }
 
   .trajectoryRow {
+    gap: 8px;
+  }
+
+  .correlationRow {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 }
@@ -662,6 +688,7 @@ button,
   display: flex;
   gap: 12px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 4px 0;
 }
 
@@ -1269,5 +1296,27 @@ button,
 
   .metricGridTwo {
     grid-template-columns: 1fr;
+  }
+
+  .nav a {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .lede {
+    font-size: 14px;
+  }
+
+  .benefitRow {
+    grid-template-columns: 1fr;
+  }
+
+  .shellGlow {
+    width: 200px;
+    height: 200px;
   }
 }

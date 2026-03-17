@@ -8,7 +8,7 @@ export default function App({ Component, pageProps }) {
     <SessionProvider>
       <Head>
         <title>TriggerMap</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#0b1220" />
         <meta name="description" content="Track emotional triggers, review your timeline, and get a weekly pattern report from any browser." />
         <meta name="apple-mobile-web-app-capable" content="yes" />
