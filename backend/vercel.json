@@ -9,6 +9,5 @@
       "path": "/api/weeklyReport?mode=scheduled",
       "schedule": "0 3 * * *"
     }
-  ],
-  "ignoreCommand": "exit 0"
+  ]
 }
