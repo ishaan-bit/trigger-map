@@ -15,6 +15,7 @@ export default function PremiumPage() {
           Core logging, timeline, and weekly summaries stay free. Premium adds AI-powered pattern reading and deeper suggestions.
         </p>
         <strong className="premiumPrice">{PREMIUM_PRICE_LABEL}</strong>
+        <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Web payments coming soon. Subscribe via the Android app.</p>
       </section>
 
       <section className="gridHero premiumGrid">

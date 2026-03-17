@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 
@@ -89,6 +90,7 @@ function PairingChip({ trigger, emotion, count, positive }) {
 }
 
 export default function ReportPage() {
+  const router = useRouter();
   const { loadWeeklyReport, isSignedIn, isPremium } = useSession();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -245,7 +247,7 @@ export default function ReportPage() {
                   title="Patterns and pairings"
                   teaser="Create a free account to see emotional correlations, energy flow, and weekly trajectory."
                   ctaLabel="Sign in to unlock"
-                  onAction={() => { window.location.href = "/login"; }}
+                  onAction={() => { router.push("/login"); }}
                 >
                   <div className="card">
                     <p className="muted">Deeper correlations between triggers and emotions appear here once you sign in.</p>
@@ -371,44 +373,20 @@ export default function ReportPage() {
                   <div className="card cardAccent stack">
                     <div className="aiLabelRow">
                       <span className="aiLabelPill aiLabelPillPurple">AI</span>
-                      {report.llmInsight.firstFree ? (
-                        <span className="aiLabelPill aiLabelPillGreen" style={{ marginLeft: 6 }}>Free preview</span>
-                      ) : null}
                     </div>
                     <p>{cleanText(report.llmInsight.narrative)}</p>
-                    {report.llmInsight.firstFree ? (
-                      <p className="muted" style={{ fontStyle: "italic", fontSize: 12 }}>Future AI insights require Premium.</p>
-                    ) : null}
                   </div>
                 </>
               ) : hasLlmTeaser ? (
                 <>
                   <SectionHeader label="Weekly insight" badge="weekly" />
-                  <div className="teaserWrap">
-                    <div className="card cardAccent stack">
-                      <div className="aiLabelRow">
-                        <span className="aiLabelPill aiLabelPillPurple">AI</span>
-                      </div>
-                      <p>{cleanText(report.llmTeaser.narrative)}</p>
+                  <div className="card cardAccent stack">
+                    <div className="aiLabelRow">
+                      <span className="aiLabelPill aiLabelPillPurple">AI</span>
                     </div>
-                    <div className="teaserGradient" />
-                    <div className="teaserCta">
-                      <p>Subscribe for the full weekly insight</p>
-                      <a className="primaryButton inlineButton" href="/premium">Unlock Premium</a>
-                    </div>
+                    <p>{cleanText(report.llmTeaser.narrative)}</p>
                   </div>
                 </>
-              ) : isSignedIn && !isPremium && confidence !== "low" ? (
-                <LockedSection
-                  title="Weekly insight"
-                  teaser="A concise AI analysis grounded in your actual data, not generic advice."
-                  ctaLabel="Unlock Premium"
-                  onAction={() => { window.location.href = "/premium"; }}
-                >
-                  <div className="card" style={{ opacity: 0.5 }}>
-                    <p className="muted">Your patterns suggest a connection between how you spend your energy and how you feel afterward...</p>
-                  </div>
-                </LockedSection>
               ) : null}
 
               {/* ── 7. DATA QUALITY NUDGE ── */}
