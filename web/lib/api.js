@@ -14,29 +14,38 @@ function createTimeoutSignal(timeoutMs) {
   };
 }
 
-function getDeviceId() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
+export function getDeviceId() {
+  if (typeof window === "undefined") return "";
   const existing = window.localStorage.getItem("triggermap.web.deviceId");
-  if (existing) {
-    return existing;
-  }
-
+  if (existing) return existing;
   const created = window.crypto?.randomUUID?.() || `web-${Date.now()}`;
   window.localStorage.setItem("triggermap.web.deviceId", created);
   return created;
 }
 
+export function getStoredToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("triggermap.web.token") || null;
+}
+
+export function setStoredToken(token) {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.localStorage.setItem("triggermap.web.token", token);
+  } else {
+    window.localStorage.removeItem("triggermap.web.token");
+  }
+}
+
 async function request(path, options = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, headers, ...rest } = options;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, headers, token, ...rest } = options;
   const { signal, cleanup } = createTimeoutSignal(timeoutMs);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api${path}`, {
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
       signal,
@@ -69,19 +78,51 @@ async function request(path, options = {}) {
   }
 }
 
-export function fetchTimeline() {
-  return request(`/timeline?deviceId=${encodeURIComponent(getDeviceId())}`, { timeoutMs: 3000 });
+export function fetchTimeline(token) {
+  const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
+  return request(`/timeline${query}`, { timeoutMs: 3000, token });
 }
 
-export function fetchWeeklyReport() {
-  return request(`/weeklyReport?deviceId=${encodeURIComponent(getDeviceId())}`, { timeoutMs: 3000 });
+export function fetchWeeklyReport(token) {
+  const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
+  return request(`/weeklyReport${query}`, { timeoutMs: 3000, token });
 }
 
-export function logMoment(payload) {
+export function logMoment(payload, token) {
   return request("/logMoment", {
     method: "POST",
     body: JSON.stringify({ ...payload, deviceId: getDeviceId(), timestamp: new Date().toISOString() }),
+    token,
   });
+}
+
+export function loginApi(payload) {
+  return request("/login", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function registerApi(payload) {
+  return request("/register", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function fetchMe(token) {
+  return request("/me", { token });
+}
+
+export function editMomentApi(momentId, payload, token) {
+  return request(`/moment/${encodeURIComponent(momentId)}`, { method: "PUT", body: JSON.stringify(payload), token });
+}
+
+export function deleteMomentApi(momentId, token) {
+  return request(`/moment/${encodeURIComponent(momentId)}`, { method: "DELETE", token });
+}
+
+export function fetchExport(token) {
+  const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
+  return request(`/export${query}`, { token });
+}
+
+export function deleteAllDataApi(token) {
+  return request("/deleteData", { method: "DELETE", token });
 }
 
 export function fetchHealth() {

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchHealth } from "../lib/api";
+import { useSession } from "../hooks/useSession";
 
 export function Layout({ title, children, actions = null }) {
+  const { user, isSignedIn } = useSession();
   const [installPrompt, setInstallPrompt] = useState(null);
   const [health, setHealth] = useState({ status: "loading", message: "Checking backend" });
 
@@ -21,26 +23,18 @@ export function Layout({ title, children, actions = null }) {
 
     fetchHealth()
       .then((payload) => {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setHealth({
           status: payload.status === "ok" ? "online" : "offline",
           message: payload.status === "ok" ? "Backend online" : "Backend degraded",
         });
       })
       .catch(() => {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setHealth({ status: "offline", message: "Backend unavailable" });
       });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   return (
@@ -49,14 +43,18 @@ export function Layout({ title, children, actions = null }) {
       <div className="shellGlow shellGlowTwo" />
       <header className="hero">
         <div className="heroCopy">
-          <p className="eyebrow">QuietDen</p>
+          <p className="eyebrow">TriggerMap</p>
           <h1>{title}</h1>
           <p className="lede">Log a moment, review your timeline, and open your weekly report — from any browser.</p>
           <div className="statusRow">
             <span className={`statusBadge statusBadge${health.status.charAt(0).toUpperCase()}${health.status.slice(1)}`}>
               {health.message}
             </span>
-            <span className="statusHint">Private local device ID keeps logs linked until you sign in.</span>
+            {isSignedIn ? (
+              <span className="statusHint">Signed in as {user.email}</span>
+            ) : (
+              <span className="statusHint">Private local device ID keeps logs linked until you sign in.</span>
+            )}
           </div>
         </div>
         <div className="heroActions">
@@ -79,7 +77,8 @@ export function Layout({ title, children, actions = null }) {
         <Link href="/">Log moment</Link>
         <Link href="/timeline">Timeline</Link>
         <Link href="/report">Weekly report</Link>
-        <Link href="/premium">Premium</Link>
+        <Link href="/settings">Settings</Link>
+        {!isSignedIn ? <Link href="/login" className="navLoginLink">Sign in</Link> : null}
       </nav>
 
       <section className="content">{children}</section>

@@ -1,6 +1,6 @@
 {
-  "name": "QuietDen",
-  "short_name": "QuietDen",
+  "name": "TriggerMap",
+  "short_name": "TriggerMap",
   "description": "A lightweight emotional trigger journal with weekly pattern insights.",
   "start_url": "/",
   "scope": "/",

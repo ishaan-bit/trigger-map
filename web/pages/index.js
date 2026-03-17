@@ -2,67 +2,124 @@ import { useState } from "react";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { Layout } from "../components/Layout";
-import { logMoment } from "../lib/api";
+import { useSession } from "../hooks/useSession";
+
+const TRIGGER_EMOJIS = {
+  work: "💼", social: "👥", money: "💰", family: "🏠",
+  exercise: "🏃", health: "🩺", travel: "✈️", alone: "🧘", other: "📌",
+};
+
+const EMOTION_EMOJIS = {
+  frustrated: "💢", anxious: "⚡", neutral: "🌫️", calm: "🍃", energized: "☀️",
+};
 
 export default function HomePage() {
-  const [trigger, setTrigger] = useState(TRIGGERS[0]);
-  const [emotion, setEmotion] = useState(EMOTIONS[0]);
+  const { saveMoment } = useSession();
+  const [step, setStep] = useState("trigger");
+  const [trigger, setTrigger] = useState(null);
+  const [emotion, setEmotion] = useState(null);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  function reset() {
+    setStep("trigger");
+    setTrigger(null);
+    setEmotion(null);
+    setNote("");
+    setMessage("");
+  }
+
+  async function handleSave() {
+    if (!trigger || !emotion || loading) return;
+    try {
+      setLoading(true);
+      const response = await saveMoment({ trigger, emotion, note, notes: note });
+      setMessage(response?.patternFeedback || response?.smartReflectionPrompt || "Moment saved ✓");
+      setTimeout(reset, 1800);
+    } catch (error) {
+      setMessage(error.message || "Unable to save. Check connection.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <Layout title="Log a moment">
-      <section className="gridHero">
-        <article className="card cardFeature stack">
-          <p className="sectionKicker">Quick capture</p>
-          <h2>Log what happened before the feeling fades.</h2>
-          <p className="muted">Each entry updates your timeline and feeds the weekly pattern report.</p>
-          <div className="pillRow">
-            <span className="pill">🔒 Anonymous</span>
-            <span className="pill">📊 Pattern engine</span>
-            <span className="pill">📱 PWA</span>
+      {/* ── Step 1: Trigger selection ── */}
+      {step === "trigger" ? (
+        <section className="stack">
+          <article className="card cardFeature stack">
+            <p className="sectionKicker">Quick capture</p>
+            <h2>What triggered this moment?</h2>
+            <p className="muted">Tap the area of life that affected you. Each entry updates your timeline and feeds the weekly report.</p>
+          </article>
+          <div className="tileGrid">
+            {TRIGGERS.map((t) => (
+              <button
+                key={t}
+                className="triggerTile"
+                onClick={() => { setTrigger(t); setStep("emotion"); }}
+                type="button"
+              >
+                <span className="triggerTileEmoji">{TRIGGER_EMOJIS[t] || "📌"}</span>
+                <span className="triggerTileLabel">{t}</span>
+              </button>
+            ))}
           </div>
-        </article>
+        </section>
+      ) : null}
 
-        <article className="card stack">
+      {/* ── Step 2: Emotion selection ── */}
+      {step === "emotion" ? (
+        <section className="stack">
+          <article className="card stack">
+            <p className="sectionKicker">{trigger}</p>
+            <h2>How did it affect you?</h2>
+            <p className="muted">Choose an emotion, add an optional note, then save.</p>
+          </article>
+          <div className="emotionChipRow">
+            {EMOTIONS.map((e) => (
+              <button
+                key={e}
+                className={`emotionChip ${emotion === e ? "emotionChipActive" : ""}`}
+                data-emotion={e}
+                onClick={() => setEmotion(e)}
+                type="button"
+              >
+                <span className="emotionChipEmoji">{EMOTION_EMOJIS[e] || "•"}</span>
+                <span className="emotionChipLabel">{e}</span>
+              </button>
+            ))}
+          </div>
+
           <label>
-            Trigger
-            <select value={trigger} onChange={(event) => setTrigger(event.target.value)}>
-              {TRIGGERS.map((entry) => <option key={entry}>{entry}</option>)}
-            </select>
+            Note (optional)
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="What happened right before this?"
+            />
           </label>
-          <label>
-            Emotion
-            <select value={emotion} onChange={(event) => setEmotion(event.target.value)}>
-              {EMOTIONS.map((entry) => <option key={entry}>{entry}</option>)}
-            </select>
-          </label>
-          <label>
-            Note
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={5} placeholder="What happened right before this?" />
-          </label>
-          <button
-            className="primaryButton"
-            disabled={loading}
-            onClick={async () => {
-              try {
-                setLoading(true);
-                const response = await logMoment({ trigger, emotion, note, notes: note });
-                setMessage(response.patternFeedback || response.smartReflectionPrompt || "Moment saved.");
-                setNote("");
-              } catch (error) {
-                setMessage(error.message || "Unable to save data. Check connection.");
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            {loading ? "Saving..." : "Save moment"}
-          </button>
-          {message ? <p className="feedback feedbackPanel">{message}</p> : null}
-        </article>
-      </section>
+
+          <div className="logActions">
+            <button className="ghostButton" type="button" onClick={() => { setStep("trigger"); setEmotion(null); setNote(""); }}>
+              ← Back
+            </button>
+            <button
+              className="primaryButton"
+              disabled={!emotion || loading}
+              onClick={handleSave}
+              type="button"
+            >
+              {loading ? "Saving..." : "Log moment"}
+            </button>
+          </div>
+
+          {message ? <p className="feedback feedbackPanel" style={{ padding: "12px 16px", borderRadius: 12 }}>{message}</p> : null}
+        </section>
+      ) : null}
     </Layout>
   );
 }

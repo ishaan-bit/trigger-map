@@ -1,11 +1,12 @@
 import Head from "next/head";
+import { SessionProvider } from "../hooks/useSession";
 import "../styles/globals.css";
 
 export default function App({ Component, pageProps }) {
   return (
-    <>
+    <SessionProvider>
       <Head>
-        <title>QuietDen Web</title>
+        <title>TriggerMap</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0b1220" />
         <meta name="description" content="Track emotional triggers, review your timeline, and get a weekly pattern report from any browser." />
@@ -16,6 +17,6 @@ export default function App({ Component, pageProps }) {
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </Head>
       <Component {...pageProps} />
-    </>
+    </SessionProvider>
   );
 }

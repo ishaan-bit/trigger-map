@@ -1,53 +1,95 @@
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { Layout } from "../components/Layout";
-import { fetchWeeklyReport } from "../lib/api";
+import { useSession } from "../hooks/useSession";
 
 const EMOTION_EMOJIS = {
-  angry: "🔥", anxious: "⚡", sad: "🌧", calm: "🍃", happy: "☀️",
-  numb: "🌫", ashamed: "🫧", hopeful: "🌱", frustrated: "💢", grateful: "✨",
+  frustrated: "💢", anxious: "⚡", neutral: "🌫️", calm: "🍃", energized: "☀️",
 };
 
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
-function formatMetricLabel(value) {
-  if (!value || value === "none") return "—";
-  return value;
+const ENERGY_COLORS = {
+  steady: "#9de4b7", balanced: "#7bc9d8", tense: "#f0b96a",
+  drained: "#f07f84", uplifted: "#c084fc",
+};
+
+const CONFIDENCE_LABELS = {
+  too_early: "Just getting started",
+  low: "Early patterns",
+  emerging: "Taking shape",
+  moderate: "Solid picture",
+  strong: "High confidence",
+};
+
+function cleanText(str) {
+  if (typeof str !== "string") return str;
+  return str
+    .replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\n/g, "\n")
+    .replace(/\u2014/g, ", ")
+    .replace(/\u2013/g, ", ")
+    .trim();
 }
 
-function maxValue(record = {}) {
-  return Math.max(...Object.values(record).map((v) => Number(v || 0)), 1);
+function topEntries(record, limit = 5) {
+  return Object.entries(record || {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, limit);
 }
 
-function EnergyBar({ label, value, max }) {
+function HBar({ label, value, max, color = "#7bc9d8", icon }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
   return (
     <div className="chartRow">
-      <span className="chartLabel">{label}</span>
+      <span className="chartLabel">{icon ? `${icon} ` : ""}{label}</span>
       <div className="chartTrack">
-        <span className="chartBar" style={{ width: `${pct}%` }} />
+        <span className="chartBar" style={{ width: `${pct}%`, background: color }} />
       </div>
       <span className="chartValue">{value}</span>
     </div>
   );
 }
 
-function PremiumGate({ children, available, teaser }) {
-  if (!available) return children;
+function SectionHeader({ label, badge, extra }) {
   return (
-    <div className="premiumGateWrap">
-      <div className="premiumGateBlur">{children}</div>
-      <div className="premiumGateOverlay">
-        <span className="premiumGateIcon">✦</span>
-        <strong className="premiumGateTitle">Premium insight ready</strong>
-        <p className="premiumGateText">{teaser}</p>
-        <a className="primaryButton inlineButton premiumGateCta" href="/premium">Unlock Premium</a>
+    <div className="reportSectionHeader">
+      <div className="reportSectionHeaderLeft">
+        <span className="sectionKicker">{label.toUpperCase()}</span>
+        {badge ? (
+          <span className={`freqBadge ${badge === "weekly" ? "freqBadgeWeekly" : ""}`}>
+            {badge === "weekly" ? "WEEKLY" : "LIVE"}
+          </span>
+        ) : null}
+      </div>
+      {extra ? <span className="reportSectionExtra">{extra}</span> : null}
+    </div>
+  );
+}
+
+function LockedSection({ title, teaser, ctaLabel, onAction, children }) {
+  return (
+    <div className="lockedWrap">
+      <div className="lockedContent">{children}</div>
+      <div className="lockedGradient" />
+      <div className="lockedOverlay">
+        <span className="lockedIcon">🔒</span>
+        <strong className="lockedTitle">{title}</strong>
+        <p className="lockedTeaser">{teaser}</p>
+        <button className="primaryButton inlineButton" onClick={onAction} type="button">{ctaLabel}</button>
       </div>
     </div>
   );
 }
 
+function PairingChip({ trigger, emotion, count, positive }) {
+  const cls = positive ? "pairingChipPositive" : "pairingChipNegative";
+  return (
+    <span className={`pairingChip ${cls}`}>{trigger} → {emotion} ×{count}</span>
+  );
+}
+
 export default function ReportPage() {
+  const { loadWeeklyReport, isSignedIn, isPremium } = useSession();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,8 +98,8 @@ export default function ReportPage() {
     try {
       setLoading(true);
       setError("");
-      const payload = await fetchWeeklyReport();
-      setReport(payload.report || null);
+      const data = await loadWeeklyReport();
+      setReport(data || null);
     } catch (loadError) {
       setError(loadError.message || "Unable to load data. Check connection.");
     } finally {
@@ -67,24 +109,25 @@ export default function ReportPage() {
 
   useEffect(() => { loadReport(); }, []);
 
-  const triggerMax = maxValue(report?.triggerFrequency);
-  const emotionMax = maxValue(report?.emotionFrequency);
-  const energyMax = Math.max(
-    ...Object.values(report?.energyDistribution || {}).map(Number), 1
-  );
-  const timeMax = Math.max(
-    ...Object.values(report?.timeOfDayPatterns || {}).map(Number), 1
-  );
+  const dq = report?.dataQuality || {};
+  const confidence = dq.confidence || "too_early";
+  const hasRuleInsight = !!report?.aiInsight?.summary;
+  const hasLlmInsight = !!report?.llmInsight?.narrative;
+  const hasLlmTeaser = !!report?.llmTeaser?.narrative;
 
-  const hasAi = !!report?.aiInsight?.summary;
-  const showPreviewGate = !hasAi && report?.aiPreview?.available;
+  const triggerEntries = topEntries(report?.triggerFrequency, 6);
+  const emotionEntries = topEntries(report?.emotionFrequency, 6);
+  const triggerMax = triggerEntries[0]?.[1] || 1;
+  const emotionMax = emotionEntries[0]?.[1] || 1;
+  const energyEntries = Object.entries(report?.energyDistribution || {}).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+  const energyMax = energyEntries[0]?.[1] || 1;
+  const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
+  const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
 
   return (
     <Layout
       title="Weekly report"
-      actions={
-        <button className="ghostButton" onClick={loadReport} type="button">Refresh</button>
-      }
+      actions={<button className="ghostButton" onClick={loadReport} type="button">Refresh</button>}
     >
       {loading ? <div className="card loadingCard">Building your weekly view...</div> : null}
       {error ? (
@@ -96,192 +139,305 @@ export default function ReportPage() {
       ) : null}
 
       {report ? (
-        <div className="stack reportStack reportAtmosphere">
+        <div className="stack reportStack">
 
-          {/* ─── AI INSIGHT (premium) or PREVIEW GATE ─── */}
-          {hasAi ? (
-            <section className="card cardAccent summaryCard stack">
-              <span className="summaryLabel">AI insight</span>
-              <p className="sectionKicker">Weekly summary</p>
-              <h2>{report.aiInsight.summary}</h2>
-              {report.aiInsight.suggestion ? <p className="muted">{report.aiInsight.suggestion}</p> : null}
-            </section>
-          ) : (
-            <PremiumGate available={showPreviewGate} teaser={report.aiPreview?.teaser}>
-              <section className="card cardFeature stack">
-                <p className="sectionKicker">AI summary</p>
-                <h2 style={{ color: "#5a6b80" }}>
-                  Your week was most shaped by &ldquo;{report.topTrigger}&rdquo; triggers, and you often felt {report.topEmotion}.
-                </h2>
-                <p className="muted" style={{ color: "#4a5a6e" }}>Upgrade to Premium for personalised suggestions and deeper analysis.</p>
-              </section>
-            </PremiumGate>
-          )}
-
-          {/* ─── HEADLINE METRICS ─── */}
-          <section className="metricGrid">
-            <article className="card stack metricCard">
-              <p className="metricLabel">Top trigger</p>
-              <strong className="metricValue">{formatMetricLabel(report.topTrigger)}</strong>
-              {report.topPair?.count > 0 ? (
-                <span className="metricHint">
-                  Most often → {report.topPair.emotion} ({report.topPair.count}×)
+          {/* ── 1. AT A GLANCE HERO ── */}
+          <div className="card cardFeature stack">
+            <p className="sectionKicker">Weekly patterns</p>
+            <h2>Your Week</h2>
+            {report.totalMoments ? (
+              <p className="muted">
+                {report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} across {dq.daysLogged || "-"} day{(dq.daysLogged || 0) !== 1 ? "s" : ""}
+              </p>
+            ) : null}
+            {report.totalMoments ? (
+              <div className="heroRow">
+                <span className="heroPill">
+                  <span>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</span>
+                  {report.topEmotion || "Mixed"}
                 </span>
-              ) : null}
-            </article>
-            <article className="card stack metricCard">
-              <p className="metricLabel">Top emotion</p>
-              <strong className="metricValue">
-                <span className="metricEmoji">{EMOTION_EMOJIS[report.topEmotion] || ""}</span>{" "}
-                {formatMetricLabel(report.topEmotion)}
-              </strong>
-            </article>
-            <article className="card stack metricCard">
-              <p className="metricLabel">Volatility</p>
-              <strong className="metricValue">{formatMetricLabel(report.volatilityChange)}</strong>
-              {report.volatilityScore != null ? (
-                <span className="metricHint">Score: {report.volatilityScore}</span>
-              ) : null}
-            </article>
-            <article className="card stack metricCard">
-              <p className="metricLabel">Most stable day</p>
-              <strong className="metricValue">{formatMetricLabel(report.mostStableDay)}</strong>
-            </article>
-          </section>
-
-          {/* ─── FREQUENCY CHARTS (side by side) ─── */}
-          <section className="chartGrid">
-            <article className="card stack">
-              <p className="sectionKicker">Trigger frequency</p>
-              {Object.entries(report.triggerFrequency || {}).length ? (
-                Object.entries(report.triggerFrequency)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([key, value]) => (
-                    <div className="chartRow" key={key}>
-                      <span className="chartLabel">{key}</span>
-                      <div className="chartTrack">
-                        <span className="chartBar" style={{ width: `${(Number(value) / triggerMax) * 100}%` }} />
-                      </div>
-                      <span className="chartValue">{value}</span>
-                    </div>
-                  ))
-              ) : <p className="muted">No trigger data yet.</p>}
-            </article>
-
-            <article className="card stack">
-              <p className="sectionKicker">Emotion frequency</p>
-              {Object.entries(report.emotionFrequency || {}).length ? (
-                Object.entries(report.emotionFrequency)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([key, value]) => (
-                    <div className="chartRow" key={key}>
-                      <span className="chartLabel">
-                        <span className="emotionEmoji">{EMOTION_EMOJIS[key] || ""}</span> {key}
-                      </span>
-                      <div className="chartTrack">
-                        <span className="chartBar chartBarWarm" style={{ width: `${(Number(value) / emotionMax) * 100}%` }} />
-                      </div>
-                      <span className="chartValue">{value}</span>
-                    </div>
-                  ))
-              ) : <p className="muted">No emotion data yet.</p>}
-            </article>
-          </section>
-
-          {/* ─── ENERGY + TIME OF DAY (side by side) ─── */}
-          <section className="chartGrid">
-            <article className="card stack">
-              <p className="sectionKicker">Energy distribution</p>
-              {Object.entries(report.energyDistribution || {}).filter(([, v]) => v > 0).length ? (
-                Object.entries(report.energyDistribution)
-                  .filter(([, v]) => v > 0)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([key, value]) => (
-                    <EnergyBar key={key} label={key} value={value} max={energyMax} />
-                  ))
-              ) : <p className="muted">Energy data will appear with more logs.</p>}
-            </article>
-
-            <article className="card stack">
-              <p className="sectionKicker">Time of day</p>
-              {Object.entries(report.timeOfDayPatterns || {}).filter(([, v]) => v > 0).length ? (
-                Object.entries(report.timeOfDayPatterns)
-                  .filter(([, v]) => v > 0)
-                  .map(([key, value]) => (
-                    <div className="chartRow" key={key}>
-                      <span className="chartLabel">{TIME_ICONS[key] || ""} {key}</span>
-                      <div className="chartTrack">
-                        <span className="chartBar chartBarGold" style={{ width: `${(Number(value) / timeMax) * 100}%` }} />
-                      </div>
-                      <span className="chartValue">{value}</span>
-                    </div>
-                  ))
-              ) : <p className="muted">Time-of-day data will appear with more logs.</p>}
-            </article>
-          </section>
-
-          {/* ─── WEEKLY TRAJECTORY ─── */}
-          {report.weeklyEmotionTrajectory?.length > 1 ? (
-            <section className="card stack">
-              <p className="sectionKicker">Weekly emotion trajectory</p>
-              <div className="trajectoryRow">
-                {report.weeklyEmotionTrajectory.map((day) => (
-                  <div className="trajectoryDay" key={day.date}>
-                    <span className="trajectoryEmoji">{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</span>
-                    <span className="trajectoryScore">{day.score}</span>
-                    <span className="trajectoryDate">{new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}</span>
-                  </div>
-                ))}
+                <span className="heroPill">
+                  <span>🎯</span>
+                  {report.topTrigger || (report.tiedTriggers?.length > 1 ? `${report.tiedTriggers.length} areas` : "-")}
+                </span>
+                <span className="heroPill heroPillConfidence">
+                  {CONFIDENCE_LABELS[confidence] || confidence}
+                </span>
               </div>
-            </section>
+            ) : null}
+            {hasRuleInsight ? (
+              <div className="takeawayBar">{cleanText(report.aiInsight.summary)}</div>
+            ) : null}
+          </div>
+
+          {/* Starter state */}
+          {confidence === "too_early" ? (
+            <div className="card stack" style={{ textAlign: "center" }}>
+              <span style={{ fontSize: 48 }}>🌱</span>
+              <strong>A few more moments to go</strong>
+              <p className="muted">Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture.</p>
+              <a className="primaryButton inlineButton" href="/">Log a moment</a>
+            </div>
           ) : null}
 
-          {/* ─── CORRELATIONS (premium gate) ─── */}
-          <PremiumGate
-            available={showPreviewGate}
-            teaser="Unlock Premium to see full trigger → emotion correlations."
-          >
-            <section className="card stack">
-              <p className="sectionKicker">Trigger → Emotion correlations</p>
-              {Object.entries(report.correlations || {}).length ? (
-                Object.entries(report.correlations).map(([trigger, emotions]) => (
-                  <div className="correlationRow" key={trigger}>
-                    <strong className="correlationTrigger">{trigger}</strong>
-                    <div className="correlationChips">
-                      {Object.entries(emotions)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([emotion, count]) => (
-                          <span className="correlationChip" key={emotion} data-emotion={emotion}>
-                            {EMOTION_EMOJIS[emotion] || ""} {emotion} ×{count}
-                          </span>
+          {confidence !== "too_early" ? (
+            <>
+              {/* ── 2. WHAT SHOWED UP ── */}
+              <SectionHeader label="What showed up" badge="live" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
+
+              {emotionEntries.length ? (
+                <div className="card stack">
+                  {emotionEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={emotionMax} color="#f0b96a" icon={EMOTION_EMOJIS[key]} />
+                  ))}
+                </div>
+              ) : null}
+
+              {triggerEntries.length ? (
+                <div className="card stack">
+                  {triggerEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={triggerMax} />
+                  ))}
+                </div>
+              ) : null}
+
+              {dq.hasEnoughForRhythm && timeEntries.length ? (
+                <div className="card stack">
+                  <p className="sectionKicker">When you logged</p>
+                  {timeEntries.map(([key, value]) => (
+                    <HBar key={key} label={key} value={value} max={timeMax} color="#f0b96a" icon={TIME_ICONS[key]} />
+                  ))}
+                </div>
+              ) : null}
+
+              {/* ── 3. WHAT HELPED / WHAT DRAINED ── */}
+              {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
+                <>
+                  <SectionHeader label="What helped · What drained" badge="live" />
+                  <div className="card stack">
+                    {report.regulators?.length ? (
+                      <div className="pairingGroup">
+                        <span className="pairingGroupLabel">🌿 Regulators</span>
+                        <div className="pairingList">
+                          {report.regulators.slice(0, 4).map((r) => (
+                            <PairingChip key={`${r.trigger}-${r.emotion}`} trigger={r.trigger} emotion={r.emotion} count={r.count} positive />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {report.frictionZones?.length ? (
+                      <div className="pairingGroup">
+                        <span className="pairingGroupLabel">🔥 Friction zones</span>
+                        <div className="pairingList">
+                          {report.frictionZones.slice(0, 4).map((f) => (
+                            <PairingChip key={`${f.trigger}-${f.emotion}`} trigger={f.trigger} emotion={f.emotion} count={f.count} positive={false} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              {/* ── 4. PATTERNS & PAIRINGS (sign-in gate) ── */}
+              {!isSignedIn && confidence !== "low" ? (
+                <LockedSection
+                  title="Patterns and pairings"
+                  teaser="Create a free account to see emotional correlations, energy flow, and weekly trajectory."
+                  ctaLabel="Sign in to unlock"
+                  onAction={() => { window.location.href = "/login"; }}
+                >
+                  <div className="card">
+                    <p className="muted">Deeper correlations between triggers and emotions appear here once you sign in.</p>
+                  </div>
+                </LockedSection>
+              ) : (
+                <>
+                  {/* Correlations */}
+                  {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
+                    <>
+                      <SectionHeader label="Trigger → Emotion" badge="live" />
+                      <div className="card stack">
+                        {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
+                          <div className="correlationRow" key={trigger}>
+                            <strong className="correlationTrigger">{trigger}</strong>
+                            <div className="correlationChips">
+                              {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
+                                <span className="correlationChip" key={emo} data-emotion={emo}>
+                                  {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Energy flow */}
+                  {energyEntries.length ? (
+                    <>
+                      <SectionHeader label="Energy flow" badge="live" />
+                      <div className="card stack">
+                        {energyEntries.map(([key, value]) => (
+                          <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || "#7bc9d8"} />
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Stability */}
+                  {dq.hasEnoughForStability ? (
+                    <>
+                      <SectionHeader label="Stability" badge="weekly" />
+                      <div className="metricGrid metricGridTwo">
+                        {report.volatilityScore !== null ? (
+                          <div className="card stack metricCard">
+                            <p className="metricLabel">Volatility</p>
+                            <strong className="metricValue">
+                              {report.volatilityScore < 0.5 ? "🟢" : report.volatilityScore < 1.5 ? "🟡" : "🔴"} {report.volatilityScore}
+                            </strong>
+                          </div>
+                        ) : null}
+                        {report.mostStableDay ? (
+                          <div className="card stack metricCard">
+                            <p className="metricLabel">Steadiest day</p>
+                            <strong className="metricValue">
+                              {new Date(report.mostStableDay).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                            </strong>
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Trajectory */}
+                  {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
+                    <>
+                      <SectionHeader label="Emotion trajectory" badge="live" />
+                      {report.trajectoryNote ? (
+                        <p className="muted" style={{ fontSize: 13 }}>{cleanText(report.trajectoryNote)}</p>
+                      ) : null}
+                      <div className="trajectoryRow">
+                        {report.weeklyEmotionTrajectory.map((day) => (
+                          <div className="trajectoryDay" key={day.date}>
+                            <span className="trajectoryEmoji">{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</span>
+                            <span className="trajectoryScore">{day.score}</span>
+                            <span className="trajectoryDate">
+                              {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Gut check */}
+                  {report.predictionAccuracy ? (
+                    <>
+                      <SectionHeader label="Gut check" badge="live" />
+                      <div className="card gutCheckCard">
+                        <span className="gutCheckEmoji">
+                          {report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}
+                        </span>
+                        <div className="gutCheckContent">
+                          <strong>{report.predictionAccuracy.correct} of {report.predictionAccuracy.daysCompared} days</strong>
+                          <p className="muted">
+                            {report.predictionAccuracy.rate >= 0.6
+                              ? "Your morning gut feeling matched how the day actually went. Strong self-awareness."
+                              : report.predictionAccuracy.rate >= 0.3
+                                ? "Your predictions were a mixed bag. Your days may hold more surprises than you expect."
+                                : "Your days unfolded differently than expected. Not a bad thing — it means you're adapting."}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </>
+              )}
+
+              {/* ── 5. TRY THIS WEEK ── */}
+              {report.aiInsight?.microExperiment ? (
+                <div className="card experimentCard">
+                  <span className="aiLabelPill aiLabelPillGreen">Try this week</span>
+                  <p>{cleanText(report.aiInsight.microExperiment)}</p>
+                </div>
+              ) : null}
+
+              {/* ── 6. WEEKLY INSIGHT (LLM) ── */}
+              {hasLlmInsight ? (
+                <>
+                  <SectionHeader label="Weekly insight" badge="weekly" />
+                  <div className="card cardAccent stack">
+                    <div className="aiLabelRow">
+                      <span className="aiLabelPill aiLabelPillPurple">AI</span>
+                      {report.llmInsight.firstFree ? (
+                        <span className="aiLabelPill aiLabelPillGreen" style={{ marginLeft: 6 }}>Free preview</span>
+                      ) : null}
+                    </div>
+                    <p>{cleanText(report.llmInsight.narrative)}</p>
+                    {report.llmInsight.firstFree ? (
+                      <p className="muted" style={{ fontStyle: "italic", fontSize: 12 }}>Future AI insights require Premium.</p>
+                    ) : null}
+                  </div>
+                </>
+              ) : hasLlmTeaser ? (
+                <>
+                  <SectionHeader label="Weekly insight" badge="weekly" />
+                  <div className="teaserWrap">
+                    <div className="card cardAccent stack">
+                      <div className="aiLabelRow">
+                        <span className="aiLabelPill aiLabelPillPurple">AI</span>
+                      </div>
+                      <p>{cleanText(report.llmTeaser.narrative)}</p>
+                    </div>
+                    <div className="teaserGradient" />
+                    <div className="teaserCta">
+                      <p>Subscribe for the full weekly insight</p>
+                      <a className="primaryButton inlineButton" href="/premium">Unlock Premium</a>
                     </div>
                   </div>
-                ))
-              ) : <p className="muted">Correlations need at least a few trigger-emotion pairs.</p>}
-            </section>
-          </PremiumGate>
+                </>
+              ) : isSignedIn && !isPremium && confidence !== "low" ? (
+                <LockedSection
+                  title="Weekly insight"
+                  teaser="A concise AI analysis grounded in your actual data, not generic advice."
+                  ctaLabel="Unlock Premium"
+                  onAction={() => { window.location.href = "/premium"; }}
+                >
+                  <div className="card" style={{ opacity: 0.5 }}>
+                    <p className="muted">Your patterns suggest a connection between how you spend your energy and how you feel afterward...</p>
+                  </div>
+                </LockedSection>
+              ) : null}
 
-          {/* ─── BEHAVIORAL TAKEAWAYS ─── */}
-          <section className="card stack">
-            <p className="sectionKicker">Behavioral takeaways</p>
-            {report.insights?.length ? report.insights.map((entry, idx) => (
-              <div className="insightRow" key={idx}>{entry}</div>
-            )) : <p className="muted">Log more moments to unlock weekly takeaways.</p>}
-          </section>
+              {/* ── 7. DATA QUALITY NUDGE ── */}
+              {confidence === "low" ? (
+                <div className="card stack" style={{ textAlign: "center" }}>
+                  <strong>Patterns are forming</strong>
+                  <p className="muted">
+                    {dq.totalMoments} moments across {dq.daysLogged} day{dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.
+                  </p>
+                  <a className="primaryButton inlineButton" href="/">Log a moment</a>
+                </div>
+              ) : null}
+            </>
+          ) : null}
 
-          {/* ─── TOTAL MOMENTS FOOTER ─── */}
-          <div className="reportFooter">
-            <span className="reportFooterText">
-              Based on <strong>{report.totalMoments}</strong> moment{report.totalMoments !== 1 ? "s" : ""} this week
-            </span>
-          </div>
+          {/* ── FOOTER ── */}
+          {report.totalMoments ? (
+            <div className="reportFooter">
+              <span className="reportFooterText">
+                Based on <strong>{report.totalMoments}</strong> moment{report.totalMoments !== 1 ? "s" : ""} this week
+              </span>
+            </div>
+          ) : null}
         </div>
       ) : !loading && !error ? (
         <div className="card feedbackPanel stack emptyStatePanel">
-          <Image src="/assets/report-empty.png" alt="Weekly report empty state" width={220} height={220} loading="lazy" className="emptyStateArt" />
-          <strong>Not enough data yet</strong>
-          <p className="feedback">Log a few moments this week and QuietDen will generate your first report.</p>
+          <span style={{ fontSize: 56 }}>📝</span>
+          <strong>Your first insight is on its way</strong>
+          <p className="feedback">Log a few moments this week and we will surface the patterns behind your emotions.</p>
           <a className="primaryButton inlineButton" href="/">Log a moment</a>
         </div>
       ) : null}

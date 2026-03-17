@@ -340,16 +340,11 @@ button,
   text-transform: capitalize;
 }
 
-.momentEmotion[data-emotion="angry"] { background: rgba(239, 83, 80, 0.12); border-color: rgba(239, 83, 80, 0.2); }
-.momentEmotion[data-emotion="anxious"] { background: rgba(255, 167, 38, 0.12); border-color: rgba(255, 167, 38, 0.2); }
-.momentEmotion[data-emotion="sad"] { background: rgba(66, 165, 245, 0.12); border-color: rgba(66, 165, 245, 0.2); }
-.momentEmotion[data-emotion="calm"] { background: rgba(102, 187, 106, 0.12); border-color: rgba(102, 187, 106, 0.2); }
-.momentEmotion[data-emotion="happy"] { background: rgba(255, 238, 88, 0.12); border-color: rgba(255, 238, 88, 0.2); }
-.momentEmotion[data-emotion="numb"] { background: rgba(158, 158, 158, 0.12); border-color: rgba(158, 158, 158, 0.2); }
-.momentEmotion[data-emotion="ashamed"] { background: rgba(171, 71, 188, 0.12); border-color: rgba(171, 71, 188, 0.2); }
-.momentEmotion[data-emotion="hopeful"] { background: rgba(77, 208, 225, 0.12); border-color: rgba(77, 208, 225, 0.2); }
-.momentEmotion[data-emotion="frustrated"] { background: rgba(255, 112, 67, 0.12); border-color: rgba(255, 112, 67, 0.2); }
-.momentEmotion[data-emotion="grateful"] { background: rgba(129, 199, 132, 0.12); border-color: rgba(129, 199, 132, 0.2); }
+.momentEmotion[data-emotion="frustrated"] { background: rgba(240, 127, 132, 0.12); border-color: rgba(240, 127, 132, 0.25); }
+.momentEmotion[data-emotion="anxious"] { background: rgba(240, 185, 106, 0.12); border-color: rgba(240, 185, 106, 0.25); }
+.momentEmotion[data-emotion="neutral"] { background: rgba(158, 176, 201, 0.12); border-color: rgba(158, 176, 201, 0.25); }
+.momentEmotion[data-emotion="calm"] { background: rgba(157, 228, 183, 0.12); border-color: rgba(157, 228, 183, 0.25); }
+.momentEmotion[data-emotion="energized"] { background: rgba(240, 217, 106, 0.12); border-color: rgba(240, 217, 106, 0.25); }
 
 .momentArrow {
   color: var(--muted);
@@ -733,12 +728,11 @@ button,
   text-transform: capitalize;
 }
 
-.correlationChip[data-emotion="angry"] { background: rgba(239, 83, 80, 0.1); border-color: rgba(239, 83, 80, 0.18); }
-.correlationChip[data-emotion="anxious"] { background: rgba(255, 167, 38, 0.1); border-color: rgba(255, 167, 38, 0.18); }
-.correlationChip[data-emotion="sad"] { background: rgba(66, 165, 245, 0.1); border-color: rgba(66, 165, 245, 0.18); }
-.correlationChip[data-emotion="calm"] { background: rgba(102, 187, 106, 0.1); border-color: rgba(102, 187, 106, 0.18); }
-.correlationChip[data-emotion="happy"] { background: rgba(255, 238, 88, 0.1); border-color: rgba(255, 238, 88, 0.18); }
-.correlationChip[data-emotion="frustrated"] { background: rgba(255, 112, 67, 0.1); border-color: rgba(255, 112, 67, 0.18); }
+.correlationChip[data-emotion="frustrated"] { background: rgba(240, 127, 132, 0.1); border-color: rgba(240, 127, 132, 0.18); }
+.correlationChip[data-emotion="anxious"] { background: rgba(240, 185, 106, 0.1); border-color: rgba(240, 185, 106, 0.18); }
+.correlationChip[data-emotion="neutral"] { background: rgba(158, 176, 201, 0.1); border-color: rgba(158, 176, 201, 0.18); }
+.correlationChip[data-emotion="calm"] { background: rgba(157, 228, 183, 0.1); border-color: rgba(157, 228, 183, 0.18); }
+.correlationChip[data-emotion="energized"] { background: rgba(240, 217, 106, 0.1); border-color: rgba(240, 217, 106, 0.18); }
 
 /* ─── Report footer ─── */
 .reportFooter {
@@ -750,4 +744,508 @@ button,
   font-size: 12px;
   color: #6a7e96;
   letter-spacing: 0.04em;
+}
+
+/* ─── Trigger tile grid (log page step 1) ─── */
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.triggerTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100px;
+  padding: 16px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(197, 214, 235, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s, border-color 0.15s;
+}
+
+.triggerTile:hover {
+  background: rgba(123, 201, 216, 0.08);
+  border-color: rgba(123, 201, 216, 0.22);
+  transform: scale(1.03);
+}
+
+.triggerTile:active {
+  transform: scale(0.97);
+}
+
+.triggerTileEmoji {
+  font-size: 28px;
+}
+
+.triggerTileLabel {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #d0dae8;
+}
+
+/* ─── Emotion chips (log page step 2) ─── */
+.emotionChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.emotionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(197, 214, 235, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b8c8dc;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.emotionChip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(197, 214, 235, 0.2);
+}
+
+.emotionChipActive {
+  background: rgba(123, 201, 216, 0.15);
+  border-color: rgba(123, 201, 216, 0.35);
+  color: #f1f5fb;
+}
+
+.emotionChip[data-emotion="frustrated"].emotionChipActive { background: rgba(240, 127, 132, 0.15); border-color: rgba(240, 127, 132, 0.4); }
+.emotionChip[data-emotion="anxious"].emotionChipActive { background: rgba(240, 185, 106, 0.15); border-color: rgba(240, 185, 106, 0.4); }
+.emotionChip[data-emotion="neutral"].emotionChipActive { background: rgba(158, 176, 201, 0.15); border-color: rgba(158, 176, 201, 0.4); }
+.emotionChip[data-emotion="calm"].emotionChipActive { background: rgba(157, 228, 183, 0.15); border-color: rgba(157, 228, 183, 0.4); }
+.emotionChip[data-emotion="energized"].emotionChipActive { background: rgba(240, 217, 106, 0.15); border-color: rgba(240, 217, 106, 0.4); }
+
+.emotionChipEmoji {
+  font-size: 16px;
+}
+
+.emotionChipLabel {
+  text-transform: capitalize;
+}
+
+/* ─── Log actions row ─── */
+.logActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.logActions .ghostButton {
+  min-height: 50px;
+}
+
+.logActions .primaryButton {
+  flex: 1;
+}
+
+/* ─── Frequency badges (LIVE / WEEKLY) ─── */
+.freqBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  background: rgba(123, 201, 216, 0.12);
+  color: #7bc9d8;
+  border: 1px solid rgba(123, 201, 216, 0.2);
+}
+
+.freqBadgeWeekly {
+  background: rgba(192, 132, 252, 0.12);
+  color: #c084fc;
+  border-color: rgba(192, 132, 252, 0.2);
+}
+
+/* ─── Report section headers ─── */
+.reportSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reportSectionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reportSectionExtra {
+  font-size: 12px;
+  color: #7a8ea6;
+}
+
+/* ─── Hero row (report at-a-glance pills) ─── */
+.heroRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.heroPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(197, 214, 235, 0.1);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.heroPillConfidence {
+  background: rgba(123, 201, 216, 0.08);
+  border-color: rgba(123, 201, 216, 0.18);
+}
+
+/* ─── Takeaway bar (rule-based insight summary) ─── */
+.takeawayBar {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #cfd8e8;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid #7bc9d8;
+}
+
+/* ─── Pairing chips (regulators/friction zones) ─── */
+.pairingGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.pairingGroupLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b8c8dc;
+}
+
+.pairingList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pairingChip {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid;
+}
+
+.pairingChipPositive {
+  background: rgba(157, 228, 183, 0.08);
+  border-color: rgba(157, 228, 183, 0.3);
+  color: #9de4b7;
+}
+
+.pairingChipNegative {
+  background: rgba(240, 127, 132, 0.08);
+  border-color: rgba(240, 127, 132, 0.3);
+  color: #f07f84;
+}
+
+/* ─── Gut check card ─── */
+.gutCheckCard {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.gutCheckEmoji {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.gutCheckContent {
+  display: grid;
+  gap: 4px;
+}
+
+/* ─── Experiment card (Try this week) ─── */
+.experimentCard {
+  border-left: 3px solid #9de4b7;
+  display: grid;
+  gap: 8px;
+}
+
+/* ─── AI label pills ─── */
+.aiLabelRow {
+  display: flex;
+  align-items: center;
+}
+
+.aiLabelPill {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.aiLabelPillPurple {
+  background: rgba(192, 132, 252, 0.12);
+  color: #c084fc;
+}
+
+.aiLabelPillGreen {
+  background: rgba(157, 228, 183, 0.12);
+  color: #9de4b7;
+}
+
+/* ─── Strava-style teaser wrap ─── */
+.teaserWrap {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.teaserGradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(transparent, rgba(11, 18, 32, 0.95));
+  pointer-events: none;
+}
+
+.teaserCta {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px;
+  text-align: center;
+  z-index: 2;
+}
+
+.teaserCta p {
+  margin: 0;
+  font-size: 13px;
+  color: #cfd8e8;
+  font-weight: 600;
+}
+
+/* ─── Locked section (sign-in gate) ─── */
+.lockedWrap {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.lockedContent {
+  filter: blur(6px);
+  opacity: 0.4;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lockedGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent, rgba(11, 18, 32, 0.92) 45%, rgba(11, 18, 32, 0.98));
+  pointer-events: none;
+}
+
+.lockedOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+  z-index: 2;
+}
+
+.lockedIcon {
+  font-size: 28px;
+}
+
+.lockedTitle {
+  font-size: 16px;
+  color: #f1f5fb;
+}
+
+.lockedTeaser {
+  font-size: 13px;
+  color: #9eb0c9;
+  max-width: 36ch;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── 2-column metric grid ─── */
+.metricGridTwo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ─── Timeline moment actions ─── */
+.momentActions {
+  display: flex;
+  gap: 8px;
+}
+
+.momentActionBtn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(197, 214, 235, 0.1);
+  color: #8da4bd;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: auto;
+  box-shadow: none;
+  transition: background 0.15s;
+}
+
+.momentActionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5fb;
+}
+
+.momentActionBtnDanger:hover {
+  background: rgba(240, 127, 132, 0.12);
+  color: #f07f84;
+}
+
+/* Timeline edit mode */
+.editSelect {
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.editTextarea {
+  min-height: 60px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
+
+.editActions .primaryButton,
+.editActions .ghostButton {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+/* ─── Settings page ─── */
+.settingsSection {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(197, 214, 235, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+}
+
+.settingsSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settingsSectionIcon {
+  font-size: 14px;
+}
+
+.settingsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 28px;
+  font-size: 14px;
+}
+
+.planBadge {
+  display: inline-flex;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(197, 214, 235, 0.12);
+  color: #b8c8dc;
+}
+
+.planBadgePremium {
+  background: rgba(123, 201, 216, 0.12);
+  border-color: rgba(123, 201, 216, 0.25);
+  color: #7bc9d8;
+}
+
+.dangerButton {
+  background: rgba(240, 127, 132, 0.1) !important;
+  border: 1px solid rgba(240, 127, 132, 0.25) !important;
+  color: #f07f84 !important;
+  box-shadow: none !important;
+}
+
+.dangerButton:hover {
+  background: rgba(240, 127, 132, 0.18) !important;
+}
+
+/* ─── Login page ─── */
+.loginCard {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.loginDivider {
+  height: 1px;
+  background: rgba(197, 214, 235, 0.1);
+  margin: 4px 0;
+}
+
+/* ─── Nav sign-in link ─── */
+.navLoginLink {
+  margin-left: auto;
+  color: #7bc9d8 !important;
+}
+
+/* ─── Responsive adjustments ─── */
+@media (max-width: 480px) {
+  .tileGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metricGridTwo {
+    grid-template-columns: 1fr;
+  }
 }
