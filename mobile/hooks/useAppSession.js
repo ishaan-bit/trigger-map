@@ -107,8 +107,11 @@ export function SessionProvider({ children }) {
 
   useEffect(() => {
     async function bootstrap() {
+      let enabledReminder = false;
+      let enabledReflection = false;
+      let enabledNudges = false;
       try {
-        const [storedDeviceId, storedToken, completedOnboarding, enabledReminder, enabledReflection, enabledNudges] = await Promise.all([
+        const [storedDeviceId, storedToken, completedOnboarding, _enabledReminder, _enabledReflection, _enabledNudges] = await Promise.all([
           getOrCreateDeviceId(),
           getSessionToken(),
           getOnboardingComplete(),
@@ -116,6 +119,10 @@ export function SessionProvider({ children }) {
           getReflectionEnabled(),
           getNudgesEnabled(),
         ]);
+
+        enabledReminder = _enabledReminder;
+        enabledReflection = _enabledReflection;
+        enabledNudges = _enabledNudges;
 
         setDeviceId(storedDeviceId);
         setOnboardingCompleteState(completedOnboarding);
@@ -138,7 +145,13 @@ export function SessionProvider({ children }) {
         setSubscription(null);
       } finally {
         setReady(true);
-        // Check for inactivity nudge on each app open (fire-and-forget), respecting preference
+        // Re-register recurring notifications on each app start (they can be lost after updates/restarts)
+        if (enabledReminder) {
+          enableWeeklyReminder().catch(() => null);
+        }
+        if (enabledReflection) {
+          scheduleReflectionReminder().catch(() => null);
+        }
         if (enabledNudges) {
           scheduleInactivityNudge().catch(() => null);
         }

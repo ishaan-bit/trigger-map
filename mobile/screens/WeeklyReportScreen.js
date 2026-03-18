@@ -255,7 +255,6 @@ export function WeeklyReportScreen() {
   const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
 
   function handleSignIn() { trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
-  function handlePremium() { trackEvent("report_premium_unlock_tapped", {}); router.push("/(tabs)/premium"); }
   async function handleUpgrade() {
     trackEvent("report_upgrade_tapped", {});
     try {

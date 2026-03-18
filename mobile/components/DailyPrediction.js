@@ -4,11 +4,11 @@ import { getDailyPrediction, saveDailyPrediction } from "@/services/deviceServic
 import { palette, radius } from "@/utils/theme";
 
 const OPTIONS = [
-  { key: "calm", emoji: "\uD83C\uDF43", label: "Calm" },
-  { key: "neutral", emoji: "\u2696\uFE0F", label: "Neutral" },
-  { key: "anxious", emoji: "\u26A1", label: "Anxious" },
-  { key: "frustrated", emoji: "\uD83D\uDCA2", label: "Frustrated" },
-  { key: "energized", emoji: "\u2600\uFE0F", label: "Energized" },
+  { key: "calm", emoji: "🍃", label: "Calm" },
+  { key: "neutral", emoji: "⚖️", label: "Neutral" },
+  { key: "anxious", emoji: "⚡", label: "Anxious" },
+  { key: "frustrated", emoji: "💢", label: "Frustrated" },
+  { key: "energized", emoji: "☀️", label: "Energized" },
 ];
 
 export function DailyPrediction({ onVisibilityChange }) {
