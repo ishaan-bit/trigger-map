@@ -7,6 +7,12 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 
+const INSIGHT_PREVIEW = [
+  { icon: "💡", label: "What stood out" },
+  { icon: "🔗", label: "What may be contributing" },
+  { icon: "🎯", label: "One thing to try" },
+];
+
 const tiers = [
   {
     icon: "👤",
@@ -27,7 +33,7 @@ const tiers = [
       "Everything in Anonymous",
       "Cloud backup + sync",
       "Weekly pattern observations",
-      "First AI insight report free",
+      "First insight report free",
       "Edit & delete moments",
       "Export your data",
     ],
@@ -39,7 +45,7 @@ const tiers = [
     description: PREMIUM_PRICE_LABEL,
     features: [
       "Everything in Free",
-      "Weekly AI-written reflections",
+      "Weekly personalized reflections",
       "Multi-week trend tracking",
       "Priority support",
     ],
@@ -63,12 +69,26 @@ export function PremiumScreen() {
           accessible={false}
         />
         <View style={styles.heroOverlay}>
-          <Text style={styles.kicker}>Plans</Text>
-          <Text style={styles.title}>Understand{"\n"}yourself better</Text>
+          <Text style={styles.kicker}>Premium</Text>
+          <Text style={styles.title}>See the full{"\n"}picture</Text>
           <Text style={styles.subtitle}>
-            Start free. Upgrade when you're ready for deeper insight.
+            Turn patterns into understanding — and small actions that actually help.
           </Text>
         </View>
+      </View>
+
+      {/* Structure preview */}
+      <View style={styles.previewCard}>
+        <Text style={styles.previewTitle}>What you unlock</Text>
+        {INSIGHT_PREVIEW.map((item) => (
+          <View key={item.label} style={styles.previewRow}>
+            <Text style={styles.previewIcon}>{item.icon}</Text>
+            <Text style={styles.previewLabel}>{item.label}</Text>
+          </View>
+        ))}
+        <Text style={styles.previewBody}>
+          Based on your patterns — personalized, grounded, and updated weekly.
+        </Text>
       </View>
 
       {tiers.map((tier) => (
@@ -107,7 +127,7 @@ export function PremiumScreen() {
               try {
                 setBusy(true);
                 await subscribe();
-                Alert.alert("Premium enabled", "Your subscription is active.");
+                Alert.alert("Premium enabled", "Your weekly insights are ready to view.");
               } catch (error) {
                 const msg = error?.message || "Something went wrong";
                 if (error?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) {
@@ -275,5 +295,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
+  },
+  previewCard: {
+    borderRadius: radius.md,
+    padding: 18,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+    gap: 12,
+  },
+  previewTitle: {
+    color: palette.accent,
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  previewIcon: {
+    fontSize: 18,
+  },
+  previewLabel: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  previewBody: {
+    color: palette.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
   },
 });

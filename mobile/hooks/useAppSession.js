@@ -387,6 +387,17 @@ export function SessionProvider({ children }) {
       async subscribe() {
         const result = await startSubscriptionFlow(token);
         setSubscription(result);
+        // Force re-fetch session so premium state and insight are immediately available
+        if (token) {
+          try {
+            const session = await fetchMe(token);
+            setUser(session.user);
+            setSubscription(session.subscription || result);
+            setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
+          } catch {
+            // Subscribe succeeded; session refresh is best-effort
+          }
+        }
         return result;
       },
       async restoreSubscription() {

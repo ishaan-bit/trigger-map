@@ -63,9 +63,20 @@ export default async function handler(req, res) {
           await markFirstAiFreeUsed(ownerId);
         }
       } else if (isAuthenticated) {
-        // Strava-style: show first 2-3 lines as teaser
-        const lines = (llmInsight.narrative || "").split("\n").filter(Boolean);
-        const teaser = lines.slice(0, 3).join("\n");
+        // Teaser: extract first section ("What stood out") for curiosity-driven preview
+        const narrative = llmInsight.narrative || "";
+        const headerRe = /(?:what stood out|what may be contributing|one thing to try)/gi;
+        const hits = [];
+        let hm;
+        while ((hm = headerRe.exec(narrative)) !== null) hits.push(hm.index);
+        // Take text between first and second header, or first 2 sentences
+        let teaser;
+        if (hits.length >= 2) {
+          teaser = narrative.slice(hits[0], hits[1]).replace(/^what stood out[:\s-]*/i, "").trim();
+        } else {
+          const sentences = narrative.split(/(?<=[.!?])\s+/).filter(Boolean);
+          teaser = sentences.slice(0, 2).join(" ");
+        }
         report.llmTeaser = {
           narrative: teaser,
           truncated: true,

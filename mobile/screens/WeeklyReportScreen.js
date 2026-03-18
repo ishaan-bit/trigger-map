@@ -523,24 +523,34 @@ export function WeeklyReportScreen() {
                 </View>
               ) : null}
 
-              {/* --- 6. WEEKLY INSIGHT (was Pattern Read) --- */}
-              {hasLlmInsight ? (
-                <View style={s.section}>
-                  <SectionHeader label="Weekly insight" badge="weekly" />
-                  <View style={s.aiLabelRow}>
-                    <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                      <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
+              {/* --- 6. WEEKLY INSIGHT — strict state model --- */}
+              {(() => {
+                const momentCount = report.totalMoments || 0;
+
+                /* STATE 1 — Insufficient data */
+                if (momentCount < 5) {
+                  return (
+                    <View style={s.insightStateCard}>
+                      <Text style={s.insightStateIcon}>🌱</Text>
+                      <Text style={s.insightStateTitle}>Not enough signal yet</Text>
+                      <Text style={s.insightStateBody}>
+                        Log a few more moments to start seeing deeper patterns.
+                      </Text>
                     </View>
-                    {report.llmInsight.firstFree ? (
-                      <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 6 }]}>
-                        <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  {(() => {
-                    const sections = parseLlmSections(report.llmInsight.narrative);
-                    if (sections) {
-                      return (
+                  );
+                }
+
+                /* STATE 6 — Premium with full insight */
+                if (isPremium && hasLlmInsight) {
+                  const sections = parseLlmSections(report.llmInsight.narrative);
+                  const generatedAt = report.llmInsight.generatedAt;
+                  const daysAgo = generatedAt
+                    ? Math.max(0, Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86400000))
+                    : null;
+                  return (
+                    <View style={s.section}>
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      {sections ? (
                         <View style={s.insightCardsRow}>
                           {INSIGHT_SECTION_META.map((meta, i) => (
                             sections[i] ? (
@@ -552,68 +562,110 @@ export function WeeklyReportScreen() {
                             ) : null
                           ))}
                         </View>
-                      );
-                    }
-                    return <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>;
-                  })()}
-                  {report.llmInsight.firstFree ? (
-                    <Text style={s.firstFreeHint}>Future AI insights require Premium.</Text>
-                  ) : null}
-                </View>
-              ) : hasLlmTeaser ? (
-                <View style={s.section}>
-                  <SectionHeader label="Weekly insight" badge="weekly" />
-                  <View style={s.teaserWrap}>
-                    {/* Show first card as blurred preview */}
-                    <View style={s.teaserPreviewCards}>
-                      <View style={s.insightSectionCard}>
-                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[0].icon}</Text>
-                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[0].label}</Text>
-                        <Text style={s.insightSectionBody} numberOfLines={2}>
-                          {(() => {
-                            const sections = parseLlmSections(report.llmTeaser.narrative);
-                            return sections?.[0] || cleanText(report.llmTeaser.narrative);
-                          })()}
+                      ) : (
+                        <View style={s.insightSectionCard}>
+                          <Text style={s.insightSectionBody}>{cleanText(report.llmInsight.narrative)}</Text>
+                        </View>
+                      )}
+                      {daysAgo !== null ? (
+                        <Text style={s.insightFooter}>
+                          Updated {daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                }
+
+                /* STATE 5 — Premium but no insight yet (post-purchase) */
+                if (isPremium && !hasLlmInsight) {
+                  return (
+                    <View style={s.section}>
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <View style={s.insightStateCard}>
+                        <Text style={s.insightStateIcon}>✨</Text>
+                        <Text style={s.insightStateTitle}>Your insight is updating</Text>
+                        <Text style={s.insightStateBody}>
+                          This usually takes under a minute. Your patterns are being analyzed.
                         </Text>
                       </View>
-                      <View style={[s.insightSectionCard, { opacity: 0.3 }]}>
-                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[1].icon}</Text>
-                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[1].label}</Text>
-                        <View style={s.teaserPlaceholder} />
-                      </View>
-                      <View style={[s.insightSectionCard, { opacity: 0.2 }]}>
-                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[2].icon}</Text>
-                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[2].label}</Text>
-                        <View style={s.teaserPlaceholder} />
-                      </View>
                     </View>
-                    <LinearGradient
-                      colors={["transparent", "rgba(11,18,32,0.92)", "rgba(11,18,32,0.98)"]}
-                      locations={[0, 0.4, 1]}
-                      style={s.teaserGradient}
-                    />
-                    <View style={s.teaserCta}>
-                      <Text style={s.teaserCtaText}>Unlock all 3 personalized insights</Text>
-                      <Pressable style={s.lockedCta} onPress={handlePremium} accessibilityRole="button">
-                        <Text style={s.lockedCtaText}>Go Premium</Text>
+                  );
+                }
+
+                /* STATE 3 — Free user, has LLM teaser or insight → teaser + CTA */
+                if (isSignedIn && !isPremium && (hasLlmTeaser || hasLlmInsight)) {
+                  const narrativeSource = report.llmTeaser?.narrative || report.llmInsight?.narrative;
+                  const sections = parseLlmSections(narrativeSource);
+                  const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
+
+                  /* First free preview: show all 3 cards */
+                  if (hasLlmInsight && report.llmInsight.firstFree) {
+                    const fullSections = parseLlmSections(report.llmInsight.narrative);
+                    return (
+                      <View style={s.section}>
+                        <SectionHeader label="Weekly insight" badge="weekly" />
+                        <View style={s.aiLabelRow}>
+                          <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 0 }]}>
+                            <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
+                          </View>
+                        </View>
+                        {fullSections ? (
+                          <View style={s.insightCardsRow}>
+                            {INSIGHT_SECTION_META.map((meta, i) => (
+                              fullSections[i] ? (
+                                <View key={meta.label} style={s.insightSectionCard}>
+                                  <Text style={s.insightSectionIcon}>{meta.icon}</Text>
+                                  <Text style={s.insightSectionLabel}>{meta.label}</Text>
+                                  <Text style={s.insightSectionBody}>{fullSections[i]}</Text>
+                                </View>
+                              ) : null
+                            ))}
+                          </View>
+                        ) : (
+                          <View style={s.insightSectionCard}>
+                            <Text style={s.insightSectionBody}>{cleanText(report.llmInsight.narrative)}</Text>
+                          </View>
+                        )}
+                        <Text style={s.firstFreeHint}>Future pattern insights require Premium.</Text>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View style={s.section}>
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <View style={s.teaserCard}>
+                        <Text style={s.teaserTitle}>A deeper pattern is emerging\u2026</Text>
+                        <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text>
+                        <LinearGradient
+                          colors={["transparent", palette.glass]}
+                          locations={[0, 1]}
+                          style={s.teaserFade}
+                        />
+                      </View>
+                      <Pressable style={s.teaserCtaButton} onPress={handlePremium} accessibilityRole="button">
+                        <Text style={s.teaserCtaButtonText}>Unlock full insight</Text>
                       </Pressable>
+                      <Text style={s.teaserSubtext}>See what may be contributing and what to try</Text>
                     </View>
-                  </View>
-                </View>
-              ) : isSignedIn && !isPremium && confidence !== "low" ? (
-                <LockedSection
-                  title="Weekly insight"
-                  teaser="A concise AI analysis grounded in your actual data, not generic advice."
-                  ctaLabel="Unlock Premium"
-                  onPress={handlePremium}
-                >
-                  <View style={[s.aiCard, { opacity: 0.5 }]}>
-                    <Text style={[s.aiSummary, { color: palette.muted }]}>
-                      Your patterns suggest a connection between how you spend your energy and how you feel afterward...
-                    </Text>
-                  </View>
-                </LockedSection>
-              ) : null}
+                  );
+                }
+
+                /* STATE 2 — Signed in, has data, no insight yet */
+                if (isSignedIn && !isPremium) {
+                  return (
+                    <View style={s.insightStateCard}>
+                      <Text style={s.insightStateIcon}>🔍</Text>
+                      <Text style={s.insightStateTitle}>Patterns are starting to emerge</Text>
+                      <Text style={s.insightStateBody}>
+                        Your deeper insight will appear as more data builds up.
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return null;
+              })()}
 
               {/* --- 7. DATA QUALITY NUDGE --- */}
               {confidence === "low" ? (
@@ -862,20 +914,35 @@ const s = StyleSheet.create({
   gutCheckTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
   gutCheckBody: { color: palette.muted, fontSize: 13, lineHeight: 19 },
 
-  /* Strava-style teaser */
-  teaserWrap: { position: "relative", borderRadius: radius.md, overflow: "hidden" },
-  teaserPreviewCards: { gap: 10, paddingBottom: 60 },
-  teaserPlaceholder: { height: 14, width: "70%", borderRadius: 4, backgroundColor: palette.glassBorder, marginTop: 4 },
-  teaserGradient: {
-    position: "absolute", left: 0, right: 0, bottom: 0, height: 140,
-    zIndex: 1,
+  /* Teaser card (State 3) */
+  teaserCard: {
+    position: "relative", borderRadius: radius.md, padding: 18, gap: 8,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+    overflow: "hidden",
   },
-  teaserCta: {
-    position: "absolute", left: 0, right: 0, bottom: 0,
-    alignItems: "center", gap: 8, paddingBottom: 16, paddingTop: 8,
-    zIndex: 2,
+  teaserTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
+  teaserBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
+  teaserFade: {
+    position: "absolute", left: 0, right: 0, bottom: 0, height: 32,
   },
-  teaserCtaText: { color: palette.muted, fontSize: 12, fontWeight: "600" },
+  teaserCtaButton: {
+    alignSelf: "stretch", alignItems: "center",
+    paddingVertical: 14, borderRadius: radius.pill,
+    backgroundColor: palette.accentStrong,
+  },
+  teaserCtaButtonText: { color: palette.text, fontSize: 15, fontWeight: "700" },
+  teaserSubtext: { color: palette.muted, fontSize: 12, textAlign: "center", lineHeight: 17 },
+
+  /* Insight state cards (States 1, 2, 5) */
+  insightStateCard: {
+    alignItems: "center", gap: 10, paddingVertical: 28, paddingHorizontal: 24,
+    borderRadius: radius.md, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  insightStateIcon: { fontSize: 28 },
+  insightStateTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
+  insightStateBody: { color: palette.muted, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
+  insightFooter: { color: palette.muted, fontSize: 11, fontStyle: "italic", textAlign: "right" },
 
   /* Insight 3-card layout */
   insightCardsRow: { gap: 10 },
