@@ -21,7 +21,7 @@ export const PREMIUM_TIERS = {
   premium: "premium",
 };
 
-export const PREMIUM_PRODUCT_ID = "triggermap_premium_monthly";
+export const PREMIUM_PRODUCT_ID = "premium_monthly";
 
 export const PREMIUM_PRICE_LABEL = "₹149/month";
 

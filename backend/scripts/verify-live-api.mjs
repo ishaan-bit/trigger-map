@@ -58,7 +58,7 @@ const checks = [
       "Content-Type:application/json",
       "--data",
       JSON.stringify({
-        subscriptionId: "triggermap_premium_monthly",
+        subscriptionId: "premium_monthly",
         purchaseToken: "stub-token",
       }),
     ],

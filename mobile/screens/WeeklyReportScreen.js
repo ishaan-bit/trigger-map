@@ -660,6 +660,9 @@ export function WeeklyReportScreen() {
                       <Text style={s.insightStateBody}>
                         Your deeper insight will appear as more data builds up.
                       </Text>
+                      <Pressable style={s.nudgeSecondary} onPress={handlePremium} accessibilityRole="button">
+                        <Text style={s.nudgeSecondaryText}>Go Premium for weekly personalised insights</Text>
+                      </Pressable>
                     </View>
                   );
                 }
@@ -675,6 +678,15 @@ export function WeeklyReportScreen() {
                     {`${dq.totalMoments} moments across ${dq.daysLogged} day${dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.`}
                   </Text>
                   <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+                  {!isSignedIn ? (
+                    <Pressable style={s.nudgeSecondary} onPress={handleSignIn} accessibilityRole="button">
+                      <Text style={s.nudgeSecondaryText}>Sign in for free to unlock deeper insights</Text>
+                    </Pressable>
+                  ) : !isPremium ? (
+                    <Pressable style={s.nudgeSecondary} onPress={handlePremium} accessibilityRole="button">
+                      <Text style={s.nudgeSecondaryText}>Go Premium for weekly personalised insights</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </>
@@ -886,6 +898,12 @@ const s = StyleSheet.create({
   },
   nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
   nudgeBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+  nudgeSecondary: {
+    marginTop: 4, paddingVertical: 10, alignItems: "center",
+  },
+  nudgeSecondaryText: {
+    color: palette.accent, fontSize: 14, fontWeight: "600", textDecorationLine: "underline",
+  },
 
   /* Starter state (too_early) */
   starterCard: {
