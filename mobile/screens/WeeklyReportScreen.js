@@ -689,7 +689,25 @@ export function WeeklyReportScreen() {
                   );
                 }
 
-                /* ── SIGNED-IN FREE, no teaser yet — neutral ── */
+                /* ── SIGNED-IN FREE, no teaser yet ── */
+                if (report.totalMoments >= 5) {
+                  return (
+                    <View style={s.section}>
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <View style={s.insightStateCard}>
+                        <Text style={s.insightStateIcon}>🔓</Text>
+                        <Text style={s.insightStateTitle}>Unlock your personalised insight</Text>
+                        <Text style={s.insightStateBody}>
+                          You have enough data for a deeper pattern analysis. Upgrade to see what your moments reveal.
+                        </Text>
+                        <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+                          <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                }
+
                 return (
                   <View style={s.section}>
                     <SectionHeader label="Insights" badge="weekly" />
