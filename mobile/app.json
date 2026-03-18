@@ -20,6 +20,12 @@
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
       [
+        "expo-notifications",
+        {
+          "color": "#7bc9d8"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
@@ -52,7 +58,8 @@
       "versionCode": 14,
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-padded.png",

@@ -158,9 +158,10 @@ export function SessionProvider({ children }) {
       async completeOnboarding() {
         await setOnboardingComplete(true);
         setOnboardingCompleteState(true);
-        // Enable weekly reminder by default on first launch
+        // Enable weekly reminder and daily reflection reminder on first launch
         try {
           await enableWeeklyReminder();
+          await scheduleReflectionReminder();
           await setReminderEnabled(true);
           setReminderEnabledState(true);
         } catch {

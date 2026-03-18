@@ -1,6 +1,7 @@
 import { Alert, Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -102,6 +103,33 @@ export function SettingsScreen() {
             thumbColor={reminderEnabled ? palette.accent : palette.muted}
           />
         </View>
+        <PrimaryButton
+          label="Send test notification"
+          onPress={async () => {
+            try {
+              const { status } = await Notifications.getPermissionsAsync();
+              if (status !== "granted") {
+                const { status: newStatus } = await Notifications.requestPermissionsAsync();
+                if (newStatus !== "granted") {
+                  Alert.alert("Permission denied", "Enable notifications in your device settings to receive alerts.");
+                  return;
+                }
+              }
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "TriggerMap",
+                  body: "Notifications are working. You'll receive weekly insights and gentle reminders here.",
+                  data: { type: "test" },
+                },
+                trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3 },
+              });
+              Alert.alert("Sent", "You should see a notification in a few seconds.");
+            } catch (error) {
+              Alert.alert("Notification failed", error.message);
+            }
+          }}
+          secondary
+        />
       </Section>
 
       {/* ── Data ── */}

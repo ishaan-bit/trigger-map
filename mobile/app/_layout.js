@@ -1,9 +1,10 @@
-import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ToastAndroid } from "react-native";
+import { ToastAndroid, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from "expo-notifications";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
 import { setLastOpenedAt } from "@/services/deviceService";
@@ -15,7 +16,31 @@ initCrashMonitoring();
 initAnalytics();
 SplashScreen.preventAutoHideAsync().catch(() => null);
 
+async function requestNotificationPermission() {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === "granted") return true;
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== "granted") {
+    console.warn("[NOTIF] Permission denied");
+    return false;
+  }
+  console.info("[NOTIF] Permission granted");
+  return true;
+}
+
+if (Platform.OS === "android") {
+  Notifications.setNotificationChannelAsync("default", {
+    name: "TriggerMap",
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250],
+    lightColor: "#7bc9d8",
+  }).catch(() => null);
+}
+
 export default function RootLayout() {
+  const notificationListener = useRef(null);
+  const responseListener = useRef(null);
+
   useEffect(() => {
     let active = true;
 
@@ -35,15 +60,35 @@ export default function RootLayout() {
           ToastAndroid.show("Offline mode, data saved locally", ToastAndroid.SHORT);
         }
       } finally {
-        // Hide splash after startup validation completes
         SplashScreen.hideAsync().catch(() => null);
       }
     }
 
+    // Request notification permission early
+    requestNotificationPermission().catch(() => null);
+
     validateStartup();
+
+    // Listen for incoming notifications while app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      const type = notification.request.content.data?.type;
+      console.info("[NOTIF] Received in foreground:", type);
+    });
+
+    // Listen for notification taps — navigate to relevant screen
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const type = response.notification.request.content.data?.type;
+      console.info("[NOTIF] Tapped:", type);
+    });
 
     return () => {
       active = false;
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
     };
   }, []);
 
