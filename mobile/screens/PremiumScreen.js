@@ -7,12 +7,6 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 
-const INSIGHT_PREVIEW = [
-  { icon: "💡", label: "What stood out" },
-  { icon: "🔗", label: "What may be contributing" },
-  { icon: "🎯", label: "One thing to try" },
-];
-
 const tiers = [
   {
     icon: "👤",
