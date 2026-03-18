@@ -7,6 +7,8 @@ const DEVICE_ID_KEY = "triggermap.device-id";
 const SESSION_TOKEN_KEY = "triggermap.session-token";
 const ONBOARDING_KEY = "triggermap.onboarding-complete";
 const REMINDER_KEY = "triggermap.reminder-enabled";
+const REFLECTION_KEY = "triggermap.reflection-enabled";
+const NUDGES_KEY = "triggermap.nudges-enabled";
 const LAST_OPENED_AT_KEY = "triggermap.last-opened-at";
 const LAST_LOGGED_AT_KEY = "triggermap.last-logged-at";
 const DAILY_PREDICTION_KEY = "triggermap.daily-prediction";
@@ -55,6 +57,25 @@ export async function getReminderEnabled() {
 
 export async function setReminderEnabled(value) {
   return AsyncStorage.setItem(REMINDER_KEY, value ? "true" : "false");
+}
+
+export async function getReflectionEnabled() {
+  // Default to true for new users (set on onboarding)
+  const raw = await AsyncStorage.getItem(REFLECTION_KEY);
+  return raw === null ? true : raw === "true";
+}
+
+export async function setReflectionEnabled(value) {
+  return AsyncStorage.setItem(REFLECTION_KEY, value ? "true" : "false");
+}
+
+export async function getNudgesEnabled() {
+  const raw = await AsyncStorage.getItem(NUDGES_KEY);
+  return raw === null ? true : raw === "true";
+}
+
+export async function setNudgesEnabled(value) {
+  return AsyncStorage.setItem(NUDGES_KEY, value ? "true" : "false");
 }
 
 export async function getLastOpenedAt() {

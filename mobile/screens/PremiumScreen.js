@@ -110,8 +110,15 @@ export function PremiumScreen() {
                 Alert.alert("Premium enabled", "Your subscription is active.");
               } catch (error) {
                 const msg = error?.message || "Something went wrong";
-                if (msg.includes("not found") || msg.includes("unavailable") || msg.includes("No subscription")) {
-                  Alert.alert("Not available yet", "Premium subscriptions are not yet available in your region. Check back soon.");
+                if (error?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) {
+                  // User dismissed the purchase sheet — no alert needed
+                } else if (msg.includes("not found") || msg.includes("No subscription")) {
+                  Alert.alert(
+                    "Subscription unavailable",
+                    "We couldn't find the subscription product on Google Play. Make sure your app is up to date and try again in a few minutes."
+                  );
+                } else if (msg.includes("not completed")) {
+                  Alert.alert("Purchase incomplete", "The purchase was not completed. No charge was made.");
                 } else {
                   Alert.alert("Subscription error", msg);
                 }

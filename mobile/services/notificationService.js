@@ -14,11 +14,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Cancel only scheduled notifications matching a specific type */
+async function cancelNotificationsByType(targetType) {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const toCancel = scheduled.filter((n) => n.content.data?.type === targetType);
+  for (const n of toCancel) {
+    await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
+}
+
 export async function enableWeeklyReminder() {
   await ensureNotificationAccess();
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Cancel only existing weekly-type notifications, not all
+  await cancelNotificationsByType(NOTIFICATION_TYPES.WEEKLY_INSIGHT);
 
-  // Schedule recurring weekly notification — no daily gate for scheduled notifications
   return scheduleRecurringNotification({
     type: NOTIFICATION_TYPES.WEEKLY_INSIGHT,
     body: "Your weekly patterns are ready — see what stands out this week.",
@@ -32,13 +41,13 @@ export async function enableWeeklyReminder() {
 }
 
 export async function disableWeeklyReminder() {
-  return Notifications.cancelAllScheduledNotificationsAsync();
+  return cancelNotificationsByType(NOTIFICATION_TYPES.WEEKLY_INSIGHT);
 }
 
 export async function scheduleReflectionReminder() {
   await ensureNotificationAccess();
+  await cancelNotificationsByType(NOTIFICATION_TYPES.REFLECTION_REMINDER);
 
-  // Recurring daily notification — schedule directly, no daily gate
   return scheduleRecurringNotification({
     type: NOTIFICATION_TYPES.REFLECTION_REMINDER,
     body: "How did today feel? A quick log helps your pattern map stay current.",
@@ -48,6 +57,10 @@ export async function scheduleReflectionReminder() {
       minute: 0,
     },
   });
+}
+
+export async function disableReflectionReminder() {
+  return cancelNotificationsByType(NOTIFICATION_TYPES.REFLECTION_REMINDER);
 }
 
 export async function schedulePatternAlert(message) {

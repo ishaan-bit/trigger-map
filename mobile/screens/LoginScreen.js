@@ -51,6 +51,14 @@ export function LoginScreen() {
     try {
       // Re-configure every time to ensure fresh state after sign-out
       configureGoogleSignIn();
+
+      // Clear any residual Google session to force account chooser
+      try {
+        await GoogleSignin.signOut();
+      } catch {
+        // No previous session — safe to ignore
+      }
+
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
       if (!isSuccessResponse(response)) return;

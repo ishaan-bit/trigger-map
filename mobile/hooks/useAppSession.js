@@ -8,10 +8,14 @@ import {
   getOrCreateDeviceId,
   setLastLoggedAt,
   getReminderEnabled,
+  getReflectionEnabled,
+  getNudgesEnabled,
   getSessionToken,
   getDailyPrediction,
   setOnboardingComplete,
   setReminderEnabled,
+  setReflectionEnabled,
+  setNudgesEnabled,
   setSessionToken,
 } from "@/services/deviceService";
 import {
@@ -42,6 +46,7 @@ import {
   enableWeeklyReminder,
   schedulePatternAlert,
   scheduleReflectionReminder,
+  disableReflectionReminder,
   scheduleInactivityNudge,
 } from "@/services/notificationService";
 import { startSubscriptionFlow, restoreSubscriptionFlow } from "@/services/subscriptionService";
@@ -97,20 +102,26 @@ export function SessionProvider({ children }) {
   const [firstAiFreeAvailable, setFirstAiFreeAvailable] = useState(false);
   const [onboardingComplete, setOnboardingCompleteState] = useState(false);
   const [reminderEnabled, setReminderEnabledState] = useState(false);
+  const [reflectionEnabled, setReflectionEnabledState] = useState(true);
+  const [nudgesEnabled, setNudgesEnabledState] = useState(true);
 
   useEffect(() => {
     async function bootstrap() {
       try {
-        const [storedDeviceId, storedToken, completedOnboarding, enabledReminder] = await Promise.all([
+        const [storedDeviceId, storedToken, completedOnboarding, enabledReminder, enabledReflection, enabledNudges] = await Promise.all([
           getOrCreateDeviceId(),
           getSessionToken(),
           getOnboardingComplete(),
           getReminderEnabled(),
+          getReflectionEnabled(),
+          getNudgesEnabled(),
         ]);
 
         setDeviceId(storedDeviceId);
         setOnboardingCompleteState(completedOnboarding);
         setReminderEnabledState(enabledReminder);
+        setReflectionEnabledState(enabledReflection);
+        setNudgesEnabledState(enabledNudges);
 
         if (storedToken) {
           const session = await fetchMe(storedToken);
@@ -127,8 +138,10 @@ export function SessionProvider({ children }) {
         setSubscription(null);
       } finally {
         setReady(true);
-        // Check for inactivity nudge on each app open (fire-and-forget)
-        scheduleInactivityNudge().catch(() => null);
+        // Check for inactivity nudge on each app open (fire-and-forget), respecting preference
+        if (enabledNudges) {
+          scheduleInactivityNudge().catch(() => null);
+        }
       }
     }
 
@@ -155,6 +168,8 @@ export function SessionProvider({ children }) {
       firstAiFreeAvailable,
       onboardingComplete,
       reminderEnabled,
+      reflectionEnabled,
+      nudgesEnabled,
       async completeOnboarding() {
         await setOnboardingComplete(true);
         setOnboardingCompleteState(true);
@@ -196,17 +211,29 @@ export function SessionProvider({ children }) {
         trackEvent("login_completed", { provider: "google" });
       },
       async signOut() {
-        // Fully revoke Google session so fresh credentials are used next time
+        // Configure Google SDK before attempting revocation (ensures SDK is initialized)
+        try {
+          GoogleSignin.configure({
+            webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+          });
+        } catch {
+          // Safe to ignore — may not be Google user
+        }
+
+        // Revoke access first (forces account re-selection on next sign-in)
         try {
           await GoogleSignin.revokeAccess();
-        } catch {
-          // Not signed in via Google — safe to ignore
+        } catch (err) {
+          console.info("[Auth] revokeAccess skipped:", err.message);
         }
+
+        // Then sign out from Google locally
         try {
           await GoogleSignin.signOut();
-        } catch {
-          // SDK not initialised — safe to ignore
+        } catch (err) {
+          console.info("[Auth] signOut skipped:", err.message);
         }
+
         await clearSessionToken();
         setToken(null);
         setUser(null);
@@ -343,6 +370,20 @@ export function SessionProvider({ children }) {
         await setReminderEnabled(enabled);
         setReminderEnabledState(enabled);
       },
+      async toggleReflection(enabled) {
+        if (enabled) {
+          await scheduleReflectionReminder();
+        } else {
+          await disableReflectionReminder();
+        }
+
+        await setReflectionEnabled(enabled);
+        setReflectionEnabledState(enabled);
+      },
+      async toggleNudges(enabled) {
+        await setNudgesEnabled(enabled);
+        setNudgesEnabledState(enabled);
+      },
       async subscribe() {
         const result = await startSubscriptionFlow(token);
         setSubscription(result);
@@ -364,7 +405,7 @@ export function SessionProvider({ children }) {
         await clearLocalMoments();
       },
     }),
-    [deviceId, ensureDeviceIdentity, firstAiFreeAvailable, onboardingComplete, ready, reminderEnabled, subscription, token, user]
+    [deviceId, ensureDeviceIdentity, firstAiFreeAvailable, nudgesEnabled, onboardingComplete, ready, reflectionEnabled, reminderEnabled, subscription, token, user]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

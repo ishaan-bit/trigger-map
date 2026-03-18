@@ -2,6 +2,7 @@ import { Alert, Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import { useState, useEffect } from "react";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -31,8 +32,18 @@ function Row({ label, value }) {
 
 export function SettingsScreen() {
   const router = useRouter();
-  const { exportLogs, deleteAllUserData, reminderEnabled, signOut, subscription, toggleReminder, user } = useAppSession();
+  const {
+    exportLogs, deleteAllUserData, reminderEnabled, reflectionEnabled, nudgesEnabled,
+    signOut, subscription, toggleReminder, toggleReflection, toggleNudges, user,
+  } = useAppSession();
   const baseUrl = getWebBaseUrl();
+  const [permissionStatus, setPermissionStatus] = useState("undetermined");
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => setPermissionStatus(status));
+  }, []);
+
+  const notificationsBlocked = permissionStatus === "denied";
 
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
   const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
@@ -85,51 +96,59 @@ export function SettingsScreen() {
 
       {/* ── Notifications ── */}
       <Section icon="🔔" title="Notifications">
-        <View style={styles.switchRow}>
-          <View style={styles.switchLabel}>
-            <Text style={styles.rowLabel}>Weekly report reminder</Text>
-            <Text style={styles.switchHint}>Get notified when your weekly report is ready.</Text>
+        {notificationsBlocked ? (
+          <View style={styles.permissionNotice}>
+            <Text style={styles.permissionNoticeText}>
+              Notifications are turned off. Enable them in your device settings to receive reminders.
+            </Text>
+            <PrimaryButton label="Open settings" onPress={() => Linking.openSettings()} secondary />
           </View>
-          <Switch
-            onValueChange={async (value) => {
-              try {
-                await toggleReminder(value);
-              } catch (error) {
-                Alert.alert("Reminder error", error.message);
-              }
-            }}
-            value={reminderEnabled}
-            trackColor={{ false: palette.glass, true: palette.accentGlow }}
-            thumbColor={reminderEnabled ? palette.accent : palette.muted}
-          />
-        </View>
-        <PrimaryButton
-          label="Send test notification"
-          onPress={async () => {
-            try {
-              const { status } = await Notifications.getPermissionsAsync();
-              if (status !== "granted") {
-                const { status: newStatus } = await Notifications.requestPermissionsAsync();
-                if (newStatus !== "granted") {
-                  Alert.alert("Permission denied", "Enable notifications in your device settings to receive alerts.");
-                  return;
-                }
-              }
-              await Notifications.scheduleNotificationAsync({
-                content: {
-                  title: "TriggerMap",
-                  body: "Notifications are working. You'll receive weekly insights and gentle reminders here.",
-                  data: { type: "test" },
-                },
-                trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3 },
-              });
-              Alert.alert("Sent", "You should see a notification in a few seconds.");
-            } catch (error) {
-              Alert.alert("Notification failed", error.message);
-            }
-          }}
-          secondary
-        />
+        ) : (
+          <>
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.rowLabel}>Daily check-in</Text>
+                <Text style={styles.switchHint}>A gentle evening reminder to log how your day went.</Text>
+              </View>
+              <Switch
+                onValueChange={async (value) => {
+                  try { await toggleReflection(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                }}
+                value={reflectionEnabled}
+                trackColor={{ false: palette.glass, true: palette.accentGlow }}
+                thumbColor={reflectionEnabled ? palette.accent : palette.muted}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.rowLabel}>Weekly insights</Text>
+                <Text style={styles.switchHint}>Get notified when your weekly pattern report is ready.</Text>
+              </View>
+              <Switch
+                onValueChange={async (value) => {
+                  try { await toggleReminder(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                }}
+                value={reminderEnabled}
+                trackColor={{ false: palette.glass, true: palette.accentGlow }}
+                thumbColor={reminderEnabled ? palette.accent : palette.muted}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.rowLabel}>Gentle nudges</Text>
+                <Text style={styles.switchHint}>A quiet prompt if you haven't logged in a few days.</Text>
+              </View>
+              <Switch
+                onValueChange={async (value) => {
+                  try { await toggleNudges(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                }}
+                value={nudgesEnabled}
+                trackColor={{ false: palette.glass, true: palette.accentGlow }}
+                thumbColor={nudgesEnabled ? palette.accent : palette.muted}
+              />
+            </View>
+          </>
+        )}
       </Section>
 
       {/* ── Data ── */}
@@ -309,6 +328,19 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 12,
     lineHeight: 16,
+  },
+  permissionNotice: {
+    gap: 10,
+    padding: 12,
+    borderRadius: radius.sm,
+    backgroundColor: palette.warningSoft,
+    borderWidth: 1,
+    borderColor: palette.warning + "33",
+  },
+  permissionNoticeText: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   aboutName: {
     color: palette.text,

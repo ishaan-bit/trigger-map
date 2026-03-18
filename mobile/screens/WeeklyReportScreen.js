@@ -29,6 +29,59 @@ function cleanText(str) {
     .trim();
 }
 
+/**
+ * Parse a structured LLM narrative into 3 distinct sections.
+ * Expected headers: "What stood out", "What may be contributing", "One thing to try".
+ * Falls back to showing the whole narrative in section 1 if parsing fails.
+ */
+function parseLlmSections(narrative) {
+  if (!narrative) return null;
+  const text = cleanText(narrative);
+
+  const patterns = [
+    /what stood out/i,
+    /what may be contributing/i,
+    /one thing to try/i,
+  ];
+
+  const indices = patterns.map((p) => {
+    const match = text.match(p);
+    return match ? match.index : -1;
+  });
+
+  // If at least 2 sections found, parse them
+  const found = indices.filter((i) => i >= 0).length;
+  if (found >= 2) {
+    const sorted = [...indices].map((idx, i) => ({ idx: idx >= 0 ? idx : Infinity, section: i })).sort((a, b) => a.idx - b.idx);
+    const sections = sorted.map((entry, i) => {
+      const start = entry.idx;
+      const end = i < sorted.length - 1 ? sorted[i + 1].idx : text.length;
+      let body = text.slice(start, end).replace(patterns[entry.section], "").replace(/^\s*[:\-–—]?\s*/, "").trim();
+      return { section: entry.section, body };
+    });
+
+    const result = [null, null, null];
+    for (const s of sections) {
+      if (s.section >= 0 && s.section < 3) result[s.section] = s.body;
+    }
+    return result;
+  }
+
+  // Fallback: split by double newlines into up to 3 chunks
+  const chunks = text.split(/\n\s*\n/).filter(Boolean).slice(0, 3);
+  return [
+    chunks[0] || text,
+    chunks[1] || null,
+    chunks[2] || null,
+  ];
+}
+
+const INSIGHT_SECTION_META = [
+  { icon: "🔍", label: "What stood out" },
+  { icon: "🧩", label: "What may be contributing" },
+  { icon: "💡", label: "One thing to try" },
+];
+
 const EMOTION_EMOJIS = {
   frustrated: "💢", anxious: "⚡", neutral: "🌫️",
   calm: "🍃", energized: "☀️",
@@ -138,14 +191,23 @@ export function WeeklyReportScreen() {
   const callbacksRef = useRef({});
   callbacksRef.current = { loadWeeklyReport, refreshSession, token, isPremium, isSignedIn };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const reportRef = useRef(null);
+  reportRef.current = report;
+
+  const load = useCallback(async (isRetry = false) => {
+    if (isRetry && reportRef.current) {
+      // Retry: keep existing report visible, show subtle indicator
+      setError("");
+    } else {
+      setLoading(true);
+      setError("");
+    }
     try {
       const nextReport = await callbacksRef.current.loadWeeklyReport();
       setReport(nextReport);
     } catch {
-      setReport(null);
+      // Only clear report if we never had one
+      if (!reportRef.current) setReport(null);
       setError("Unable to load report. Check connection.");
     } finally {
       setLoading(false);
@@ -183,7 +245,7 @@ export function WeeklyReportScreen() {
       loadingTitle="Building your report"
       loadingMessage="Summarizing patterns from the past week."
       timeoutMessage="Unable to load report. Check connection."
-      onRetry={load}
+      onRetry={() => load(true)}
       scroll
     >
       <View style={s.canvas}>
@@ -230,7 +292,7 @@ export function WeeklyReportScreen() {
             <View style={s.stateCard}>
               <Text style={s.stateTitle}>Report unavailable</Text>
               <Text style={s.stateBody}>{error}</Text>
-              <PrimaryButton label="Retry" onPress={load} />
+              <PrimaryButton label="Retry" onPress={() => load(true)} />
             </View>
           ) : null}
 
@@ -449,22 +511,38 @@ export function WeeklyReportScreen() {
               {hasLlmInsight ? (
                 <View style={s.section}>
                   <SectionHeader label="Weekly insight" badge="weekly" />
-                  <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
-                    <View style={s.aiLabelRow}>
-                      <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                        <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
-                      </View>
-                      {report.llmInsight.firstFree ? (
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 6 }]}>
-                          <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
-                        </View>
-                      ) : null}
+                  <View style={s.aiLabelRow}>
+                    <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
+                      <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
                     </View>
-                    <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>
                     {report.llmInsight.firstFree ? (
-                      <Text style={s.firstFreeHint}>Future AI insights require Premium.</Text>
+                      <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 6 }]}>
+                        <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
+                      </View>
                     ) : null}
                   </View>
+                  {(() => {
+                    const sections = parseLlmSections(report.llmInsight.narrative);
+                    if (sections) {
+                      return (
+                        <View style={s.insightCardsRow}>
+                          {INSIGHT_SECTION_META.map((meta, i) => (
+                            sections[i] ? (
+                              <View key={meta.label} style={s.insightSectionCard}>
+                                <Text style={s.insightSectionIcon}>{meta.icon}</Text>
+                                <Text style={s.insightSectionLabel}>{meta.label}</Text>
+                                <Text style={s.insightSectionBody}>{sections[i]}</Text>
+                              </View>
+                            ) : null
+                          ))}
+                        </View>
+                      );
+                    }
+                    return <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>;
+                  })()}
+                  {report.llmInsight.firstFree ? (
+                    <Text style={s.firstFreeHint}>Future AI insights require Premium.</Text>
+                  ) : null}
                 </View>
               ) : hasLlmTeaser ? (
                 <View style={s.section}>
@@ -476,7 +554,7 @@ export function WeeklyReportScreen() {
                           <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
                         </View>
                       </View>
-                      <Text style={s.aiSummary}>{cleanText(report.llmTeaser.narrative)}</Text>
+                      <Text style={s.aiSummary} numberOfLines={3}>{cleanText(report.llmTeaser.narrative)}</Text>
                     </View>
                     <LinearGradient
                       colors={["transparent", "rgba(11,18,32,0.95)"]}
@@ -765,4 +843,20 @@ const s = StyleSheet.create({
     zIndex: 2,
   },
   teaserCtaText: { color: palette.muted, fontSize: 12, fontWeight: "600" },
+
+  /* Insight 3-card layout */
+  insightCardsRow: { gap: 10 },
+  insightSectionCard: {
+    borderRadius: radius.md, padding: 16, gap: 6,
+    backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  insightSectionIcon: { fontSize: 20 },
+  insightSectionLabel: {
+    color: palette.purple, fontSize: 11, fontWeight: "700",
+    letterSpacing: 0.6, textTransform: "uppercase",
+  },
+  insightSectionBody: {
+    color: palette.text, fontSize: 14, lineHeight: 21,
+  },
 });
