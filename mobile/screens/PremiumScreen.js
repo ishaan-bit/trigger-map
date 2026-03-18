@@ -77,20 +77,6 @@ export function PremiumScreen() {
         </View>
       </View>
 
-      {/* Structure preview */}
-      <View style={styles.previewCard}>
-        <Text style={styles.previewTitle}>What you unlock</Text>
-        {INSIGHT_PREVIEW.map((item) => (
-          <View key={item.label} style={styles.previewRow}>
-            <Text style={styles.previewIcon}>{item.icon}</Text>
-            <Text style={styles.previewLabel}>{item.label}</Text>
-          </View>
-        ))}
-        <Text style={styles.previewBody}>
-          Based on your patterns — personalized, grounded, and updated weekly.
-        </Text>
-      </View>
-
       {tiers.map((tier) => (
         <View key={tier.name} style={[styles.tierCard, tier.highlight && styles.tierHighlight]}>
           <View style={styles.tierHeader}>

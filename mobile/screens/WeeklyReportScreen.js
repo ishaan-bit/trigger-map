@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   Pressable,
@@ -195,11 +196,12 @@ function PairingChip({ trigger, emotion, count, positive }) {
 /* -- Main screen -- */
 
 export function WeeklyReportScreen() {
-  const { loadWeeklyReport, refreshSession, subscription, user, token } = useAppSession();
+  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe } = useAppSession();
   const router = useRouter();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [purchasing, setPurchasing] = useState(false);
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -254,6 +256,24 @@ export function WeeklyReportScreen() {
 
   function handleSignIn() { trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
   function handlePremium() { trackEvent("report_premium_unlock_tapped", {}); router.push("/(tabs)/premium"); }
+  async function handleUpgrade() {
+    trackEvent("report_upgrade_tapped", {});
+    try {
+      setPurchasing(true);
+      await subscribe();
+      load();
+    } catch (err) {
+      const msg = err?.message || "";
+      if (err?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) return;
+      if (msg.includes("not found") || msg.includes("No subscription")) {
+        Alert.alert("Subscription unavailable", "Could not find the subscription product. Make sure the app is up to date.");
+      } else {
+        Alert.alert("Upgrade error", msg || "Something went wrong.");
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  }
 
   return (
     <ScreenShell
@@ -483,7 +503,7 @@ export function WeeklyReportScreen() {
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
                         {report.weeklyEmotionTrajectory.map((day) => (
                           <View style={s.trajectoryDay} key={day.date}>
-                            <Text style={s.trajectoryEmoji}>{EMOTION_EMOJIS[day.dominantEmotion] || "\u2022"}</Text>
+                            <Text style={s.trajectoryEmoji}>{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</Text>
                             <Text style={s.trajectoryScore}>{day.score}</Text>
                             <Text style={s.trajectoryDate}>
                               {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
@@ -653,7 +673,7 @@ export function WeeklyReportScreen() {
                     <View style={s.section}>
                       <SectionHeader label="Weekly insight" badge="weekly" />
                       <View style={s.teaserCard}>
-                        <Text style={s.teaserTitle}>A deeper pattern is emerging\u2026</Text>
+                        <Text style={s.teaserTitle}>A deeper pattern is emerging…</Text>
                         <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text>
                         <LinearGradient
                           colors={["transparent", palette.glass]}
@@ -661,10 +681,10 @@ export function WeeklyReportScreen() {
                           style={s.teaserFade}
                         />
                       </View>
-                      <Pressable style={s.teaserCtaButton} onPress={handlePremium} accessibilityRole="button">
-                        <Text style={s.teaserCtaButtonText}>Upgrade to Premium</Text>
+                      <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+                        <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
                       </Pressable>
-                      <Text style={s.teaserSubtext}>Unlock full AI-driven insights into your patterns</Text>
+                      <Text style={s.teaserSubtext}>Unlock full insights into your patterns</Text>
                     </View>
                   );
                 }
