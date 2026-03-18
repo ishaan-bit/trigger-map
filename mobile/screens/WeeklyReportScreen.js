@@ -38,31 +38,47 @@ function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
 
-  const patterns = [
+  const headerRe = /(?:what stood out|what may be contributing|one thing to try)/gi;
+  const labelMap = [
     /what stood out/i,
     /what may be contributing/i,
     /one thing to try/i,
   ];
 
-  const indices = patterns.map((p) => {
-    const match = text.match(p);
-    return match ? match.index : -1;
-  });
+  // Collect ALL header positions
+  const hits = [];
+  let m;
+  while ((m = headerRe.exec(text)) !== null) {
+    const section = labelMap.findIndex((p) => p.test(m[0]));
+    if (section >= 0) hits.push({ idx: m.index, section, len: m[0].length });
+  }
 
-  // If at least 2 sections found, parse them
-  const found = indices.filter((i) => i >= 0).length;
-  if (found >= 2) {
-    const sorted = [...indices].map((idx, i) => ({ idx: idx >= 0 ? idx : Infinity, section: i })).sort((a, b) => a.idx - b.idx);
-    const sections = sorted.map((entry, i) => {
-      const start = entry.idx;
-      const end = i < sorted.length - 1 ? sorted[i + 1].idx : text.length;
-      let body = text.slice(start, end).replace(patterns[entry.section], "").replace(/^\s*[:\-–—]?\s*/, "").trim();
-      return { section: entry.section, body };
-    });
+  // Take only the FIRST occurrence of each section
+  const seen = new Set();
+  const firstHits = [];
+  for (const h of hits) {
+    if (!seen.has(h.section)) {
+      seen.add(h.section);
+      firstHits.push(h);
+    }
+  }
+  firstHits.sort((a, b) => a.idx - b.idx);
+
+  if (firstHits.length >= 2) {
+    // Find where the duplicate/second set starts (first repeated header)
+    let cutoff = text.length;
+    const seenAgain = new Set();
+    for (const h of hits) {
+      if (seenAgain.has(h.section)) { cutoff = Math.min(cutoff, h.idx); break; }
+      seenAgain.add(h.section);
+    }
+    const cleanedText = text.slice(0, cutoff).trim();
 
     const result = [null, null, null];
-    for (const s of sections) {
-      if (s.section >= 0 && s.section < 3) result[s.section] = s.body;
+    for (let i = 0; i < firstHits.length; i++) {
+      const start = firstHits[i].idx + firstHits[i].len;
+      const end = i < firstHits.length - 1 ? firstHits[i + 1].idx : cleanedText.length;
+      result[firstHits[i].section] = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
     }
     return result;
   }
@@ -548,23 +564,38 @@ export function WeeklyReportScreen() {
                 <View style={s.section}>
                   <SectionHeader label="Weekly insight" badge="weekly" />
                   <View style={s.teaserWrap}>
-                    <View style={[s.aiCard, { borderColor: palette.purpleSoft }]}>
-                      <View style={s.aiLabelRow}>
-                        <View style={[s.aiLabelPill, { backgroundColor: palette.purpleSoft }]}>
-                          <Text style={[s.aiLabelText, { color: palette.purple }]}>AI</Text>
-                        </View>
+                    {/* Show first card as blurred preview */}
+                    <View style={s.teaserPreviewCards}>
+                      <View style={s.insightSectionCard}>
+                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[0].icon}</Text>
+                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[0].label}</Text>
+                        <Text style={s.insightSectionBody} numberOfLines={2}>
+                          {(() => {
+                            const sections = parseLlmSections(report.llmTeaser.narrative);
+                            return sections?.[0] || cleanText(report.llmTeaser.narrative);
+                          })()}
+                        </Text>
                       </View>
-                      <Text style={s.aiSummary} numberOfLines={3}>{cleanText(report.llmTeaser.narrative)}</Text>
+                      <View style={[s.insightSectionCard, { opacity: 0.3 }]}>
+                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[1].icon}</Text>
+                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[1].label}</Text>
+                        <View style={s.teaserPlaceholder} />
+                      </View>
+                      <View style={[s.insightSectionCard, { opacity: 0.2 }]}>
+                        <Text style={s.insightSectionIcon}>{INSIGHT_SECTION_META[2].icon}</Text>
+                        <Text style={s.insightSectionLabel}>{INSIGHT_SECTION_META[2].label}</Text>
+                        <View style={s.teaserPlaceholder} />
+                      </View>
                     </View>
                     <LinearGradient
-                      colors={["transparent", "rgba(11,18,32,0.95)"]}
-                      locations={[0, 0.8]}
+                      colors={["transparent", "rgba(11,18,32,0.92)", "rgba(11,18,32,0.98)"]}
+                      locations={[0, 0.4, 1]}
                       style={s.teaserGradient}
                     />
                     <View style={s.teaserCta}>
-                      <Text style={s.teaserCtaText}>Subscribe for the full weekly insight</Text>
+                      <Text style={s.teaserCtaText}>Unlock all 3 personalized insights</Text>
                       <Pressable style={s.lockedCta} onPress={handlePremium} accessibilityRole="button">
-                        <Text style={s.lockedCtaText}>Unlock Premium</Text>
+                        <Text style={s.lockedCtaText}>Go Premium</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -776,7 +807,7 @@ const s = StyleSheet.create({
     position: "relative", borderRadius: radius.md, overflow: "hidden",
     borderWidth: 1, borderColor: palette.glassBorder, backgroundColor: palette.glass,
   },
-  lockedContent: { opacity: 0.3, padding: 14, gap: 8 },
+  lockedContent: { opacity: 0.3, padding: 14, gap: 8, minHeight: 220 },
   lockedGradient: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   lockedOverlay: {
     ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center",
@@ -833,8 +864,10 @@ const s = StyleSheet.create({
 
   /* Strava-style teaser */
   teaserWrap: { position: "relative", borderRadius: radius.md, overflow: "hidden" },
+  teaserPreviewCards: { gap: 10, paddingBottom: 60 },
+  teaserPlaceholder: { height: 14, width: "70%", borderRadius: 4, backgroundColor: palette.glassBorder, marginTop: 4 },
   teaserGradient: {
-    position: "absolute", left: 0, right: 0, bottom: 0, height: 80,
+    position: "absolute", left: 0, right: 0, bottom: 0, height: 140,
     zIndex: 1,
   },
   teaserCta: {

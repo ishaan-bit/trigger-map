@@ -70,22 +70,23 @@ Below are structured signals from the user's past week. ONLY reference what appe
 
 ${signals}
 
-Write a pattern read using EXACTLY this structure:
+Respond with EXACTLY three sections, each starting with the header on its own line. Do NOT repeat any section. Write each section ONCE only.
 
-**What stood out**
+What stood out
 One or two sentences about the most notable pattern or shift this week. Be specific.
 
-**What may be contributing**
+What may be contributing
 One sentence connecting a trigger-emotion pairing to a possible cause. ${sparse ? "Acknowledge the data is limited." : "Be grounded in the numbers."}
 
-**One thing to try**
+One thing to try
 A single concrete, small experiment for next week. Make it specific to their top trigger.
 
 Rules:
+- Output EXACTLY three sections. STOP after "One thing to try" section. Do not write anything after it.
 - Total length: 60-90 words. Do not exceed 100 words.
 - Do not invent data. Do not repeat raw numbers already visible on screen.
 - Do not moralize, lecture, or use therapeutic language.
-- Do not use em dashes, colons in headers, or bullet markers.
+- Do not use em dashes, colons in headers, bullet markers, or bold markers.
 - Tone: calm, direct, perceptive. Like a sharp friend, not a therapist.
 - ${sparse ? "This user has limited data. Be honest about what you can and cannot see." : "Be confident but not certain."}`;
 }
@@ -135,6 +136,22 @@ export async function generateLlmInsight({ weeklyReport }) {
       .replace(/^[-*]\s+/gm, "")     // strip bullet markers
       .replace(/\n{3,}/g, "\n\n")    // collapse excess newlines
       .trim();
+
+    // Truncate after the first complete 3-section set (some models repeat sections)
+    const sectionHeaders = /(?:what stood out|what may be contributing|one thing to try)/gi;
+    const headerPositions = [];
+    let hm;
+    while ((hm = sectionHeaders.exec(content)) !== null) {
+      headerPositions.push({ idx: hm.index, text: hm[0].toLowerCase() });
+    }
+    const seenHeaders = new Set();
+    for (const hp of headerPositions) {
+      if (seenHeaders.has(hp.text)) {
+        content = content.slice(0, hp.idx).trim();
+        break;
+      }
+      seenHeaders.add(hp.text);
+    }
 
     return {
       narrative: content,
