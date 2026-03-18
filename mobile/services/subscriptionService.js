@@ -27,31 +27,50 @@ async function getOfferToken() {
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.info(`[Billing] getSubscriptions attempt ${attempt}/${MAX_RETRIES} for SKU: ${SUBSCRIPTION_SKU}`);
+      console.info(`[Billing] getSubscriptions attempt ${attempt}/${MAX_RETRIES} for SKU: "${SUBSCRIPTION_SKU}"`);
       const subscriptions = await getSubscriptions({ skus: [SUBSCRIPTION_SKU] });
       console.info(`[Billing] getSubscriptions returned ${subscriptions?.length ?? 0} product(s)`);
 
-      const sub = subscriptions?.[0];
-      if (!sub) {
+      if (!subscriptions?.length) {
+        console.warn(`[Billing] Empty subscriptions array. Play may not have this product, or billing client is not ready.`);
         if (attempt < MAX_RETRIES) {
-          console.info(`[Billing] No products yet, retrying in ${RETRY_DELAY_MS}ms...`);
+          console.info(`[Billing] Retrying in ${RETRY_DELAY_MS}ms...`);
           await delay(RETRY_DELAY_MS);
           continue;
         }
-        throw new Error("Subscription product not found. Please ensure the app is up to date and try again.");
+        throw new Error(
+          `Subscription product "${SUBSCRIPTION_SKU}" not found on Google Play. ` +
+          "Ensure the product ID exists in Play Console and the app is published to a testing track."
+        );
       }
+
+      const sub = subscriptions[0];
+      console.info(`[Billing] Product found: id="${sub.productId}", title="${sub.title || ""}", ` +
+        `offerCount=${sub.subscriptionOfferDetails?.length ?? 0}`);
 
       const offers = sub.subscriptionOfferDetails;
-      console.info(`[Billing] Product "${sub.productId}" has ${offers?.length ?? 0} offer(s)`);
-
       if (!offers || !offers.length) {
-        throw new Error("No subscription offers found for this product. Please try again later.");
+        console.error(`[Billing] Product "${sub.productId}" has NO subscriptionOfferDetails. Full product:`, JSON.stringify(sub));
+        throw new Error(
+          "No subscription offers returned by Google Play. " +
+          "Ensure the base plan is active in Play Console."
+        );
       }
 
-      return { offerToken: offers[0].offerToken, pricingPhases: offers[0].pricingPhases };
+      // Pick the first available offer (base plan offer)
+      const selectedOffer = offers[0];
+      console.info(`[Billing] Selected offer: offerToken=${selectedOffer.offerToken ? "present" : "MISSING"}, ` +
+        `phases=${selectedOffer.pricingPhases?.pricingPhaseList?.length ?? 0}`);
+
+      if (!selectedOffer.offerToken) {
+        console.error(`[Billing] offerToken is null/undefined. Full offer:`, JSON.stringify(selectedOffer));
+        throw new Error("Offer token missing from Google Play response. Please try again later.");
+      }
+
+      return { offerToken: selectedOffer.offerToken, pricingPhases: selectedOffer.pricingPhases };
     } catch (err) {
       lastError = err;
-      if (attempt < MAX_RETRIES && !err.message?.includes("No subscription offers")) {
+      if (attempt < MAX_RETRIES && !err.message?.includes("not found on Google Play") && !err.message?.includes("No subscription offers")) {
         console.warn(`[Billing] Attempt ${attempt} failed: ${err.message}, retrying...`);
         await delay(RETRY_DELAY_MS);
       }
@@ -75,16 +94,20 @@ export async function startSubscriptionFlow(token) {
 
   try {
     const { offerToken } = await getOfferToken();
-    console.info("[Billing] Requesting subscription with offerToken...");
 
-    const purchase = await requestSubscription({
-      sku: SUBSCRIPTION_SKU,
+    const requestPayload = {
       subscriptionOffers: [{ sku: SUBSCRIPTION_SKU, offerToken }],
-    });
+    };
+    console.info(`[Billing] requestSubscription payload:`, JSON.stringify(requestPayload));
+
+    const purchase = await requestSubscription(requestPayload);
+    console.info(`[Billing] requestSubscription returned:`, typeof purchase, Array.isArray(purchase) ? `array(${purchase.length})` : "object");
+
     const resolved = Array.isArray(purchase) ? purchase[0] : purchase;
     const purchaseToken = resolved?.purchaseToken;
 
     if (!purchaseToken) {
+      console.warn("[Billing] No purchaseToken in response:", JSON.stringify(resolved));
       throw new Error("Purchase was not completed. Please try again.");
     }
 
@@ -117,7 +140,10 @@ export async function restoreSubscriptionFlow(token) {
     const purchases = await getAvailablePurchases();
     console.info(`[Billing] Found ${purchases?.length ?? 0} existing purchase(s)`);
     const sub = purchases?.find((p) => p.productId === SUBSCRIPTION_SKU);
-    if (!sub?.purchaseToken) return null;
+    if (!sub?.purchaseToken) {
+      console.info(`[Billing] No purchase found for SKU "${SUBSCRIPTION_SKU}"`);
+      return null;
+    }
 
     const response = await verifySubscription(
       { subscriptionId: SUBSCRIPTION_SKU, purchaseToken: sub.purchaseToken },

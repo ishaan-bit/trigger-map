@@ -316,11 +316,24 @@ export function WeeklyReportScreen() {
             /* ---------- STARTER STATE (0-2 moments) ---------- */
             <View style={s.starterCard}>
               <Text style={s.starterEmoji}>🌱</Text>
-              <Text style={s.starterTitle}>A few more moments to go</Text>
-              <Text style={s.starterBody}>
-                Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture.
+              <Text style={s.starterTitle}>
+                {isSignedIn ? "A few more moments to go" : "Start tracking to see patterns"}
               </Text>
-              <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+              <Text style={s.starterBody}>
+                {isSignedIn
+                  ? "Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture."
+                  : "Log a few moments and sign in to unlock personalised insights about your patterns."}
+              </Text>
+              {!isSignedIn ? (
+                <>
+                  <PrimaryButton label="Sign in to unlock deeper insights" onPress={handleSignIn} />
+                  <Pressable style={s.nudgeSecondary} onPress={() => router.push("/(tabs)/log")} accessibilityRole="button">
+                    <Text style={s.nudgeSecondaryText}>Log a moment</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+              )}
             </View>
           ) : null}
 
@@ -525,22 +538,27 @@ export function WeeklyReportScreen() {
 
               {/* --- 6. WEEKLY INSIGHT — strict state model --- */}
               {(() => {
-                const momentCount = report.totalMoments || 0;
-
-                /* STATE 1 — Insufficient data */
-                if (momentCount < 5) {
+                /* ── ANONYMOUS ── */
+                if (!isSignedIn) {
                   return (
-                    <View style={s.insightStateCard}>
-                      <Text style={s.insightStateIcon}>🌱</Text>
-                      <Text style={s.insightStateTitle}>Not enough signal yet</Text>
-                      <Text style={s.insightStateBody}>
-                        Log a few more moments to start seeing deeper patterns.
-                      </Text>
+                    <View style={s.section}>
+                      <SectionHeader label="Insights" badge="weekly" />
+                      <View style={s.insightStateCard}>
+                        <Text style={s.insightStateIcon}>🔒</Text>
+                        <Text style={s.insightStateTitle}>Unlock deeper insights</Text>
+                        <Text style={s.insightStateBody}>
+                          Sign in for free to get personalised pattern analysis based on your data.
+                        </Text>
+                        <PrimaryButton label="Sign in to unlock deeper insights" onPress={handleSignIn} />
+                        <Pressable style={s.nudgeSecondary} onPress={() => router.push("/(tabs)/log")} accessibilityRole="button">
+                          <Text style={s.nudgeSecondaryText}>Log a moment</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   );
                 }
 
-                /* STATE 6 — Premium with full insight */
+                /* ── PREMIUM + full insight ── */
                 if (isPremium && hasLlmInsight) {
                   const sections = parseLlmSections(report.llmInsight.narrative);
                   const generatedAt = report.llmInsight.generatedAt;
@@ -576,7 +594,7 @@ export function WeeklyReportScreen() {
                   );
                 }
 
-                /* STATE 5 — Premium but no insight yet (post-purchase) */
+                /* ── PREMIUM, no insight yet (post-purchase) ── */
                 if (isPremium && !hasLlmInsight) {
                   return (
                     <View style={s.section}>
@@ -592,8 +610,8 @@ export function WeeklyReportScreen() {
                   );
                 }
 
-                /* STATE 3 — Free user, has LLM teaser or insight → teaser + CTA */
-                if (isSignedIn && !isPremium && (hasLlmTeaser || hasLlmInsight)) {
+                /* ── SIGNED-IN FREE + teaser or insight available ── */
+                if (hasLlmTeaser || hasLlmInsight) {
                   const narrativeSource = report.llmTeaser?.narrative || report.llmInsight?.narrative;
                   const sections = parseLlmSections(narrativeSource);
                   const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
@@ -644,51 +662,27 @@ export function WeeklyReportScreen() {
                         />
                       </View>
                       <Pressable style={s.teaserCtaButton} onPress={handlePremium} accessibilityRole="button">
-                        <Text style={s.teaserCtaButtonText}>Unlock full insight</Text>
+                        <Text style={s.teaserCtaButtonText}>Upgrade to Premium</Text>
                       </Pressable>
-                      <Text style={s.teaserSubtext}>See what may be contributing and what to try</Text>
+                      <Text style={s.teaserSubtext}>Unlock full AI-driven insights into your patterns</Text>
                     </View>
                   );
                 }
 
-                /* STATE 2 — Signed in, has data, no insight yet */
-                if (isSignedIn && !isPremium) {
-                  return (
+                /* ── SIGNED-IN FREE, no teaser yet — neutral ── */
+                return (
+                  <View style={s.section}>
+                    <SectionHeader label="Insights" badge="weekly" />
                     <View style={s.insightStateCard}>
-                      <Text style={s.insightStateIcon}>🔍</Text>
-                      <Text style={s.insightStateTitle}>Patterns are starting to emerge</Text>
+                      <Text style={s.insightStateIcon}>📊</Text>
+                      <Text style={s.insightStateTitle}>Building your insight</Text>
                       <Text style={s.insightStateBody}>
-                        Your deeper insight will appear as more data builds up.
+                        Keep logging — your personalised insight will appear here once there is enough data.
                       </Text>
-                      <Pressable style={s.nudgeSecondary} onPress={handlePremium} accessibilityRole="button">
-                        <Text style={s.nudgeSecondaryText}>Go Premium for weekly personalised insights</Text>
-                      </Pressable>
                     </View>
-                  );
-                }
-
-                return null;
+                  </View>
+                );
               })()}
-
-              {/* --- 7. DATA QUALITY NUDGE --- */}
-              {confidence === "low" ? (
-                <View style={s.nudgeCard}>
-                  <Text style={s.nudgeTitle}>Patterns are forming</Text>
-                  <Text style={s.nudgeBody}>
-                    {`${dq.totalMoments} moments across ${dq.daysLogged} day${dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.`}
-                  </Text>
-                  <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
-                  {!isSignedIn ? (
-                    <Pressable style={s.nudgeSecondary} onPress={handleSignIn} accessibilityRole="button">
-                      <Text style={s.nudgeSecondaryText}>Sign in for free to unlock deeper insights</Text>
-                    </Pressable>
-                  ) : !isPremium ? (
-                    <Pressable style={s.nudgeSecondary} onPress={handlePremium} accessibilityRole="button">
-                      <Text style={s.nudgeSecondaryText}>Go Premium for weekly personalised insights</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
             </>
           ) : null}
 
