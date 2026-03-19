@@ -1,7 +1,10 @@
 import Constants from "expo-constants";
 
 const REQUEST_TIMEOUT_MS = 8000;
-const SCREEN_REQUEST_TIMEOUT_MS = 3000;
+const SCREEN_REQUEST_TIMEOUT_MS = 8000;
+
+// In-flight GET deduplication: collapse identical concurrent GETs into one request
+const inflight = new Map();
 
 function getConfiguredApiUrl() {
   const extra = Constants.expoConfig?.extra || {};
@@ -49,6 +52,27 @@ async function fetchJson(path, options = {}) {
     throw new Error("API URL is not configured");
   }
 
+  // Deduplicate concurrent identical GET requests
+  const method = options.method || "GET";
+  const dedup = method === "GET";
+  const dedupKey = dedup ? `${path}:${options.token || ""}` : null;
+
+  if (dedup && dedupKey) {
+    const pending = inflight.get(dedupKey);
+    if (pending) return pending;
+  }
+
+  const promise = _fetchJson(path, options);
+
+  if (dedup && dedupKey) {
+    inflight.set(dedupKey, promise);
+    promise.finally(() => inflight.delete(dedupKey));
+  }
+
+  return promise;
+}
+
+async function _fetchJson(path, options = {}) {
   const apiUrl = getBaseUrl();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs || REQUEST_TIMEOUT_MS);

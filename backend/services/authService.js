@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { SignJWT, jwtVerify } from "jose";
-import { hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
+import { flatArrayToObject, hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID?.trim());
 const encoder = new TextEncoder();
@@ -223,17 +223,23 @@ export async function createSession(user) {
 export async function validateSession(token) {
   const verified = await jwtVerify(token, sessionSecret());
   const sessionId = verified.payload.sid;
+  const userId = verified.payload.sub;
 
-  if (!sessionId) {
+  if (!sessionId || !userId) {
     throw new Error("INVALID_SESSION");
   }
 
-  const session = await hgetallObject(sessionKey(sessionId));
-  if (!session?.userId) {
+  const [sessionRaw, userRaw] = await pipeline([
+    ["HGETALL", sessionKey(sessionId)],
+    ["HGETALL", userKey(userId)],
+  ]);
+
+  const session = flatArrayToObject(sessionRaw);
+  if (!session.userId) {
     throw new Error("SESSION_NOT_FOUND");
   }
 
-  const user = await getUserById(session.userId);
+  const user = serializeUser(flatArrayToObject(userRaw));
   if (!user) {
     throw new Error("USER_NOT_FOUND");
   }

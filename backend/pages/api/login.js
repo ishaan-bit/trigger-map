@@ -46,12 +46,15 @@ export default async function handler(req, res) {
       ? await loginEmailUser(parsed.data)
       : await loginGoogleUser(parsed.data);
 
-    const token = await createSession(user);
-    const migration = await migrateMoments(parsed.data.deviceId, user.id);
-    await trackServerEvent("login_completed", user.id, { provider: parsed.data.provider, migrated: migration.migrated });
+    const [tokenResult, migration] = await Promise.all([
+      createSession(user),
+      migrateMoments(parsed.data.deviceId, user.id),
+    ]);
+    // Fire-and-forget analytics
+    trackServerEvent("login_completed", user.id, { provider: parsed.data.provider, migrated: migration.migrated }).catch(() => {});
 
     return sendSuccess(res, {
-      token,
+      token: tokenResult,
       user,
       migratedMoments: migration.migrated,
     });

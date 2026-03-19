@@ -8,8 +8,8 @@ import { getStoredLlmInsight } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
-import { validateSession, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
-import { checkFeatureAccess, isPremiumActive } from "@/services/premiumService.js";
+import { validateSession, getSubscription, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
+import { checkFeatureAccess } from "@/services/premiumService.js";
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) {
@@ -38,11 +38,18 @@ export default async function handler(req, res) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
     }
 
-    const aggregates = await getWeeklyAggregates(ownerId);
-
     const isAuthenticated = Boolean(user);
-    const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated });
-    const hasPremium = isAuthenticated ? await isPremiumActive(ownerId) : false;
+
+    // Parallel fetch: aggregates, subscription, LLM insight, first-free check
+    const [aggregates, subscription, llmInsight, firstFreeAvailable] = await Promise.all([
+      getWeeklyAggregates(ownerId),
+      isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
+      getStoredLlmInsight(ownerId),
+      isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
+    ]);
+
+    const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
+    const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated, subscription });
 
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
@@ -53,14 +60,12 @@ export default async function handler(req, res) {
 
     // Attach LLM insight for premium users OR first-free eligible users
     // For Strava-style gating: non-premium see a truncated teaser
-    const firstFreeAvailable = isAuthenticated && !hasPremium ? await isFirstAiFreeAvailable(ownerId) : false;
-    const llmInsight = await getStoredLlmInsight(ownerId);
     if (llmInsight) {
-      if (hasPremium || firstFreeAvailable) {
+      if (hasPremium || (firstFreeAvailable && !hasPremium)) {
         report.llmInsight = llmInsight;
-        if (firstFreeAvailable) {
+        if (firstFreeAvailable && !hasPremium) {
           report.llmInsight.firstFree = true;
-          await markFirstAiFreeUsed(ownerId);
+          markFirstAiFreeUsed(ownerId).catch(() => {});
         }
       } else if (isAuthenticated) {
         // Teaser: extract first section ("What stood out") for curiosity-driven preview
@@ -104,8 +109,10 @@ export default async function handler(req, res) {
       }
     }
 
-    await trackServerEvent("weekly_report_viewed", ownerId, { totalMoments: report.totalMoments });
+    // Fire-and-forget analytics — don't block the response
+    trackServerEvent("weekly_report_viewed", ownerId, { totalMoments: report.totalMoments }).catch(() => {});
 
+    res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
     return sendSuccess(res, { report });
   } catch (error) {
     captureServerError(error, { route: "weeklyReport" });

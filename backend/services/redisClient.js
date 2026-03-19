@@ -52,16 +52,19 @@ export async function pipeline(commands) {
   return Array.isArray(data) ? data.map((entry) => entry.result) : [];
 }
 
+export function flatArrayToObject(arr) {
+  const record = {};
+  if (Array.isArray(arr)) {
+    for (let i = 0; i < arr.length; i += 2) {
+      record[arr[i]] = arr[i + 1];
+    }
+  }
+  return record;
+}
+
 export async function hgetallObject(key) {
   const result = await redis(["HGETALL", key]);
-  const values = Array.isArray(result) ? result : [];
-  const record = {};
-
-  for (let index = 0; index < values.length; index += 2) {
-    record[values[index]] = values[index + 1];
-  }
-
-  return record;
+  return flatArrayToObject(result);
 }
 
 export async function lrangeJson(key, start = 0, end = -1) {

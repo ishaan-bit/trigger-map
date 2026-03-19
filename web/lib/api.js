@@ -80,12 +80,12 @@ async function request(path, options = {}) {
 
 export function fetchTimeline(token) {
   const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
-  return request(`/timeline${query}`, { timeoutMs: 3000, token });
+  return request(`/timeline${query}`, { timeoutMs: 8000, token });
 }
 
 export function fetchWeeklyReport(token) {
   const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
-  return request(`/weeklyReport${query}`, { timeoutMs: 3000, token });
+  return request(`/weeklyReport${query}`, { timeoutMs: 8000, token });
 }
 
 export function logMoment(payload, token) {

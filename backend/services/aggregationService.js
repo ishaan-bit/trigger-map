@@ -1,4 +1,4 @@
-import { hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
+import { flatArrayToObject, hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
 
 const AGGREGATE_TTL_SECONDS = 60 * 60 * 24 * 45;
 
@@ -111,8 +111,10 @@ export async function getWeeklyAggregates(ownerId, days = 7) {
     dates.push(formatAggregateDate(date));
   }
 
-  const snapshots = await Promise.all(dates.map((date) => getDailyAggregate(ownerId, date)));
-  return snapshots;
+  const keys = dates.map((date) => getDailyAggregateKey(ownerId, date));
+  const results = await pipeline(keys.map((key) => ["HGETALL", key]));
+
+  return dates.map((date, i) => parseAggregateHash(flatArrayToObject(results[i]), date));
 }
 
 export async function getWeeklyPairCount(ownerId, trigger, emotion, days = 7) {

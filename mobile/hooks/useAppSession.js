@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
@@ -104,6 +104,24 @@ export function SessionProvider({ children }) {
   const [reminderEnabled, setReminderEnabledState] = useState(false);
   const [reflectionEnabled, setReflectionEnabledState] = useState(true);
   const [nudgesEnabled, setNudgesEnabledState] = useState(true);
+
+  // Simple in-memory cache to avoid redundant fetches on rapid tab switching
+  const cache = useRef({});
+  const CACHE_TTL = 15_000; // 15 seconds
+
+  function getCached(key) {
+    const entry = cache.current[key];
+    if (entry && Date.now() - entry.time < CACHE_TTL) return entry.data;
+    return null;
+  }
+
+  function setCache(key, data) {
+    cache.current[key] = { data, time: Date.now() };
+  }
+
+  function invalidateCache(key) {
+    if (key) { delete cache.current[key]; } else { cache.current = {}; }
+  }
 
   useEffect(() => {
     async function bootstrap() {
@@ -224,34 +242,30 @@ export function SessionProvider({ children }) {
         trackEvent("login_completed", { provider: "google" });
       },
       async signOut() {
-        // Configure Google SDK before attempting revocation (ensures SDK is initialized)
-        try {
-          GoogleSignin.configure({
-            webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-          });
-        } catch {
-          // Safe to ignore — may not be Google user
-        }
-
-        // Revoke access first (forces account re-selection on next sign-in)
-        try {
-          await GoogleSignin.revokeAccess();
-        } catch (err) {
-          console.info("[Auth] revokeAccess skipped:", err.message);
-        }
-
-        // Then sign out from Google locally
-        try {
-          await GoogleSignin.signOut();
-        } catch (err) {
-          console.info("[Auth] signOut skipped:", err.message);
-        }
-
+        // Clear local session immediately for instant UX
         await clearSessionToken();
         setToken(null);
         setUser(null);
         setSubscription(null);
         setFirstAiFreeAvailable(false);
+        invalidateCache();
+
+        // Revoke Google access in background (non-blocking)
+        (async () => {
+          try {
+            GoogleSignin.configure({
+              webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+            });
+            await GoogleSignin.revokeAccess();
+          } catch {
+            // No previous Google session — safe to ignore
+          }
+          try {
+            await GoogleSignin.signOut();
+          } catch {
+            // Safe to ignore
+          }
+        })();
       },
       async refreshSession() {
         if (!token) {
@@ -268,6 +282,9 @@ export function SessionProvider({ children }) {
         const notes = payload.notes ?? payload.note ?? "";
         const timestamp = payload.timestamp || new Date().toISOString();
         const prediction = await getDailyPrediction().catch(() => null);
+
+        // Invalidate caches so next load picks up the new moment
+        invalidateCache();
 
         if (!token) {
           const localMoment = await saveLocalMoment({
@@ -318,11 +335,17 @@ export function SessionProvider({ children }) {
           return localMoments;
         }
 
+        const cached = getCached("timeline");
+        if (cached) return cached;
+
         const response = await fetchTimeline(activeDeviceId, token);
         console.info("QuietDen: timeline fetched", { count: response.moments?.length ?? 0 });
-        return response.moments || [];
+        const moments = response.moments || [];
+        setCache("timeline", moments);
+        return moments;
       },
       async updateMoment(momentId, updates) {
+        invalidateCache();
         if (!token) {
           const updated = await updateLocalMoment(momentId, updates);
           trackEvent("moment_edited", { momentId, local: true });
@@ -333,6 +356,7 @@ export function SessionProvider({ children }) {
         return response.moment;
       },
       async removeMoment(momentId) {
+        invalidateCache();
         if (!token) {
           await deleteLocalMoment(momentId);
           trackEvent("moment_deleted", { momentId, local: true });
@@ -351,10 +375,14 @@ export function SessionProvider({ children }) {
           return report;
         }
 
+        const cached = getCached("weeklyReport");
+        if (cached) return cached;
+
         const response = await fetchWeeklyReport(activeDeviceId, token);
         const report = response.report || createEmptyReport();
         console.info("QuietDen: report generated", { totalMoments: report.totalMoments ?? 0 });
         trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments });
+        setCache("weeklyReport", report);
         return report;
       },
       async exportLogs() {
