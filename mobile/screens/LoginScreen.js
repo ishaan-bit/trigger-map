@@ -138,6 +138,9 @@ export function LoginScreen() {
       <Text style={styles.anonHint}>
         Anonymous mode keeps everything on-device. Sign in to sync across devices and unlock weekly insights.
       </Text>
+      <Text style={styles.privacyHint}>
+        Your data stays private. We don't sell or share it.
+      </Text>
     </ScreenShell>
   );
 }
@@ -194,5 +197,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     lineHeight: 16,
+  },
+  privacyHint: {
+    color: palette.muted,
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 15,
+    marginTop: 12,
+    opacity: 0.7,
   },
 });

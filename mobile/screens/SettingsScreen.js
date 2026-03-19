@@ -194,8 +194,9 @@ export function SettingsScreen() {
         />
       </Section>
 
-      {/* ── Legal ── */}
-      <Section icon="📄" title="Legal">
+      {/* ── Privacy ── */}
+      <Section icon="🔒" title="Privacy">
+        <Text style={styles.hintText}>Privacy first — your data stays yours.</Text>
         <PrimaryButton label="Privacy policy" onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
         <PrimaryButton label="Terms and conditions" onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
         <Row label="Support" value="qdenxp@gmail.com" />
@@ -211,7 +212,6 @@ export function SettingsScreen() {
           <Row label="Version" value={`v${Constants.expoConfig?.version || "1.0.0"}`} />
           <Row label="Developer" value="QuietDen (OPC) Pvt. Ltd." />
           <Row label="Website" value="qdenxp.com" />
-          <Row label="Phone" value="+91 9798784610" />
         </View>
         <Text style={styles.aboutFooter}>Registered December 2025, India</Text>
       </Section>
