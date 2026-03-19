@@ -12,6 +12,7 @@ import { generateWeeklyReport } from "../services/patternEngine.js";
 import { generateInsight } from "../ai/generateInsight.js";
 import { generateLlmInsight } from "../ai/generateLlmInsight.js";
 import { storeWeeklyInsight } from "../services/reportStore.js";
+import { getTimeline } from "../services/momentService.js";
 import { redis, redisKey } from "../services/redisClient.js";
 
 function parseArgs() {
@@ -65,7 +66,14 @@ async function main() {
 
   // LLM narrative
   console.log("Generating LLM narrative...");
-  const llmInsight = await generateLlmInsight({ weeklyReport });
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const allMoments = await getTimeline(ownerId);
+  const recentNotes = allMoments
+    .filter(m => m.note && m.note.trim() && new Date(m.timestamp).getTime() >= sevenDaysAgo)
+    .slice(0, 10)
+    .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
+  console.log(`  ${recentNotes.length} recent notes found.`);
+  const llmInsight = await generateLlmInsight({ weeklyReport, recentNotes });
 
   await storeLlmInsight(ownerId, llmInsight);
   console.log("  LLM insight stored.\n");

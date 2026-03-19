@@ -166,6 +166,19 @@ function appendTagContext(summary, report) {
   return `${summary} Notably, "${topTag[0]}" came up ${topTag[1]} times across your moments.`;
 }
 
+function appendPredictionContext(summary, report) {
+  const pa = report.predictionAccuracy;
+  if (!pa || pa.daysCompared < 2) return summary;
+
+  if (pa.rate >= 0.6) {
+    return `${summary} You seem to anticipate your days fairly accurately.`;
+  }
+  if (pa.rate <= 0.3) {
+    return `${summary} Your days often unfolded differently than expected.`;
+  }
+  return summary;
+}
+
 export async function generateInsight(report) {
   const confidence = report.dataQuality?.confidence || "too_early";
 
@@ -191,7 +204,7 @@ export async function generateInsight(report) {
   const microExperiment = confidence !== "too_early" ? pickExperiment(trigger) : null;
 
   return {
-    summary: appendTagContext(summary, report),
+    summary: appendPredictionContext(appendTagContext(summary, report), report),
     microExperiment,
     confidence,
     model: "rule-based-v2",

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { generateLlmInsight } from "../ai/generateLlmInsight.js";
 import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationService.js";
 import { generateWeeklyReport } from "../services/patternEngine.js";
+import { getTimeline } from "../services/momentService.js";
 import { getUserById } from "../services/authService.js";
 import { redis, redisKey } from "../services/redisClient.js";
 import { getStoredLlmInsight, getLlmInsightKey } from "../services/reportStore.js";
@@ -70,9 +71,17 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
         continue;
       }
 
-      console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments)`);
+      // Fetch recent notes for LLM context (last 7 days, max 10, truncated)
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const allMoments = await getTimeline(ownerId);
+      const recentNotes = allMoments
+        .filter(m => m.note && m.note.trim() && new Date(m.timestamp).getTime() >= sevenDaysAgo)
+        .slice(0, 10)
+        .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
 
-      const insight = await generateLlmInsight({ weeklyReport });
+      console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
+
+      const insight = await generateLlmInsight({ weeklyReport, recentNotes });
 
       await storeLlmInsight(ownerId, insight);
       processed++;

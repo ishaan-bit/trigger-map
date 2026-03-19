@@ -12,7 +12,7 @@ const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
 const REQUEST_TIMEOUT_MS = 300_000;
 
-function buildSignals(report) {
+function buildSignals(report, recentNotes) {
   const lines = [];
   const dq = report.dataQuality || {};
 
@@ -63,15 +63,36 @@ function buildSignals(report) {
     lines.push(`Context tags: ${topTags.join(", ")}.`);
   }
 
+  const pa = report.predictionAccuracy;
+  if (pa && pa.daysCompared >= 2) {
+    lines.push(`Prediction accuracy: ${pa.correct} of ${pa.daysCompared} days matched (${Math.round(pa.rate * 100)}%).`);
+  }
+
+  const dailyPredictions = (report.dailyAggregates || []).filter(d => d.prediction && Number(d.total || 0) > 0);
+  if (dailyPredictions.length) {
+    const pLines = dailyPredictions.map(d => {
+      const actual = Object.entries(d.emotions || {}).sort(([, a], [, b]) => b - a)[0]?.[0] || "unknown";
+      return `${d.date}: predicted ${d.prediction}, actual ${actual}`;
+    });
+    lines.push(`Daily predictions vs reality: ${pLines.join("; ")}.`);
+  }
+
+  if (recentNotes?.length) {
+    const noteLines = recentNotes.map(n => `[${n.trigger}/${n.emotion}] "${n.note}"`);
+    lines.push(`Recent user notes:\n${noteLines.join("\n")}`);
+  }
+
   return lines.join("\n");
 }
 
-function buildPrompt(report) {
-  const signals = buildSignals(report);
+function buildPrompt(report, recentNotes) {
+  const signals = buildSignals(report, recentNotes);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
+  const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
+  const hasNotes = recentNotes?.length > 0;
 
-  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, travel, alone) and how each made them feel (calm, neutral, anxious, frustrated, energized).${hasTags ? " They also add optional context tags (e.g. deadline, conflict, support) to describe the type of moment." : ""}
+  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, travel, alone) and how each made them feel (calm, neutral, anxious, frustrated, energized).${hasTags ? " They also add optional context tags (e.g. deadline, conflict, support) to describe the type of moment." : ""}${hasPredictions ? " Each morning they predict how the day will feel. You have their predictions vs actual outcomes." : ""}
 
 Below are structured signals from the user's past week. ONLY reference what appears here.
 
@@ -93,16 +114,16 @@ Rules:
 - Total length: 60-90 words. Do not exceed 100 words.
 - Do not invent data. Do not repeat raw numbers already visible on screen.
 - Do not moralize, lecture, or use therapeutic language.
-- Do not use em dashes, colons in headers, bullet markers, or bold markers.${hasTags ? "\n- If context tags are present, weave them naturally into your observations. Prefer note content over tags." : ""}
+- Do not use em dashes, colons in headers, bullet markers, or bold markers.${hasTags ? "\n- If context tags are present, weave them naturally into your observations. Prefer note content over tags." : ""}${hasPredictions ? "\n- If prediction data is present, compare expected vs actual emotional patterns. Identify gaps between anticipation and lived experience. Prediction is a supporting signal, not the focus." : ""}${hasNotes ? "\n- User notes provide direct context. Weave their own words naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive. Like a sharp friend, not a therapist.
 - ${sparse ? "This user has limited data. Be honest about what you can and cannot see." : "Be confident but not certain."}`;
 }
 
-export async function generateLlmInsight({ weeklyReport }) {
+export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
 
-  const prompt = buildPrompt(weeklyReport);
+  const prompt = buildPrompt(weeklyReport, recentNotes);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
