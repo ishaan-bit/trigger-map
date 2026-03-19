@@ -32,6 +32,66 @@ function cleanText(str) {
     .trim();
 }
 
+function parseLlmSections(narrative) {
+  if (!narrative) return null;
+  const text = cleanText(narrative);
+
+  const headerRe = /(?:what stood out|what may be contributing|one thing to try)/gi;
+  const labelMap = [
+    /what stood out/i,
+    /what may be contributing/i,
+    /one thing to try/i,
+  ];
+
+  const hits = [];
+  let m;
+  while ((m = headerRe.exec(text)) !== null) {
+    const section = labelMap.findIndex((p) => p.test(m[0]));
+    if (section >= 0) hits.push({ idx: m.index, section, len: m[0].length });
+  }
+
+  const seen = new Set();
+  const firstHits = [];
+  for (const h of hits) {
+    if (!seen.has(h.section)) {
+      seen.add(h.section);
+      firstHits.push(h);
+    }
+  }
+  firstHits.sort((a, b) => a.idx - b.idx);
+
+  if (firstHits.length >= 2) {
+    let cutoff = text.length;
+    const seenAgain = new Set();
+    for (const h of hits) {
+      if (seenAgain.has(h.section)) { cutoff = Math.min(cutoff, h.idx); break; }
+      seenAgain.add(h.section);
+    }
+    const cleanedText = text.slice(0, cutoff).trim();
+
+    const result = [null, null, null];
+    for (let i = 0; i < firstHits.length; i++) {
+      const start = firstHits[i].idx + firstHits[i].len;
+      const end = i < firstHits.length - 1 ? firstHits[i + 1].idx : cleanedText.length;
+      result[firstHits[i].section] = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
+    }
+    return result;
+  }
+
+  const chunks = text.split(/\n\s*\n/).filter(Boolean).slice(0, 3);
+  return [
+    chunks[0] || text,
+    chunks[1] || null,
+    chunks[2] || null,
+  ];
+}
+
+const INSIGHT_SECTION_META = [
+  { icon: "🔍", label: "What stood out" },
+  { icon: "🧩", label: "What may be contributing" },
+  { icon: "💡", label: "One thing to try" },
+];
+
 function topEntries(record, limit = 5) {
   return Object.entries(record || {})
     .sort(([, a], [, b]) => b - a)
@@ -366,28 +426,152 @@ export default function ReportPage() {
                 </div>
               ) : null}
 
-              {/* ── 6. WEEKLY INSIGHT (LLM) ── */}
-              {hasLlmInsight ? (
-                <>
-                  <SectionHeader label="Weekly insight" badge="weekly" />
-                  <div className="card cardAccent stack">
-                    <div className="aiLabelRow">
-                      <span className="aiLabelPill aiLabelPillPurple">AI</span>
+              {/* ── 6. WEEKLY INSIGHT — strict state model ── */}
+              {(() => {
+                /* ── ANONYMOUS ── */
+                if (!isSignedIn) {
+                  return (
+                    <div className="insightSection">
+                      <SectionHeader label="Insights" badge="weekly" />
+                      <div className="insightStateCard">
+                        <span className="insightStateIcon">🔒</span>
+                        <strong className="insightStateTitle">Unlock deeper insights</strong>
+                        <p className="insightStateBody">Sign in for free to get personalised pattern analysis based on your data.</p>
+                        <button className="primaryButton inlineButton" onClick={() => router.push("/login")} type="button">Sign in to unlock deeper insights</button>
+                        <a className="nudgeSecondaryLink" href="/">Log a moment</a>
+                      </div>
                     </div>
-                    <p>{cleanText(report.llmInsight.narrative)}</p>
-                  </div>
-                </>
-              ) : hasLlmTeaser ? (
-                <>
-                  <SectionHeader label="Weekly insight" badge="weekly" />
-                  <div className="card cardAccent stack">
-                    <div className="aiLabelRow">
-                      <span className="aiLabelPill aiLabelPillPurple">AI</span>
+                  );
+                }
+
+                /* ── PREMIUM + full insight ── */
+                if (isPremium && hasLlmInsight) {
+                  const sections = parseLlmSections(report.llmInsight.narrative);
+                  const generatedAt = report.llmInsight.generatedAt;
+                  const daysAgo = generatedAt
+                    ? Math.max(0, Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86400000))
+                    : null;
+                  return (
+                    <div className="insightSection">
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      {sections ? (
+                        <div className="insightCardsRow">
+                          {INSIGHT_SECTION_META.map((meta, i) => (
+                            sections[i] ? (
+                              <div key={meta.label} className="insightSectionCard">
+                                <span className="insightSectionIcon">{meta.icon}</span>
+                                <span className="insightSectionLabel">{meta.label}</span>
+                                <p className="insightSectionBody">{sections[i]}</p>
+                              </div>
+                            ) : null
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="insightSectionCard">
+                          <p className="insightSectionBody">{cleanText(report.llmInsight.narrative)}</p>
+                        </div>
+                      )}
+                      {daysAgo !== null ? (
+                        <p className="insightFooter">
+                          Updated {daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`}
+                        </p>
+                      ) : null}
                     </div>
-                    <p>{cleanText(report.llmTeaser.narrative)}</p>
+                  );
+                }
+
+                /* ── PREMIUM, no insight yet ── */
+                if (isPremium && !hasLlmInsight) {
+                  return (
+                    <div className="insightSection">
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <div className="insightStateCard">
+                        <span className="insightStateIcon">✨</span>
+                        <strong className="insightStateTitle">Your insight is updating</strong>
+                        <p className="insightStateBody">This usually takes under a minute. Your patterns are being analyzed.</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* ── SIGNED-IN FREE + teaser or insight available ── */
+                if (hasLlmTeaser || hasLlmInsight) {
+                  const narrativeSource = report.llmTeaser?.narrative || report.llmInsight?.narrative;
+                  const sections = parseLlmSections(narrativeSource);
+                  const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
+
+                  /* First free preview: show all 3 cards */
+                  if (hasLlmInsight && report.llmInsight.firstFree) {
+                    const fullSections = parseLlmSections(report.llmInsight.narrative);
+                    return (
+                      <div className="insightSection">
+                        <SectionHeader label="Weekly insight" badge="weekly" />
+                        <div className="aiLabelRow">
+                          <span className="aiLabelPill aiLabelPillGreen">Free preview</span>
+                        </div>
+                        {fullSections ? (
+                          <div className="insightCardsRow">
+                            {INSIGHT_SECTION_META.map((meta, i) => (
+                              fullSections[i] ? (
+                                <div key={meta.label} className="insightSectionCard">
+                                  <span className="insightSectionIcon">{meta.icon}</span>
+                                  <span className="insightSectionLabel">{meta.label}</span>
+                                  <p className="insightSectionBody">{fullSections[i]}</p>
+                                </div>
+                              ) : null
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="insightSectionCard">
+                            <p className="insightSectionBody">{cleanText(report.llmInsight.narrative)}</p>
+                          </div>
+                        )}
+                        <p className="firstFreeHint">Future pattern insights require Premium.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="insightSection">
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <div className="teaserCard">
+                        <strong className="teaserTitle">A deeper pattern is emerging…</strong>
+                        <p className="teaserBody">{teaserText}</p>
+                        <div className="teaserFade" />
+                      </div>
+                      <button className="teaserCtaButton" type="button">Upgrade to Premium</button>
+                      <p className="teaserSubtext">Unlock full insights into your patterns</p>
+                    </div>
+                  );
+                }
+
+                /* ── SIGNED-IN FREE, enough data but no teaser ── */
+                if (report.totalMoments >= 5) {
+                  return (
+                    <div className="insightSection">
+                      <SectionHeader label="Weekly insight" badge="weekly" />
+                      <div className="insightStateCard">
+                        <span className="insightStateIcon">🔓</span>
+                        <strong className="insightStateTitle">Unlock your personalised insight</strong>
+                        <p className="insightStateBody">You have enough data for a deeper pattern analysis. Upgrade to see what your moments reveal.</p>
+                        <button className="teaserCtaButton" type="button">Upgrade to Premium</button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* ── NOT ENOUGH DATA ── */
+                return (
+                  <div className="insightSection">
+                    <SectionHeader label="Insights" badge="weekly" />
+                    <div className="insightStateCard">
+                      <span className="insightStateIcon">📊</span>
+                      <strong className="insightStateTitle">Building your insight</strong>
+                      <p className="insightStateBody">Keep logging — your personalised insight will appear here once there is enough data.</p>
+                    </div>
                   </div>
-                </>
-              ) : null}
+                );
+              })()}
 
               {/* ── 7. DATA QUALITY NUDGE ── */}
               {confidence === "low" ? (

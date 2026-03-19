@@ -1111,6 +1111,168 @@ button,
   color: #9de4b7;
 }
 
+/* ─── Insight section (matches Android layout) ─── */
+.insightSection {
+  display: grid;
+  gap: 10px;
+}
+
+.insightCardsRow {
+  display: grid;
+  gap: 10px;
+}
+
+.insightSectionCard {
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+  background: rgba(13, 20, 36, 0.72);
+  border: 1px solid rgba(148, 180, 224, 0.10);
+}
+
+.insightSectionIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.insightSectionLabel {
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.insightSectionBody {
+  color: #edf2fa;
+  font-size: 14px;
+  line-height: 21px;
+  margin: 0;
+}
+
+.insightFooter {
+  color: #7b8faa;
+  font-size: 11px;
+  font-style: italic;
+  text-align: right;
+  margin: 0;
+}
+
+.insightStateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 24px;
+  border-radius: 18px;
+  background: rgba(13, 20, 36, 0.72);
+  border: 1px solid rgba(148, 180, 224, 0.10);
+  text-align: center;
+}
+
+.insightStateIcon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.insightStateTitle {
+  color: #edf2fa;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.insightStateBody {
+  color: #7b8faa;
+  font-size: 14px;
+  line-height: 21px;
+  max-width: 280px;
+  margin: 0;
+}
+
+.firstFreeHint {
+  color: #7b8faa;
+  font-size: 12px;
+  line-height: 17px;
+  font-style: italic;
+  margin: 4px 0 0;
+}
+
+/* ─── Teaser card (insight preview) ─── */
+.teaserCard {
+  position: relative;
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 8px;
+  background: rgba(13, 20, 36, 0.72);
+  border: 1px solid rgba(148, 180, 224, 0.10);
+  overflow: hidden;
+}
+
+.teaserTitle {
+  color: #edf2fa;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.teaserBody {
+  color: #c4d0e1;
+  font-size: 14px;
+  line-height: 21px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.teaserFade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32px;
+  background: linear-gradient(transparent, rgba(13, 20, 36, 0.72));
+  pointer-events: none;
+}
+
+.teaserCtaButton {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 999px;
+  background: #2e93a8;
+  border: none;
+  color: #edf2fa;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.teaserCtaButton:hover {
+  opacity: 0.85;
+}
+
+.teaserSubtext {
+  color: #7b8faa;
+  font-size: 12px;
+  text-align: center;
+  line-height: 17px;
+  margin: 0;
+}
+
+.nudgeSecondaryLink {
+  color: #56d0e0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 /* ─── Strava-style teaser wrap ─── */
 .teaserWrap {
   position: relative;
