@@ -319,10 +319,10 @@ export function SessionProvider({ children }) {
         });
         await setLastLoggedAt(response.moment?.timestamp || timestamp);
         if (response.patternFeedback) {
-          await schedulePatternAlert(response.patternFeedback).catch(() => null);
+          schedulePatternAlert(response.patternFeedback).catch(() => null);
         }
-        if (reminderEnabled) {
-          await scheduleReflectionReminder().catch(() => null);
+        if (reflectionEnabled) {
+          scheduleReflectionReminder().catch(() => null);
         }
         trackEvent("moment_logged", { trigger: response.moment.trigger, emotion: response.moment.emotion });
         return response;

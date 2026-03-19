@@ -3,8 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NOTIFICATION_TITLES, NOTIFICATION_TYPES, INACTIVITY_THRESHOLD_DAYS } from "@triggermap/shared/constants/notifications";
 import { getLastLoggedAt, getLastOpenedAt } from "./deviceService";
 
-const LAST_NOTIFICATION_DATE_KEY = "triggermap.last-notification-date";
-const RECENT_OPEN_WINDOW_MS = 45 * 60 * 1000;
+const LAST_PATTERN_ALERT_DATE_KEY = "triggermap.last-pattern-alert-date";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -64,16 +63,29 @@ export async function disableReflectionReminder() {
 }
 
 export async function schedulePatternAlert(message) {
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) {
+  if (!message) return null;
+
+  try {
+    await ensureNotificationAccess();
+  } catch {
     return null;
   }
 
-  return scheduleNotification({
-    type: NOTIFICATION_TYPES.PATTERN_ALERT,
+  // Rate-limit: max one pattern alert per day
+  const today = new Date().toISOString().slice(0, 10);
+  const lastAlertDate = await AsyncStorage.getItem(LAST_PATTERN_ALERT_DATE_KEY);
+  if (lastAlertDate === today) return null;
+
+  const content = {
+    title: NOTIFICATION_TITLES[NOTIFICATION_TYPES.PATTERN_ALERT],
     body: message,
-    trigger: null,
-  });
+    data: { type: NOTIFICATION_TYPES.PATTERN_ALERT },
+  };
+
+  // Fire immediately — user just logged, show it right away
+  const id = await Notifications.scheduleNotificationAsync({ content, trigger: null });
+  await AsyncStorage.setItem(LAST_PATTERN_ALERT_DATE_KEY, today);
+  return id;
 }
 
 export async function scheduleWeeklyInsightRelease(message) {
@@ -99,41 +111,14 @@ async function ensureNotificationAccess() {
   return permissions;
 }
 
-async function canSendNotificationToday() {
-  await ensureNotificationAccess();
-
-  const today = new Date().toISOString().slice(0, 10);
-  const [lastSentDate, lastOpenedAt, lastLoggedAt] = await Promise.all([
-    AsyncStorage.getItem(LAST_NOTIFICATION_DATE_KEY),
-    getLastOpenedAt(),
-    getLastLoggedAt(),
-  ]);
-
-  if (lastSentDate === today) {
-    return false;
-  }
-
-  if (lastLoggedAt?.slice(0, 10) === today) {
-    return false;
-  }
-
-  if (lastOpenedAt && Date.now() - new Date(lastOpenedAt).getTime() <= RECENT_OPEN_WINDOW_MS) {
-    return false;
-  }
-
-  return true;
-}
-
-async function scheduleNotification({ type, body, trigger }) {
+async function scheduleImmediateNotification({ type, body }) {
   const content = {
     title: NOTIFICATION_TITLES[type],
     body,
     data: { type },
   };
 
-  const notificationId = await Notifications.scheduleNotificationAsync({ content, trigger });
-  await AsyncStorage.setItem(LAST_NOTIFICATION_DATE_KEY, new Date().toISOString().slice(0, 10));
-  return notificationId;
+  return Notifications.scheduleNotificationAsync({ content, trigger: null });
 }
 
 /** Schedule a recurring notification (daily/weekly) — bypasses daily rate limit */
@@ -149,30 +134,40 @@ async function scheduleRecurringNotification({ type, body, trigger }) {
 
 /** Notify when a rule-based weekly report has been generated */
 export async function notifyReportReady() {
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) return null;
+  try {
+    await ensureNotificationAccess();
+  } catch {
+    return null;
+  }
 
-  return scheduleNotification({
+  return scheduleImmediateNotification({
     type: NOTIFICATION_TYPES.REPORT_READY,
     body: "Your weekly emotional patterns are ready to explore.",
-    trigger: null,
   });
 }
 
 /** Notify when a personalized AI (LLM) insight is available */
 export async function notifyAiInsightReady() {
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) return null;
+  try {
+    await ensureNotificationAccess();
+  } catch {
+    return null;
+  }
 
-  return scheduleNotification({
+  return scheduleImmediateNotification({
     type: NOTIFICATION_TYPES.AI_INSIGHT_READY,
     body: "Your personalized TriggerMap insight is ready.",
-    trigger: null,
   });
 }
 
-/** Schedule an inactivity nudge if user hasn't logged in INACTIVITY_THRESHOLD_DAYS */
+/** Schedule an inactivity nudge — fires next day at 11 AM if user hasn't logged recently */
 export async function scheduleInactivityNudge() {
+  try {
+    await ensureNotificationAccess();
+  } catch {
+    return null;
+  }
+
   const lastLoggedAt = await getLastLoggedAt();
 
   if (lastLoggedAt) {
@@ -180,12 +175,22 @@ export async function scheduleInactivityNudge() {
     if (daysSinceLog < INACTIVITY_THRESHOLD_DAYS) return null;
   }
 
-  const shouldNotify = await canSendNotificationToday();
-  if (!shouldNotify) return null;
+  // Cancel any existing nudge before scheduling a new one
+  await cancelNotificationsByType(NOTIFICATION_TYPES.INACTIVITY_NUDGE);
 
-  return scheduleNotification({
-    type: NOTIFICATION_TYPES.INACTIVITY_NUDGE,
+  const content = {
+    title: NOTIFICATION_TITLES[NOTIFICATION_TYPES.INACTIVITY_NUDGE],
     body: "How has your day been? Log a moment to keep your pattern map current.",
-    trigger: null,
+    data: { type: NOTIFICATION_TYPES.INACTIVITY_NUDGE },
+  };
+
+  // Schedule for tomorrow at 11 AM instead of firing immediately
+  return Notifications.scheduleNotificationAsync({
+    content,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour: 11,
+      minute: 0,
+    },
   });
 }
