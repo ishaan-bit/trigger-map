@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
+import { TRIGGER_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 
 const TRIGGER_EMOJIS = {
-  work: "💼", social: "👥", money: "💰", family: "🏠",
-  exercise: "🏃", health: "🩺", travel: "✈️", alone: "🧘", other: "📌",
+  work: "💼", family: "🏠", partner: "💛", social: "👥",
+  alone: "🧘", exercise: "🏃", travel: "✈️", health: "🩺", money: "💰",
 };
 
 const EMOTION_EMOJIS = {
