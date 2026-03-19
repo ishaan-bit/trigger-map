@@ -30,7 +30,7 @@ const TRIGGER_TINTS = {
 };
 
 export function TriggerTile({ label, onPress }) {
-  const tint = TRIGGER_TINTS[label] || TRIGGER_TINTS.other;
+  const tint = TRIGGER_TINTS[label] || "rgba(148, 180, 224, 0.08)";
   return (
     <Pressable
       accessibilityRole="button"

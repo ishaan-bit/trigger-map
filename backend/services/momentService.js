@@ -25,7 +25,7 @@ export function getMomentsKey(ownerId) {
 }
 
 export function createMomentPayload({ ownerId, trigger, emotion, note, occurredAt, isAnonymous, prediction, tags }) {
-  const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "other";
+  const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
   const finalEmotion = EMOTIONS.includes(emotion) ? emotion : "neutral";
 
   return {

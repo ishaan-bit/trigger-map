@@ -4,14 +4,14 @@
  */
 export const TRIGGER_TAGS = {
   work: ["deadline", "feedback", "meeting", "pressure"],
-  social: ["comparison", "rejection", "support", "event"],
-  money: ["unexpected expense", "planning", "guilt", "goal"],
   family: ["expectation", "conflict", "support", "obligation"],
-  exercise: ["motivation", "fatigue", "progress", "routine"],
-  health: ["sleep", "pain", "recovery", "appointment"],
-  travel: ["commute", "adventure", "delay", "new place"],
-  alone: ["recharge", "loneliness", "reflection", "boredom"],
-  other: [],
+  partner: ["conflict", "distance", "closeness", "uncertainty"],
+  social: ["group", "plans", "comparison", "isolation"],
+  alone: ["rest", "overthinking", "loneliness", "recharge"],
+  exercise: ["energy", "fatigue", "discipline", "skip"],
+  travel: ["movement", "delay", "exploration", "stress"],
+  health: ["sleep", "diet", "illness", "recovery"],
+  money: ["spending", "earning", "stress", "planning"],
 };
 
 /** Flat set of all valid tags for validation */

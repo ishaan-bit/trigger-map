@@ -14,60 +14,50 @@ const MICRO_EXPERIMENTS = {
     "Give a task you have been avoiding just 10 focused minutes.",
     "Before your next meeting, take three slow breaths and set one intention.",
   ],
-  social: [
-    "Decline one invite this week and track how your energy responds.",
-    "After your next social outing, write one word for how you feel.",
-    "Reach out to someone you have not spoken to in a while.",
-  ],
-  money: [
-    "Rate three purchases from this week on a felt-good scale.",
-    "Apply a 24-hour wait before your next non-essential purchase.",
-    "Review one subscription you are unsure about for 5 minutes.",
-  ],
   family: [
     "Name one emotion out loud during a family conversation this week.",
     "Before a gathering, pick one boundary you want to keep.",
     "Write a short note to a family member, even if you do not send it.",
-  ],
-  exercise: [
-    "Log your mood before and after your next workout and compare.",
-    "Swap one intense session for a 20-minute walk this week.",
-    "Try a stretch routine at a time of day you normally skip.",
-  ],
-  health: [
-    "Track one health habit for three days and note your mood alongside.",
-    "Replace 10 minutes of screen time with quiet before bed tonight.",
-    "Take one small step toward a health concern you have postponed.",
-  ],
-  sleep: [
-    "Put your phone down 30 minutes before bed for three nights.",
-    "Wake at the same time for five days regardless of bedtime.",
-    "Each morning, rate how rested you feel in one sentence.",
   ],
   partner: [
     "Ask your partner one open-ended question and just listen.",
     "When you feel a reaction mid-conversation, pause before responding.",
     "Write down one thing you appreciate about your partner today.",
   ],
-  travel: [
-    "On your next trip, note one moment when the environment shifted your mood.",
-    "Before traveling, write down what you hope to feel by the end.",
-    "After arriving somewhere new, spend five minutes watching your surroundings silently.",
+  social: [
+    "Decline one invite this week and track how your energy responds.",
+    "After your next social outing, write one word for how you feel.",
+    "Reach out to someone you have not spoken to in a while.",
   ],
   alone: [
     "Block 30 minutes of solo time this week with no screens.",
     "During your next stretch of alone time, label the emotion you feel halfway through.",
     "Notice whether solitude charges or drains you at different times of day.",
   ],
-  other: [
-    "Spend 5 minutes writing freely about whatever is on your mind.",
-    "Label your emotion the next time something unexpected happens.",
-    "Describe one moment today as if telling a close friend.",
+  exercise: [
+    "Log your mood before and after your next workout and compare.",
+    "Swap one intense session for a 20-minute walk this week.",
+    "Try a stretch routine at a time of day you normally skip.",
+  ],
+  travel: [
+    "On your next trip, note one moment when the environment shifted your mood.",
+    "Before traveling, write down what you hope to feel by the end.",
+    "After arriving somewhere new, spend five minutes watching your surroundings silently.",
+  ],
+  health: [
+    "Track one health habit for three days and note your mood alongside.",
+    "Replace 10 minutes of screen time with quiet before bed tonight.",
+    "Take one small step toward a health concern you have postponed.",
+  ],
+  money: [
+    "Rate three purchases from this week on a felt-good scale.",
+    "Apply a 24-hour wait before your next non-essential purchase.",
+    "Review one subscription you are unsure about for 5 minutes.",
   ],
 };
 
 function pickExperiment(trigger) {
-  const pool = MICRO_EXPERIMENTS[trigger] || MICRO_EXPERIMENTS.other;
+  const pool = MICRO_EXPERIMENTS[trigger] || MICRO_EXPERIMENTS.work;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -200,7 +190,7 @@ export async function generateInsight(report) {
       summary = buildStrongSummary(report);
   }
 
-  const trigger = report.topTrigger || report.tiedTriggers?.[0] || "other";
+  const trigger = report.topTrigger || report.tiedTriggers?.[0] || "work";
   const microExperiment = confidence !== "too_early" ? pickExperiment(trigger) : null;
 
   return {
