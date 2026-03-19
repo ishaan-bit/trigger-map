@@ -36,11 +36,11 @@ function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
 
-  const headerRe = /(?:what stood out|what may be contributing|one thing to try)/gi;
+  const headerRe = /(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this)/gi;
   const labelMap = [
-    /what stood out/i,
-    /what may be contributing/i,
-    /one thing to try/i,
+    /(?:what (?:stood|stands) out|(?:most )?notable pattern)/i,
+    /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor))/i,
+    /(?:one thing to try|something to try|try this)/i,
   ];
 
   const hits = [];

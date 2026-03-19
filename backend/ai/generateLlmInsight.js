@@ -165,6 +165,22 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       .replace(/\n{3,}/g, "\n\n")    // collapse excess newlines
       .trim();
 
+    // Normalize variant section headers to canonical names.
+    // Match header at start of line; handle both "Header\n" and "Header: content..." forms.
+    content = content
+      .replace(/^[ \t]*(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
+      .replace(/^[ \t]*what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
+      .replace(/^[ \t]*(?:possible|potential|likely)\s+(?:cause|contributing(?:\s+factor)?)[s]?[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+      .replace(/^[ \t]*what\s+may\s+be\s+contributing[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+      .replace(/^[ \t]*(?:one\s+thing\s+to\s+try|something\s+to\s+try|try\s+this)[ \t]*:?[ \t]*/gmi, "One thing to try\n")
+      .replace(/\n{3,}/g, "\n\n");
+
+    // Strip any preamble text before the first recognized section header
+    const firstHeaderMatch = content.match(/^What stood out|^What may be contributing|^One thing to try/mi);
+    if (firstHeaderMatch) {
+      content = content.slice(firstHeaderMatch.index).trim();
+    }
+
     // Truncate after the first complete 3-section set (some models repeat sections)
     const sectionHeaders = /(?:what stood out|what may be contributing|one thing to try)/gi;
     const headerPositions = [];
