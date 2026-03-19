@@ -151,7 +151,7 @@ function PairingChip({ trigger, emotion, count, positive }) {
 
 export default function ReportPage() {
   const router = useRouter();
-  const { loadWeeklyReport, isSignedIn, isPremium } = useSession();
+  const { loadWeeklyReport, isSignedIn } = useSession();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -444,10 +444,11 @@ export default function ReportPage() {
                   );
                 }
 
-                /* ── PREMIUM + full insight ── */
-                if (isPremium && hasLlmInsight) {
-                  const sections = parseLlmSections(report.llmInsight.narrative);
-                  const generatedAt = report.llmInsight.generatedAt;
+                /* ── HAS INSIGHT (LLM or teaser) ── */
+                if (hasLlmInsight || hasLlmTeaser) {
+                  const narrativeSource = report.llmInsight?.narrative || report.llmTeaser?.narrative;
+                  const sections = parseLlmSections(narrativeSource);
+                  const generatedAt = report.llmInsight?.generatedAt || report.llmTeaser?.generatedAt;
                   const daysAgo = generatedAt
                     ? Math.max(0, Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86400000))
                     : null;
@@ -468,7 +469,7 @@ export default function ReportPage() {
                         </div>
                       ) : (
                         <div className="insightSectionCard">
-                          <p className="insightSectionBody">{cleanText(report.llmInsight.narrative)}</p>
+                          <p className="insightSectionBody">{cleanText(narrativeSource)}</p>
                         </div>
                       )}
                       {daysAgo !== null ? (
@@ -476,86 +477,6 @@ export default function ReportPage() {
                           Updated {daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`}
                         </p>
                       ) : null}
-                    </div>
-                  );
-                }
-
-                /* ── PREMIUM, no insight yet ── */
-                if (isPremium && !hasLlmInsight) {
-                  return (
-                    <div className="insightSection">
-                      <SectionHeader label="Weekly insight" badge="weekly" />
-                      <div className="insightStateCard">
-                        <span className="insightStateIcon">✨</span>
-                        <strong className="insightStateTitle">Your insight is updating</strong>
-                        <p className="insightStateBody">This usually takes under a minute. Your patterns are being analyzed.</p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                /* ── SIGNED-IN FREE + teaser or insight available ── */
-                if (hasLlmTeaser || hasLlmInsight) {
-                  const narrativeSource = report.llmTeaser?.narrative || report.llmInsight?.narrative;
-                  const sections = parseLlmSections(narrativeSource);
-                  const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
-
-                  /* First free preview: show all 3 cards */
-                  if (hasLlmInsight && report.llmInsight.firstFree) {
-                    const fullSections = parseLlmSections(report.llmInsight.narrative);
-                    return (
-                      <div className="insightSection">
-                        <SectionHeader label="Weekly insight" badge="weekly" />
-                        <div className="aiLabelRow">
-                          <span className="aiLabelPill aiLabelPillGreen">Free preview</span>
-                        </div>
-                        {fullSections ? (
-                          <div className="insightCardsRow">
-                            {INSIGHT_SECTION_META.map((meta, i) => (
-                              fullSections[i] ? (
-                                <div key={meta.label} className="insightSectionCard">
-                                  <span className="insightSectionIcon">{meta.icon}</span>
-                                  <span className="insightSectionLabel">{meta.label}</span>
-                                  <p className="insightSectionBody">{fullSections[i]}</p>
-                                </div>
-                              ) : null
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="insightSectionCard">
-                            <p className="insightSectionBody">{cleanText(report.llmInsight.narrative)}</p>
-                          </div>
-                        )}
-                        <p className="firstFreeHint">Future pattern insights require Premium.</p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="insightSection">
-                      <SectionHeader label="Weekly insight" badge="weekly" />
-                      <div className="teaserCard">
-                        <strong className="teaserTitle">A deeper pattern is emerging…</strong>
-                        <p className="teaserBody">{teaserText}</p>
-                        <div className="teaserFade" />
-                      </div>
-                      <button className="teaserCtaButton" type="button">Upgrade to Premium</button>
-                      <p className="teaserSubtext">Unlock full insights into your patterns</p>
-                    </div>
-                  );
-                }
-
-                /* ── SIGNED-IN FREE, enough data but no teaser ── */
-                if (report.totalMoments >= 5) {
-                  return (
-                    <div className="insightSection">
-                      <SectionHeader label="Weekly insight" badge="weekly" />
-                      <div className="insightStateCard">
-                        <span className="insightStateIcon">🔓</span>
-                        <strong className="insightStateTitle">Unlock your personalised insight</strong>
-                        <p className="insightStateBody">You have enough data for a deeper pattern analysis. Upgrade to see what your moments reveal.</p>
-                        <button className="teaserCtaButton" type="button">Upgrade to Premium</button>
-                      </div>
                     </div>
                   );
                 }
