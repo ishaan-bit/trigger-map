@@ -863,6 +863,73 @@ button,
   text-transform: capitalize;
 }
 
+/* ─── Tag chip row ─── */
+.tagSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tagLabel {
+  font-size: 13px;
+  color: #9eb0c9;
+  margin: 0;
+}
+
+.tagHint {
+  font-size: 11px;
+  color: #6a7d96;
+  margin: 0;
+}
+
+.tagChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagChip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #c4d4e8;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tagChip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.tagChipActive {
+  background: rgba(123, 201, 216, 0.12);
+  border-color: rgba(123, 201, 216, 0.4);
+  color: #f1f5fb;
+}
+
+.tagChip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── Timeline tag pills ─── */
+.momentTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.momentTag {
+  font-size: 11px;
+  text-transform: capitalize;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: rgba(123, 201, 216, 0.08);
+  color: rgba(123, 201, 216, 0.85);
+}
+
 /* ─── Log actions row ─── */
 .logActions {
   display: flex;

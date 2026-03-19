@@ -19,6 +19,7 @@ export default function HomePage() {
   const [trigger, setTrigger] = useState(null);
   const [emotion, setEmotion] = useState(null);
   const [note, setNote] = useState("");
+  const [selectedTags, setSelectedTags] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [todayCount, setTodayCount] = useState(0);
@@ -37,6 +38,7 @@ export default function HomePage() {
     setTrigger(null);
     setEmotion(null);
     setNote("");
+    setSelectedTags([]);
     setMessage("");
   }
 
@@ -44,7 +46,9 @@ export default function HomePage() {
     if (!trigger || !emotion || loading) return;
     try {
       setLoading(true);
-      const response = await saveMoment({ trigger, emotion, note, notes: note });
+      const payload = { trigger, emotion, note, notes: note };
+      if (selectedTags.length > 0) payload.tags = selectedTags;
+      const response = await saveMoment(payload);
       setMessage(response?.patternFeedback || response?.smartReflectionPrompt || "Moment saved ✓");
       setTodayCount((c) => c + 1);
       setTimeout(reset, 1800);
@@ -130,8 +134,34 @@ export default function HomePage() {
             />
           </label>
 
+          {trigger && (TRIGGER_TAGS[trigger] || []).length > 0 ? (
+            <div className="tagSection">
+              <p className="tagLabel">What kind of moment was this?</p>
+              <div className="tagChipRow">
+                {TRIGGER_TAGS[trigger].map((tag) => {
+                  const active = selectedTags.includes(tag);
+                  const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`tagChip ${active ? "tagChipActive" : ""}`}
+                      disabled={atMax}
+                      onClick={() => setSelectedTags((prev) =>
+                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                      )}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="tagHint">Optional — up to {MAX_TAGS_PER_MOMENT}</p>
+            </div>
+          ) : null}
+
           <div className="logActions">
-            <button className="ghostButton" type="button" onClick={() => { setStep("trigger"); setEmotion(null); setNote(""); }}>
+            <button className="ghostButton" type="button" onClick={() => { setStep("trigger"); setEmotion(null); setNote(""); setSelectedTags([]); }}>
               ← Back
             </button>
             <button

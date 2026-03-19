@@ -162,6 +162,11 @@ export default function TimelinePage() {
                   </div>
                   <strong>{new Date(moment.timestamp).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</strong>
                   {moment.note ? <p className="momentNote">{moment.note}</p> : null}
+                  {moment.tags?.length ? (
+                    <div className="momentTagRow">
+                      {moment.tags.map((tag) => <span key={tag} className="momentTag">{tag}</span>)}
+                    </div>
+                  ) : null}
                   <div className="momentActions">
                     <button className="momentActionBtn" type="button" onClick={() => startEdit(moment)}>Edit</button>
                     <button className="momentActionBtn momentActionBtnDanger" type="button" onClick={() => handleDelete(moment.id)}>Delete</button>
