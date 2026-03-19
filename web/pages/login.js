@@ -113,6 +113,9 @@ export default function LoginPage() {
         <p className="muted" style={{ textAlign: "center", fontSize: 12 }}>
           Anonymous mode uses a device ID. Sign in to sync across devices and unlock weekly insights.
         </p>
+        <p className="muted" style={{ textAlign: "center", fontSize: 11, opacity: 0.7, marginTop: 8 }}>
+          Your data stays private. We don't sell or share it.
+        </p>
       </section>
     </Layout>
   );

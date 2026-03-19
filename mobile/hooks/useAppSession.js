@@ -204,15 +204,19 @@ export function SessionProvider({ children }) {
       async completeOnboarding() {
         await setOnboardingComplete(true);
         setOnboardingCompleteState(true);
-        // Enable weekly reminder and daily reflection reminder on first launch
-        try {
-          await enableWeeklyReminder();
-          await scheduleReflectionReminder();
-          await setReminderEnabled(true);
-          setReminderEnabledState(true);
-        } catch {
-          // Permission denied or scheduling failed — leave disabled
-        }
+        // Schedule notifications in background — never block navigation.
+        // Awaiting requestPermissionsAsync() here can deadlock on Android 13+
+        // if the system dialog hasn't been dismissed yet.
+        (async () => {
+          try {
+            await enableWeeklyReminder();
+            await scheduleReflectionReminder();
+            await setReminderEnabled(true);
+            setReminderEnabledState(true);
+          } catch {
+            // Permission denied or scheduling failed — leave disabled
+          }
+        })();
       },
       async signInWithEmail(email, password) {
         const activeDeviceId = await ensureDeviceIdentity();

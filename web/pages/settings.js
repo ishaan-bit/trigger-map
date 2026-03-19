@@ -86,8 +86,9 @@ export default function SettingsPage() {
           </button>
         </Section>
 
-        {/* Legal */}
-        <Section icon="📄" title="Legal">
+        {/* Privacy */}
+        <Section icon="🔒" title="Privacy">
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>Privacy first — your data stays yours.</p>
           <a className="ghostButton inlineButton" href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>
           <a className="ghostButton inlineButton" href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms and conditions</a>
           <Row label="Support" value="qdenxp@gmail.com" />
@@ -101,7 +102,6 @@ export default function SettingsPage() {
           </p>
           <Row label="Developer" value="QuietDen (OPC) Pvt. Ltd." />
           <Row label="Website" value="qdenxp.com" />
-          <Row label="Phone" value="+91 9798784610" />
           <p className="muted" style={{ fontSize: 11, textAlign: "center" }}>Registered December 2025, India</p>
         </Section>
       </div>

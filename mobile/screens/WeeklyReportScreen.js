@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   Alert,
-  Dimensions,
   Image,
   Pressable,
   ScrollView,
@@ -16,8 +15,6 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
-
-const screenWidth = Dimensions.get("window").width;
 
 /** Strip encoding artifacts from any backend/stored text */
 function cleanText(str) {
@@ -341,8 +338,8 @@ export function WeeklyReportScreen() {
               </Text>
               <Text style={s.starterBody}>
                 {isSignedIn
-                  ? "Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture."
-                  : "Log a few moments and sign in to unlock personalised insights about your patterns."}
+                  ? "Log at least 3 moments this week for your pattern report to take shape. With 5 or more, you unlock personalised AI insights that get sharper the more you log."
+                  : "Log at least 3 moments to see your first patterns. Sign in and log 5+ to unlock personalised AI insights."}
               </Text>
               {!isSignedIn ? (
                 <>
@@ -623,7 +620,7 @@ export function WeeklyReportScreen() {
                         <Text style={s.insightStateIcon}>✨</Text>
                         <Text style={s.insightStateTitle}>Your insight is updating</Text>
                         <Text style={s.insightStateBody}>
-                          This usually takes under a minute. Your patterns are being analyzed.
+                          This usually takes under a minute. Your patterns are being analyzed — insights get richer the more moments you log.
                         </Text>
                       </View>
                     </View>
@@ -698,7 +695,7 @@ export function WeeklyReportScreen() {
                         <Text style={s.insightStateIcon}>🔓</Text>
                         <Text style={s.insightStateTitle}>Unlock your personalised insight</Text>
                         <Text style={s.insightStateBody}>
-                          You have enough data for a deeper pattern analysis. Upgrade to see what your moments reveal.
+                          You have enough data for a deeper pattern analysis. Upgrade to see what your moments reveal — insights get sharper the more you log.
                         </Text>
                         <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
                           <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
@@ -708,6 +705,7 @@ export function WeeklyReportScreen() {
                   );
                 }
 
+                const remaining = Math.max(0, 5 - (report.totalMoments || 0));
                 return (
                   <View style={s.section}>
                     <SectionHeader label="Insights" badge="weekly" />
@@ -715,7 +713,9 @@ export function WeeklyReportScreen() {
                       <Text style={s.insightStateIcon}>📊</Text>
                       <Text style={s.insightStateTitle}>Building your insight</Text>
                       <Text style={s.insightStateBody}>
-                        Keep logging — your personalised insight will appear here once there is enough data.
+                        {remaining > 0
+                          ? `Log ${remaining} more moment${remaining !== 1 ? "s" : ""} this week to unlock your personalised AI insight. Insights get better the more you log.`
+                          : "Your personalised insight is being prepared. Check back soon."}
                       </Text>
                     </View>
                   </View>
@@ -728,7 +728,7 @@ export function WeeklyReportScreen() {
             <View style={[s.stateCard, s.emptyStateCard]}>
               <Image source={require("@/assets/report-empty.png")} style={s.emptyIllustration} resizeMode="contain" accessible={false} />
               <Text style={s.stateTitle}>Your first insight is on its way</Text>
-              <Text style={s.stateBody}>Log a few moments this week and we will surface the patterns behind your emotions.</Text>
+              <Text style={s.stateBody}>Log at least 3 moments this week to see your patterns. With 5+, you get personalised AI insights.</Text>
               <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
             </View>
           ) : null}

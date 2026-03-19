@@ -236,9 +236,20 @@ export default function ReportPage() {
           {confidence === "too_early" ? (
             <div className="card stack" style={{ textAlign: "center" }}>
               <span style={{ fontSize: 48 }}>🌱</span>
-              <strong>A few more moments to go</strong>
-              <p className="muted">Log at least 3 moments this week for patterns to start forming. The more days you cover, the sharper the picture.</p>
-              <a className="primaryButton inlineButton" href="/">Log a moment</a>
+              <strong>{isSignedIn ? "A few more moments to go" : "Start tracking to see patterns"}</strong>
+              <p className="muted">
+                {isSignedIn
+                  ? "Log at least 3 moments this week for your pattern report to take shape. With 5 or more, you unlock personalised AI insights that get sharper the more you log."
+                  : "Log at least 3 moments to see your first patterns. Sign in and log 5+ to unlock personalised AI insights."}
+              </p>
+              {!isSignedIn ? (
+                <>
+                  <button className="primaryButton inlineButton" onClick={() => router.push("/login")} type="button">Sign in to unlock deeper insights</button>
+                  <a className="nudgeSecondaryLink" href="/">Log a moment</a>
+                </>
+              ) : (
+                <a className="primaryButton inlineButton" href="/">Log a moment</a>
+              )}
             </div>
           ) : null}
 
@@ -488,7 +499,13 @@ export default function ReportPage() {
                     <div className="insightStateCard">
                       <span className="insightStateIcon">📊</span>
                       <strong className="insightStateTitle">Building your insight</strong>
-                      <p className="insightStateBody">Keep logging — your personalised insight will appear here once there is enough data.</p>
+                      <p className="insightStateBody">
+                        {(() => {
+                          const remaining = Math.max(0, 5 - (report.totalMoments || 0));
+                          if (remaining > 0) return `Log ${remaining} more moment${remaining !== 1 ? "s" : ""} this week to unlock your personalised AI insight. Insights get better the more you log.`;
+                          return "Your personalised insight is being prepared. Check back soon.";
+                        })()}
+                      </p>
                     </div>
                   </div>
                 );
@@ -520,7 +537,7 @@ export default function ReportPage() {
         <div className="card feedbackPanel stack emptyStatePanel">
           <span style={{ fontSize: 56 }}>📝</span>
           <strong>Your first insight is on its way</strong>
-          <p className="feedback">Log a few moments this week and we will surface the patterns behind your emotions.</p>
+          <p className="feedback">Log at least 3 moments this week to see your patterns. With 5+, you get personalised AI insights.</p>
           <a className="primaryButton inlineButton" href="/">Log a moment</a>
         </div>
       ) : null}

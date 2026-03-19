@@ -17,18 +17,6 @@ initCrashMonitoring();
 initAnalytics();
 SplashScreen.preventAutoHideAsync().catch(() => null);
 
-async function requestNotificationPermission() {
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === "granted") return true;
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== "granted") {
-    console.warn("[NOTIF] Permission denied");
-    return false;
-  }
-  console.info("[NOTIF] Permission granted");
-  return true;
-}
-
 if (Platform.OS === "android") {
   Notifications.setNotificationChannelAsync("default", {
     name: "TriggerMap",
@@ -58,15 +46,14 @@ export default function RootLayout() {
       } catch (error) {
         if (active) {
           console.warn(`[QuietDen] Startup validation failed: ${error.message}`);
-          ToastAndroid.show("Offline mode, data saved locally", ToastAndroid.SHORT);
+          if (Platform.OS === "android") {
+            ToastAndroid.show("Offline mode, data saved locally", ToastAndroid.SHORT);
+          }
         }
       } finally {
         SplashScreen.hideAsync().catch(() => null);
       }
     }
-
-    // Request notification permission early
-    requestNotificationPermission().catch(() => null);
 
     validateStartup();
 

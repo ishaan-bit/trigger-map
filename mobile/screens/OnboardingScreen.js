@@ -1,13 +1,10 @@
 import { useRef, useState } from "react";
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SLIDE_WIDTH = SCREEN_WIDTH;
 
 const slides = [
   {
@@ -30,29 +27,32 @@ const slides = [
 export function OnboardingScreen() {
   const router = useRouter();
   const { completeOnboarding } = useAppSession();
+  const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  async function finish() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await completeOnboarding();
+      router.replace("/(tabs)/log");
+    } catch {
+      setLoading(false);
+    }
+  }
 
   function handleNext() {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
     } else {
-      completeOnboarding().then(() => router.replace("/(tabs)/log"));
+      finish();
     }
   }
 
   function handleSkip() {
-    completeOnboarding().then(() => router.replace("/(tabs)/log"));
-  }
-
-  function renderSlide({ item }) {
-    return (
-      <View style={styles.slide}>
-        <Text style={styles.slideIcon}>{item.icon}</Text>
-        <Text style={styles.slideTitle}>{item.title}</Text>
-        <Text style={styles.slideBody}>{item.body}</Text>
-      </View>
-    );
+    finish();
   }
 
   const isLast = currentIndex === slides.length - 1;
@@ -71,18 +71,24 @@ export function OnboardingScreen() {
       <FlatList
         ref={flatListRef}
         data={slides}
-        renderItem={renderSlide}
+        renderItem={({ item }) => (
+          <View style={[styles.slide, { width: screenWidth }]}>
+            <Text style={styles.slideIcon}>{item.icon}</Text>
+            <Text style={styles.slideTitle}>{item.title}</Text>
+            <Text style={styles.slideBody}>{item.body}</Text>
+          </View>
+        )}
         keyExtractor={(_, i) => String(i)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onMomentumScrollEnd={(e) => {
-          const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          const index = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
           setCurrentIndex(index);
         }}
         style={styles.list}
-        getItemLayout={(_, index) => ({ length: SLIDE_WIDTH, offset: SLIDE_WIDTH * index, index })}
+        getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
       />
 
       <View style={styles.dots} accessibilityRole="tablist">
@@ -92,8 +98,9 @@ export function OnboardingScreen() {
       </View>
 
       <PrimaryButton
-        label={isLast ? "Start logging" : "Continue"}
+        label={isLast ? (loading ? "Starting\u2026" : "Start logging") : "Continue"}
         onPress={handleNext}
+        disabled={loading}
       />
     </ScreenShell>
   );
@@ -122,7 +129,6 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   slide: {
-    width: SLIDE_WIDTH,
     justifyContent: "center",
     gap: 18,
     paddingVertical: 32,
