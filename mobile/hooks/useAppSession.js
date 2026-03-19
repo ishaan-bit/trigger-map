@@ -275,6 +275,7 @@ export function SessionProvider({ children }) {
             emotion: payload.emotion,
             note: notes,
             timestamp,
+            ...(payload.tags?.length ? { tags: payload.tags } : {}),
           });
           await setLastLoggedAt(timestamp);
           trackEvent("moment_logged", { trigger: payload.trigger, emotion: payload.emotion, local: true });
@@ -290,6 +291,7 @@ export function SessionProvider({ children }) {
             notes,
             timestamp,
             ...(prediction ? { prediction } : {}),
+            ...(payload.tags?.length ? { tags: payload.tags } : {}),
           },
           token
         );

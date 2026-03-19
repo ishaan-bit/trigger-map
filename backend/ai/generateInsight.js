@@ -155,6 +155,17 @@ function buildStrongSummary(report) {
   return parts.join(" ");
 }
 
+function appendTagContext(summary, report) {
+  const tagFreq = report.tagFrequency;
+  if (!tagFreq || !Object.keys(tagFreq).length) return summary;
+
+  const sorted = Object.entries(tagFreq).sort(([, a], [, b]) => b - a);
+  const topTag = sorted[0];
+  if (!topTag || topTag[1] < 2) return summary;
+
+  return `${summary} Notably, "${topTag[0]}" came up ${topTag[1]} times across your moments.`;
+}
+
 export async function generateInsight(report) {
   const confidence = report.dataQuality?.confidence || "too_early";
 
@@ -180,7 +191,7 @@ export async function generateInsight(report) {
   const microExperiment = confidence !== "too_early" ? pickExperiment(trigger) : null;
 
   return {
-    summary,
+    summary: appendTagContext(summary, report),
     microExperiment,
     confidence,
     model: "rule-based-v2",

@@ -4,6 +4,7 @@
  * @property {string} trigger
  * @property {string} emotion
  * @property {string} note
+ * @property {string[]} [tags]
  * @property {string} timestamp
  * @property {string} ownerId
  * @property {boolean} isAnonymous

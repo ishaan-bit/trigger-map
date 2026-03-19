@@ -43,6 +43,15 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
             </View>
           </View>
           {moment.note ? <Text style={styles.note} numberOfLines={2}>{moment.note}</Text> : null}
+          {moment.tags?.length ? (
+            <View style={styles.tagRow}>
+              {moment.tags.map((tag) => (
+                <View key={tag} style={styles.tagPill}>
+                  <Text style={styles.tagPillText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
         <Text style={styles.time}>
           {new Date(moment.timestamp).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
@@ -128,6 +137,24 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 2,
+  },
+  tagPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: palette.accentSoft,
+  },
+  tagPillText: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "capitalize",
   },
   time: {
     color: palette.muted,

@@ -57,14 +57,21 @@ function buildSignals(report) {
     lines.push(`Trigger diversity: ${report.triggerConcentration < 0.3 ? "spread broadly" : report.triggerConcentration < 0.5 ? "moderately concentrated" : "dominated by few"}.`);
   }
 
+  const tagEntries = Object.entries(report.tagFrequency || {}).sort(([, a], [, b]) => b - a);
+  if (tagEntries.length) {
+    const topTags = tagEntries.slice(0, 5).map(([tag, count]) => `${tag} (${count}x)`);
+    lines.push(`Context tags: ${topTags.join(", ")}.`);
+  }
+
   return lines.join("\n");
 }
 
 function buildPrompt(report) {
   const signals = buildSignals(report);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
+  const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
 
-  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, travel, alone) and how each made them feel (calm, neutral, anxious, frustrated, energized).
+  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, social, money, family, exercise, health, travel, alone) and how each made them feel (calm, neutral, anxious, frustrated, energized).${hasTags ? " They also add optional context tags (e.g. deadline, conflict, support) to describe the type of moment." : ""}
 
 Below are structured signals from the user's past week. ONLY reference what appears here.
 
@@ -86,7 +93,7 @@ Rules:
 - Total length: 60-90 words. Do not exceed 100 words.
 - Do not invent data. Do not repeat raw numbers already visible on screen.
 - Do not moralize, lecture, or use therapeutic language.
-- Do not use em dashes, colons in headers, bullet markers, or bold markers.
+- Do not use em dashes, colons in headers, bullet markers, or bold markers.${hasTags ? "\n- If context tags are present, weave them naturally into your observations. Prefer note content over tags." : ""}
 - Tone: calm, direct, perceptive. Like a sharp friend, not a therapist.
 - ${sparse ? "This user has limited data. Be honest about what you can and cannot see." : "Be confident but not certain."}`;
 }

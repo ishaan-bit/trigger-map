@@ -38,6 +38,7 @@ function parseAggregateHash(record, date) {
     triggers: {},
     emotions: {},
     pairs: {},
+    tags: {},
     timeOfDay: {
       morning: 0,
       afternoon: 0,
@@ -57,6 +58,8 @@ function parseAggregateHash(record, date) {
       snapshot.pairs[field.replace("pair:", "")] = value;
     } else if (field.startsWith("time:")) {
       snapshot.timeOfDay[field.replace("time:", "")] = value;
+    } else if (field.startsWith("tag:")) {
+      snapshot.tags[field.replace("tag:", "")] = value;
     }
   }
 
@@ -83,6 +86,12 @@ export async function appendDailyAggregate(moment) {
   // Store daily prediction (first one per day wins)
   if (moment.prediction) {
     cmds.push(["HSETNX", key, "prediction", moment.prediction]);
+  }
+
+  if (Array.isArray(moment.tags)) {
+    for (const tag of moment.tags) {
+      cmds.push(["HINCRBY", key, `tag:${tag}`, "1"]);
+    }
   }
 
   await pipeline(cmds);

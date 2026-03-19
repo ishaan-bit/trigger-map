@@ -22,7 +22,7 @@ export async function getLocalMoments() {
 /**
  * Save a moment to local storage.
  */
-export async function saveLocalMoment({ trigger, emotion, note }) {
+export async function saveLocalMoment({ trigger, emotion, note, tags }) {
   const moments = await getLocalMoments();
   const moment = {
     id: Crypto.randomUUID(),
@@ -31,6 +31,7 @@ export async function saveLocalMoment({ trigger, emotion, note }) {
     note: note || "",
     timestamp: new Date().toISOString(),
     isLocal: true,
+    ...(tags?.length ? { tags } : {}),
   };
   moments.unshift(moment);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(moments));

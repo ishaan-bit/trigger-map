@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
+import { TRIGGER_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { ScreenShell } from "@/components/ScreenShell";
 import { EmotionChip } from "@/components/EmotionChip";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -22,14 +23,27 @@ export function EmotionSelectionScreen() {
   const router = useRouter();
   const { saveMoment } = useAppSession();
   const [selectedEmotion, setSelectedEmotion] = useState(null);
+  const [selectedTags, setSelectedTags] = useState([]);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const availableTags = TRIGGER_TAGS[trigger] || [];
+
+  function toggleTag(tag) {
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
+      if (prev.length >= MAX_TAGS_PER_MOMENT) return prev;
+      return [...prev, tag];
+    });
+  }
 
   async function handleSave() {
     if (!selectedEmotion || saving) return;
     try {
       setSaving(true);
-      await saveMoment({ trigger, emotion: selectedEmotion, note });
+      const payload = { trigger, emotion: selectedEmotion, note };
+      if (selectedTags.length > 0) payload.tags = selectedTags;
+      await saveMoment(payload);
       showToast("Moment logged");
       router.back();
     } catch {
@@ -58,6 +72,37 @@ export function EmotionSelectionScreen() {
           />
         ))}
       </View>
+
+      {selectedEmotion && availableTags.length > 0 && (
+        <View style={styles.tagSection}>
+          <Text style={styles.tagLabel}>What kind of moment was this?</Text>
+          <View style={styles.tagWrap}>
+            {availableTags.map((tag) => {
+              const active = selectedTags.includes(tag);
+              const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
+              return (
+                <Pressable
+                  key={tag}
+                  onPress={() => toggleTag(tag)}
+                  disabled={atMax}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${active ? "Deselect" : "Select"} ${tag} tag`}
+                  style={({ pressed }) => [
+                    styles.tagChip,
+                    active && styles.tagChipActive,
+                    atMax && styles.tagChipDisabled,
+                    pressed && !atMax && styles.tagChipPressed,
+                  ]}
+                >
+                  <Text style={[styles.tagText, active && styles.tagTextActive, atMax && styles.tagTextDisabled]}>
+                    {tag}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View style={styles.noteCard}>
         <Text style={styles.noteLabel}>Note (optional)</Text>
@@ -119,6 +164,52 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  tagSection: {
+    gap: 10,
+  },
+  tagLabel: {
+    color: palette.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  tagWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tagChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+    backgroundColor: palette.glass,
+  },
+  tagChipActive: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  tagChipDisabled: {
+    opacity: 0.35,
+  },
+  tagChipPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  tagText: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  tagTextActive: {
+    color: palette.accent,
+  },
+  tagTextDisabled: {
+    color: palette.muted,
   },
   noteCard: {
     padding: 16,
