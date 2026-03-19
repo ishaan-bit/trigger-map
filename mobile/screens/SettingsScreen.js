@@ -49,7 +49,7 @@ export function SettingsScreen() {
   const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
 
   return (
-    <ScreenShell scroll>
+    <ScreenShell scroll edges={["top", "left", "right"]}>
 
       <View style={styles.header}>
         <Text style={styles.kicker}>Preferences</Text>

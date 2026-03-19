@@ -14,6 +14,7 @@ export function ScreenShell({
   loadingMessage = "Loading your latest data.",
   timeoutMessage = "This is taking longer than expected. Check connection and try again.",
   onRetry,
+  edges,
 }) {
   const [showTimeout, setShowTimeout] = useState(false);
 
@@ -57,7 +58,7 @@ export function ScreenShell({
       <View style={styles.glowTopRight} />
       <View style={styles.glowMidLeft} />
       <View style={styles.glowBottomCenter} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={edges}>
         {scroll ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {content}

@@ -90,6 +90,7 @@ export function TimelineScreen() {
       timeoutMessage="Unable to load timeline. Check connection."
       onRetry={load}
       scroll
+      edges={["top", "left", "right"]}
     >
       <View style={styles.header}>
         <Text style={styles.kicker}>Past 7 days</Text>

@@ -35,7 +35,7 @@ export function TriggerSelectionScreen() {
   );
 
   return (
-    <ScreenShell scroll>
+    <ScreenShell scroll edges={["top", "left", "right"]}>
       <View style={styles.top}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Quick log</Text>
