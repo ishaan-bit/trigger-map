@@ -3,7 +3,7 @@
     "name": "TriggerMap",
     "slug": "triggermap",
     "scheme": "triggermap",
-    "version": "1.0.0",
+    "version": "1.0.5-preview",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
@@ -55,7 +55,7 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 40,
+      "versionCode": 41,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
