@@ -36,7 +36,8 @@ function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
 
-  const headerRe = /(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this)/gi;
+  // Match headers only at the start of a line to avoid mid-sentence false positives
+  const headerRe = /^[ \t]*(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this)[ \t]*:?/gmi;
   const labelMap = [
     /(?:what (?:stood|stands) out|(?:most )?notable pattern)/i,
     /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor))/i,
@@ -73,7 +74,8 @@ function parseLlmSections(narrative) {
     for (let i = 0; i < firstHits.length; i++) {
       const start = firstHits[i].idx + firstHits[i].len;
       const end = i < firstHits.length - 1 ? firstHits[i + 1].idx : cleanedText.length;
-      result[firstHits[i].section] = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
+      const body = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
+      result[firstHits[i].section] = body.length >= 5 ? body : null;
     }
     return result;
   }

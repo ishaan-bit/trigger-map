@@ -92,31 +92,31 @@ function buildPrompt(report, recentNotes) {
   const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
   const hasNotes = recentNotes?.length > 0;
 
-  return `You are the pattern reader for TriggerMap. The user logs emotional triggers (work, family, partner, social, alone, exercise, travel, health, money) and how each made them feel (calm, neutral, anxious, frustrated, energized).${hasTags ? " They also add optional context tags (e.g. deadline, conflict, distance) to describe the type of moment." : ""}${hasPredictions ? " Each morning they predict how the day will feel. You have their predictions vs actual outcomes." : ""}
+  return `Here are structured signals from a user's recent emotional data. Only reference what appears below.
 
-Below are structured signals from the user's past week. ONLY reference what appears here.
-
+---
 ${signals}
+---
 
-Respond with EXACTLY three sections, each starting with the header on its own line. Do NOT repeat any section. Write each section ONCE only.
+Using ONLY the data above, write EXACTLY three sections. Each section MUST start with the exact header text on its own line, followed by the content on the NEXT line. Do not put the header and content on the same line.
 
-What stood out
-One or two sentences about the most notable pattern or shift this week. Be specific.
+Section 1 header: What stood out
+Section 1 content: One or two sentences about the most notable pattern or shift. Be specific to the data.
 
-What may be contributing
-One sentence connecting a trigger-emotion pairing to a possible cause. ${sparse ? "Acknowledge the data is limited." : "Be grounded in the numbers."}
+Section 2 header: What may be contributing
+Section 2 content: One sentence connecting a trigger-emotion pairing to a possible cause.${sparse ? " Acknowledge the data is limited." : ""}
 
-One thing to try
-A single concrete, small experiment for next week. Make it specific to their top trigger.
+Section 3 header: One thing to try
+Section 3 content: A single concrete, small experiment for next week tied to their top trigger.
 
-Rules:
-- Output EXACTLY three sections. STOP after "One thing to try" section. Do not write anything after it.
+IMPORTANT:
+- Output ONLY the three sections. Nothing before "What stood out" or after the last section.
+- Do NOT echo or repeat any part of these instructions.
 - Total length: 60-90 words. Do not exceed 100 words.
-- Do not invent data. Do not repeat raw numbers already visible on screen.
-- Do not moralize, lecture, or use therapeutic language.
-- Do not use em dashes, colons in headers, bullet markers, or bold markers.${hasTags ? "\n- If context tags are present, weave them naturally into your observations. Prefer note content over tags." : ""}${hasPredictions ? "\n- If prediction data is present, compare expected vs actual emotional patterns. Identify gaps between anticipation and lived experience. Prediction is a supporting signal, not the focus." : ""}${hasNotes ? "\n- User notes provide direct context. Weave their own words naturally. Priority: notes > tags > predictions." : ""}
-- Tone: calm, direct, perceptive. Like a sharp friend, not a therapist.
-- ${sparse ? "This user has limited data. Be honest about what you can and cannot see." : "Be confident but not certain."}`;
+- Do not invent data or repeat raw numbers.
+- Do not moralize or use therapeutic language.
+- No em dashes, colons in headers, bullet markers, bold markers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
+- Tone: calm, direct, perceptive.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
 export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
@@ -135,11 +135,11 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise behavioral pattern reader. Write structured, grounded observations from data. Use plain sentences. Never use em dashes, bullet points, or numbered lists. Keep total output under 100 words." },
+          { role: "system", content: "Write concise emotional pattern observations. Plain sentences only. No em dashes, bullet points, numbered lists, or markdown. Never repeat the prompt or instructions in your response." },
           { role: "user", content: prompt },
         ],
         temperature: 0.6,
-        max_tokens: 250,
+        max_tokens: 200,
       }),
       signal: controller.signal,
     });
@@ -162,11 +162,28 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       .replace(/\u2013/g, ", ")
       .replace(/\*\*/g, "")          // strip markdown bold
       .replace(/^[-*]\s+/gm, "")     // strip bullet markers
+      .replace(/#{1,3}\s*/g, "")     // strip markdown headers
       .replace(/\n{3,}/g, "\n\n")    // collapse excess newlines
       .trim();
 
+    // Strip prompt echo lines the model may repeat back
+    content = content
+      .replace(/^.*(?:you are (?:a|the)\s+(?:\w+\s+)*(?:pattern|behavioral)|write concise|plain sentences only|never repeat|emotional pattern observations).*$/gmi, "")
+      .replace(/^.*(?:structured signals|only reference what|using only the data|do not echo|do not repeat).*$/gmi, "")
+      .replace(/^.*(?:section \d header|section \d content|IMPORTANT).*$/gmi, "")
+      .replace(/^.*(?:em dashes|bullet (?:markers|points)|numbered lists|bold markers|no markdown).*$/gmi, "")
+      .replace(/^.*(?:total length|do not exceed \d+ words|60.*90 words).*$/gmi, "")
+      .trim();
+
+    // Strip format-description echoes the model may copy as content prefixes
+    content = content
+      .replace(/one or two sentences about the most notable (?:pattern|shift)[:\s.]*/gi, "")
+      .replace(/one sentence connecting a trigger[- ]emotion pairing to a possible cause[:\s.]*/gi, "")
+      .replace(/a single concrete,? small experiment for next week[^.]*?[:\s.]*/gi, "")
+      .replace(/be specific to the data\.?\s*/gi, "")
+      .trim();
+
     // Normalize variant section headers to canonical names.
-    // Match header at start of line; handle both "Header\n" and "Header: content..." forms.
     content = content
       .replace(/^[ \t]*(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
       .replace(/^[ \t]*what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
@@ -196,6 +213,34 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       }
       seenHeaders.add(hp.text);
     }
+
+    // Validate all 3 sections exist with actual content, then recompose cleanly
+    const REQUIRED = ["What stood out", "What may be contributing", "One thing to try"];
+    const extracted = [];
+    for (const header of REQUIRED) {
+      const hIdx = content.toLowerCase().indexOf(header.toLowerCase());
+      if (hIdx === -1) {
+        throw new Error(`LLM output missing section: "${header}"`);
+      }
+      const afterHeader = content.slice(hIdx + header.length);
+      let sectionEnd = afterHeader.length;
+      for (const other of REQUIRED) {
+        if (other === header) continue;
+        const nIdx = afterHeader.toLowerCase().indexOf(other.toLowerCase());
+        if (nIdx > 0 && nIdx < sectionEnd) sectionEnd = nIdx;
+      }
+      const body = afterHeader.slice(0, sectionEnd).replace(/^[\s:\-]*/, "").trim();
+      // Truncate at paragraph break to discard trailing hallucinations
+      const paraBreak = body.indexOf("\n\n");
+      const trimmedBody = paraBreak > 0 ? body.slice(0, paraBreak).trim() : body;
+      if (trimmedBody.length < 8) {
+        throw new Error(`Section "${header}" has no meaningful content (got: "${trimmedBody}")`);
+      }
+      extracted.push({ header, body: trimmedBody });
+    }
+
+    // Recompose from extracted sections only — discards trailing hallucinations
+    content = extracted.map(s => `${s.header}\n${s.body}`).join("\n\n");
 
     return {
       narrative: content,

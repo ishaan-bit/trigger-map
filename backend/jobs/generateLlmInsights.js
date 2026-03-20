@@ -62,7 +62,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
         }
       }
 
-      const aggregates = await getWeeklyAggregates(ownerId);
+      const aggregates = await getWeeklyAggregates(ownerId, 45);
       const weeklyReport = generateWeeklyReport({ aggregates });
 
       if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
@@ -71,12 +71,11 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
         continue;
       }
 
-      // Fetch recent notes for LLM context (last 7 days, max 10, truncated)
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      // Fetch recent notes for LLM context (all available, max 15, truncated)
       const allMoments = await getTimeline(ownerId);
       const recentNotes = allMoments
-        .filter(m => m.note && m.note.trim() && new Date(m.timestamp).getTime() >= sevenDaysAgo)
-        .slice(0, 10)
+        .filter(m => m.note && m.note.trim())
+        .slice(0, 15)
         .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
 
       console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
