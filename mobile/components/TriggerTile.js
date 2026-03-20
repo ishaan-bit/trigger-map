@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
+import { tap } from "@/utils/haptics";
 
 const TRIGGER_ICONS = {
   work: "🏢",
@@ -35,6 +36,7 @@ export function TriggerTile({ label, onPress }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   function handlePressIn() {
+    tap();
     Animated.spring(scaleAnim, {
       toValue: 0.92,
       friction: 5,

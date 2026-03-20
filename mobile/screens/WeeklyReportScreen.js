@@ -104,9 +104,21 @@ const INSIGHT_SECTION_META = [
 ];
 
 const EMOTION_EMOJIS = {
-  frustrated: "💢", anxious: "⚡", neutral: "🌫️",
-  calm: "🍃", energized: "☀️",
+  frustrated: "�", anxious: "😰", neutral: "😐",
+  calm: "😌", energized: "⚡",
 };
+
+const EMOTION_COLORS = {
+  calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa",
+};
+
+function scoreTone(score) {
+  if (score >= 4.2) return { emoji: "🌟", label: "Great", color: "#a78bfa" };
+  if (score >= 3.5) return { emoji: "😌", label: "Good", color: "#5ee6a0" };
+  if (score >= 2.8) return { emoji: "😐", label: "Mixed", color: "#9eb0c9" };
+  if (score >= 2)   return { emoji: "😟", label: "Uneasy", color: "#ffb347" };
+  return { emoji: "😤", label: "Tough", color: "#ff6b7a" };
+}
 
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
@@ -500,9 +512,16 @@ export function WeeklyReportScreen() {
                       <View style={s.metricsRow}>
                         {report.volatilityScore !== null ? (
                           <View style={s.metricCard}>
-                            <Text style={s.metricLabel}>Volatility</Text>
-                            <Text style={s.metricValue}>
-                              {report.volatilityScore < 0.5 ? "🟢" : report.volatilityScore < 1.5 ? "🟡" : "🔴"} {report.volatilityScore}
+                            <Text style={s.metricLabel}>Day-to-day shifts</Text>
+                            <Text style={[s.metricValue, { color: report.volatilityScore < 0.8 ? "#5ee6a0" : report.volatilityScore < 1.5 ? "#ffb347" : "#ff6b7a" }]}>
+                              {report.volatilityLabel || (report.volatilityScore < 0.3 ? "Steady" : report.volatilityScore < 0.8 ? "Mild shifts" : report.volatilityScore < 1.5 ? "Moderate swings" : "High variability")}
+                            </Text>
+                            <Text style={s.metricHint}>
+                              {report.volatilityScore < 0.8
+                                ? "Emotions stayed fairly consistent within each day."
+                                : report.volatilityScore < 1.5
+                                  ? "Some emotional range within your days."
+                                  : "Wide swings between emotions within days."}
                             </Text>
                           </View>
                         ) : null}
@@ -521,20 +540,24 @@ export function WeeklyReportScreen() {
                   {/* Trajectory */}
                   {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
                     <View style={s.section}>
-                      <SectionHeader label="Emotion trajectory" badge="live" />
+                      <SectionHeader label="Emotional tone" badge="live" />
+                      <Text style={s.trajectoryHint}>How your average tone shifted day by day. Higher is calmer/more energized.</Text>
                       {report.trajectoryNote ? (
                         <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
                       ) : null}
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-                        {report.weeklyEmotionTrajectory.map((day) => (
+                        {report.weeklyEmotionTrajectory.map((day) => {
+                          const tone = scoreTone(day.score);
+                          return (
                           <View style={s.trajectoryDay} key={day.date}>
-                            <Text style={s.trajectoryEmoji}>{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</Text>
-                            <Text style={s.trajectoryScore}>{day.score}</Text>
+                            <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
+                            <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
                             <Text style={s.trajectoryDate}>
                               {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
                             </Text>
                           </View>
-                        ))}
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   ) : null}
@@ -559,7 +582,7 @@ export function WeeklyReportScreen() {
                                 ? "Your morning gut feeling matched how the day actually went. Strong self-awareness."
                                 : report.predictionAccuracy.rate >= 0.3
                                   ? "Your predictions were a mixed bag. Your days may hold more surprises than you expect."
-                                  : "Your days unfolded differently than expected. Not a bad thing — it means you're adapting."}
+                                  : "Your days unfolded differently than expected. Not a bad thing, it means you're adapting."}
                             </Text>
                           </View>
                         </View>
@@ -905,11 +928,14 @@ const s = StyleSheet.create({
   },
   trajectoryEmoji: { fontSize: 20 },
   trajectoryScore: { color: palette.text, fontSize: 14, fontWeight: "700" },
+  trajectoryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
   trajectoryDate: {
     color: palette.muted, fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.4,
   },
+  trajectoryHint: { color: palette.muted, fontSize: 12, lineHeight: 17 },
   trajectoryNote: { color: palette.muted, fontSize: 13, lineHeight: 19, fontStyle: "italic" },
+  metricHint: { color: palette.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
 
   /* Correlation */
   correlationRow: {

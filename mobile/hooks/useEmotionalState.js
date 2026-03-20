@@ -21,6 +21,8 @@ const EmotionalStateContext = createContext({
   momentCount: 0,
 });
 
+const SCORE = { frustrated: 1, anxious: 2, neutral: 3, calm: 4, energized: 5 };
+
 function computeDominantEmotion(moments) {
   if (!moments?.length) return null;
   const now = Date.now();
@@ -29,16 +31,23 @@ function computeDominantEmotion(moments) {
   );
   if (!recent.length) return null;
 
-  const counts = {};
+  // Weighted average — same logic as MoodWeather
+  let totalWeight = 0;
+  let weightedSum = 0;
   for (const m of recent) {
-    counts[m.emotion] = (counts[m.emotion] || 0) + 1;
+    const ageH = (now - new Date(m.timestamp).getTime()) / 3_600_000;
+    const w = ageH < 2 ? 1.5 : ageH < 6 ? 1.2 : 1.0;
+    weightedSum += (SCORE[m.emotion] || 3) * w;
+    totalWeight += w;
   }
-  let top = null;
-  let max = 0;
-  for (const [emotion, count] of Object.entries(counts)) {
-    if (count > max) { top = emotion; max = count; }
-  }
-  return top;
+  const avg = weightedSum / totalWeight;
+
+  // Map to dominant emotion for palette selection
+  if (avg >= 4.0) return "calm";
+  if (avg >= 3.3) return "energized";
+  if (avg >= 2.6) return "neutral";
+  if (avg >= 1.8) return "anxious";
+  return "frustrated";
 }
 
 export function EmotionalStateProvider({ children }) {

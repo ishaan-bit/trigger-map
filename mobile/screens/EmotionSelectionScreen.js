@@ -9,6 +9,7 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
 import { palette, radius } from "@/utils/theme";
+import { emotionTap, selection, success as hapticSuccess } from "@/utils/haptics";
 
 const EMOTION_COLORS = {
   calm: palette.success,
@@ -69,6 +70,7 @@ export function EmotionSelectionScreen() {
   }, [selectedEmotion, trigger, tagSectionAnim]);
 
   function toggleTag(tag) {
+    selection();
     setSelectedTags((prev) => {
       if (prev.includes(tag)) return prev.filter((t) => t !== tag);
       if (prev.length >= MAX_TAGS_PER_MOMENT) return prev;
@@ -103,6 +105,7 @@ export function EmotionSelectionScreen() {
         pairCount: response?.pairCount || 0,
       });
 
+      hapticSuccess();
       showToast("Moment logged ✓");
 
       // Auto-navigate back after feedback display
@@ -117,27 +120,60 @@ export function EmotionSelectionScreen() {
   // Animated orb for post-log
   const orbScale = useRef(new Animated.Value(0)).current;
   const orbGlow = useRef(new Animated.Value(0)).current;
+  // Ripple rings — 3 expanding circles radiating outward
+  const ripple1 = useRef(new Animated.Value(0)).current;
+  const ripple2 = useRef(new Animated.Value(0)).current;
+  const ripple3 = useRef(new Animated.Value(0)).current;
 
   if (saved && feedback) {
     const emotionColor = EMOTION_COLORS[selectedEmotion] || palette.accent;
     // Trigger entrance animation
     if (orbScale._value === 0) {
-      Animated.sequence([
-        Animated.spring(orbScale, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }),
+      // Start ripple rings with staggered delay
+      const makeRipple = (anim, delay) =>
         Animated.loop(
           Animated.sequence([
-            Animated.timing(orbGlow, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            Animated.timing(orbGlow, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.delay(delay),
+            Animated.timing(anim, { toValue: 1, duration: 2400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
           ])
-        ),
+        );
+      Animated.parallel([
+        Animated.sequence([
+          Animated.spring(orbScale, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }),
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(orbGlow, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+              Animated.timing(orbGlow, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ])
+          ),
+        ]),
+        makeRipple(ripple1, 0),
+        makeRipple(ripple2, 800),
+        makeRipple(ripple3, 1600),
       ]).start();
     }
 
     const orbOpacity = orbGlow.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] });
+    const makeRippleStyle = (anim) => ({
+      position: "absolute",
+      top: 40 + 90 - 60,   // center with feedbackOrb
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      borderWidth: 1.5,
+      borderColor: emotionColor,
+      opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] }),
+      transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 3] }) }],
+    });
 
     return (
       <ScreenShell scroll>
         <View style={styles.feedbackWrap}>
+          {/* Ripple rings */}
+          <Animated.View style={makeRippleStyle(ripple1)} />
+          <Animated.View style={makeRippleStyle(ripple2)} />
+          <Animated.View style={makeRippleStyle(ripple3)} />
           {/* Breathing emotion orb */}
           <Animated.View style={[styles.feedbackOrb, {
             backgroundColor: emotionColor,

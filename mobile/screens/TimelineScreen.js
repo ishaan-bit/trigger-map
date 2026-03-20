@@ -7,6 +7,7 @@ import { TimelineGroup } from "@/components/TimelineGroup";
 import { EditMomentModal } from "@/components/EditMomentModal";
 import { MicroInsight } from "@/components/MicroInsight";
 import { MoodWeather } from "@/components/MoodWeather";
+import { EmotionGarden } from "@/components/EmotionGarden";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelativeDayLabel } from "@/utils/date";
@@ -151,6 +152,9 @@ export function TimelineScreen() {
 
       {/* Emotional weather ribbon */}
       <MoodWeather moments={moments} />
+
+      {/* Today's emotion garden */}
+      <EmotionGarden moments={moments} />
 
       <Tooltip
         id="timeline_tooltip"

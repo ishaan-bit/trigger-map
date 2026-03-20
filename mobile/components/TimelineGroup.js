@@ -1,5 +1,6 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
+import { warning } from "@/utils/haptics";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -20,6 +21,7 @@ const EMOTION_ICONS = {
 
 export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   function handleDelete() {
+    warning();
     Alert.alert("Delete moment?", "This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => onDelete(moment) },

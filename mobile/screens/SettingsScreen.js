@@ -8,6 +8,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
+import { selection, warning } from "@/utils/haptics";
 
 function Section({ icon, title, children }) {
   return (
@@ -112,6 +113,7 @@ export function SettingsScreen() {
               </View>
               <Switch
                 onValueChange={async (value) => {
+                  selection();
                   try { await toggleReflection(value); } catch (error) { Alert.alert("Reminder error", error.message); }
                 }}
                 value={reflectionEnabled}
@@ -126,6 +128,7 @@ export function SettingsScreen() {
               </View>
               <Switch
                 onValueChange={async (value) => {
+                  selection();
                   try { await toggleReminder(value); } catch (error) { Alert.alert("Reminder error", error.message); }
                 }}
                 value={reminderEnabled}
@@ -140,6 +143,7 @@ export function SettingsScreen() {
               </View>
               <Switch
                 onValueChange={async (value) => {
+                  selection();
                   try { await toggleNudges(value); } catch (error) { Alert.alert("Reminder error", error.message); }
                 }}
                 value={nudgesEnabled}
@@ -170,6 +174,7 @@ export function SettingsScreen() {
         <PrimaryButton
           label="Delete all data"
           onPress={() => {
+            warning();
             Alert.alert(
               "Delete all data?",
               "This will permanently remove all your moments, reports, and insights. This cannot be undone.",

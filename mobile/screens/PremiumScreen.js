@@ -7,6 +7,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
+import { success as hapticSuccess } from "@/utils/haptics";
 
 const transformations = [
   {
@@ -119,6 +120,7 @@ export function PremiumScreen() {
               try {
                 setBusy(true);
                 await subscribe();
+                hapticSuccess();
                 Alert.alert("Premium enabled", "Your weekly insights are ready to view.");
               } catch (error) {
                 const msg = error?.message || "Something went wrong";

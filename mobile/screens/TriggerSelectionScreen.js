@@ -7,6 +7,7 @@ import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
 import { DailyPrediction } from "@/components/DailyPrediction";
 import { MoodWeather } from "@/components/MoodWeather";
+import { StreakOrb } from "@/components/StreakOrb";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
@@ -71,6 +72,9 @@ export function TriggerSelectionScreen() {
 
         {/* Emotional weather forecast */}
         <MoodWeather moments={moments} />
+
+        {/* Streak tracker */}
+        <StreakOrb moments={moments} />
 
         <Tooltip
           id="log_tooltip"

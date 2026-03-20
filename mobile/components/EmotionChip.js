@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
+import { emotionTap } from "@/utils/haptics";
 
 const EMOTION_ICONS = {
   calm: "😌",
@@ -43,7 +44,7 @@ export function EmotionChip({ label, active, onPress }) {
   return (
     <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
       <Pressable
-        onPress={onPress}
+        onPress={() => { emotionTap(label); onPress?.(); }}
         accessibilityRole="button"
         accessibilityLabel={`Select ${label} emotion`}
         style={({ pressed }) => [
