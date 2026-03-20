@@ -40,7 +40,7 @@ export function PremiumScreen() {
   const isActive = subscription?.status === "active" || subscription?.status === "grace_period";
 
   return (
-    <ScreenShell scroll edges={["top", "left", "right"]}>
+    <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
       <View style={styles.hero}>
         <Image
           source={require("@/assets/premium-pattern.png")}

@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
+import { EmotionalStateProvider } from "@/hooks/useEmotionalState";
 import { setLastOpenedAt } from "@/services/deviceService";
 import { initAnalytics } from "@/services/analyticsService";
 import { initCrashMonitoring } from "@/services/crashService";
@@ -85,7 +86,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppErrorBoundary>
           <SessionProvider>
-            <StatusBar style="light" />
+            <EmotionalStateProvider>
+            <StatusBar style="light" translucent={Platform.OS === "android"} backgroundColor="transparent" />
             <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="onboarding" />
@@ -93,6 +95,7 @@ export default function RootLayout() {
               <Stack.Screen name="emotion" options={{ presentation: "card" }} />
               <Stack.Screen name="(tabs)" />
             </Stack>
+            </EmotionalStateProvider>
           </SessionProvider>
         </AppErrorBoundary>
       </SafeAreaProvider>

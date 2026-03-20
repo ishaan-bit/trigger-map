@@ -6,6 +6,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
 import { DailyPrediction } from "@/components/DailyPrediction";
+import { MoodWeather } from "@/components/MoodWeather";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
@@ -24,6 +25,7 @@ export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
   const [todayCount, setTodayCount] = useState(0);
+  const [moments, setMoments] = useState([]);
   const [predictionDone, setPredictionDone] = useState(true);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
@@ -39,10 +41,12 @@ export function TriggerSelectionScreen() {
         useNativeDriver: true,
       }).start();
       loadTimelineRef.current()
-        .then((moments) => {
+        .then((result) => {
           if (!active) return;
+          const all = Array.isArray(result) ? result : [];
+          setMoments(all);
           const today = new Date().toDateString();
-          const count = moments.filter(
+          const count = all.filter(
             (m) => new Date(m.timestamp).toDateString() === today
           ).length;
           setTodayCount(count);
@@ -53,7 +57,7 @@ export function TriggerSelectionScreen() {
   );
 
   return (
-    <ScreenShell scroll edges={["top", "left", "right"]}>
+    <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
       <Animated.View style={[styles.top, { opacity: fadeAnim }]}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Quick log</Text>
@@ -64,6 +68,9 @@ export function TriggerSelectionScreen() {
               : "Tap a trigger to start logging"}
           </Text>
         </View>
+
+        {/* Emotional weather forecast */}
+        <MoodWeather moments={moments} />
 
         <Tooltip
           id="log_tooltip"

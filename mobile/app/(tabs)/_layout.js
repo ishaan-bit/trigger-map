@@ -1,10 +1,12 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createTabOptions } from "@/navigation/tabOptions";
+import { useEmotionalState } from "@/hooks/useEmotionalState";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const tabOptions = (icon, label) => createTabOptions(icon, label, insets.bottom);
+  const { emotionColor } = useEmotionalState();
+  const tabOptions = (icon, label) => createTabOptions(icon, label, insets.bottom, emotionColor);
 
   return (
     <Tabs>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { palette, radius } from "@/utils/theme";
 
 const LOADING_TIMEOUT_MS = 3000;
@@ -17,6 +18,7 @@ export function ScreenShell({
   edges,
 }) {
   const [showTimeout, setShowTimeout] = useState(false);
+  const { glowColor, glowDeepColor } = useEmotionalState();
 
   useEffect(() => {
     if (!loading) {
@@ -54,10 +56,10 @@ export function ScreenShell({
 
   return (
     <LinearGradient colors={["#080e1a", "#060a12", "#040710"]} style={styles.gradient}>
-      {/* Ambient glow orbs — cinematic depth */}
-      <View style={styles.glowTopRight} />
-      <View style={styles.glowMidLeft} />
-      <View style={styles.glowBottomCenter} />
+      {/* Ambient glow orbs — tinted by emotional state */}
+      <View style={[styles.glowTopRight, { backgroundColor: glowColor }]} />
+      <View style={[styles.glowMidLeft, { backgroundColor: glowDeepColor }]} />
+      <View style={[styles.glowBottomCenter, { backgroundColor: glowDeepColor }]} />
       <SafeAreaView style={styles.safeArea} edges={edges}>
         {scroll ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

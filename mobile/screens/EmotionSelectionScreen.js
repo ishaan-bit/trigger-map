@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
@@ -9,6 +9,14 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
 import { palette, radius } from "@/utils/theme";
+
+const EMOTION_COLORS = {
+  calm: palette.success,
+  neutral: palette.muted,
+  anxious: palette.warning,
+  frustrated: palette.danger,
+  energized: palette.accent,
+};
 
 function showToast(message) {
   if (Platform.OS === "android") {
@@ -106,12 +114,46 @@ export function EmotionSelectionScreen() {
     }
   }
 
+  // Animated orb for post-log
+  const orbScale = useRef(new Animated.Value(0)).current;
+  const orbGlow = useRef(new Animated.Value(0)).current;
+
   if (saved && feedback) {
+    const emotionColor = EMOTION_COLORS[selectedEmotion] || palette.accent;
+    // Trigger entrance animation
+    if (orbScale._value === 0) {
+      Animated.sequence([
+        Animated.spring(orbScale, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(orbGlow, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(orbGlow, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          ])
+        ),
+      ]).start();
+    }
+
+    const orbOpacity = orbGlow.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] });
+
     return (
       <ScreenShell scroll>
         <View style={styles.feedbackWrap}>
-          <Text style={styles.feedbackCheckmark}>✓</Text>
-          <Text style={styles.feedbackTitle}>Moment logged</Text>
+          {/* Breathing emotion orb */}
+          <Animated.View style={[styles.feedbackOrb, {
+            backgroundColor: emotionColor,
+            transform: [{ scale: orbScale }],
+            opacity: orbOpacity,
+          }]} />
+          <Animated.View style={[styles.feedbackOrbInner, {
+            backgroundColor: emotionColor,
+            transform: [{ scale: orbScale }],
+          }]} />
+          <Animated.View style={{ transform: [{ scale: orbScale }] }}>
+            <Text style={styles.feedbackEmoji}>
+              {selectedEmotion === "calm" ? "😌" : selectedEmotion === "anxious" ? "😰" : selectedEmotion === "frustrated" ? "😤" : selectedEmotion === "energized" ? "⚡" : "😐"}
+            </Text>
+          </Animated.View>
+          <Text style={[styles.feedbackTitle, { color: emotionColor }]}>Heard you.</Text>
           <FeedbackCard
             feedback={feedback}
             trigger={trigger}
@@ -178,6 +220,7 @@ export function EmotionSelectionScreen() {
         </Animated.View>
       )}
 
+      <KeyboardAvoidingView behavior={Platform.OS === "android" ? "padding" : "height"}>
       <View style={styles.noteCard}>
         <Text style={styles.noteLabel}>Note (optional)</Text>
         <TextInput
@@ -188,8 +231,10 @@ export function EmotionSelectionScreen() {
           placeholderTextColor={palette.muted}
           style={styles.input}
           value={note}
+          maxFontSizeMultiplier={1.2}
         />
       </View>
+      </KeyboardAvoidingView>
 
       <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
         <Pressable
@@ -340,17 +385,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 20,
-    paddingTop: 60,
+    gap: 18,
+    paddingTop: 80,
+    paddingBottom: 40,
   },
-  feedbackCheckmark: {
-    fontSize: 48,
-    color: palette.success,
-    fontWeight: "700",
+  feedbackOrb: {
+    position: "absolute",
+    top: 40,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+  },
+  feedbackOrbInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    opacity: 0.2,
+    marginBottom: -20,
+  },
+  feedbackEmoji: {
+    fontSize: 52,
+    marginBottom: 4,
   },
   feedbackTitle: {
-    color: palette.text,
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.3,
   },
 });

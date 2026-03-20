@@ -6,6 +6,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { TimelineGroup } from "@/components/TimelineGroup";
 import { EditMomentModal } from "@/components/EditMomentModal";
 import { MicroInsight } from "@/components/MicroInsight";
+import { MoodWeather } from "@/components/MoodWeather";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelativeDayLabel } from "@/utils/date";
@@ -136,7 +137,7 @@ export function TimelineScreen() {
       timeoutMessage="Unable to load timeline. Check connection."
       onRetry={load}
       scroll
-      edges={["top", "left", "right"]}
+      edges={["top", "left", "right", "bottom"]}
     >
       <View style={styles.header}>
         <Text style={styles.kicker}>Past 7 days</Text>
@@ -147,6 +148,9 @@ export function TimelineScreen() {
             : "Your moments, grouped by day."}
         </Text>
       </View>
+
+      {/* Emotional weather ribbon */}
+      <MoodWeather moments={moments} />
 
       <Tooltip
         id="timeline_tooltip"

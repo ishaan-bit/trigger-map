@@ -5,7 +5,8 @@ const TAB_BAR_CONTENT_HEIGHT = 56;
 const TAB_BAR_INNER_PAD_TOP = 8;
 const TAB_BAR_INNER_PAD_BOTTOM = 4;
 
-export function createTabOptions(iconName, label, bottomInset = 0) {
+export function createTabOptions(iconName, label, bottomInset = 0, accentColor) {
+  const tint = accentColor || palette.accent;
   return {
     title: label,
     headerShown: false,
@@ -18,7 +19,7 @@ export function createTabOptions(iconName, label, bottomInset = 0) {
       paddingBottom: TAB_BAR_INNER_PAD_BOTTOM + bottomInset,
       elevation: 0,
     },
-    tabBarActiveTintColor: palette.accent,
+    tabBarActiveTintColor: tint,
     tabBarInactiveTintColor: palette.muted,
     tabBarLabelStyle: {
       fontSize: 11,

@@ -6,46 +6,93 @@ const EMOTION_ICONS = {
   calm: "😌", neutral: "😐", anxious: "😰", frustrated: "😤", energized: "⚡",
 };
 
+/** Emotion-aware acknowledgment messages — the app echoes back what it heard */
+const EMOTION_ECHOES = {
+  calm: [
+    "A calm moment — let that settle in.",
+    "Stillness noted. Your body remembers this.",
+    "That quiet feeling matters more than you think.",
+  ],
+  neutral: [
+    "Steady ground. Not every moment needs to be loud.",
+    "Noted — even the in-between matters.",
+    "Sometimes neutral is exactly enough.",
+  ],
+  anxious: [
+    "That tension you're carrying — we see it.",
+    "Anxiety logged. Naming it is already a step.",
+    "You showed up even when it felt heavy.",
+  ],
+  frustrated: [
+    "Frustration acknowledged. You didn't push it away.",
+    "That friction is real — and now it's visible.",
+    "Logged. Frustration loses power when it's seen.",
+  ],
+  energized: [
+    "That spark — hold onto it.",
+    "Energy captured. This is the fuel you come back to.",
+    "Momentum logged. Remember what brought you here.",
+  ],
+};
+
+function getEcho(emotion) {
+  const echoes = EMOTION_ECHOES[emotion] || EMOTION_ECHOES.neutral;
+  return echoes[Math.floor(Math.random() * echoes.length)];
+}
+
 /**
- * Lightweight feedback card shown after logging a moment.
- * Displays pattern feedback + smart reflection prompt from the backend.
+ * Emotionally alive feedback card shown after logging a moment.
+ * Echoes back what the user felt, not just "keep tracking".
  */
 export function FeedbackCard({ feedback, trigger, emotion, onDismiss }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
 
+    // Subtle glow pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+
     const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+      Animated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
         if (onDismiss) onDismiss();
       });
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, onDismiss]);
+  }, [fadeAnim, slideAnim, glowAnim, onDismiss]);
 
-  if (!feedback) return null;
-
-  const { patternFeedback, smartReflectionPrompt, pairCount } = feedback;
   const icon = EMOTION_ICONS[emotion] || "💫";
 
-  // Build the message
-  let message = "";
+  // Use backend pattern feedback if available, otherwise echo the emotion
+  const { patternFeedback, smartReflectionPrompt, pairCount } = feedback || {};
+  let message;
   if (patternFeedback) {
     message = patternFeedback;
-  } else if (pairCount >= 2) {
-    message = `You've felt ${emotion} in ${trigger} situations ${pairCount} times this week.`;
+  } else if (pairCount >= 3) {
+    message = `${trigger} + ${emotion} — ${pairCount} times this week. A pattern is forming.`;
   } else {
-    message = `Logged — ${trigger} + ${emotion}. Keep tracking to uncover patterns.`;
+    message = getEcho(emotion);
   }
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.03, 0.08],
+  });
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View style={[styles.glowBg, { opacity: glowOpacity }]} />
       <View style={styles.iconWrap}>
         <Text style={styles.icon}>{icon}</Text>
       </View>
@@ -63,38 +110,44 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
-    padding: 16,
-    borderRadius: radius.md,
-    backgroundColor: "rgba(86, 208, 224, 0.08)",
+    gap: 14,
+    padding: 18,
+    borderRadius: radius.lg,
+    backgroundColor: "rgba(86, 208, 224, 0.06)",
     borderWidth: 1,
-    borderColor: "rgba(86, 208, 224, 0.18)",
+    borderColor: "rgba(86, 208, 224, 0.14)",
+    overflow: "hidden",
+  },
+  glowBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: palette.accent,
+    borderRadius: radius.lg,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(86, 208, 224, 0.12)",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(86, 208, 224, 0.10)",
     alignItems: "center",
     justifyContent: "center",
   },
   icon: {
-    fontSize: 20,
+    fontSize: 22,
   },
   textWrap: {
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   message: {
     color: palette.text,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: "600",
   },
   reflection: {
     color: palette.accent,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     fontStyle: "italic",
   },
 });

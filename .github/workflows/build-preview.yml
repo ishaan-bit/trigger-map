@@ -1,4 +1,4 @@
-name: Build Preview APK
+name: Build Preview AAB
 
 on:
   push:
@@ -36,16 +36,16 @@ jobs:
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
-      - name: Build APK (preview)
+      - name: Build AAB (production)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           cd mobile
-          eas build --platform android --profile preview --local --non-interactive --output ./triggermap-preview.apk
+          eas build --platform android --profile production --local --non-interactive --output ./build.aab
 
-      - name: Upload APK
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: triggermap-preview-apk
-          path: mobile/triggermap-preview.apk
+          name: triggermap-v42-aab
+          path: mobile/build.aab
           retention-days: 30
