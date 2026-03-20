@@ -1549,3 +1549,298 @@ button,
     height: 200px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CINEMATIC · Post-Log, Weather, Timeline Connectors, Animations
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Scene transition ─── */
+@-webkit-keyframes sceneIn {
+  from { opacity: 0; -webkit-transform: translateY(14px); transform: translateY(14px); }
+  to   { opacity: 1; -webkit-transform: translateY(0);    transform: translateY(0); }
+}
+@keyframes sceneIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sceneIn {
+  -webkit-animation: sceneIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: sceneIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Post-log "Heard you." scene ─── */
+.postLogScene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 56px 24px 40px;
+  text-align: center;
+}
+
+@-webkit-keyframes breathe {
+  0%, 100% {
+    -webkit-transform: scale(1);
+    transform: scale(1);
+    box-shadow: 0 0 40px var(--orb-color, #5ee6a060);
+  }
+  50% {
+    -webkit-transform: scale(1.08);
+    transform: scale(1.08);
+    box-shadow: 0 0 80px var(--orb-color, #5ee6a060);
+  }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 40px var(--orb-color, #5ee6a060); }
+  50%      { transform: scale(1.08); box-shadow: 0 0 80px var(--orb-color, #5ee6a060); }
+}
+
+.postLogOrb {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-animation: breathe 3.5s ease-in-out infinite;
+  animation: breathe 3.5s ease-in-out infinite;
+  background: radial-gradient(circle at 40% 40%, var(--orb-color, #5ee6a0), transparent 70%);
+}
+
+.postLogOrbInner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(18, 21, 29, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.postLogEmoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.postLogTitle {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.postLogEcho {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-style: italic;
+  max-width: 280px;
+}
+
+.postLogReflection {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.postLogReflection a {
+  color: rgba(123, 201, 216, 0.6);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ─── Weather ribbon ─── */
+.weatherRibbon {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(123, 201, 216, 0.05);
+  border: 1px solid rgba(123, 201, 216, 0.10);
+}
+
+@-webkit-keyframes shimmer {
+  0%   { -webkit-transform: translateX(-100%); transform: translateX(-100%); }
+  100% { -webkit-transform: translateX(100%);  transform: translateX(100%); }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.weatherShimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(123, 201, 216, 0.06), transparent);
+  -webkit-animation: shimmer 6s ease-in-out infinite;
+  animation: shimmer 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.weatherIcon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.weatherCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.weatherLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.weatherDesc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0;
+}
+
+/* ─── Timeline connectors ─── */
+.tlConnector {
+  display: flex;
+  flex-direction: column;
+}
+
+.tlItem {
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+
+.tlDotCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+  padding-top: 20px;
+}
+
+.tlDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.tlLine {
+  width: 2px;
+  flex: 1;
+  min-height: 24px;
+  border-radius: 1px;
+}
+
+.tlCard {
+  flex: 1;
+  min-width: 0;
+  border-left: none !important;
+}
+
+.momentBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(123, 201, 216, 0.8);
+  background: rgba(123, 201, 216, 0.08);
+  padding: 2px 7px;
+  border-radius: 8px;
+  margin-left: 4px;
+}
+
+/* ─── Day header ─── */
+.dayHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.dayCount {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.30);
+}
+
+/* ─── Loading card ─── */
+.loadingCard {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 48px 16px;
+}
+
+/* ─── Cross-browser: safe-area & PWA ─── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .shell {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ─── Cross-browser: selection color ─── */
+::selection {
+  background: rgba(123, 201, 216, 0.25);
+  color: inherit;
+}
+::-moz-selection {
+  background: rgba(123, 201, 216, 0.25);
+  color: inherit;
+}
+
+/* ─── Cross-browser: scrollbar (webkit) ─── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(123, 201, 216, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 201, 216, 0.30);
+}
+
+/* ─── Cross-browser: touch highlights (mobile) ─── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Responsive: weather + timeline on mobile ─── */
+@media (max-width: 480px) {
+  .weatherRibbon {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .weatherIcon {
+    font-size: 22px;
+  }
+  .postLogScene {
+    padding: 40px 16px 32px;
+  }
+  .postLogOrb {
+    width: 72px;
+    height: 72px;
+  }
+  .postLogOrbInner {
+    width: 44px;
+    height: 44px;
+  }
+  .postLogTitle {
+    font-size: 18px;
+  }
+  .tlDotCol {
+    width: 12px;
+  }
+  .tlDot {
+    width: 10px;
+    height: 10px;
+  }
+}

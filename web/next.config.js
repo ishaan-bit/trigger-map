@@ -8,6 +8,8 @@ const withPWA = require("next-pwa")({
 
 module.exports = withPWA({
   reactStrictMode: true,
+  // Turbopack doesn't support Windows path aliases yet; use --webpack for builds
+  turbopack: {},
   webpack(config) {
     config.resolve.alias["@triggermap/shared"] = path.resolve(__dirname, "shared");
     return config;
