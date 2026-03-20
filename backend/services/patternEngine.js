@@ -142,11 +142,17 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
       correlations[trigger][emotion] = (correlations[trigger][emotion] || 0) + Number(count || 0);
     }
 
-    weeklyEmotionTrajectory.push({
-      date: snapshot.date,
-      score: Number(emotionAvgScore(snapshot.emotions).toFixed(2)),
-      dominantEmotion: topEntry(snapshot.emotions, "neutral"),
-    });
+    // Only include days that have actual logged moments in trajectory
+    if (Number(snapshot.total || 0) > 0) {
+      const score = Number(emotionAvgScore(snapshot.emotions).toFixed(2));
+      const tone = score >= 4 ? "positive" : score >= 2.5 ? "mixed" : "negative";
+      weeklyEmotionTrajectory.push({
+        date: snapshot.date,
+        score,
+        dominantEmotion: topEntry(snapshot.emotions, "neutral"),
+        tone,
+      });
+    }
 
     stableDayCandidates.push({
       date: snapshot.date,
@@ -181,18 +187,29 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
   const mostStableDay = validDays.length >= 2
     ? validDays.sort((a, b) => a.variance - b.variance)[0]?.date || null
     : null;
-  const volatilityScore = validDays.length >= 2
+  const rawVolatility = validDays.length >= 2
     ? Number((validDays.reduce((sum, e) => sum + e.variance, 0) / validDays.length).toFixed(2))
     : null;
+  const volatilityScore = rawVolatility;
+  const volatilityLabel = rawVolatility === null ? null
+    : rawVolatility < 0.3 ? "steady"
+    : rawVolatility < 0.8 ? "mild shifts"
+    : rawVolatility < 1.5 ? "moderate swings"
+    : "high variability";
 
   let trajectoryNote = null;
   if (weeklyEmotionTrajectory.length >= MIN_LOGS_FOR_TRAJECTORY) {
     const first = weeklyEmotionTrajectory[0].score;
     const last = weeklyEmotionTrajectory[weeklyEmotionTrajectory.length - 1].score;
+    const best = Math.max(...weeklyEmotionTrajectory.map((d) => d.score));
+    const worst = Math.min(...weeklyEmotionTrajectory.map((d) => d.score));
     const delta = last - first;
-    if (Math.abs(delta) < 0.25) trajectoryNote = "Mostly steady across the days you logged.";
-    else if (delta > 0) trajectoryNote = "Emotional tone shifted toward calmer energy over the week.";
-    else trajectoryNote = "Emotional tone shifted toward more strain over the week.";
+    if (Math.abs(delta) < 0.25 && (best - worst) < 0.5) trajectoryNote = "Emotional tone stayed fairly consistent across the days you logged.";
+    else if (Math.abs(delta) < 0.25) trajectoryNote = "Ended the week where you started, but the middle had some shifts.";
+    else if (delta > 0.5) trajectoryNote = "Emotional tone improved as the week went on.";
+    else if (delta > 0) trajectoryNote = "Slight upward shift in emotional tone over the week.";
+    else if (delta < -0.5) trajectoryNote = "Emotional tone dipped as the week progressed.";
+    else trajectoryNote = "Slight downward shift in emotional tone over the week.";
   }
 
   // --- Prediction accuracy ("gut check") ---
@@ -244,6 +261,7 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     emotionConcentration,
     mostStableDay,
     volatilityScore,
+    volatilityLabel,
     trajectoryNote,
     predictionAccuracy,
     weeklyEmotionTrajectory,

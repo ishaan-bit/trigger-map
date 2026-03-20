@@ -10,7 +10,14 @@ const EMOTION_EMOJIS = {
 const EMOTION_COLORS = {
   calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa",
 };
-
+/** Map a 1-5 wellbeing score to a tone emoji and label */
+function scoreTone(score) {
+  if (score >= 4.2) return { emoji: "🌟", label: "Great", color: "#a78bfa" };
+  if (score >= 3.5) return { emoji: "😌", label: "Good", color: "#5ee6a0" };
+  if (score >= 2.8) return { emoji: "😐", label: "Mixed", color: "#9eb0c9" };
+  if (score >= 2)   return { emoji: "😟", label: "Uneasy", color: "#ffb347" };
+  return { emoji: "😤", label: "Tough", color: "#ff6b7a" };
+}
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
 const ENERGY_COLORS = {
@@ -408,10 +415,17 @@ export default function ReportPage() {
                       <div className="metricGrid metricGridTwo sceneIn">
                         {report.volatilityScore !== null ? (
                           <div className="card stack metricCard">
-                            <p className="metricLabel">Volatility</p>
-                            <strong className="metricValue" style={{ color: report.volatilityScore < 0.5 ? "#5ee6a0" : report.volatilityScore < 1.5 ? "#ffb347" : "#ff6b7a" }}>
-                              {report.volatilityScore < 0.5 ? "🟢" : report.volatilityScore < 1.5 ? "🟡" : "🔴"} {report.volatilityScore}
+                            <p className="metricLabel">Day-to-day shifts</p>
+                            <strong className="metricValue" style={{ color: report.volatilityScore < 0.3 ? "#5ee6a0" : report.volatilityScore < 0.8 ? "#5ee6a0" : report.volatilityScore < 1.5 ? "#ffb347" : "#ff6b7a" }}>
+                              {report.volatilityLabel || (report.volatilityScore < 0.3 ? "Steady" : report.volatilityScore < 0.8 ? "Mild shifts" : report.volatilityScore < 1.5 ? "Moderate swings" : "High variability")}
                             </strong>
+                            <p className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                              {report.volatilityScore < 0.8
+                                ? "Your emotions stayed fairly consistent within each day."
+                                : report.volatilityScore < 1.5
+                                  ? "Some emotional range within your days. That's normal."
+                                  : "Wide swings between emotions within days. A lot going on."}
+                            </p>
                           </div>
                         ) : null}
                         {report.mostStableDay ? (
@@ -429,17 +443,20 @@ export default function ReportPage() {
                   {/* Trajectory */}
                   {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
                     <>
-                      <SectionHeader label="Emotion trajectory" badge="live" />
+                      <SectionHeader label="Emotional tone" badge="live" />
+                      <p className="muted sceneIn" style={{ fontSize: 12, marginBottom: 2 }}>
+                        How your average emotional tone shifted day by day. Higher is calmer/more energized.
+                      </p>
                       {report.trajectoryNote ? (
                         <p className="muted sceneIn" style={{ fontSize: 13 }}>{colorizeInsightText(cleanText(report.trajectoryNote))}</p>
                       ) : null}
                       <div className="trajectoryRow sceneIn">
                         {report.weeklyEmotionTrajectory.map((day) => {
-                          const dayColor = EMOTION_COLORS[day.dominantEmotion] || "#9eb0c9";
+                          const tone = scoreTone(day.score);
                           return (
-                            <div className="trajectoryDay" key={day.date} style={{ "--day-color": dayColor }}>
-                              <span className="trajectoryEmoji">{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</span>
-                              <span className="trajectoryScore" style={{ color: dayColor }}>{day.score}</span>
+                            <div className="trajectoryDay" key={day.date} style={{ "--day-color": tone.color }}>
+                              <span className="trajectoryEmoji">{tone.emoji}</span>
+                              <span className="trajectoryLabel" style={{ color: tone.color }}>{tone.label}</span>
                               <span className="trajectoryDate">
                                 {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
                               </span>

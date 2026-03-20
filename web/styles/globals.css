@@ -1995,6 +1995,13 @@ button,
   font-weight: 700;
 }
 
+.trajectoryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ─── Correlation row color-coding ─── */
 .correlationTrigger {
   font-weight: 700;
