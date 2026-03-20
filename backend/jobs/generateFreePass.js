@@ -94,15 +94,23 @@ export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}
 
         console.log(`  ${ownerId.slice(0, 8)}: generating... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
 
-        // Retry up to 3 times — small models can produce invalid output
+        // Retry up to 5 times — small models can produce invalid output.
+        // Prefer results with all 3 sections; accept 2 after exhausting retries.
         let insight;
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        let bestSoFar = null;
+        for (let attempt = 1; attempt <= 5; attempt++) {
           try {
             insight = await generateLlmInsight({ weeklyReport, recentNotes });
-            break;
+            if (insight.sectionCount >= 3) break; // ideal result
+            bestSoFar = bestSoFar || insight;
+            console.log(`  ${ownerId.slice(0, 8)}: attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying for full set...`);
+            if (attempt >= 5) break;
           } catch (retryErr) {
-            if (attempt < 3) {
+            if (attempt < 5) {
               console.log(`  ${ownerId.slice(0, 8)}: attempt ${attempt} failed, retrying... (${retryErr.message})`);
+            } else if (bestSoFar) {
+              insight = bestSoFar; // accept partial result
+              break;
             } else {
               throw retryErr;
             }
@@ -110,7 +118,7 @@ export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}
         }
         await storeLlmInsight(ownerId, insight);
         generated++;
-        console.log(`  ${ownerId.slice(0, 8)}: generated (${insight.model})`);
+        console.log(`  ${ownerId.slice(0, 8)}: generated (${insight.model}, ${insight.sectionCount}/3 sections)`);
       }
 
       // Grant one-time free-pass

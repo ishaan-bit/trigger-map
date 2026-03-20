@@ -36,12 +36,12 @@ function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
 
-  // Match headers only at the start of a line to avoid mid-sentence false positives
-  const headerRe = /^[ \t]*(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this)[ \t]*:?/gmi;
+  // Match headers at the start of a line, allowing optional numbering/colons
+  const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this|suggestion|action\s*(?:item|step))[ \t]*:?/gmi;
   const labelMap = [
     /(?:what (?:stood|stands) out|(?:most )?notable pattern)/i,
     /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor))/i,
-    /(?:one thing to try|something to try|try this)/i,
+    /(?:one thing to try|something to try|try this|suggestion|action\s*(?:item|step))/i,
   ];
 
   // Collect ALL header positions
@@ -77,7 +77,9 @@ function parseLlmSections(narrative) {
     for (let i = 0; i < firstHits.length; i++) {
       const start = firstHits[i].idx + firstHits[i].len;
       const end = i < firstHits.length - 1 ? firstHits[i + 1].idx : cleanedText.length;
-      const body = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
+      let body = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
+      // Strip trailing whitespace-only lines
+      body = body.replace(/\s+$/, "");
       // Reject empty bodies or bodies that are just the header label repeated
       result[firstHits[i].section] = body.length >= 5 ? body : null;
     }
@@ -86,10 +88,12 @@ function parseLlmSections(narrative) {
 
   // Fallback: split by double newlines into up to 3 chunks
   const chunks = text.split(/\n\s*\n/).filter(Boolean).slice(0, 3);
+  // Strip any header-like prefix from each chunk
+  const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what may be contributing|one thing to try)[:\s]*/i, "").trim();
   return [
-    chunks[0] || text,
-    chunks[1] || null,
-    chunks[2] || null,
+    stripHeader(chunks[0] || text),
+    chunks[1] ? stripHeader(chunks[1]) : null,
+    chunks[2] ? stripHeader(chunks[2]) : null,
   ];
 }
 
@@ -673,8 +677,8 @@ export function WeeklyReportScreen() {
                     <View style={s.section}>
                       <SectionHeader label="Weekly insight" badge="weekly" />
                       <View style={s.teaserCard}>
-                        <Text style={s.teaserTitle}>A deeper pattern is emerging…</Text>
-                        <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text>
+                        <Text style={s.teaserTitle}>{teaserText ? "Your pattern insight is ready" : "A deeper pattern is emerging…"}</Text>
+                        {teaserText ? <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text> : null}
                         <LinearGradient
                           colors={["transparent", palette.glass]}
                           locations={[0, 1]}

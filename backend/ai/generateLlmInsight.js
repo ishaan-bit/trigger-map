@@ -98,24 +98,27 @@ function buildPrompt(report, recentNotes) {
 ${signals}
 ---
 
-Using ONLY the data above, write EXACTLY three sections. Each section MUST start with the exact header text on its own line, followed by the content on the NEXT line. Do not put the header and content on the same line.
+Using ONLY the data above, write EXACTLY three short sections. Use the EXACT format shown in the example below.
 
-Section 1 header: What stood out
-Section 1 content: One or two sentences about the most notable pattern or shift. Be specific to the data.
+EXAMPLE FORMAT (do not copy the content, only mimic the structure):
 
-Section 2 header: What may be contributing
-Section 2 content: One sentence connecting a trigger-emotion pairing to a possible cause.${sparse ? " Acknowledge the data is limited." : ""}
+What stood out
+Work-related triggers appeared most often this week, consistently paired with anxiety before deadlines.
 
-Section 3 header: One thing to try
-Section 3 content: A single concrete, small experiment for next week tied to their top trigger.
+What may be contributing
+The combination of deadline pressure and back-to-back meetings may be amplifying anticipatory stress.
 
-IMPORTANT:
-- Output ONLY the three sections. Nothing before "What stood out" or after the last section.
-- Do NOT echo or repeat any part of these instructions.
-- Total length: 60-90 words. Do not exceed 100 words.
-- Do not invent data or repeat raw numbers.
-- Do not moralize or use therapeutic language.
-- No em dashes, colons in headers, bullet markers, bold markers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
+One thing to try
+Before your next presentation, spend five minutes writing down three things you know well about the topic.
+
+END OF EXAMPLE. Now write your three sections using the data above.
+
+Rules:
+- Start with "What stood out" — no text before it.
+- Each header must be alone on its own line, with the body on the next line.
+- 60-90 words total. Do not exceed 100 words.
+- Do not echo these instructions. Do not add any preamble or closing remarks.
+- No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
@@ -138,8 +141,8 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
           { role: "system", content: "Write concise emotional pattern observations. Plain sentences only. No em dashes, bullet points, numbered lists, or markdown. Never repeat the prompt or instructions in your response." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.6,
-        max_tokens: 200,
+        temperature: 0.4,
+        max_tokens: 250,
       }),
       signal: controller.signal,
     });
@@ -170,9 +173,10 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
     content = content
       .replace(/^.*(?:you are (?:a|the)\s+(?:\w+\s+)*(?:pattern|behavioral)|write concise|plain sentences only|never repeat|emotional pattern observations).*$/gmi, "")
       .replace(/^.*(?:structured signals|only reference what|using only the data|do not echo|do not repeat).*$/gmi, "")
-      .replace(/^.*(?:section \d header|section \d content|IMPORTANT).*$/gmi, "")
+      .replace(/^.*(?:section \d (?:header|content)|IMPORTANT|EXAMPLE FORMAT|END OF EXAMPLE|now write your).*$/gmi, "")
       .replace(/^.*(?:em dashes|bullet (?:markers|points)|numbered lists|bold markers|no markdown).*$/gmi, "")
-      .replace(/^.*(?:total length|do not exceed \d+ words|60.*90 words).*$/gmi, "")
+      .replace(/^.*(?:total length|do not exceed \d+ words|60.*90 words|each header must be alone).*$/gmi, "")
+      .replace(/^.*(?:do not copy the content|only mimic the structure|Rules:).*$/gmi, "")
       .trim();
 
     // Strip format-description echoes the model may copy as content prefixes
@@ -184,12 +188,13 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       .trim();
 
     // Normalize variant section headers to canonical names.
+    // Handle numbered variants (e.g., "1. What stood out:", "Section 1: What stood out")
     content = content
-      .replace(/^[ \t]*(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
-      .replace(/^[ \t]*what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
-      .replace(/^[ \t]*(?:possible|potential|likely)\s+(?:cause|contributing(?:\s+factor)?)[s]?[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
-      .replace(/^[ \t]*what\s+may\s+be\s+contributing[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
-      .replace(/^[ \t]*(?:one\s+thing\s+to\s+try|something\s+to\s+try|try\s+this)[ \t]*:?[ \t]*/gmi, "One thing to try\n")
+      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
+      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
+      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:possible|potential|likely)\s+(?:cause|contributing(?:\s+factor)?)[s]?[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+may\s+be\s+contributing[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:one\s+thing\s+to\s+try|something\s+to\s+try|try\s+this|suggestion|action\s*(?:item|step))[ \t]*:?[ \t]*/gmi, "One thing to try\n")
       .replace(/\n{3,}/g, "\n\n");
 
     // Strip any preamble text before the first recognized section header
@@ -214,14 +219,12 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       seenHeaders.add(hp.text);
     }
 
-    // Validate all 3 sections exist with actual content, then recompose cleanly
+    // Validate sections exist with actual content, then recompose cleanly
     const REQUIRED = ["What stood out", "What may be contributing", "One thing to try"];
     const extracted = [];
     for (const header of REQUIRED) {
       const hIdx = content.toLowerCase().indexOf(header.toLowerCase());
-      if (hIdx === -1) {
-        throw new Error(`LLM output missing section: "${header}"`);
-      }
+      if (hIdx === -1) continue;
       const afterHeader = content.slice(hIdx + header.length);
       let sectionEnd = afterHeader.length;
       for (const other of REQUIRED) {
@@ -233,10 +236,15 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       // Truncate at paragraph break to discard trailing hallucinations
       const paraBreak = body.indexOf("\n\n");
       const trimmedBody = paraBreak > 0 ? body.slice(0, paraBreak).trim() : body;
-      if (trimmedBody.length < 8) {
-        throw new Error(`Section "${header}" has no meaningful content (got: "${trimmedBody}")`);
+      if (trimmedBody.length >= 8) {
+        extracted.push({ header, body: trimmedBody });
       }
-      extracted.push({ header, body: trimmedBody });
+    }
+
+    // Need at least 2 sections to accept the output
+    if (extracted.length < 2) {
+      const found = extracted.map(s => s.header).join(", ") || "none";
+      throw new Error(`LLM output only had ${extracted.length} valid section(s) (${found})`);
     }
 
     // Recompose from extracted sections only — discards trailing hallucinations
@@ -244,6 +252,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
 
     return {
       narrative: content,
+      sectionCount: extracted.length,
       model: `llm-${model}`,
       generatedAt: new Date().toISOString(),
     };

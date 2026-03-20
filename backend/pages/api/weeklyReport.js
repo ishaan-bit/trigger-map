@@ -4,7 +4,7 @@ import { generateInsight } from "@/ai/generateInsight.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredLlmInsight, hasFreePass, consumeFreePass } from "@/services/reportStore.js";
+import { getStoredLlmInsight, hasFreePass } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -69,10 +69,9 @@ export default async function handler(req, res) {
           markFirstAiFreeUsed(ownerId).catch(() => {});
         }
       } else if (freePass && !hasPremium) {
-        // One-time free pass: show full insight and consume the pass
+        // Free pass: show full insight (pass auto-expires via TTL)
         report.llmInsight = llmInsight;
         report.llmInsight.freePass = true;
-        consumeFreePass(ownerId).catch(() => {});
       } else if (isAuthenticated) {
         // Teaser: extract first section ("What stood out") for curiosity-driven preview
         const narrative = llmInsight.narrative || "";

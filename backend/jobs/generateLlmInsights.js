@@ -81,13 +81,20 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
       console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
 
       let insight;
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      let bestSoFar = null;
+      for (let attempt = 1; attempt <= 5; attempt++) {
         try {
           insight = await generateLlmInsight({ weeklyReport, recentNotes });
-          break;
+          if (insight.sectionCount >= 3) break;
+          bestSoFar = bestSoFar || insight;
+          console.log(`  Attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying...`);
+          if (attempt >= 5) break;
         } catch (retryErr) {
-          if (attempt < 3) {
+          if (attempt < 5) {
             console.log(`  Attempt ${attempt} failed, retrying... (${retryErr.message})`);
+          } else if (bestSoFar) {
+            insight = bestSoFar;
+            break;
           } else {
             throw retryErr;
           }
@@ -97,7 +104,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
       await storeLlmInsight(ownerId, insight);
       processed++;
       results.push({ ownerId, generated: true, model: insight.model });
-      console.log(`  Done (${insight.model})`);
+      console.log(`  Done (${insight.model}, ${insight.sectionCount}/3 sections)`);
 
     } catch (error) {
       results.push({ ownerId, skipped: true, reason: error.message });

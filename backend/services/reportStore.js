@@ -44,9 +44,12 @@ export async function hasFreePass(ownerId) {
 }
 
 export async function grantFreePass(ownerId) {
-  await redis(["SET", getFreePassKey(ownerId), "1"]);
+  // Free pass is valid for 48 hours from grant time
+  await redis(["SET", getFreePassKey(ownerId), "1", "EX", 172800]);
 }
 
 export async function consumeFreePass(ownerId) {
-  await redis(["DEL", getFreePassKey(ownerId)]);
+  // Instead of deleting immediately, let the TTL handle expiration.
+  // This allows the user to view the insight on multiple devices/sessions
+  // within the 48-hour window. No-op if pass already expired.
 }
