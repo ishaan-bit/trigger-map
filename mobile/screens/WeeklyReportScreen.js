@@ -636,8 +636,8 @@ export function WeeklyReportScreen() {
                   const sections = parseLlmSections(narrativeSource);
                   const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
 
-                  /* First free preview: show all 3 cards */
-                  if (hasLlmInsight && report.llmInsight.firstFree) {
+                  /* First free preview or free pass: show all 3 cards */
+                  if (hasLlmInsight && (report.llmInsight.firstFree || report.llmInsight.freePass)) {
                     const fullSections = parseLlmSections(report.llmInsight.narrative);
                     return (
                       <View style={s.section}>

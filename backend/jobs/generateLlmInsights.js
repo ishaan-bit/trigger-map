@@ -80,7 +80,19 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
 
       console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
 
-      const insight = await generateLlmInsight({ weeklyReport, recentNotes });
+      let insight;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          insight = await generateLlmInsight({ weeklyReport, recentNotes });
+          break;
+        } catch (retryErr) {
+          if (attempt < 3) {
+            console.log(`  Attempt ${attempt} failed, retrying... (${retryErr.message})`);
+          } else {
+            throw retryErr;
+          }
+        }
+      }
 
       await storeLlmInsight(ownerId, insight);
       processed++;

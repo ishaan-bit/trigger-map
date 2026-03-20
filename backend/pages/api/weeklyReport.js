@@ -4,7 +4,7 @@ import { generateInsight } from "@/ai/generateInsight.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredLlmInsight } from "@/services/reportStore.js";
+import { getStoredLlmInsight, hasFreePass, consumeFreePass } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -40,12 +40,13 @@ export default async function handler(req, res) {
 
     const isAuthenticated = Boolean(user);
 
-    // Parallel fetch: aggregates, subscription, LLM insight, first-free check
-    const [aggregates, subscription, llmInsight, firstFreeAvailable] = await Promise.all([
+    // Parallel fetch: aggregates, subscription, LLM insight, first-free check, free pass
+    const [aggregates, subscription, llmInsight, firstFreeAvailable, freePass] = await Promise.all([
       getWeeklyAggregates(ownerId),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
       getStoredLlmInsight(ownerId),
       isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
+      isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
     ]);
 
     const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
       report.aiInsight = await generateInsight(report);
     }
 
-    // Attach LLM insight for premium users OR first-free eligible users
+    // Attach LLM insight for premium users, first-free eligible, OR free-pass holders
     // For Strava-style gating: non-premium see a truncated teaser
     if (llmInsight) {
       if (hasPremium || (firstFreeAvailable && !hasPremium)) {
@@ -67,6 +68,11 @@ export default async function handler(req, res) {
           report.llmInsight.firstFree = true;
           markFirstAiFreeUsed(ownerId).catch(() => {});
         }
+      } else if (freePass && !hasPremium) {
+        // One-time free pass: show full insight and consume the pass
+        report.llmInsight = llmInsight;
+        report.llmInsight.freePass = true;
+        consumeFreePass(ownerId).catch(() => {});
       } else if (isAuthenticated) {
         // Teaser: extract first section ("What stood out") for curiosity-driven preview
         const narrative = llmInsight.narrative || "";

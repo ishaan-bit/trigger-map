@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "reports:generate": "node ./jobs/generateWeeklyReports.js"
+    "reports:generate": "node ./jobs/generateWeeklyReports.js",
+    "insights:generate-free-pass": "node ./jobs/generateFreePass.js"
   },
   "dependencies": {
     "@sentry/node": "^9.47.1",

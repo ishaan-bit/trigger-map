@@ -31,3 +31,22 @@ export async function getStoredLlmInsight(ownerId) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
+
+// --- Free-pass (one-time view) helpers ---
+
+export function getFreePassKey(ownerId) {
+  return redisKey("llm_free_pass", ownerId);
+}
+
+export async function hasFreePass(ownerId) {
+  const val = await redis(["GET", getFreePassKey(ownerId)]);
+  return val === "1";
+}
+
+export async function grantFreePass(ownerId) {
+  await redis(["SET", getFreePassKey(ownerId), "1"]);
+}
+
+export async function consumeFreePass(ownerId) {
+  await redis(["DEL", getFreePassKey(ownerId)]);
+}
