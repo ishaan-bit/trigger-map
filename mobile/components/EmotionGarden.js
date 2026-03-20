@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
+import { EMOTION_STYLES } from "@/utils/designSystem";
 
 /**
  * EmotionGarden — a visual row of "planted" emotion seeds from today's moments.
@@ -36,7 +37,7 @@ export function EmotionGarden({ moments }) {
       </View>
       <View style={styles.row}>
         {todayBlooms.map((b, i) => (
-          <BloomItem key={`${b.emotion}-${i}`} bloom={b} index={i} />
+          <BloomItem key={`${b.emotion}-${i}`} bloom={b} index={i} isNewest={i === todayBlooms.length - 1} />
         ))}
         {/* Empty soil slots for visual rhythm */}
         {todayBlooms.length < 6 && Array.from({ length: Math.min(3, 6 - todayBlooms.length) }).map((_, i) => (
@@ -49,30 +50,35 @@ export function EmotionGarden({ moments }) {
   );
 }
 
-function BloomItem({ bloom, index }) {
+function BloomItem({ bloom, index, isNewest }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  const targetScale = isNewest ? 1.15 : 1;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
-      toValue: 1,
+      toValue: targetScale,
       friction: 5,
       tension: 60,
       delay: index * 100,
       useNativeDriver: true,
     }).start();
-  }, [scaleAnim, index]);
+  }, [scaleAnim, index, targetScale]);
 
   const meta = BLOOM[bloom.emotion] || BLOOM.neutral;
+  const eStyle = EMOTION_STYLES[bloom.emotion] || EMOTION_STYLES.neutral;
   const icon = bloom.isMature ? meta.bloom : meta.seed;
   const label = bloom.emotion;
 
   return (
     <Animated.View style={[styles.bloomSlot, {
       transform: [{ scale: scaleAnim }],
+      backgroundColor: eStyle.bg,
+      borderColor: eStyle.border,
+      borderWidth: 1,
     }]}>
       <Text style={styles.bloomIcon}>{icon}</Text>
-      <View style={[styles.bloomGlow, { backgroundColor: meta.color }]} />
-      <Text style={[styles.bloomLabel, { color: meta.color }]} numberOfLines={1}>{label}</Text>
+      <View style={[styles.bloomGlow, { backgroundColor: eStyle.color }]} />
+      <Text style={[styles.bloomLabel, { color: eStyle.color }]} numberOfLines={1}>{label}</Text>
     </Animated.View>
   );
 }
@@ -158,9 +164,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 40,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.015)",
+    backgroundColor: "rgba(255,255,255,0.02)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.05)",
     borderStyle: "dashed",
   },
   emptyDot: {

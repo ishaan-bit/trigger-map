@@ -18,6 +18,8 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
+import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
+import { useEmotionalState } from "@/hooks/useEmotionalState";
 
 /** Strip encoding artifacts from any backend/stored text */
 function cleanText(str) {
@@ -115,6 +117,25 @@ const EMOTION_COLORS = {
   calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa",
 };
 
+/** Animated section that fades + slides in with stagger */
+function AnimatedSection({ children, index = 0, style }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 450, delay: index * STAGGER_DELAY, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 450, delay: index * STAGGER_DELAY, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, slideAnim, index]);
+
+  return (
+    <Animated.View style={[style, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 function scoreTone(score) {
   if (score >= 4.2) return { emoji: "🌟", label: "Great", color: "#a78bfa" };
   if (score >= 3.5) return { emoji: "😌", label: "Good", color: "#5ee6a0" };
@@ -151,17 +172,18 @@ function capitalize(str) {
 
 /* -- Shared components -- */
 
-function HBar({ label, value, max, color = palette.accent, icon }) {
+function HBar({ label, value, max, color = palette.accent, icon, highlight }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
+  const isTop = pct >= 80;
   return (
-    <View style={s.hbarRow}>
-      <Text style={s.hbarLabel} numberOfLines={1}>
+    <View style={[s.hbarRow, isTop && highlight && { backgroundColor: color + "08", borderRadius: 8, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 }]}>
+      <Text style={[s.hbarLabel, { color: highlight ? color : palette.text }]} numberOfLines={1}>
         {icon ? `${icon} ` : ""}{label}
       </Text>
       <View style={s.hbarTrack}>
         <View style={[s.hbarFill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
-      <Text style={s.hbarValue}>{value}</Text>
+      <Text style={[s.hbarValue, isTop && { color, fontWeight: "700" }]}>{value}</Text>
     </View>
   );
 }
@@ -206,12 +228,14 @@ function LockedSection({ title, teaser, ctaLabel, onPress, children }) {
 }
 
 function PairingChip({ trigger, emotion, count, positive }) {
+  const tColor = TRIGGER_COLORS[trigger] || palette.accent;
+  const eColor = EMOTION_COLORS[emotion] || palette.text;
   const bg = positive ? (palette.successSoft || palette.glass) : (palette.dangerSoft || palette.glass);
   const border = positive ? (palette.success + "44") : (palette.danger + "44");
   return (
     <View style={[s.pairingChip, { backgroundColor: bg, borderColor: border }]}>
       <Text style={s.pairingText}>
-        {trigger} → {emotion} ×{count}
+        <Text style={{ color: tColor }}>{trigger}</Text> → <Text style={{ color: eColor }}>{emotion}</Text> ×{count}
       </Text>
     </View>
   );
@@ -250,6 +274,7 @@ function InsightCard({ icon, label, body, color, index }) {
 export function WeeklyReportScreen() {
   const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe } = useAppSession();
   const router = useRouter();
+  const { dominantEmotion } = useEmotionalState();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -363,7 +388,7 @@ export function WeeklyReportScreen() {
                 </View>
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>🎯</Text>
-                  <Text style={s.heroPillLabel}>
+                  <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
                     {report.topTrigger || (report.tiedTriggers?.length > 1 ? `${report.tiedTriggers.length} areas` : "-")}
                   </Text>
                 </View>
@@ -379,7 +404,9 @@ export function WeeklyReportScreen() {
             {/* Dominant pattern highlight */}
             {report?.frictionZones?.length > 0 && (() => {
               const frictionEmo = report.frictionZones[0].emotion;
+              const frictionTrigger = report.frictionZones[0].trigger;
               const frictionColor = EMOTION_COLORS[frictionEmo] || palette.danger;
+              const trigColor = TRIGGER_COLORS[frictionTrigger] || palette.accent;
               return (
                 <View style={[s.dominantCard, {
                   backgroundColor: frictionColor + "12",
@@ -390,7 +417,7 @@ export function WeeklyReportScreen() {
                   <View style={s.dominantContent}>
                     <Text style={[s.dominantLabel, { color: frictionColor }]}>PRIMARY FRICTION</Text>
                     <Text style={s.dominantText}>
-                      {report.frictionZones[0].trigger} tends to leave you feeling <Text style={{ color: frictionColor, fontWeight: "600" }}>{frictionEmo}</Text> — this showed up {report.frictionZones[0].count} times this week.
+                      <Text style={{ color: trigColor, fontWeight: "600" }}>{frictionTrigger}</Text> tends to leave you feeling <Text style={{ color: frictionColor, fontWeight: "600" }}>{frictionEmo}</Text> — this showed up {report.frictionZones[0].count} times this week.
                     </Text>
                   </View>
                 </View>
@@ -437,29 +464,29 @@ export function WeeklyReportScreen() {
               <SectionHeader label="What showed up" badge="live" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
 
               {emotionEntries.length ? (
-                <View style={s.card}>
+                <AnimatedSection index={0} style={s.card}>
                   {emotionEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} />
+                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
                   ))}
-                </View>
+                </AnimatedSection>
               ) : null}
 
               {triggerEntries.length ? (
-                <View style={s.card}>
+                <AnimatedSection index={1} style={s.card}>
                   {triggerEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={triggerMax} color={palette.accent} />
+                    <HBar key={key} label={key} value={value} max={triggerMax} color={TRIGGER_COLORS[key] || palette.accent} highlight />
                   ))}
-                </View>
+                </AnimatedSection>
               ) : null}
 
               {/* Time of day — conditional on rhythm data */}
               {dq.hasEnoughForRhythm && timeEntries.length ? (
-                <View style={s.card}>
+                <AnimatedSection index={2} style={s.card}>
                   <Text style={s.cardLabel}>When you logged</Text>
                   {timeEntries.map(([key, value]) => (
                     <HBar key={key} label={key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
                   ))}
-                </View>
+                </AnimatedSection>
               ) : null}
 
               {/* --- 3. WHAT HELPED / WHAT DRAINED --- */}
@@ -467,30 +494,38 @@ export function WeeklyReportScreen() {
                 <>
                   <SectionHeader label="Emotional loops" badge="live" />
                   {report.frictionZones?.length ? (
-                    <View style={s.narrativeCard}>
+                    <AnimatedSection index={3} style={s.narrativeCard}>
                       <Text style={s.narrativeIcon}>🔥</Text>
                       <View style={s.narrativeContent}>
                         <Text style={s.narrativeTitle}>Friction zones</Text>
-                        {report.frictionZones.slice(0, 3).map((f) => (
-                          <Text key={`${f.trigger}-${f.emotion}`} style={s.narrativeText}>
-                            {capitalize(f.trigger)} → <Text style={{ color: EMOTION_COLORS[f.emotion] || palette.textSecondary, fontWeight: "600" }}>{f.emotion}</Text> ({f.count}×) — this combination keeps showing up and may be worth noticing.
-                          </Text>
-                        ))}
+                        {report.frictionZones.slice(0, 3).map((f) => {
+                          const tColor = TRIGGER_COLORS[f.trigger] || palette.accent;
+                          const eColor = EMOTION_COLORS[f.emotion] || palette.textSecondary;
+                          return (
+                            <Text key={`${f.trigger}-${f.emotion}`} style={s.narrativeText}>
+                              <Text style={{ color: tColor, fontWeight: "600" }}>{capitalize(f.trigger)}</Text> → <Text style={{ color: eColor, fontWeight: "600" }}>{f.emotion}</Text> ({f.count}×) — this combination keeps showing up and may be worth noticing.
+                            </Text>
+                          );
+                        })}
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
                   {report.regulators?.length ? (
-                    <View style={s.narrativeCard}>
+                    <AnimatedSection index={4} style={s.narrativeCard}>
                       <Text style={s.narrativeIcon}>🌿</Text>
                       <View style={s.narrativeContent}>
                         <Text style={s.narrativeTitle}>What helps</Text>
-                        {report.regulators.slice(0, 3).map((r) => (
-                          <Text key={`${r.trigger}-${r.emotion}`} style={s.narrativeText}>
-                            {capitalize(r.trigger)} tends to bring <Text style={{ color: EMOTION_COLORS[r.emotion] || palette.textSecondary, fontWeight: "600" }}>{r.emotion}</Text> ({r.count}×) — a pattern worth protecting.
-                          </Text>
-                        ))}
+                        {report.regulators.slice(0, 3).map((r) => {
+                          const tColor = TRIGGER_COLORS[r.trigger] || palette.accent;
+                          const eColor = EMOTION_COLORS[r.emotion] || palette.textSecondary;
+                          return (
+                            <Text key={`${r.trigger}-${r.emotion}`} style={s.narrativeText}>
+                              <Text style={{ color: tColor, fontWeight: "600" }}>{capitalize(r.trigger)}</Text> tends to bring <Text style={{ color: eColor, fontWeight: "600" }}>{r.emotion}</Text> ({r.count}×) — a pattern worth protecting.
+                            </Text>
+                          );
+                        })}
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
                 </>
               ) : null}
@@ -513,12 +548,14 @@ export function WeeklyReportScreen() {
                 <>
                   {/* Correlations */}
                   {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
-                    <View style={s.section}>
+                    <AnimatedSection index={5} style={s.section}>
                       <SectionHeader label="Trigger → Emotion" badge="live" />
                       <View style={s.card}>
-                        {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
+                        {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => {
+                          const tColor = TRIGGER_COLORS[trigger] || palette.accent;
+                          return (
                           <View style={s.correlationRow} key={trigger}>
-                            <Text style={s.correlationTrigger}>{trigger}</Text>
+                            <Text style={[s.correlationTrigger, { color: tColor }]}>{trigger}</Text>
                             <View style={s.correlationChips}>
                               {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
                                 const emoColor = EMOTION_COLORS[emo] || palette.text;
@@ -532,26 +569,27 @@ export function WeeklyReportScreen() {
                               })}
                             </View>
                           </View>
-                        ))}
+                          );
+                        })}
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
 
                   {/* Energy distribution */}
                   {energyEntries.length ? (
-                    <View style={s.section}>
+                    <AnimatedSection index={6} style={s.section}>
                       <SectionHeader label="Energy flow" badge="live" />
                       <View style={s.card}>
                         {energyEntries.map(([key, value]) => (
                           <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || palette.accent} />
                         ))}
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
 
                   {/* --- 5. TIME & RHYTHM (conditional) --- */}
                   {dq.hasEnoughForStability ? (
-                    <View style={s.section}>
+                    <AnimatedSection index={6} style={s.section}>
                       <SectionHeader label="Stability" badge="weekly" />
                       <View style={s.metricsRow}>
                         {report.volatilityScore !== null ? (
@@ -578,14 +616,18 @@ export function WeeklyReportScreen() {
                           </View>
                         ) : null}
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
 
                   {/* Trajectory */}
-                  {dq.hasEnoughForTrajectory && report.weeklyEmotionTrajectory?.length > 1 ? (
-                    <View style={s.section}>
+                  {report.weeklyEmotionTrajectory?.length >= 1 ? (
+                    <AnimatedSection index={7} style={s.section}>
                       <SectionHeader label="Emotional tone" badge="live" />
-                      <Text style={s.trajectoryHint}>How your average tone shifted day by day. Higher is calmer/more energized.</Text>
+                      <Text style={s.trajectoryHint}>
+                        {report.weeklyEmotionTrajectory.length === 1
+                          ? "Your tone from logged days. More days logged means a richer trajectory."
+                          : "How your average tone shifted day by day. Higher is calmer/more energized."}
+                      </Text>
                       {report.trajectoryNote ? (
                         <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
                       ) : null}
@@ -593,24 +635,24 @@ export function WeeklyReportScreen() {
                         {report.weeklyEmotionTrajectory.map((day) => {
                           const tone = scoreTone(day.score);
                           return (
-                          <View style={s.trajectoryDay} key={day.date}>
+                          <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
                             <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
                             <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
                             <Text style={s.trajectoryDate}>
                               {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
                             </Text>
-                          </View>
+                          </Pressable>
                           );
                         })}
                       </ScrollView>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
 
                   {/* Micro-experiment */}
 
                   {/* Gut check — prediction accuracy */}
                   {report.predictionAccuracy ? (
-                    <View style={s.section}>
+                    <AnimatedSection index={8} style={s.section}>
                       <SectionHeader label="Gut check" badge="live" />
                       <View style={s.card}>
                         <View style={s.gutCheckRow}>
@@ -631,7 +673,7 @@ export function WeeklyReportScreen() {
                           </View>
                         </View>
                       </View>
-                    </View>
+                    </AnimatedSection>
                   ) : null}
                 </>
               )}

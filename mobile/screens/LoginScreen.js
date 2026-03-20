@@ -12,6 +12,24 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 import { tap, success as hapticSuccess } from "@/utils/haptics";
+import { STAGGER_DELAY } from "@/utils/designSystem";
+
+/** Stagger-in wrapper — each child fades + slides up after a delay */
+function StaggerIn({ index, children, style }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 500,
+      delay: index * STAGGER_DELAY,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+  const opacity = anim;
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
+  return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
+}
 
 export function LoginScreen() {
   const router = useRouter();
@@ -98,77 +116,95 @@ export function LoginScreen() {
       {/* Breathing glow orb */}
       <Animated.View style={[styles.glowOrb, { opacity: glowOpacity }]} />
 
-      <View style={styles.header}>
-        <Text style={styles.brand}>TriggerMap</Text>
-        <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
-        <Text style={styles.title}>{mode === "login" ? "Good to see you" : "Let's begin"}</Text>
-        <Text style={styles.subtitle}>
-          {mode === "login"
-            ? "Your emotional journey picks up right where you left off."
-            : "A safe, private space to understand your emotions."}
-        </Text>
-      </View>
+      <StaggerIn index={0}>
+        <View style={styles.header}>
+          <Text style={styles.brand}>TriggerMap</Text>
+          <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
+          <Text style={styles.title}>{mode === "login" ? "Good to see you" : "Let's begin"}</Text>
+          <Text style={styles.subtitle}>
+            {mode === "login"
+              ? "Your emotional journey picks up right where you left off."
+              : "A safe, private space to understand your emotions."}
+          </Text>
+        </View>
+      </StaggerIn>
 
       {/* Trust signal */}
-      <View style={styles.trustRow}>
-        <Text style={styles.trustIcon}>🔒</Text>
-        <Text style={styles.trustText}>Your data is encrypted and never shared with anyone.</Text>
-      </View>
+      <StaggerIn index={1}>
+        <View style={styles.trustRow}>
+          <Text style={styles.trustIcon}>🔒</Text>
+          <Text style={styles.trustText}>Your data is encrypted and never shared with anyone.</Text>
+        </View>
+      </StaggerIn>
 
-      {mode === "register" ? (
+      <StaggerIn index={2} style={styles.inputGroup}>
+        {mode === "register" ? (
+          <TextInput
+            accessibilityLabel="Name"
+            onChangeText={setName}
+            placeholder="Name"
+            placeholderTextColor={palette.muted}
+            style={styles.input}
+            value={name}
+          />
+        ) : null}
+
         <TextInput
-          accessibilityLabel="Name"
-          onChangeText={setName}
-          placeholder="Name"
+          accessibilityLabel="Email"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          onChangeText={setEmail}
+          placeholder="Email"
           placeholderTextColor={palette.muted}
           style={styles.input}
-          value={name}
+          value={email}
         />
-      ) : null}
+        <TextInput
+          accessibilityLabel="Password"
+          autoCapitalize="none"
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={palette.muted}
+          secureTextEntry
+          style={styles.input}
+          value={password}
+        />
+      </StaggerIn>
 
-      <TextInput
-        accessibilityLabel="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        onChangeText={setEmail}
-        placeholder="Email"
-        placeholderTextColor={palette.muted}
-        style={styles.input}
-        value={email}
-      />
-      <TextInput
-        accessibilityLabel="Password"
-        autoCapitalize="none"
-        onChangeText={setPassword}
-        placeholder="Password"
-        placeholderTextColor={palette.muted}
-        secureTextEntry
-        style={styles.input}
-        value={password}
-      />
+      <StaggerIn index={3}>
+        <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
+      </StaggerIn>
+      <StaggerIn index={4}>
+        <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary disabled={loading} />
+      </StaggerIn>
+      <StaggerIn index={5}>
+        <PrimaryButton
+          label={mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+          onPress={() => { tap(); setMode(mode === "login" ? "register" : "login"); }}
+          secondary
+          disabled={loading}
+        />
+      </StaggerIn>
 
-      <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
-      <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary disabled={loading} />
-      <PrimaryButton
-        label={mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
-        onPress={() => { tap(); setMode(mode === "login" ? "register" : "login"); }}
-        secondary
-        disabled={loading}
-      />
+      <StaggerIn index={6}>
+        <View style={styles.divider} />
+      </StaggerIn>
 
-      <View style={styles.divider} />
-
-      <PrimaryButton
-        label="Continue anonymously"
-        onPress={() => router.replace("/(tabs)/log")}
-        secondary
-      />
-      <Text style={styles.anonHint}>
-        Anonymous mode keeps everything on your device only. Sign in to sync across devices and get personalised weekly insights.
-      </Text>
-      <Text style={styles.privacyHint}>
-        Built with privacy at the core. Your emotional data belongs to you, always.
-      </Text>
+      <StaggerIn index={7}>
+        <PrimaryButton
+          label="Continue anonymously"
+          onPress={() => router.replace("/(tabs)/log")}
+          secondary
+        />
+        <Text style={styles.anonHint}>
+          Anonymous mode keeps everything on your device only. Sign in to sync across devices and get personalised weekly insights.
+        </Text>
+      </StaggerIn>
+      <StaggerIn index={8}>
+        <Text style={styles.privacyHint}>
+          Built with privacy at the core. Your emotional data belongs to you, always.
+        </Text>
+      </StaggerIn>
     </ScreenShell>
   );
 }
@@ -243,6 +279,9 @@ const styles = StyleSheet.create({
     color: palette.text,
     paddingHorizontal: 16,
     fontSize: 16,
+  },
+  inputGroup: {
+    gap: 12,
   },
 
   divider: {

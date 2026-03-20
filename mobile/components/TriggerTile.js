@@ -75,7 +75,7 @@ export function TriggerTile({ label, onPress }) {
 
 const styles = StyleSheet.create({
   tileWrap: {
-    width: "30%",
+    width: "100%",
   },
   tile: {
     aspectRatio: 1.1,

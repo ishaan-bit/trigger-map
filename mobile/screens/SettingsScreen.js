@@ -9,16 +9,34 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
 import { selection, warning, tap } from "@/utils/haptics";
+import { STAGGER_DELAY } from "@/utils/designSystem";
 
-function Section({ icon, title, children }) {
+/** Stagger-in wrapper */
+function StaggerIn({ index, children, style }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 500,
+      delay: index * STAGGER_DELAY,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+  const opacity = anim;
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
+  return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
+}
+
+function Section({ icon, title, children, index }) {
   return (
-    <View style={styles.section}>
+    <StaggerIn index={index} style={styles.section}>
       <View style={styles.sectionTitleRow}>
         {icon ? <Text style={styles.sectionIcon}>{icon}</Text> : null}
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {children}
-    </View>
+    </StaggerIn>
   );
 }
 
@@ -62,14 +80,16 @@ export function SettingsScreen() {
     <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
       <Animated.View style={[styles.glowOrb, { opacity: glowOpacity }]} />
 
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Preferences</Text>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Manage your account, notifications, and data.</Text>
-      </View>
+      <StaggerIn index={0}>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>Preferences</Text>
+          <Text style={styles.title}>Settings</Text>
+          <Text style={styles.subtitle}>Manage your account, notifications, and data.</Text>
+        </View>
+      </StaggerIn>
 
       {/* ── Account ── */}
-      <Section icon="👤" title="Account">
+      <Section icon="👤" title="Account" index={1}>
         <Row label="Status" value={user ? user.email : "Anonymous"} />
         {!user && (
           <Text style={styles.hintText}>Sign in to keep your emotional data safe and synced across devices.</Text>
@@ -90,7 +110,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Subscription ── */}
-      <Section icon="✦" title="Subscription">
+      <Section icon="✦" title="Subscription" index={2}>
         <View style={styles.planRow}>
           <View style={[styles.planBadge, isPremium && styles.planBadgePremium]}>
             <Text style={[styles.planBadgeText, isPremium && styles.planBadgeTextPremium]}>{planLabel}</Text>
@@ -107,7 +127,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Notifications ── */}
-      <Section icon="🔔" title="Notifications">
+      <Section icon="🔔" title="Notifications" index={3}>
         {notificationsBlocked ? (
           <View style={styles.permissionNotice}>
             <Text style={styles.permissionNoticeText}>
@@ -167,7 +187,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Data ── */}
-      <Section icon="📂" title="Data">
+      <Section icon="📂" title="Data" index={4}>
         <PrimaryButton
           label="Export logs"
           onPress={async () => {
@@ -211,7 +231,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Privacy ── */}
-      <Section icon="🔒" title="Privacy">
+      <Section icon="🔒" title="Privacy" index={5}>
         <Text style={styles.hintText}>Privacy first — your emotional data stays on your terms, always.</Text>
         <PrimaryButton label="Privacy policy" onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
         <PrimaryButton label="Terms and conditions" onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
@@ -219,7 +239,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── About ── */}
-      <Section icon="ℹ️" title="About">
+      <Section icon="ℹ️" title="About" index={6}>
         <Text style={styles.aboutName}>TriggerMap</Text>
         <Text style={styles.aboutBody}>
           Log moments, reflect on emotional triggers, and understand weekly patterns over time.

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { palette, radius } from "@/utils/theme";
+import { EMOTION_STYLES } from "@/utils/designSystem";
 
 const LOADING_TIMEOUT_MS = 3000;
 
@@ -18,7 +19,24 @@ export function ScreenShell({
   edges,
 }) {
   const [showTimeout, setShowTimeout] = useState(false);
-  const { glowColor, glowDeepColor } = useEmotionalState();
+  const { glowColor, glowDeepColor, dominantEmotion } = useEmotionalState();
+  const breathAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathAnim, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(breathAnim, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      ])
+    ).start();
+  }, [breathAnim]);
+
+  const breathScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const breathOpacity = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
+  // Living gradient — tinted by emotional state
+  const emotionTint = EMOTION_STYLES[dominantEmotion]?.glow || "rgba(86, 208, 224, 0.04)";
+  const gradientColors = ["#080e1a", emotionTint, "#040710"];
 
   useEffect(() => {
     if (!loading) {
@@ -55,11 +73,11 @@ export function ScreenShell({
   );
 
   return (
-    <LinearGradient colors={["#080e1a", "#060a12", "#040710"]} style={styles.gradient}>
-      {/* Ambient glow orbs — tinted by emotional state */}
-      <View style={[styles.glowTopRight, { backgroundColor: glowColor }]} />
-      <View style={[styles.glowMidLeft, { backgroundColor: glowDeepColor }]} />
-      <View style={[styles.glowBottomCenter, { backgroundColor: glowDeepColor }]} />
+    <LinearGradient colors={gradientColors} style={styles.gradient}>
+      {/* Ambient glow orbs — tinted by emotional state, breathing */}
+      <Animated.View style={[styles.glowTopRight, { backgroundColor: glowColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
+      <Animated.View style={[styles.glowMidLeft, { backgroundColor: glowDeepColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
+      <Animated.View style={[styles.glowBottomCenter, { backgroundColor: glowDeepColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
       <SafeAreaView style={styles.safeArea} edges={edges}>
         {scroll ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
