@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -9,6 +9,17 @@ import { DailyPrediction } from "@/components/DailyPrediction";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 
+const PROMPTS = [
+  "What just happened?",
+  "What pulled you here?",
+  "What's on your mind?",
+];
+
+function getPrompt(count) {
+  if (count >= 3) return "Back again — good habit.";
+  return PROMPTS[count % PROMPTS.length];
+}
+
 export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
@@ -16,10 +27,17 @@ export function TriggerSelectionScreen() {
   const [predictionDone, setPredictionDone] = useState(true);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
       loadTimelineRef.current()
         .then((moments) => {
           if (!active) return;
@@ -31,15 +49,15 @@ export function TriggerSelectionScreen() {
         })
         .catch(() => {});
       return () => { active = false; };
-    }, [])
+    }, [fadeAnim])
   );
 
   return (
     <ScreenShell scroll edges={["top", "left", "right"]}>
-      <View style={styles.top}>
+      <Animated.View style={[styles.top, { opacity: fadeAnim }]}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Quick log</Text>
-          <Text style={styles.prompt}>What triggered{"\n"}this moment?</Text>
+          <Text style={styles.prompt}>{getPrompt(todayCount)}</Text>
           <Text style={styles.hint}>
             {todayCount > 0
               ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
@@ -64,7 +82,7 @@ export function TriggerSelectionScreen() {
             />
           ))}
         </View>
-      </View>
+      </Animated.View>
 
       <View style={styles.bottomCard}>
         <Text style={styles.bottomEmoji}>

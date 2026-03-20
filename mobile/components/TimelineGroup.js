@@ -18,7 +18,7 @@ const EMOTION_ICONS = {
   calm: "😌", neutral: "😐", anxious: "😰", frustrated: "😤", energized: "⚡",
 };
 
-export function TimelineGroup({ moment, onEdit, onDelete }) {
+export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   function handleDelete() {
     Alert.alert("Delete moment?", "This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
@@ -41,6 +41,11 @@ export function TimelineGroup({ moment, onEdit, onDelete }) {
               <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || "•"}</Text>
               <Text style={[styles.emotionLabel, { color: emotionColor }]}>{moment.emotion}</Text>
             </View>
+            {groupCount > 1 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>×{groupCount}</Text>
+              </View>
+            )}
           </View>
           {moment.note ? <Text style={styles.note} numberOfLines={2}>{moment.note}</Text> : null}
           {moment.tags?.length ? (
@@ -186,5 +191,18 @@ const styles = StyleSheet.create({
   actionPressed: {
     opacity: 0.6,
     transform: [{ scale: 0.95 }],
+  },
+  countBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+  },
+  countText: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

@@ -129,6 +129,10 @@ function topEntries(record, limit = 5) {
     .slice(0, limit);
 }
 
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+}
+
 /* -- Shared components -- */
 
 function HBar({ label, value, max, color = palette.accent, icon }) {
@@ -326,6 +330,19 @@ export function WeeklyReportScreen() {
             {hasRuleInsight ? (
               <Text style={s.takeaway}>{cleanText(report.aiInsight.summary)}</Text>
             ) : null}
+
+            {/* Dominant pattern highlight */}
+            {report?.frictionZones?.length > 0 && (
+              <View style={s.dominantCard}>
+                <Text style={s.dominantIcon}>🔥</Text>
+                <View style={s.dominantContent}>
+                  <Text style={s.dominantLabel}>PRIMARY FRICTION</Text>
+                  <Text style={s.dominantText}>
+                    {report.frictionZones[0].trigger} tends to leave you feeling {report.frictionZones[0].emotion} — this showed up {report.frictionZones[0].count} times this week.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {error ? (
@@ -395,29 +412,33 @@ export function WeeklyReportScreen() {
               {/* --- 3. WHAT HELPED / WHAT DRAINED --- */}
               {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
                 <>
-                  <SectionHeader label="What helped · What drained" badge="live" />
-                  <View style={s.card}>
-                    {report.regulators?.length ? (
-                      <View style={s.pairingGroup}>
-                        <Text style={s.pairingGroupLabel}>🌿 Regulators</Text>
-                        <View style={s.pairingList}>
-                          {report.regulators.slice(0, 4).map((r) => (
-                            <PairingChip key={`${r.trigger}-${r.emotion}`} trigger={r.trigger} emotion={r.emotion} count={r.count} positive />
-                          ))}
-                        </View>
+                  <SectionHeader label="Emotional loops" badge="live" />
+                  {report.frictionZones?.length ? (
+                    <View style={s.narrativeCard}>
+                      <Text style={s.narrativeIcon}>🔥</Text>
+                      <View style={s.narrativeContent}>
+                        <Text style={s.narrativeTitle}>Friction zones</Text>
+                        {report.frictionZones.slice(0, 3).map((f) => (
+                          <Text key={`${f.trigger}-${f.emotion}`} style={s.narrativeText}>
+                            {capitalize(f.trigger)} → {f.emotion} ({f.count}×) — this combination keeps showing up and may be worth noticing.
+                          </Text>
+                        ))}
                       </View>
-                    ) : null}
-                    {report.frictionZones?.length ? (
-                      <View style={s.pairingGroup}>
-                        <Text style={s.pairingGroupLabel}>🔥 Friction zones</Text>
-                        <View style={s.pairingList}>
-                          {report.frictionZones.slice(0, 4).map((f) => (
-                            <PairingChip key={`${f.trigger}-${f.emotion}`} trigger={f.trigger} emotion={f.emotion} count={f.count} positive={false} />
-                          ))}
-                        </View>
+                    </View>
+                  ) : null}
+                  {report.regulators?.length ? (
+                    <View style={s.narrativeCard}>
+                      <Text style={s.narrativeIcon}>🌿</Text>
+                      <View style={s.narrativeContent}>
+                        <Text style={s.narrativeTitle}>What helps</Text>
+                        {report.regulators.slice(0, 3).map((r) => (
+                          <Text key={`${r.trigger}-${r.emotion}`} style={s.narrativeText}>
+                            {capitalize(r.trigger)} tends to bring {r.emotion} ({r.count}×) — a pattern worth protecting.
+                          </Text>
+                        ))}
                       </View>
-                    ) : null}
-                  </View>
+                    </View>
+                  ) : null}
                 </>
               ) : null}
 
@@ -686,7 +707,7 @@ export function WeeklyReportScreen() {
                         />
                       </View>
                       <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-                        <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
+                        <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "See what's really going on"}</Text>
                       </Pressable>
                       <Text style={s.teaserSubtext}>Unlock full insights into your patterns</Text>
                     </View>
@@ -1015,5 +1036,56 @@ const s = StyleSheet.create({
   },
   insightSectionBody: {
     color: palette.text, fontSize: 14, lineHeight: 21,
+  },
+
+  /* Dominant pattern hero */
+  dominantCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 16,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255, 107, 122, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 107, 122, 0.20)",
+    borderLeftWidth: 3,
+    borderLeftColor: palette.danger,
+  },
+  dominantIcon: { fontSize: 24, marginTop: 2 },
+  dominantContent: { flex: 1, gap: 4 },
+  dominantLabel: {
+    color: palette.danger,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  dominantText: {
+    color: palette.text,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  /* Narrative-style cards */
+  narrativeCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 16,
+    borderRadius: radius.md,
+    backgroundColor: palette.glass,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+  },
+  narrativeIcon: { fontSize: 20, marginTop: 2 },
+  narrativeContent: { flex: 1, gap: 6 },
+  narrativeTitle: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  narrativeText: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
   },
 });

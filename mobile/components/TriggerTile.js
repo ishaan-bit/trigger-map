@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 
 const TRIGGER_ICONS = {
@@ -16,39 +17,65 @@ const TRIGGER_ICONS = {
 };
 
 const TRIGGER_TINTS = {
-  work: "rgba(167, 139, 250, 0.10)",
-  social: "rgba(86, 208, 224, 0.10)",
-  money: "rgba(255, 179, 71, 0.10)",
-  family: "rgba(94, 230, 160, 0.10)",
-  exercise: "rgba(86, 208, 224, 0.10)",
-  health: "rgba(255, 107, 122, 0.10)",
-  sleep: "rgba(167, 139, 250, 0.10)",
-  partner: "rgba(255, 179, 71, 0.10)",
-  alone: "rgba(94, 230, 160, 0.10)",
-  travel: "rgba(86, 208, 224, 0.10)",
-  other: "rgba(148, 180, 224, 0.08)",
+  work: { bg: "rgba(167, 139, 250, 0.10)", glow: "rgba(167, 139, 250, 0.25)" },
+  social: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
+  money: { bg: "rgba(255, 179, 71, 0.10)", glow: "rgba(255, 179, 71, 0.25)" },
+  family: { bg: "rgba(94, 230, 160, 0.10)", glow: "rgba(94, 230, 160, 0.25)" },
+  exercise: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
+  health: { bg: "rgba(255, 107, 122, 0.10)", glow: "rgba(255, 107, 122, 0.25)" },
+  sleep: { bg: "rgba(167, 139, 250, 0.10)", glow: "rgba(167, 139, 250, 0.25)" },
+  partner: { bg: "rgba(255, 179, 71, 0.10)", glow: "rgba(255, 179, 71, 0.25)" },
+  alone: { bg: "rgba(94, 230, 160, 0.10)", glow: "rgba(94, 230, 160, 0.25)" },
+  travel: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
+  other: { bg: "rgba(148, 180, 224, 0.08)", glow: "rgba(148, 180, 224, 0.20)" },
 };
 
 export function TriggerTile({ label, onPress }) {
-  const tint = TRIGGER_TINTS[label] || "rgba(148, 180, 224, 0.08)";
+  const tint = TRIGGER_TINTS[label] || TRIGGER_TINTS.other;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  function handlePressIn() {
+    Animated.spring(scaleAnim, {
+      toValue: 0.92,
+      friction: 5,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function handlePressOut() {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 4,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  }
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Log ${label} trigger`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.tile, { backgroundColor: tint }, pressed && styles.pressed]}
-    >
-      <View style={styles.iconWrap}>
-        <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
-      </View>
-      <Text style={styles.label}>{label}</Text>
-    </Pressable>
+    <Animated.View style={[styles.tileWrap, { transform: [{ scale: scaleAnim }] }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Log ${label} trigger`}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[styles.tile, { backgroundColor: tint.bg }]}
+      >
+        <View style={[styles.iconWrap, { shadowColor: tint.glow }]}>
+          <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
+        </View>
+        <Text style={styles.label}>{label}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: {
+  tileWrap: {
     width: "30%",
+  },
+  tile: {
     aspectRatio: 1.1,
     borderRadius: radius.lg,
     paddingVertical: 10,
@@ -58,19 +85,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.glassBorder,
     gap: 6,
-  },
-  pressed: {
-    borderColor: palette.accent,
-    transform: [{ scale: 0.95 }],
-    opacity: 0.9,
+    shadowColor: "rgba(86, 208, 224, 0.15)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: palette.glass,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 2,
   },
   icon: {
     fontSize: 22,

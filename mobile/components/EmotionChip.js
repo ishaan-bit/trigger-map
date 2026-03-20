@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 
 const EMOTION_ICONS = {
@@ -10,11 +11,11 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_TINTS = {
-  calm: { bg: "rgba(94,230,160,0.08)", border: "rgba(94,230,160,0.18)", active: "rgba(94,230,160,0.20)" },
-  neutral: { bg: "rgba(148,180,224,0.08)", border: "rgba(148,180,224,0.14)", active: "rgba(148,180,224,0.18)" },
-  anxious: { bg: "rgba(255,179,71,0.08)", border: "rgba(255,179,71,0.18)", active: "rgba(255,179,71,0.20)" },
-  frustrated: { bg: "rgba(255,107,122,0.08)", border: "rgba(255,107,122,0.18)", active: "rgba(255,107,122,0.20)" },
-  energized: { bg: "rgba(86,208,224,0.08)", border: "rgba(86,208,224,0.18)", active: "rgba(86,208,224,0.20)" },
+  calm: { bg: "rgba(94,230,160,0.08)", border: "rgba(94,230,160,0.18)", active: "rgba(94,230,160,0.22)" },
+  neutral: { bg: "rgba(148,180,224,0.08)", border: "rgba(148,180,224,0.14)", active: "rgba(148,180,224,0.20)" },
+  anxious: { bg: "rgba(255,179,71,0.08)", border: "rgba(255,179,71,0.18)", active: "rgba(255,179,71,0.22)" },
+  frustrated: { bg: "rgba(255,107,122,0.08)", border: "rgba(255,107,122,0.18)", active: "rgba(255,107,122,0.22)" },
+  energized: { bg: "rgba(86,208,224,0.08)", border: "rgba(86,208,224,0.18)", active: "rgba(86,208,224,0.22)" },
 };
 
 const EMOTION_ACCENT = {
@@ -28,22 +29,39 @@ const EMOTION_ACCENT = {
 export function EmotionChip({ label, active, onPress }) {
   const tint = EMOTION_TINTS[label] || EMOTION_TINTS.neutral;
   const accentColor = EMOTION_ACCENT[label] || palette.muted;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (active) {
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 120, useNativeDriver: true }),
+        Animated.spring(pulseAnim, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [active, pulseAnim]);
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Select ${label} emotion`}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: active ? tint.active : tint.bg, borderColor: active ? accentColor : tint.border },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}22` : "rgba(255,255,255,0.06)" }]}>
-        <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
-      </View>
-      <Text style={[styles.label, active && { color: accentColor }]}>{label}</Text>
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Select ${label} emotion`}
+        style={({ pressed }) => [
+          styles.chip,
+          {
+            backgroundColor: active ? tint.active : tint.bg,
+            borderColor: active ? accentColor : tint.border,
+          },
+          active && { shadowColor: accentColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
+          pressed && styles.pressed,
+        ]}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}22` : "rgba(255,255,255,0.06)" }]}>
+          <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
+        </View>
+        <Text style={[styles.label, active && { color: accentColor }]}>{label}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

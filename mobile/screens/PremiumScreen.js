@@ -1,50 +1,36 @@
 import { useState } from "react";
 import { Alert, Image, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 
-const tiers = [
+const transformations = [
   {
-    icon: "👤",
-    name: "Anonymous",
-    description: "No sign-up needed",
-    features: [
-      "Log triggers + emotions",
-      "On-device timeline",
-      "Basic weekly charts",
-    ],
-    highlight: false,
+    before: "I keep feeling anxious but don't know why",
+    after: "Social situations are your #1 anxiety trigger — especially in groups",
+    icon: "🔍",
   },
   {
-    icon: "🔓",
-    name: "Free account",
-    description: "Sign in to unlock",
-    features: [
-      "Everything in Anonymous",
-      "Cloud backup + sync",
-      "Weekly pattern observations",
-      "First insight report free",
-      "Edit & delete moments",
-      "Export your data",
-    ],
-    highlight: false,
+    before: "All my days feel the same",
+    after: "Exercise on Tue/Thu consistently brings your calmest moments",
+    icon: "🌿",
   },
   {
+    before: "I log moments but nothing happens",
+    after: "Weekly personalized insights show exactly what's driving your patterns",
     icon: "✦",
-    name: "Premium",
-    description: PREMIUM_PRICE_LABEL,
-    features: [
-      "Everything in Free",
-      "Weekly personalized reflections",
-      "Multi-week trend tracking",
-      "Priority support",
-    ],
-    highlight: true,
   },
+];
+
+const premiumFeatures = [
+  { icon: "🧠", text: "Weekly personalized reflections" },
+  { icon: "📈", text: "Multi-week trend tracking" },
+  { icon: "🔥", text: "Friction zone analysis" },
+  { icon: "💬", text: "Priority support" },
 ];
 
 export function PremiumScreen() {
@@ -64,34 +50,60 @@ export function PremiumScreen() {
         />
         <View style={styles.heroOverlay}>
           <Text style={styles.kicker}>Premium</Text>
-          <Text style={styles.title}>See the full{"\n"}picture</Text>
+          <Text style={styles.title}>Unlock your{"\n"}patterns</Text>
           <Text style={styles.subtitle}>
-            Turn patterns into understanding — and small actions that actually help.
+            Turn raw moments into understanding — see what's really going on.
           </Text>
         </View>
       </View>
 
-      {tiers.map((tier) => (
-        <View key={tier.name} style={[styles.tierCard, tier.highlight && styles.tierHighlight]}>
-          <View style={styles.tierHeader}>
-            <View style={styles.tierIconRow}>
-              <Text style={styles.tierIcon}>{tier.icon}</Text>
-              <View>
-                <Text style={[styles.tierName, tier.highlight && styles.tierNameHighlight]}>{tier.name}</Text>
-                <Text style={styles.tierDesc}>{tier.description}</Text>
-              </View>
+      {/* BEFORE → AFTER transformations */}
+      <View style={styles.transformSection}>
+        <Text style={styles.transformHeader}>What changes with Premium</Text>
+        {transformations.map((t) => (
+          <View key={t.before} style={styles.transformCard}>
+            <View style={styles.transformRow}>
+              <Text style={styles.transformLabel}>BEFORE</Text>
+              <Text style={styles.transformBefore}>"{t.before}"</Text>
+            </View>
+            <View style={styles.transformArrow}>
+              <Text style={styles.transformArrowIcon}>{t.icon}</Text>
+              <View style={styles.transformArrowLine} />
+            </View>
+            <View style={styles.transformRow}>
+              <Text style={[styles.transformLabel, styles.transformLabelAfter]}>AFTER</Text>
+              <Text style={styles.transformAfter}>"{t.after}"</Text>
             </View>
           </View>
-          {tier.features.map((f) => (
-            <View key={f} style={styles.featureRow}>
-              <Text style={[styles.checkmark, tier.highlight && styles.checkmarkHighlight]}>
-                {tier.highlight ? "★" : "✓"}
-              </Text>
-              <Text style={styles.featureText}>{f}</Text>
-            </View>
-          ))}
+        ))}
+      </View>
+
+      {/* Blurred insight preview */}
+      <View style={styles.previewCard}>
+        <Text style={styles.previewTitle}>Your insight preview</Text>
+        <View style={styles.previewBlur}>
+          <Text style={styles.previewBlurText}>
+            {"When work comes up, you tend to feel anxious — particularly around meetings and deadlines. This pattern appeared 4 times this week..."}
+          </Text>
+          <LinearGradient
+            colors={["transparent", "rgba(13, 20, 36, 0.95)"]}
+            style={styles.previewGradient}
+          />
         </View>
-      ))}
+        <Text style={styles.previewHint}>Upgrade to read your full personalized insight</Text>
+      </View>
+
+      {/* Feature list */}
+      <View style={styles.featureCard}>
+        <Text style={styles.featureCardTitle}>Everything in Premium</Text>
+        <Text style={styles.featureCardPrice}>{PREMIUM_PRICE_LABEL}</Text>
+        {premiumFeatures.map((f) => (
+          <View key={f.text} style={styles.featureRow}>
+            <Text style={styles.featureIcon}>{f.icon}</Text>
+            <Text style={styles.featureText}>{f.text}</Text>
+          </View>
+        ))}
+      </View>
 
       {!user ? (
         <PrimaryButton
@@ -101,7 +113,7 @@ export function PremiumScreen() {
       ) : !isActive ? (
         <>
           <PrimaryButton
-            label={busy ? "Please wait..." : "Upgrade to Premium"}
+            label={busy ? "Please wait..." : "Unlock your patterns"}
             disabled={busy}
             onPress={async () => {
               try {
@@ -199,40 +211,117 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  tierCard: {
+
+  /* Transformation section */
+  transformSection: {
+    gap: 12,
+  },
+  transformHeader: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  transformCard: {
     borderRadius: radius.md,
-    padding: 18,
+    padding: 16,
     backgroundColor: palette.glass,
     borderWidth: 1,
     borderColor: palette.glassBorder,
     gap: 10,
   },
-  tierHighlight: {
-    borderColor: palette.accent,
-    backgroundColor: palette.accentSoft,
+  transformRow: {
+    gap: 4,
   },
-  tierHeader: {
-    marginBottom: 4,
+  transformLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    color: palette.muted,
   },
-  tierIconRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  tierIcon: {
-    fontSize: 28,
-  },
-  tierName: {
-    color: palette.text,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  tierNameHighlight: {
+  transformLabelAfter: {
     color: palette.accent,
   },
-  tierDesc: {
+  transformBefore: {
     color: palette.muted,
     fontSize: 13,
+    lineHeight: 18,
+    fontStyle: "italic",
+  },
+  transformAfter: {
+    color: palette.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  transformArrow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  transformArrowIcon: {
+    fontSize: 16,
+  },
+  transformArrowLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: palette.glassBorder,
+  },
+
+  /* Blurred preview */
+  previewCard: {
+    borderRadius: radius.md,
+    padding: 18,
+    backgroundColor: palette.glass,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+    gap: 10,
+    overflow: "hidden",
+  },
+  previewTitle: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  previewBlur: {
+    position: "relative",
+    overflow: "hidden",
+  },
+  previewBlurText: {
+    color: palette.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    opacity: 0.3,
+  },
+  previewGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  previewHint: {
+    color: palette.muted,
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+
+  /* Feature card */
+  featureCard: {
+    borderRadius: radius.md,
+    padding: 18,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+    gap: 12,
+  },
+  featureCardTitle: {
+    color: palette.accent,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  featureCardPrice: {
+    color: palette.muted,
+    fontSize: 13,
+    marginTop: -6,
   },
   featureRow: {
     flexDirection: "row",
@@ -240,14 +329,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingLeft: 4,
   },
-  checkmark: {
-    color: palette.success,
-    fontSize: 13,
-    width: 18,
+  featureIcon: {
+    fontSize: 16,
+    width: 22,
     textAlign: "center",
-  },
-  checkmarkHighlight: {
-    color: palette.accent,
   },
   featureText: {
     color: palette.text,
@@ -255,6 +340,8 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
+
+  /* Active state */
   activeCard: {
     borderRadius: radius.md,
     padding: 16,
@@ -275,39 +362,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
-  },
-  previewCard: {
-    borderRadius: radius.md,
-    padding: 18,
-    backgroundColor: palette.accentSoft,
-    borderWidth: 1,
-    borderColor: palette.accentMedium,
-    gap: 12,
-  },
-  previewTitle: {
-    color: palette.accent,
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  previewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  previewIcon: {
-    fontSize: 18,
-  },
-  previewLabel: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  previewBody: {
-    color: palette.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
   },
 });

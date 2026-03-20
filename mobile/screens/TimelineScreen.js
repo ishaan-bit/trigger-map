@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TimelineGroup } from "@/components/TimelineGroup";
@@ -11,6 +11,49 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
 import { palette, radius } from "@/utils/theme";
+
+const EMOTION_COLORS = {
+  calm: palette.success,
+  neutral: palette.muted,
+  anxious: palette.warning,
+  frustrated: palette.danger,
+  energized: palette.accent,
+};
+
+const MERGE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Merge duplicate entries: if same trigger + emotion within 30 min → group into one entry with count
+ */
+function mergeSimilarMoments(moments) {
+  if (!moments?.length) return [];
+  const merged = [];
+  for (const m of moments) {
+    const last = merged[merged.length - 1];
+    if (
+      last &&
+      last.trigger === m.trigger &&
+      last.emotion === m.emotion &&
+      Math.abs(new Date(last.timestamp).getTime() - new Date(m.timestamp).getTime()) < MERGE_WINDOW_MS
+    ) {
+      if (!last._grouped) {
+        last._grouped = [last.id];
+        last._count = 1;
+      }
+      last._grouped.push(m.id);
+      last._count += 1;
+      // Keep earliest timestamp
+      if (new Date(m.timestamp) < new Date(last.timestamp)) {
+        last.timestamp = m.timestamp;
+      }
+      // Merge notes
+      if (m.note && !last.note) last.note = m.note;
+    } else {
+      merged.push({ ...m });
+    }
+  }
+  return merged;
+}
 
 function groupByDay(moments) {
   const groups = {};
@@ -32,7 +75,10 @@ export function TimelineScreen() {
   const [error, setError] = useState("");
   const [editingMoment, setEditingMoment] = useState(null);
 
-  const dayGroups = useMemo(() => groupByDay(moments), [moments]);
+  const dayGroups = useMemo(() => {
+    const merged = mergeSimilarMoments(moments);
+    return groupByDay(merged);
+  }, [moments]);
   const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
 
   const loadTimelineRef = useRef(loadTimeline);
@@ -127,14 +173,29 @@ export function TimelineScreen() {
       {!error && dayGroups.map(([dayLabel, dayMoments]) => (
         <View key={dayLabel} style={styles.daySection}>
           <Text style={styles.dayHeader}>{dayLabel}</Text>
-          {dayMoments.map((moment) => (
-            <TimelineGroup
-              key={moment.id}
-              moment={moment}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
+          <View style={styles.timelineConnector}>
+            {dayMoments.map((moment, idx) => {
+              const emotionColor = EMOTION_COLORS[moment.emotion] || palette.muted;
+              const isLast = idx === dayMoments.length - 1;
+              return (
+                <View key={moment.id} style={styles.timelineItem}>
+                  {/* Connector dot + line */}
+                  <View style={styles.connectorColumn}>
+                    <View style={[styles.connectorDot, { backgroundColor: emotionColor }]} />
+                    {!isLast && <View style={[styles.connectorLine, { backgroundColor: `${emotionColor}40` }]} />}
+                  </View>
+                  <View style={styles.timelineCardWrap}>
+                    <TimelineGroup
+                      moment={moment}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      groupCount={moment._count}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </View>
       ))}
 
@@ -183,7 +244,33 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   daySection: {
-    gap: 8,
+    gap: 4,
+  },
+  timelineConnector: {
+    gap: 0,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  connectorColumn: {
+    width: 20,
+    alignItems: "center",
+    paddingTop: 18,
+  },
+  connectorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  connectorLine: {
+    width: 2,
+    flex: 1,
+    marginTop: 2,
+  },
+  timelineCardWrap: {
+    flex: 1,
+    paddingBottom: 8,
   },
   microInsights: {
     gap: 8,
