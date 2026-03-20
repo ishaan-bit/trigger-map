@@ -37,7 +37,7 @@ export default function LoginPage() {
       setLoading(true);
       setError("");
       await signInWithGoogle(response.credential);
-      router.push("/timeline");
+      router.push("/");
     } catch (err) {
       setError(err.message || "Google sign-in failed");
     } finally {
@@ -55,7 +55,7 @@ export default function LoginPage() {
       } else {
         await registerWithEmail(name, email, password);
       }
-      router.push("/timeline");
+      router.push("/");
     } catch (err) {
       setError(err.message || "Authentication failed");
     } finally {
@@ -65,33 +65,36 @@ export default function LoginPage() {
 
   return (
     <Layout title={mode === "login" ? "Sign in" : "Create account"}>
-      <section className="card stack loginCard">
-        <p className="sectionKicker">{mode === "login" ? "Welcome back" : "Get started"}</p>
-        <h2>{mode === "login" ? "Sign in" : "Create account"}</h2>
-        <p className="muted">Sign in to sync your data and unlock deeper insights.</p>
+      <section className="card stack loginCard sceneIn">
+        <div className="loginWarmth">
+          <span className="loginWarmthOrb" />
+          <p className="sectionKicker">{mode === "login" ? "Welcome back" : "Begin your journey"}</p>
+          <h2>{mode === "login" ? "Pick up where you left off" : "Start tracking what matters"}</h2>
+          <p className="loginTrust">Your emotional data is encrypted, stored securely, and never sold or shared with third parties. We built this for you, not advertisers.</p>
+        </div>
 
         {/* Google Sign-In button */}
         <div ref={googleBtnRef} className="googleBtnWrap" />
 
-        <div className="loginDivider" />
+        <div className="loginDivider"><span className="loginDividerText">or continue with email</span></div>
 
         <form className="stack" onSubmit={submit}>
           {mode === "register" ? (
             <label>
               Name
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" required />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="What should we call you?" required />
             </label>
           ) : null}
           <label>
             Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" required />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" minLength={8} required />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8+ characters" minLength={8} required />
           </label>
           <button className="primaryButton" type="submit" disabled={loading}>
-            {loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
+            {loading ? "One moment..." : mode === "login" ? "Sign in" : "Create account"}
           </button>
         </form>
 
@@ -102,20 +105,22 @@ export default function LoginPage() {
           type="button"
           onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
         >
-          {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
+          {mode === "login" ? "New here? Create a free account" : "Already have an account? Sign in"}
         </button>
 
-        <div className="loginDivider" />
+        <div className="loginDivider"><span className="loginDividerText" /></div>
 
         <button className="ghostButton" type="button" onClick={() => router.push("/")}>
-          Continue anonymously
+          Continue without signing in
         </button>
-        <p className="muted" style={{ textAlign: "center", fontSize: 12 }}>
-          Anonymous mode uses a device ID. Sign in to sync across devices and unlock weekly insights.
+        <p className="loginAnonymousHint">
+          You can log moments anonymously with a device ID. Sign in later to sync across devices and unlock AI insights.
         </p>
-        <p className="muted" style={{ textAlign: "center", fontSize: 11, opacity: 0.7, marginTop: 8 }}>
-          Your data stays private. We don't sell or share it.
-        </p>
+
+        <div className="loginSafetyRow">
+          <span className="loginSafetyIcon">🔐</span>
+          <span className="loginSafetyText">End-to-end private. No tracking pixels. No data brokers. Your patterns belong to you.</span>
+        </div>
       </section>
     </Layout>
   );

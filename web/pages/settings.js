@@ -88,7 +88,7 @@ export default function SettingsPage() {
 
         {/* Privacy */}
         <Section icon="🔒" title="Privacy">
-          <p className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>Privacy first — your data stays yours.</p>
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>Privacy first. Your data stays yours.</p>
           <a className="ghostButton inlineButton" href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>
           <a className="ghostButton inlineButton" href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms and conditions</a>
           <Row label="Support" value="qdenxp@gmail.com" />

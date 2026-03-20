@@ -4,14 +4,18 @@ import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 
 const EMOTION_EMOJIS = {
-  frustrated: "💢", anxious: "⚡", neutral: "🌫️", calm: "🍃", energized: "☀️",
+  frustrated: "�", anxious: "😰", neutral: "😐", calm: "😌", energized: "⚡",
+};
+
+const EMOTION_COLORS = {
+  calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa",
 };
 
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 
 const ENERGY_COLORS = {
-  steady: "#9de4b7", balanced: "#7bc9d8", tense: "#f0b96a",
-  drained: "#f07f84", uplifted: "#c084fc",
+  steady: "#5ee6a0", balanced: "#7bc9d8", tense: "#ffb347",
+  drained: "#ff6b7a", uplifted: "#a78bfa",
 };
 
 const CONFIDENCE_LABELS = {
@@ -21,6 +25,9 @@ const CONFIDENCE_LABELS = {
   moderate: "Solid picture",
   strong: "High confidence",
 };
+
+const TRIGGERS_SET = new Set(["work", "family", "partner", "social", "alone", "exercise", "travel", "health", "money"]);
+const EMOTIONS_SET = new Set(["calm", "neutral", "anxious", "frustrated", "energized"]);
 
 function cleanText(str) {
   if (typeof str !== "string") return str;
@@ -32,35 +39,45 @@ function cleanText(str) {
     .trim();
 }
 
+/** Color-code trigger and emotion words inside text */
+function colorizeInsightText(text) {
+  if (!text) return null;
+  const pattern = new RegExp(`\\b(${[...TRIGGERS_SET, ...EMOTIONS_SET].join("|")})\\b`, "gi");
+  const parts = [];
+  let lastIdx = 0;
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIdx) parts.push(text.slice(lastIdx, match.index));
+    const word = match[1].toLowerCase();
+    const color = EMOTION_COLORS[word] || (TRIGGERS_SET.has(word) ? "#7bc9d8" : null);
+    parts.push(<span key={match.index} style={{ color: color || "#7bc9d8", fontWeight: 600 }}>{match[0]}</span>);
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
+  return parts.length > 1 ? parts : text;
+}
+
 function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
-
-  // Match headers at the start of a line, allowing optional numbering/colons
   const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this|suggestion|action\s*(?:item|step))[ \t]*:?/gmi;
   const labelMap = [
     /(?:what (?:stood|stands) out|(?:most )?notable pattern)/i,
     /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor))/i,
     /(?:one thing to try|something to try|try this|suggestion|action\s*(?:item|step))/i,
   ];
-
   const hits = [];
   let m;
   while ((m = headerRe.exec(text)) !== null) {
     const section = labelMap.findIndex((p) => p.test(m[0]));
     if (section >= 0) hits.push({ idx: m.index, section, len: m[0].length });
   }
-
   const seen = new Set();
   const firstHits = [];
   for (const h of hits) {
-    if (!seen.has(h.section)) {
-      seen.add(h.section);
-      firstHits.push(h);
-    }
+    if (!seen.has(h.section)) { seen.add(h.section); firstHits.push(h); }
   }
   firstHits.sort((a, b) => a.idx - b.idx);
-
   if (firstHits.length >= 2) {
     let cutoff = text.length;
     const seenAgain = new Set();
@@ -69,18 +86,15 @@ function parseLlmSections(narrative) {
       seenAgain.add(h.section);
     }
     const cleanedText = text.slice(0, cutoff).trim();
-
     const result = [null, null, null];
     for (let i = 0; i < firstHits.length; i++) {
       const start = firstHits[i].idx + firstHits[i].len;
       const end = i < firstHits.length - 1 ? firstHits[i + 1].idx : cleanedText.length;
-      let body = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim();
-      body = body.replace(/\s+$/, "");
+      let body = cleanedText.slice(start, end).replace(/^\s*[:\-\u2013\u2014]?\s*/, "").trim().replace(/\s+$/, "");
       result[firstHits[i].section] = body.length >= 5 ? body : null;
     }
     return result;
   }
-
   const chunks = text.split(/\n\s*\n/).filter(Boolean).slice(0, 3);
   const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what may be contributing|one thing to try)[:\s]*/i, "").trim();
   return [
@@ -91,24 +105,33 @@ function parseLlmSections(narrative) {
 }
 
 const INSIGHT_SECTION_META = [
-  { icon: "🔍", label: "What stood out" },
-  { icon: "🧩", label: "What may be contributing" },
-  { icon: "💡", label: "One thing to try" },
+  { icon: "🔍", label: "What stood out", accentColor: "#a78bfa" },
+  { icon: "🧩", label: "What may be contributing", accentColor: "#ffb347" },
+  { icon: "💡", label: "One thing to try", accentColor: "#5ee6a0" },
 ];
 
 function topEntries(record, limit = 5) {
-  return Object.entries(record || {})
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, limit);
+  return Object.entries(record || {}).sort(([, a], [, b]) => b - a).slice(0, limit);
 }
 
-function HBar({ label, value, max, color = "#7bc9d8", icon }) {
+function deriveTopEmotion(report) {
+  if (report?.topEmotion) return report.topEmotion;
+  const entries = Object.entries(report?.emotionFrequency || {});
+  if (!entries.length) return "neutral";
+  return entries.sort(([, a], [, b]) => b - a)[0][0];
+}
+
+function HBar({ label, value, max, color = "#7bc9d8", icon, glowing }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
   return (
     <div className="chartRow">
       <span className="chartLabel">{icon ? `${icon} ` : ""}{label}</span>
       <div className="chartTrack">
-        <span className="chartBar" style={{ width: `${pct}%`, background: color }} />
+        <span className="chartBar" style={{
+          width: `${pct}%`,
+          background: `linear-gradient(90deg, ${color}, ${color}aa)`,
+          boxShadow: glowing ? `0 0 12px ${color}40` : "none",
+        }} />
       </div>
       <span className="chartValue">{value}</span>
     </div>
@@ -147,9 +170,15 @@ function LockedSection({ title, teaser, ctaLabel, onAction, children }) {
 }
 
 function PairingChip({ trigger, emotion, count, positive }) {
-  const cls = positive ? "pairingChipPositive" : "pairingChipNegative";
+  const eColor = EMOTION_COLORS[emotion] || "#9eb0c9";
   return (
-    <span className={`pairingChip ${cls}`}>{trigger} → {emotion} ×{count}</span>
+    <span className={`pairingChip ${positive ? "pairingChipPositive" : "pairingChipNegative"}`}
+      style={{ borderColor: `${eColor}50`, background: `${eColor}12`, boxShadow: `0 0 8px ${eColor}15` }}>
+      <span style={{ color: "#7bc9d8", fontWeight: 700 }}>{trigger}</span>
+      {" "}
+      <span style={{ color: eColor, fontWeight: 700 }}>{emotion}</span>
+      <span className="pairingCount"> ×{count}</span>
+    </span>
   );
 }
 
@@ -181,6 +210,9 @@ export default function ReportPage() {
   const hasLlmInsight = !!report?.llmInsight?.narrative;
   const hasLlmTeaser = !!report?.llmTeaser?.narrative;
 
+  const topEmotion = deriveTopEmotion(report);
+  const stateColor = EMOTION_COLORS[topEmotion] || "#7bc9d8";
+
   const triggerEntries = topEntries(report?.triggerFrequency, 6);
   const emotionEntries = topEntries(report?.emotionFrequency, 6);
   const triggerMax = triggerEntries[0]?.[1] || 1;
@@ -195,9 +227,14 @@ export default function ReportPage() {
       title="Weekly report"
       actions={<button className="ghostButton" onClick={loadReport} type="button">Refresh</button>}
     >
-      {loading ? <div className="card loadingCard">Building your weekly view...</div> : null}
+      {/* State-adaptive ambient glow */}
+      {report?.totalMoments ? (
+        <div className="stateGlow" style={{ "--state-color": stateColor }} />
+      ) : null}
+
+      {loading ? <div className="card loadingCard sceneIn">Reading your patterns...</div> : null}
       {error ? (
-        <div className="card feedbackPanel stack">
+        <div className="card feedbackPanel stack sceneIn">
           <strong>Report unavailable</strong>
           <p className="feedback">{error}</p>
           <button className="primaryButton" onClick={loadReport} type="button">Try again</button>
@@ -207,9 +244,9 @@ export default function ReportPage() {
       {report ? (
         <div className="stack reportStack">
 
-          {/* ── 1. AT A GLANCE HERO ── */}
-          <div className="card cardFeature stack">
-            <p className="sectionKicker">Weekly patterns</p>
+          {/* 1. AT A GLANCE HERO */}
+          <div className="card cardFeature stack sceneIn" style={{ borderTop: `2px solid ${stateColor}30` }}>
+            <p className="sectionKicker" style={{ color: stateColor }}>Weekly patterns</p>
             <h2>Your Week</h2>
             {report.totalMoments ? (
               <p className="muted">
@@ -218,9 +255,9 @@ export default function ReportPage() {
             ) : null}
             {report.totalMoments ? (
               <div className="heroRow">
-                <span className="heroPill">
+                <span className="heroPill" style={{ borderColor: `${EMOTION_COLORS[report.topEmotion] || stateColor}40`, boxShadow: `0 0 12px ${EMOTION_COLORS[report.topEmotion] || stateColor}15` }}>
                   <span>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</span>
-                  {report.topEmotion || "Mixed"}
+                  <span style={{ color: EMOTION_COLORS[report.topEmotion] || stateColor }}>{report.topEmotion || "Mixed"}</span>
                 </span>
                 <span className="heroPill">
                   <span>🎯</span>
@@ -232,14 +269,14 @@ export default function ReportPage() {
               </div>
             ) : null}
             {hasRuleInsight ? (
-              <div className="takeawayBar">{cleanText(report.aiInsight.summary)}</div>
+              <div className="takeawayBar" style={{ borderLeftColor: stateColor }}>{colorizeInsightText(cleanText(report.aiInsight.summary))}</div>
             ) : null}
           </div>
 
           {/* Starter state */}
           {confidence === "too_early" ? (
-            <div className="card stack" style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 48 }}>🌱</span>
+            <div className="card stack sceneIn" style={{ textAlign: "center" }}>
+              <span className="emptyOrb">🌱</span>
               <strong>{isSignedIn ? "A few more moments to go" : "Start tracking to see patterns"}</strong>
               <p className="muted">
                 {isSignedIn
@@ -259,39 +296,39 @@ export default function ReportPage() {
 
           {confidence !== "too_early" ? (
             <>
-              {/* ── 2. WHAT SHOWED UP ── */}
+              {/* 2. WHAT SHOWED UP */}
               <SectionHeader label="What showed up" badge="live" extra={`${dq.uniqueEmotions || 0} emotions · ${dq.uniqueTriggers || 0} triggers`} />
 
               {emotionEntries.length ? (
-                <div className="card stack">
+                <div className="card stack sceneIn">
                   {emotionEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={emotionMax} color="#f0b96a" icon={EMOTION_EMOJIS[key]} />
+                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || "#f0b96a"} icon={EMOTION_EMOJIS[key]} glowing={key === topEmotion} />
                   ))}
                 </div>
               ) : null}
 
               {triggerEntries.length ? (
-                <div className="card stack">
+                <div className="card stack sceneIn">
                   {triggerEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={triggerMax} />
+                    <HBar key={key} label={key} value={value} max={triggerMax} color="#7bc9d8" />
                   ))}
                 </div>
               ) : null}
 
               {dq.hasEnoughForRhythm && timeEntries.length ? (
-                <div className="card stack">
+                <div className="card stack sceneIn">
                   <p className="sectionKicker">When you logged</p>
                   {timeEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={timeMax} color="#f0b96a" icon={TIME_ICONS[key]} />
+                    <HBar key={key} label={key} value={value} max={timeMax} color={stateColor} icon={TIME_ICONS[key]} />
                   ))}
                 </div>
               ) : null}
 
-              {/* ── 3. WHAT HELPED / WHAT DRAINED ── */}
+              {/* 3. WHAT HELPED / WHAT DRAINED */}
               {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
                 <>
                   <SectionHeader label="What helped · What drained" badge="live" />
-                  <div className="card stack">
+                  <div className="card stack sceneIn">
                     {report.regulators?.length ? (
                       <div className="pairingGroup">
                         <span className="pairingGroupLabel">🌿 Regulators</span>
@@ -316,7 +353,7 @@ export default function ReportPage() {
                 </>
               ) : null}
 
-              {/* ── 4. PATTERNS & PAIRINGS (sign-in gate) ── */}
+              {/* 4. PATTERNS & PAIRINGS */}
               {!isSignedIn && confidence !== "low" ? (
                 <LockedSection
                   title="Patterns and pairings"
@@ -333,14 +370,15 @@ export default function ReportPage() {
                   {/* Correlations */}
                   {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
                     <>
-                      <SectionHeader label="Trigger → Emotion" badge="live" />
-                      <div className="card stack">
+                      <SectionHeader label="Trigger + Emotion" badge="live" />
+                      <div className="card stack sceneIn">
                         {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => (
                           <div className="correlationRow" key={trigger}>
-                            <strong className="correlationTrigger">{trigger}</strong>
+                            <strong className="correlationTrigger" style={{ color: "#7bc9d8" }}>{trigger}</strong>
                             <div className="correlationChips">
                               {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
-                                <span className="correlationChip" key={emo} data-emotion={emo}>
+                                <span className="correlationChip" key={emo} data-emotion={emo}
+                                  style={{ color: EMOTION_COLORS[emo], borderColor: `${EMOTION_COLORS[emo]}40`, background: `${EMOTION_COLORS[emo]}10` }}>
                                   {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
                                 </span>
                               ))}
@@ -355,7 +393,7 @@ export default function ReportPage() {
                   {energyEntries.length ? (
                     <>
                       <SectionHeader label="Energy flow" badge="live" />
-                      <div className="card stack">
+                      <div className="card stack sceneIn">
                         {energyEntries.map(([key, value]) => (
                           <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || "#7bc9d8"} />
                         ))}
@@ -367,11 +405,11 @@ export default function ReportPage() {
                   {dq.hasEnoughForStability ? (
                     <>
                       <SectionHeader label="Stability" badge="weekly" />
-                      <div className="metricGrid metricGridTwo">
+                      <div className="metricGrid metricGridTwo sceneIn">
                         {report.volatilityScore !== null ? (
                           <div className="card stack metricCard">
                             <p className="metricLabel">Volatility</p>
-                            <strong className="metricValue">
+                            <strong className="metricValue" style={{ color: report.volatilityScore < 0.5 ? "#5ee6a0" : report.volatilityScore < 1.5 ? "#ffb347" : "#ff6b7a" }}>
                               {report.volatilityScore < 0.5 ? "🟢" : report.volatilityScore < 1.5 ? "🟡" : "🔴"} {report.volatilityScore}
                             </strong>
                           </div>
@@ -393,18 +431,21 @@ export default function ReportPage() {
                     <>
                       <SectionHeader label="Emotion trajectory" badge="live" />
                       {report.trajectoryNote ? (
-                        <p className="muted" style={{ fontSize: 13 }}>{cleanText(report.trajectoryNote)}</p>
+                        <p className="muted sceneIn" style={{ fontSize: 13 }}>{colorizeInsightText(cleanText(report.trajectoryNote))}</p>
                       ) : null}
-                      <div className="trajectoryRow">
-                        {report.weeklyEmotionTrajectory.map((day) => (
-                          <div className="trajectoryDay" key={day.date}>
-                            <span className="trajectoryEmoji">{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</span>
-                            <span className="trajectoryScore">{day.score}</span>
-                            <span className="trajectoryDate">
-                              {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="trajectoryRow sceneIn">
+                        {report.weeklyEmotionTrajectory.map((day) => {
+                          const dayColor = EMOTION_COLORS[day.dominantEmotion] || "#9eb0c9";
+                          return (
+                            <div className="trajectoryDay" key={day.date} style={{ "--day-color": dayColor }}>
+                              <span className="trajectoryEmoji">{EMOTION_EMOJIS[day.dominantEmotion] || "•"}</span>
+                              <span className="trajectoryScore" style={{ color: dayColor }}>{day.score}</span>
+                              <span className="trajectoryDate">
+                                {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   ) : null}
@@ -413,7 +454,7 @@ export default function ReportPage() {
                   {report.predictionAccuracy ? (
                     <>
                       <SectionHeader label="Gut check" badge="live" />
-                      <div className="card gutCheckCard">
+                      <div className="card gutCheckCard sceneIn">
                         <span className="gutCheckEmoji">
                           {report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}
                         </span>
@@ -424,7 +465,7 @@ export default function ReportPage() {
                               ? "Your morning gut feeling matched how the day actually went. Strong self-awareness."
                               : report.predictionAccuracy.rate >= 0.3
                                 ? "Your predictions were a mixed bag. Your days may hold more surprises than you expect."
-                                : "Your days unfolded differently than expected. Not a bad thing — it means you're adapting."}
+                                : "Your days unfolded differently than expected. Not a bad thing, it means you're adapting."}
                           </p>
                         </div>
                       </div>
@@ -433,22 +474,21 @@ export default function ReportPage() {
                 </>
               )}
 
-              {/* ── 5. TRY THIS WEEK ── */}
+              {/* 5. TRY THIS WEEK */}
               {report.aiInsight?.microExperiment ? (
-                <div className="card experimentCard">
+                <div className="card experimentCard sceneIn" style={{ borderLeftColor: stateColor }}>
                   <span className="aiLabelPill aiLabelPillGreen">Try this week</span>
-                  <p>{cleanText(report.aiInsight.microExperiment)}</p>
+                  <p>{colorizeInsightText(cleanText(report.aiInsight.microExperiment))}</p>
                 </div>
               ) : null}
 
-              {/* ── 6. WEEKLY INSIGHT — strict state model ── */}
+              {/* 6. WEEKLY INSIGHT */}
               {(() => {
-                /* ── ANONYMOUS ── */
                 if (!isSignedIn) {
                   return (
-                    <div className="insightSection">
+                    <div className="insightSection sceneIn">
                       <SectionHeader label="Insights" badge="weekly" />
-                      <div className="insightStateCard">
+                      <div className="insightStateCard" style={{ borderColor: `${stateColor}20` }}>
                         <span className="insightStateIcon">🔒</span>
                         <strong className="insightStateTitle">Unlock deeper insights</strong>
                         <p className="insightStateBody">Sign in for free to get personalised pattern analysis based on your data.</p>
@@ -459,7 +499,6 @@ export default function ReportPage() {
                   );
                 }
 
-                /* ── HAS INSIGHT (LLM or teaser) ── */
                 if (hasLlmInsight || hasLlmTeaser) {
                   const narrativeSource = report.llmInsight?.narrative || report.llmTeaser?.narrative;
                   const sections = parseLlmSections(narrativeSource);
@@ -468,23 +507,23 @@ export default function ReportPage() {
                     ? Math.max(0, Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86400000))
                     : null;
                   return (
-                    <div className="insightSection">
+                    <div className="insightSection sceneIn">
                       <SectionHeader label="Weekly insight" badge="weekly" />
                       {sections ? (
                         <div className="insightCardsRow">
                           {INSIGHT_SECTION_META.map((meta, i) => (
                             sections[i] ? (
-                              <div key={meta.label} className="insightSectionCard">
+                              <div key={meta.label} className="insightSectionCard" style={{ borderLeft: `3px solid ${meta.accentColor}40` }}>
                                 <span className="insightSectionIcon">{meta.icon}</span>
-                                <span className="insightSectionLabel">{meta.label}</span>
-                                <p className="insightSectionBody">{sections[i]}</p>
+                                <span className="insightSectionLabel" style={{ color: meta.accentColor }}>{meta.label}</span>
+                                <p className="insightSectionBody">{colorizeInsightText(sections[i])}</p>
                               </div>
                             ) : null
                           ))}
                         </div>
                       ) : (
                         <div className="insightSectionCard">
-                          <p className="insightSectionBody">{cleanText(narrativeSource)}</p>
+                          <p className="insightSectionBody">{colorizeInsightText(cleanText(narrativeSource))}</p>
                         </div>
                       )}
                       {daysAgo !== null ? (
@@ -496,9 +535,8 @@ export default function ReportPage() {
                   );
                 }
 
-                /* ── NOT ENOUGH DATA ── */
                 return (
-                  <div className="insightSection">
+                  <div className="insightSection sceneIn">
                     <SectionHeader label="Insights" badge="weekly" />
                     <div className="insightStateCard">
                       <span className="insightStateIcon">📊</span>
@@ -515,9 +553,9 @@ export default function ReportPage() {
                 );
               })()}
 
-              {/* ── 7. DATA QUALITY NUDGE ── */}
+              {/* 7. DATA QUALITY NUDGE */}
               {confidence === "low" ? (
-                <div className="card stack" style={{ textAlign: "center" }}>
+                <div className="card stack sceneIn" style={{ textAlign: "center" }}>
                   <strong>Patterns are forming</strong>
                   <p className="muted">
                     {dq.totalMoments} moments across {dq.daysLogged} day{dq.daysLogged !== 1 ? "s" : ""}. A few more days will unlock trajectory and stability insights.
@@ -528,7 +566,7 @@ export default function ReportPage() {
             </>
           ) : null}
 
-          {/* ── FOOTER ── */}
+          {/* FOOTER */}
           {report.totalMoments ? (
             <div className="reportFooter">
               <span className="reportFooterText">

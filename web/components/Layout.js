@@ -45,7 +45,7 @@ export function Layout({ title, children, actions = null }) {
         <div className="heroCopy">
           <p className="eyebrow">TriggerMap</p>
           <h1>{title}</h1>
-          <p className="lede">Log a moment, review your timeline, and open your weekly report — from any browser.</p>
+          <p className="lede">Log a moment, review your timeline, and open your weekly report. From any browser.</p>
           <div className="statusRow">
             <span className={`statusBadge statusBadge${health.status.charAt(0).toUpperCase()}${health.status.slice(1)}`}>
               {health.message}

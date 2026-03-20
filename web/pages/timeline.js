@@ -21,7 +21,7 @@ const WEATHER_MAP = {
   anxious:   { icon: "🌧️", label: "Overcast",     desc: "Some tension showing up. Be gentle with yourself." },
   frustrated:{ icon: "⛈️", label: "Turbulent",    desc: "Friction in the air. Take it one moment at a time." },
   energized: { icon: "⚡", label: "Electric",      desc: "High energy in your recent logs. Ride it wisely." },
-  mixed:     { icon: "🌦️", label: "Changeable",   desc: "Emotions shifting. That's okay — patterns reveal themselves over time." },
+  mixed:     { icon: "🌦️", label: "Changeable",   desc: "Emotions shifting. That's okay. Patterns reveal themselves over time." },
   quiet:     { icon: "🌙", label: "Still night",   desc: "No recent data yet. Log a moment to see your emotional weather." },
 };
 

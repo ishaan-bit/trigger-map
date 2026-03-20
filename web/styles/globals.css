@@ -830,33 +830,40 @@ button,
   padding: 10px 16px;
   border-radius: 999px;
   border: 1px solid rgba(197, 214, 235, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
   color: #b8c8dc;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
 }
 
 .emotionChip:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
   border-color: rgba(197, 214, 235, 0.2);
+  transform: scale(1.03);
 }
 
 .emotionChipActive {
-  background: rgba(123, 201, 216, 0.15);
-  border-color: rgba(123, 201, 216, 0.35);
+  background: rgba(123, 201, 216, 0.18) !important;
+  border-color: rgba(123, 201, 216, 0.45) !important;
   color: #f1f5fb;
+  transform: scale(1.05);
+  box-shadow: 0 0 16px rgba(123, 201, 216, 0.2);
 }
 
-.emotionChip[data-emotion="frustrated"].emotionChipActive { background: rgba(240, 127, 132, 0.15); border-color: rgba(240, 127, 132, 0.4); }
-.emotionChip[data-emotion="anxious"].emotionChipActive { background: rgba(240, 185, 106, 0.15); border-color: rgba(240, 185, 106, 0.4); }
-.emotionChip[data-emotion="neutral"].emotionChipActive { background: rgba(158, 176, 201, 0.15); border-color: rgba(158, 176, 201, 0.4); }
-.emotionChip[data-emotion="calm"].emotionChipActive { background: rgba(157, 228, 183, 0.15); border-color: rgba(157, 228, 183, 0.4); }
-.emotionChip[data-emotion="energized"].emotionChipActive { background: rgba(240, 217, 106, 0.15); border-color: rgba(240, 217, 106, 0.4); }
+.emotionChip[data-emotion="frustrated"].emotionChipActive { background: rgba(255, 107, 122, 0.18) !important; border-color: rgba(255, 107, 122, 0.5) !important; box-shadow: 0 0 16px rgba(255, 107, 122, 0.2); }
+.emotionChip[data-emotion="anxious"].emotionChipActive { background: rgba(255, 179, 71, 0.18) !important; border-color: rgba(255, 179, 71, 0.5) !important; box-shadow: 0 0 16px rgba(255, 179, 71, 0.2); }
+.emotionChip[data-emotion="neutral"].emotionChipActive { background: rgba(158, 176, 201, 0.18) !important; border-color: rgba(158, 176, 201, 0.5) !important; box-shadow: 0 0 16px rgba(158, 176, 201, 0.15); }
+.emotionChip[data-emotion="calm"].emotionChipActive { background: rgba(94, 230, 160, 0.18) !important; border-color: rgba(94, 230, 160, 0.5) !important; box-shadow: 0 0 16px rgba(94, 230, 160, 0.2); }
+.emotionChip[data-emotion="energized"].emotionChipActive { background: rgba(167, 139, 250, 0.18) !important; border-color: rgba(167, 139, 250, 0.5) !important; box-shadow: 0 0 16px rgba(167, 139, 250, 0.2); }
 
 .emotionChipEmoji {
   font-size: 16px;
+  filter: none;
 }
 
 .emotionChipLabel {
@@ -1843,4 +1850,170 @@ button,
     width: 10px;
     height: 10px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE-ADAPTIVE · Login Warmth, Report Glow, Alive Elements
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Login warmth ─── */
+.loginWarmth {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.loginWarmthOrb {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(94, 230, 160, 0.08), transparent 70%);
+  pointer-events: none;
+  -webkit-animation: breathe 5s ease-in-out infinite;
+  animation: breathe 5s ease-in-out infinite;
+}
+
+.loginTrust {
+  color: #8da4bd;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 340px;
+  margin: 0;
+}
+
+.loginDivider {
+  position: relative;
+  height: 1px;
+  background: rgba(197, 214, 235, 0.1);
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loginDividerText {
+  position: absolute;
+  padding: 0 12px;
+  background: rgba(13, 20, 36, 1);
+  font-size: 11px;
+  color: #6a7d96;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.loginAnonymousHint {
+  color: #6a7d96;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.loginSafetyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(94, 230, 160, 0.04);
+  border: 1px solid rgba(94, 230, 160, 0.08);
+}
+
+.loginSafetyIcon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.loginSafetyText {
+  font-size: 11px;
+  color: #6a7d96;
+  line-height: 1.5;
+}
+
+/* ─── State-adaptive ambient glow ─── */
+@-webkit-keyframes stateGlowPulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 0.45; }
+}
+@keyframes stateGlowPulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 0.45; }
+}
+
+.stateGlow {
+  position: fixed;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--state-color, #7bc9d8), transparent 65%);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: -1;
+  -webkit-animation: stateGlowPulse 6s ease-in-out infinite;
+  animation: stateGlowPulse 6s ease-in-out infinite;
+}
+
+/* ─── Empty orb (starter state) ─── */
+.emptyOrb {
+  font-size: 48px;
+  display: block;
+  line-height: 1;
+}
+
+/* ─── Pairing chip glow overrides (color-coded) ─── */
+.pairingChip {
+  gap: 4px;
+  transition: box-shadow 0.2s;
+}
+
+.pairingCount {
+  color: #6a7d96;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* ─── Trajectory state-adaptive ─── */
+.trajectoryDay {
+  --day-color: #9eb0c9;
+}
+
+.trajectoryScore {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ─── Correlation row color-coding ─── */
+.correlationTrigger {
+  font-weight: 700;
+}
+
+.correlationChip {
+  transition: background 0.15s;
+}
+
+/* ─── Volatility color-coding ─── */
+.metricValue {
+  transition: color 0.2s;
+}
+
+/* ─── Insight section card accent borders ─── */
+.insightSectionCard {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.insightSectionCard:hover {
+  box-shadow: 0 0 16px rgba(148, 180, 224, 0.06);
 }

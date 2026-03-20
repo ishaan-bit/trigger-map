@@ -24,10 +24,10 @@ const EMOTION_COLORS = {
 
 const EMOTION_ECHOES = {
   calm: ["Stillness noticed.", "That calm matters. We see it.", "A quiet moment, held."],
-  neutral: ["Noted. Even the steady moments count.", "Middle ground — still worth seeing.", "Logged without judgment."],
-  anxious: ["That tension you're carrying — we see it.", "Anxiety logged. Naming it is already a step.", "You showed up even when it felt heavy."],
-  frustrated: ["Frustration acknowledged. You didn't push it away.", "That friction is real. We heard it.", "Noted — sometimes just naming the heat helps."],
-  energized: ["That spark is worth remembering.", "Energy captured — hold onto this one.", "Momentum logged. This feeds your patterns."],
+  neutral: ["Noted. Even the steady moments count.", "Middle ground, still worth seeing.", "Logged without judgment."],
+  anxious: ["That tension you're carrying, we see it.", "Anxiety logged. Naming it is already a step.", "You showed up even when it felt heavy."],
+  frustrated: ["Frustration acknowledged. You didn't push it away.", "That friction is real. We heard it.", "Noted. Sometimes just naming the heat helps."],
+  energized: ["That spark is worth remembering.", "Energy captured, hold onto this one.", "Momentum logged. This feeds your patterns."],
 };
 
 const WEATHER_MAP = {
@@ -36,7 +36,7 @@ const WEATHER_MAP = {
   anxious:   { icon: "🌧️", label: "Overcast",     desc: "Some tension showing up. Be gentle with yourself." },
   frustrated:{ icon: "⛈️", label: "Turbulent",    desc: "Friction in the air. Take it one moment at a time." },
   energized: { icon: "⚡", label: "Electric",      desc: "High energy in your recent logs. Ride it wisely." },
-  mixed:     { icon: "🌦️", label: "Changeable",   desc: "Emotions shifting. That's okay — patterns reveal themselves over time." },
+  mixed:     { icon: "🌦️", label: "Changeable",   desc: "Emotions shifting. That's okay. Patterns reveal themselves over time." },
   quiet:     { icon: "🌙", label: "Still night",   desc: "No recent data yet. Log a moment to see your emotional weather." },
 };
 
@@ -228,7 +228,7 @@ export default function HomePage() {
                   );
                 })}
               </div>
-              <p className="tagHint">Optional — up to {MAX_TAGS_PER_MOMENT}</p>
+              <p className="tagHint">Optional, up to {MAX_TAGS_PER_MOMENT}</p>
             </div>
           ) : null}
 
