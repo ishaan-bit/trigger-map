@@ -64,6 +64,7 @@ function BloomItem({ bloom, index }) {
 
   const meta = BLOOM[bloom.emotion] || BLOOM.neutral;
   const icon = bloom.isMature ? meta.bloom : meta.seed;
+  const label = bloom.emotion;
 
   return (
     <Animated.View style={[styles.bloomSlot, {
@@ -71,6 +72,7 @@ function BloomItem({ bloom, index }) {
     }]}>
       <Text style={styles.bloomIcon}>{icon}</Text>
       <View style={[styles.bloomGlow, { backgroundColor: meta.color }]} />
+      <Text style={[styles.bloomLabel, { color: meta.color }]} numberOfLines={1}>{label}</Text>
     </Animated.View>
   );
 }
@@ -125,8 +127,8 @@ const styles = StyleSheet.create({
   bloomSlot: {
     alignItems: "center",
     justifyContent: "center",
-    width: 36,
-    height: 40,
+    width: 44,
+    height: 52,
     borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.03)",
     position: "relative",
@@ -137,11 +139,18 @@ const styles = StyleSheet.create({
   },
   bloomGlow: {
     position: "absolute",
-    bottom: 0,
+    bottom: 12,
     width: 24,
     height: 4,
     borderRadius: 2,
     opacity: 0.3,
+  },
+  bloomLabel: {
+    fontSize: 8,
+    fontWeight: "600",
+    textTransform: "capitalize",
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
   emptySlot: {
     alignItems: "center",

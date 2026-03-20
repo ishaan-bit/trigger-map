@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Animated, Easing, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   GoogleSignin,
   isErrorWithCode,
@@ -11,6 +11,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette, radius } from "@/utils/theme";
+import { tap, success as hapticSuccess } from "@/utils/haptics";
 
 export function LoginScreen() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   function configureGoogleSignIn() {
     GoogleSignin.configure({
@@ -29,9 +31,19 @@ export function LoginScreen() {
 
   useEffect(() => {
     configureGoogleSignIn();
-  }, []);
+    // Subtle breathing glow loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 2400, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      ])
+    ).start();
+  }, [glowAnim]);
+
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.12] });
 
   async function submit() {
+    tap();
     try {
       setLoading(true);
       if (mode === "login") {
@@ -39,6 +51,7 @@ export function LoginScreen() {
       } else {
         await registerWithEmail(name, email, password);
       }
+      hapticSuccess();
       router.replace("/(tabs)/timeline");
     } catch (error) {
       Alert.alert("Authentication error", error.message);
@@ -48,6 +61,7 @@ export function LoginScreen() {
   }
 
   async function handleGoogle() {
+    tap();
     try {
       // Re-configure every time to ensure fresh state after sign-out
       configureGoogleSignIn();
@@ -68,6 +82,7 @@ export function LoginScreen() {
         throw new Error("Google login did not return an ID token");
       }
       await signInWithGoogle(idToken);
+      hapticSuccess();
       router.replace("/(tabs)/timeline");
     } catch (error) {
       if (isErrorWithCode(error)) {
@@ -80,11 +95,24 @@ export function LoginScreen() {
 
   return (
     <ScreenShell>
+      {/* Breathing glow orb */}
+      <Animated.View style={[styles.glowOrb, { opacity: glowOpacity }]} />
+
       <View style={styles.header}>
         <Text style={styles.brand}>TriggerMap</Text>
         <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
-        <Text style={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</Text>
-        <Text style={styles.subtitle}>Sign in to sync your data and unlock deeper insights.</Text>
+        <Text style={styles.title}>{mode === "login" ? "Good to see you" : "Let's begin"}</Text>
+        <Text style={styles.subtitle}>
+          {mode === "login"
+            ? "Your emotional journey picks up right where you left off."
+            : "A safe, private space to understand your emotions."}
+        </Text>
+      </View>
+
+      {/* Trust signal */}
+      <View style={styles.trustRow}>
+        <Text style={styles.trustIcon}>🔒</Text>
+        <Text style={styles.trustText}>Your data is encrypted and never shared with anyone.</Text>
       </View>
 
       {mode === "register" ? (
@@ -122,8 +150,8 @@ export function LoginScreen() {
       <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
       <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary disabled={loading} />
       <PrimaryButton
-        label={mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
-        onPress={() => setMode(mode === "login" ? "register" : "login")}
+        label={mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+        onPress={() => { tap(); setMode(mode === "login" ? "register" : "login"); }}
         secondary
         disabled={loading}
       />
@@ -136,16 +164,25 @@ export function LoginScreen() {
         secondary
       />
       <Text style={styles.anonHint}>
-        Anonymous mode keeps everything on-device. Sign in to sync across devices and unlock weekly insights.
+        Anonymous mode keeps everything on your device only. Sign in to sync across devices and get personalised weekly insights.
       </Text>
       <Text style={styles.privacyHint}>
-        Your data stays private. We don't sell or share it.
+        Built with privacy at the core. Your emotional data belongs to you, always.
       </Text>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  glowOrb: {
+    position: "absolute",
+    top: -60,
+    alignSelf: "center",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: palette.accent,
+  },
   header: {
     gap: 6,
     marginTop: 12,
@@ -175,6 +212,27 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  trustRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    backgroundColor: palette.successSoft || "rgba(94, 230, 160, 0.08)",
+    borderWidth: 1,
+    borderColor: (palette.success || "#5ee6a0") + "22",
+  },
+  trustIcon: {
+    fontSize: 14,
+  },
+  trustText: {
+    color: palette.success || "#5ee6a0",
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 16,
   },
   input: {
     minHeight: 56,

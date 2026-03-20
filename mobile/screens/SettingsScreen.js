@@ -1,14 +1,14 @@
-import { Alert, Linking, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Animated, Easing, Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
-import { selection, warning } from "@/utils/haptics";
+import { selection, warning, tap } from "@/utils/haptics";
 
 function Section({ icon, title, children }) {
   return (
@@ -39,18 +39,28 @@ export function SettingsScreen() {
   } = useAppSession();
   const baseUrl = getWebBaseUrl();
   const [permissionStatus, setPermissionStatus] = useState("undetermined");
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Notifications.getPermissionsAsync().then(({ status }) => setPermissionStatus(status));
-  }, []);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      ])
+    ).start();
+  }, [glowAnim]);
 
   const notificationsBlocked = permissionStatus === "denied";
 
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
   const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
 
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.08] });
+
   return (
     <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
+      <Animated.View style={[styles.glowOrb, { opacity: glowOpacity }]} />
 
       <View style={styles.header}>
         <Text style={styles.kicker}>Preferences</Text>
@@ -62,18 +72,19 @@ export function SettingsScreen() {
       <Section icon="👤" title="Account">
         <Row label="Status" value={user ? user.email : "Anonymous"} />
         {!user && (
-          <Text style={styles.hintText}>Sign in to sync your data and unlock deeper insights.</Text>
+          <Text style={styles.hintText}>Sign in to keep your emotional data safe and synced across devices.</Text>
         )}
         <PrimaryButton
           label={user ? "Sign out" : "Sign in"}
           onPress={user ? async () => {
+            tap();
             try {
               await signOut();
               router.replace("/login");
             } catch {
               Alert.alert("Sign out failed", "Please try again.");
             }
-          } : () => router.push("/login")}
+          } : () => { tap(); router.push("/login"); }}
           secondary
         />
       </Section>
@@ -201,7 +212,7 @@ export function SettingsScreen() {
 
       {/* ── Privacy ── */}
       <Section icon="🔒" title="Privacy">
-        <Text style={styles.hintText}>Privacy first — your data stays yours.</Text>
+        <Text style={styles.hintText}>Privacy first — your emotional data stays on your terms, always.</Text>
         <PrimaryButton label="Privacy policy" onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
         <PrimaryButton label="Terms and conditions" onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
         <Row label="Support" value="qdenxp@gmail.com" />
@@ -226,6 +237,15 @@ export function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  glowOrb: {
+    position: "absolute",
+    top: -40,
+    alignSelf: "center",
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: palette.accent,
+  },
   header: {
     gap: 6,
     marginTop: 10,

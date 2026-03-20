@@ -1,7 +1,9 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -15,6 +17,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
+import { tap, selection } from "@/utils/haptics";
 
 /** Strip encoding artifacts from any backend/stored text */
 function cleanText(str) {
@@ -98,9 +101,9 @@ function parseLlmSections(narrative) {
 }
 
 const INSIGHT_SECTION_META = [
-  { icon: "🔍", label: "What stood out" },
-  { icon: "🧩", label: "What may be contributing" },
-  { icon: "💡", label: "One thing to try" },
+  { icon: "🔍", label: "What stood out", color: palette.accent },
+  { icon: "🧩", label: "What may be contributing", color: palette.purple },
+  { icon: "💡", label: "One thing to try", color: palette.success },
 ];
 
 const EMOTION_EMOJIS = {
@@ -121,6 +124,7 @@ function scoreTone(score) {
 }
 
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
+const TIME_COLORS = { morning: "#ffb347", afternoon: "#a78bfa", evening: "#56d0e0", night: "#9eb0c9" };
 
 const ENERGY_COLORS = {
   steady: palette.success, balanced: palette.accent, tense: palette.warning,
@@ -213,6 +217,34 @@ function PairingChip({ trigger, emotion, count, positive }) {
   );
 }
 
+/** Animated insight card — slides up and fades in with a color-coded left border. */
+function InsightCard({ icon, label, body, color, index }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(18)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 120, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: index * 120, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, slideAnim, index]);
+
+  return (
+    <Animated.View style={[s.insightSectionCard, {
+      borderLeftWidth: 3,
+      borderLeftColor: color,
+      opacity: fadeAnim,
+      transform: [{ translateY: slideAnim }],
+    }]}>
+      <View style={s.insightSectionHeader}>
+        <Text style={s.insightSectionIcon}>{icon}</Text>
+        <Text style={[s.insightSectionLabel, { color }]}>{label}</Text>
+      </View>
+      <Text style={s.insightSectionBody}>{body}</Text>
+    </Animated.View>
+  );
+}
+
 /* -- Main screen -- */
 
 export function WeeklyReportScreen() {
@@ -274,8 +306,9 @@ export function WeeklyReportScreen() {
   const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
   const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
 
-  function handleSignIn() { trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
+  function handleSignIn() { tap(); trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
   async function handleUpgrade() {
+    tap();
     trackEvent("report_upgrade_tapped", {});
     try {
       setPurchasing(true);
@@ -324,7 +357,7 @@ export function WeeklyReportScreen() {
                   <Text style={s.heroPillEmoji}>
                     {report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}
                   </Text>
-                  <Text style={s.heroPillLabel}>
+                  <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
                     {report.topEmotion || "Mixed"}
                   </Text>
                 </View>
@@ -344,17 +377,25 @@ export function WeeklyReportScreen() {
             ) : null}
 
             {/* Dominant pattern highlight */}
-            {report?.frictionZones?.length > 0 && (
-              <View style={s.dominantCard}>
-                <Text style={s.dominantIcon}>🔥</Text>
-                <View style={s.dominantContent}>
-                  <Text style={s.dominantLabel}>PRIMARY FRICTION</Text>
-                  <Text style={s.dominantText}>
-                    {report.frictionZones[0].trigger} tends to leave you feeling {report.frictionZones[0].emotion} — this showed up {report.frictionZones[0].count} times this week.
-                  </Text>
+            {report?.frictionZones?.length > 0 && (() => {
+              const frictionEmo = report.frictionZones[0].emotion;
+              const frictionColor = EMOTION_COLORS[frictionEmo] || palette.danger;
+              return (
+                <View style={[s.dominantCard, {
+                  backgroundColor: frictionColor + "12",
+                  borderColor: frictionColor + "30",
+                  borderLeftColor: frictionColor,
+                }]}>
+                  <Text style={s.dominantIcon}>🔥</Text>
+                  <View style={s.dominantContent}>
+                    <Text style={[s.dominantLabel, { color: frictionColor }]}>PRIMARY FRICTION</Text>
+                    <Text style={s.dominantText}>
+                      {report.frictionZones[0].trigger} tends to leave you feeling <Text style={{ color: frictionColor, fontWeight: "600" }}>{frictionEmo}</Text> — this showed up {report.frictionZones[0].count} times this week.
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            })()}
           </View>
 
           {error ? (
@@ -398,7 +439,7 @@ export function WeeklyReportScreen() {
               {emotionEntries.length ? (
                 <View style={s.card}>
                   {emotionEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={emotionMax} color={palette.warning} icon={EMOTION_EMOJIS[key]} />
+                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} />
                   ))}
                 </View>
               ) : null}
@@ -416,7 +457,7 @@ export function WeeklyReportScreen() {
                 <View style={s.card}>
                   <Text style={s.cardLabel}>When you logged</Text>
                   {timeEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={timeMax} color={palette.warning} icon={TIME_ICONS[key]} />
+                    <HBar key={key} label={key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
                   ))}
                 </View>
               ) : null}
@@ -432,7 +473,7 @@ export function WeeklyReportScreen() {
                         <Text style={s.narrativeTitle}>Friction zones</Text>
                         {report.frictionZones.slice(0, 3).map((f) => (
                           <Text key={`${f.trigger}-${f.emotion}`} style={s.narrativeText}>
-                            {capitalize(f.trigger)} → {f.emotion} ({f.count}×) — this combination keeps showing up and may be worth noticing.
+                            {capitalize(f.trigger)} → <Text style={{ color: EMOTION_COLORS[f.emotion] || palette.textSecondary, fontWeight: "600" }}>{f.emotion}</Text> ({f.count}×) — this combination keeps showing up and may be worth noticing.
                           </Text>
                         ))}
                       </View>
@@ -445,7 +486,7 @@ export function WeeklyReportScreen() {
                         <Text style={s.narrativeTitle}>What helps</Text>
                         {report.regulators.slice(0, 3).map((r) => (
                           <Text key={`${r.trigger}-${r.emotion}`} style={s.narrativeText}>
-                            {capitalize(r.trigger)} tends to bring {r.emotion} ({r.count}×) — a pattern worth protecting.
+                            {capitalize(r.trigger)} tends to bring <Text style={{ color: EMOTION_COLORS[r.emotion] || palette.textSecondary, fontWeight: "600" }}>{r.emotion}</Text> ({r.count}×) — a pattern worth protecting.
                           </Text>
                         ))}
                       </View>
@@ -479,13 +520,16 @@ export function WeeklyReportScreen() {
                           <View style={s.correlationRow} key={trigger}>
                             <Text style={s.correlationTrigger}>{trigger}</Text>
                             <View style={s.correlationChips}>
-                              {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
-                                <View style={s.correlationChip} key={emo}>
-                                  <Text style={s.correlationChipText}>
-                                    {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
-                                  </Text>
-                                </View>
-                              ))}
+                              {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
+                                const emoColor = EMOTION_COLORS[emo] || palette.text;
+                                return (
+                                  <View style={[s.correlationChip, { backgroundColor: emoColor + "15", borderColor: emoColor + "40" }]} key={emo}>
+                                    <Text style={[s.correlationChipText, { color: emoColor }]}>
+                                      {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
+                                    </Text>
+                                  </View>
+                                );
+                              })}
                             </View>
                           </View>
                         ))}
@@ -640,18 +684,12 @@ export function WeeklyReportScreen() {
                         <View style={s.insightCardsRow}>
                           {INSIGHT_SECTION_META.map((meta, i) => (
                             sections[i] ? (
-                              <View key={meta.label} style={s.insightSectionCard}>
-                                <Text style={s.insightSectionIcon}>{meta.icon}</Text>
-                                <Text style={s.insightSectionLabel}>{meta.label}</Text>
-                                <Text style={s.insightSectionBody}>{sections[i]}</Text>
-                              </View>
+                              <InsightCard key={meta.label} icon={meta.icon} label={meta.label} body={sections[i]} color={meta.color} index={i} />
                             ) : null
                           ))}
                         </View>
                       ) : (
-                        <View style={s.insightSectionCard}>
-                          <Text style={s.insightSectionBody}>{cleanText(report.llmInsight.narrative)}</Text>
-                        </View>
+                        <InsightCard icon="🔍" label="Insight" body={cleanText(report.llmInsight.narrative)} color={palette.accent} index={0} />
                       )}
                       {daysAgo !== null ? (
                         <Text style={s.insightFooter}>
@@ -699,18 +737,12 @@ export function WeeklyReportScreen() {
                           <View style={s.insightCardsRow}>
                             {INSIGHT_SECTION_META.map((meta, i) => (
                               fullSections[i] ? (
-                                <View key={meta.label} style={s.insightSectionCard}>
-                                  <Text style={s.insightSectionIcon}>{meta.icon}</Text>
-                                  <Text style={s.insightSectionLabel}>{meta.label}</Text>
-                                  <Text style={s.insightSectionBody}>{fullSections[i]}</Text>
-                                </View>
+                                <InsightCard key={meta.label} icon={meta.icon} label={meta.label} body={fullSections[i]} color={meta.color} index={i} />
                               ) : null
                             ))}
                           </View>
                         ) : (
-                          <View style={s.insightSectionCard}>
-                            <Text style={s.insightSectionBody}>{cleanText(report.llmInsight.narrative)}</Text>
-                          </View>
+                          <InsightCard icon="🔍" label="Insight" body={cleanText(report.llmInsight.narrative)} color={palette.accent} index={0} />
                         )}
                         <Text style={s.firstFreeHint}>Future pattern insights require Premium.</Text>
                       </View>
@@ -1054,6 +1086,10 @@ const s = StyleSheet.create({
     borderRadius: radius.md, padding: 16, gap: 6,
     backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.glassBorder,
+    overflow: "hidden",
+  },
+  insightSectionHeader: {
+    flexDirection: "row", alignItems: "center", gap: 6,
   },
   insightSectionIcon: { fontSize: 20 },
   insightSectionLabel: {

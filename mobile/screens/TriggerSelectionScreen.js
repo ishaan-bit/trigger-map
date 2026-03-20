@@ -18,7 +18,7 @@ const PROMPTS = [
 ];
 
 function getPrompt(count) {
-  if (count >= 3) return "Back again — good habit.";
+  if (count >= 3) return "Back again, good habit.";
   return PROMPTS[count % PROMPTS.length];
 }
 
@@ -97,14 +97,18 @@ export function TriggerSelectionScreen() {
 
       <View style={styles.bottomCard}>
         <Text style={styles.bottomEmoji}>
-          {todayCount >= 3 ? "✨" : todayCount > 0 ? "🔥" : "🌱"}
+          {moments.length >= 10 ? "🌟" : todayCount >= 3 ? "✨" : todayCount > 0 ? "🔥" : "🌱"}
         </Text>
         <Text style={styles.bottomText}>
-          {todayCount >= 3
-            ? "Nice pattern data building up. Check your report later."
-            : todayCount > 0
-              ? `${3 - todayCount} more to unlock stronger observations this week.`
-              : "Each moment you log sharpens your weekly pattern report."}
+          {moments.length >= 10
+            ? "Strong week so far. Your patterns are getting sharper."
+            : todayCount >= 3
+              ? "Nice pattern data building up. Check your report later."
+              : moments.length >= 5
+                ? "Good momentum this week. Keep going for richer insights."
+                : todayCount > 0
+                  ? `${3 - todayCount} more today to strengthen this week's observations.`
+                  : "Each moment you log sharpens your weekly pattern report."}
         </Text>
       </View>
     </ScreenShell>
