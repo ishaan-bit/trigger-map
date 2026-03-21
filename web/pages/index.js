@@ -1,25 +1,23 @@
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { TRIGGER_EMOTION_TAGS, TRIGGER_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
+import { EmotionGarden } from "../components/EmotionGarden";
+import { StreakOrb } from "../components/StreakOrb";
+import { MoodWeather } from "../components/MoodWeather";
+import { DailyPrediction } from "../components/DailyPrediction";
+import { EMOTION_COLORS, EMOTION_CARD_TINTS } from "../lib/designSystem";
 
 const TRIGGER_EMOJIS = {
-  work: "💼", family: "🏠", partner: "💛", social: "👥",
-  alone: "🧘", exercise: "🏃", travel: "✈️", health: "🩺", money: "💰",
+  work: "\u{1F4BC}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
+  alone: "\u{1F9D8}", exercise: "\u{1F3C3}", travel: "\u2708\uFE0F", health: "\u{1FA7A}", money: "\u{1F4B0}",
 };
 
 const EMOTION_EMOJIS = {
-  frustrated: "😤", anxious: "😰", neutral: "😐", calm: "😌", energized: "⚡",
-};
-
-const EMOTION_COLORS = {
-  calm: "#5ee6a0",
-  neutral: "#9eb0c9",
-  anxious: "#ffb347",
-  frustrated: "#ff6b7a",
-  energized: "#a78bfa",
+  frustrated: "\u{1F624}", anxious: "\u{1F630}", neutral: "\u{1F610}", calm: "\u{1F60C}", energized: "\u26A1",
 };
 
 const EMOTION_ECHOES = {
@@ -30,33 +28,12 @@ const EMOTION_ECHOES = {
   energized: ["That spark is worth remembering.", "Energy captured, hold onto this one.", "Momentum logged. This feeds your patterns."],
 };
 
-const WEATHER_MAP = {
-  calm:      { icon: "☀️", label: "Clear skies",  desc: "Your recent moments lean calm. A good day to notice what's working." },
-  neutral:   { icon: "🌤️", label: "Partly clear", desc: "Steady and grounded. Not much turbulence in your recent moments." },
-  anxious:   { icon: "🌧️", label: "Overcast",     desc: "Some tension showing up. Be gentle with yourself." },
-  frustrated:{ icon: "⛈️", label: "Turbulent",    desc: "Friction in the air. Take it one moment at a time." },
-  energized: { icon: "⚡", label: "Electric",      desc: "High energy in your recent logs. Ride it wisely." },
-  mixed:     { icon: "🌦️", label: "Changeable",   desc: "Emotions shifting. That's okay. Patterns reveal themselves over time." },
-  quiet:     { icon: "🌙", label: "Still night",   desc: "No recent data yet. Log a moment to see your emotional weather." },
-};
-
-function computeWeather(moments) {
-  if (!moments?.length) return WEATHER_MAP.quiet;
-  const now = Date.now();
-  const recent = moments.filter((m) => now - new Date(m.timestamp).getTime() < 24 * 60 * 60 * 1000);
-  if (!recent.length) return WEATHER_MAP.quiet;
-  const counts = {};
-  for (const m of recent) counts[m.emotion] = (counts[m.emotion] || 0) + 1;
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  if (sorted.length >= 2 && sorted[0][1] === sorted[1][1]) return WEATHER_MAP.mixed;
-  return WEATHER_MAP[sorted[0][0]] || WEATHER_MAP.neutral;
-}
-
 function getEmotionTags(trigger, emotion) {
   return TRIGGER_EMOTION_TAGS[trigger]?.[emotion] || TRIGGER_TAGS[trigger] || [];
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const { saveMoment, loadTimeline } = useSession();
   const [step, setStep] = useState("trigger");
   const [trigger, setTrigger] = useState(null);
@@ -105,7 +82,7 @@ export default function HomePage() {
         smartReflectionPrompt: response?.smartReflectionPrompt || null,
         pairCount: response?.pairCount || 0,
       });
-      setTimeout(reset, 3500);
+      setTimeout(() => { router.push("/timeline"); }, 2500);
     } catch {
       setSaved(false);
       setFeedback(null);
@@ -114,7 +91,6 @@ export default function HomePage() {
     }
   }
 
-  const weather = computeWeather(moments);
   const emotionColor = EMOTION_COLORS[emotion] || "#56d0e0";
   const tags = trigger && emotion ? getEmotionTags(trigger, emotion) : [];
 
@@ -123,20 +99,29 @@ export default function HomePage() {
     const echoList = EMOTION_ECHOES[emotion] || EMOTION_ECHOES.neutral;
     const echo = feedback.patternFeedback || echoList[Math.floor(Math.random() * echoList.length)];
     const orbColor = EMOTION_COLORS[emotion] || "#56d0e0";
+    const cardTint = EMOTION_CARD_TINTS[emotion] || EMOTION_CARD_TINTS.neutral;
 
     return (
       <Layout title="Heard you.">
+        <div className="stateGlow" style={{ "--state-color": orbColor }} />
         <section className="postLogScene sceneIn">
           <div className="postLogOrb" style={{ "--orb-color": orbColor }}>
             <div className="postLogOrbInner">
-              <span className="postLogEmoji">{EMOTION_EMOJIS[emotion] || "😐"}</span>
+              <span className="postLogEmoji">{EMOTION_EMOJIS[emotion] || "\u{1F610}"}</span>
             </div>
           </div>
           <h2 className="postLogTitle" style={{ color: orbColor }}>Heard you.</h2>
-          <p className="postLogEcho">{echo}</p>
-          {feedback.smartReflectionPrompt ? (
-            <p className="postLogReflection">{feedback.smartReflectionPrompt}</p>
-          ) : null}
+          <div className="feedbackCardWeb" style={{ backgroundColor: cardTint.bg, borderColor: cardTint.border }}>
+            <div className="feedbackCardIcon" style={{ backgroundColor: cardTint.iconBg }}>
+              <span>{EMOTION_EMOJIS[emotion] || "\u{1F4AB}"}</span>
+            </div>
+            <div className="feedbackCardBody">
+              <p className="feedbackCardMsg">{echo}</p>
+              {feedback.smartReflectionPrompt ? (
+                <p className="feedbackCardReflection">{feedback.smartReflectionPrompt}</p>
+              ) : null}
+            </div>
+          </div>
         </section>
       </Layout>
     );
@@ -147,6 +132,9 @@ export default function HomePage() {
       {/* ── Step 1: Trigger selection ── */}
       {step === "trigger" ? (
         <section className="sceneIn stack">
+          <DailyPrediction />
+          <StreakOrb moments={moments} />
+
           <article className="card cardFeature stack">
             <p className="sectionKicker">Quick log</p>
             <h2>What triggered this moment?</h2>
@@ -157,15 +145,8 @@ export default function HomePage() {
             </p>
           </article>
 
-          {/* Emotional weather ribbon */}
-          <div className="weatherRibbon">
-            <div className="weatherShimmer" />
-            <span className="weatherIcon">{weather.icon}</span>
-            <div className="weatherCopy">
-              <strong className="weatherLabel">{weather.label}</strong>
-              <p className="weatherDesc">{weather.desc}</p>
-            </div>
-          </div>
+          <MoodWeather moments={moments} />
+          <EmotionGarden moments={moments} />
 
           <div className="tileGrid">
             {TRIGGERS.map((t) => (
@@ -175,7 +156,7 @@ export default function HomePage() {
                 onClick={() => { setTrigger(t); setStep("emotion"); }}
                 type="button"
               >
-                <span className="triggerTileEmoji">{TRIGGER_EMOJIS[t] || "📌"}</span>
+                <span className="triggerTileEmoji">{TRIGGER_EMOJIS[t] || "\u{1F4CC}"}</span>
                 <span className="triggerTileLabel">{t}</span>
               </button>
             ))}

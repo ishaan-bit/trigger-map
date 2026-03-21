@@ -1570,6 +1570,364 @@ button,
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   ANDROID PARITY · EmotionGarden, StreakOrb, MoodWeather, Prediction
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Emotion Garden ─── */
+.gardenWrap {
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(13, 20, 36, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 10px;
+}
+
+.gardenHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gardenTitle {
+  color: #f1f5fb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.gardenCount {
+  color: #9eb0c9;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.gardenRow {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+@-webkit-keyframes bloomPop {
+  from { -webkit-transform: scale(0); transform: scale(0); opacity: 0; }
+  to   { -webkit-transform: scale(1); transform: scale(1); opacity: 1; }
+}
+@keyframes bloomPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.bloomSlot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid;
+  position: relative;
+  -webkit-animation: bloomPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: bloomPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bloomSlotNewest {
+  -webkit-transform: scale(1.15);
+  transform: scale(1.15);
+}
+
+.bloomIcon {
+  font-size: 20px;
+  z-index: 1;
+  line-height: 1;
+}
+
+.bloomGlow {
+  position: absolute;
+  bottom: 12px;
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  opacity: 0.3;
+}
+
+.bloomLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin-top: 2px;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+
+.bloomSlotEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.10);
+}
+
+.bloomEmptyDot {
+  color: #6a7d96;
+  font-size: 16px;
+}
+
+/* ─── Streak Orb ─── */
+.streakOrbWrap {
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(13, 20, 36, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  position: relative;
+}
+
+@-webkit-keyframes orbPulse {
+  0%, 100% { opacity: 0.3; -webkit-transform: scale(1); transform: scale(1); }
+  50%      { opacity: 0.6; -webkit-transform: scale(1.08); transform: scale(1.08); }
+}
+@keyframes orbPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.08); }
+}
+
+.streakOrbGlow {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 40px;
+  -webkit-animation: orbPulse 3.6s ease-in-out infinite;
+  animation: orbPulse 3.6s ease-in-out infinite;
+}
+
+.streakOrbContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.streakOrbIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.streakOrbText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.streakOrbCount {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.streakOrbSub {
+  color: #9eb0c9;
+  font-size: 11px;
+}
+
+/* ─── MoodWeather breathe row ─── */
+.weatherBreatheRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+@-webkit-keyframes breatheDot {
+  0%, 100% { -webkit-transform: scale(0.8); transform: scale(0.8); opacity: 0.3; }
+  50%      { -webkit-transform: scale(1.2); transform: scale(1.2); opacity: 0.7; }
+}
+@keyframes breatheDot {
+  0%, 100% { transform: scale(0.8); opacity: 0.3; }
+  50%      { transform: scale(1.2); opacity: 0.7; }
+}
+
+.weatherBreatheDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  -webkit-animation: breatheDot 6s ease-in-out infinite;
+  animation: breatheDot 6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.weatherBreatheText {
+  color: #9eb0c9;
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ─── Micro Insight ─── */
+.microInsight {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(13, 20, 36, 0.92);
+  border: 1px solid rgba(86, 208, 224, 0.18);
+}
+
+.microInsightIcon {
+  font-size: 16px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.microInsightText {
+  color: #f1f5fb;
+  font-size: 13px;
+  line-height: 19px;
+  margin: 0;
+}
+
+/* ─── Daily Prediction ─── */
+.predictionCard {
+  border-radius: 18px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  background: rgba(13, 20, 36, 0.80);
+  border: 1px solid rgba(86, 208, 224, 0.18);
+}
+
+.predictionTitle {
+  color: #f1f5fb;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
+}
+
+.predictionOptions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px;
+  justify-content: center;
+}
+.predictionOptions::-webkit-scrollbar { display: none; }
+
+.predictionOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(86, 208, 224, 0.28);
+  border: 1px solid rgba(86, 208, 224, 0.35);
+  min-width: 62px;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.12s;
+  box-shadow: none;
+}
+
+.predictionOption:hover {
+  -webkit-transform: scale(1.05);
+  transform: scale(1.05);
+  opacity: 0.90;
+}
+
+.predictionOption:active {
+  -webkit-transform: scale(0.95);
+  transform: scale(0.95);
+  opacity: 0.7;
+}
+
+.predictionEmoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.predictionLabel {
+  color: #f1f5fb;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ─── Feedback Card (Post-log) ─── */
+.feedbackCardWeb {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid;
+  overflow: hidden;
+  max-width: 360px;
+  width: 100%;
+}
+
+.feedbackCardIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.feedbackCardBody {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.feedbackCardMsg {
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.feedbackCardReflection {
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 19px;
+  font-style: italic;
+  margin: 0;
+  opacity: 0.85;
+}
+
+/* ─── Timeline trigger icon ─── */
+.momentTriggerIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 1px solid;
+  flex-shrink: 0;
+  min-height: auto;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  cursor: default;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    CINEMATIC · Post-Log, Weather, Timeline Connectors, Animations
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -2478,6 +2836,90 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
   .teaserCard {
     padding: 14px;
     border-radius: 14px;
+  }
+
+  /* New components responsive */
+  .gardenWrap {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .bloomSlot {
+    width: 38px;
+    height: 46px;
+  }
+
+  .bloomIcon {
+    font-size: 16px;
+  }
+
+  .bloomLabel {
+    font-size: 9px;
+  }
+
+  .bloomSlotEmpty {
+    width: 30px;
+    height: 34px;
+  }
+
+  .streakOrbWrap {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .streakOrbIcon {
+    font-size: 20px;
+  }
+
+  .streakOrbCount {
+    font-size: 13px;
+  }
+
+  .predictionCard {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .predictionOption {
+    padding: 8px 10px;
+    min-width: 54px;
+    border-radius: 10px;
+  }
+
+  .predictionEmoji {
+    font-size: 18px;
+  }
+
+  .predictionLabel {
+    font-size: 10px;
+  }
+
+  .feedbackCardWeb {
+    padding: 14px;
+    gap: 10px;
+    border-radius: 18px;
+  }
+
+  .feedbackCardIcon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .feedbackCardMsg {
+    font-size: 14px;
+  }
+
+  .microInsight {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .momentTriggerIcon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    border-radius: 10px;
   }
 }
 
