@@ -101,7 +101,7 @@ export default function LoginPage() {
         {error ? <p className="feedback feedbackPanel" style={{ padding: "12px 16px", borderRadius: 12 }}>{error}</p> : null}
 
         <button
-          className="ghostButton"
+          className="outlineButton"
           type="button"
           onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
         >
@@ -110,7 +110,7 @@ export default function LoginPage() {
 
         <div className="loginDivider"><span className="loginDividerText" /></div>
 
-        <button className="ghostButton" type="button" onClick={() => router.push("/")}>
+        <button className="outlineButton" type="button" onClick={() => router.push("/")}>
           Continue without signing in
         </button>
         <p className="loginAnonymousHint">

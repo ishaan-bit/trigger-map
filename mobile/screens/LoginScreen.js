@@ -185,13 +185,13 @@ export function LoginScreen() {
         <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
       </StaggerIn>
       <StaggerIn index={4}>
-        <PrimaryButton label="Continue with Google" onPress={handleGoogle} secondary disabled={loading} />
+        <PrimaryButton label="Continue with Google" onPress={handleGoogle} outline disabled={loading} />
       </StaggerIn>
       <StaggerIn index={5}>
         <PrimaryButton
           label={mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
           onPress={() => { tap(); setMode(mode === "login" ? "register" : "login"); }}
-          secondary
+          outline
           disabled={loading}
         />
       </StaggerIn>
@@ -204,8 +204,9 @@ export function LoginScreen() {
         <PrimaryButton
           label="Continue anonymously"
           onPress={() => router.replace("/(tabs)/log")}
-          secondary
+          outline
         />
+        <View style={{ height: 10 }} />
         <Text style={styles.anonHint}>
           Anonymous mode keeps everything on your device only. Sign in to sync across devices and get personalised weekly insights.
         </Text>

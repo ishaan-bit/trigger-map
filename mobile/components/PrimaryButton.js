@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 import { palette, radius } from "@/utils/theme";
 
-export function PrimaryButton({ label, onPress, disabled = false, secondary = false, danger = false }) {
+export function PrimaryButton({ label, onPress, disabled = false, secondary = false, danger = false, outline = false }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -9,12 +9,12 @@ export function PrimaryButton({ label, onPress, disabled = false, secondary = fa
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        secondary ? styles.secondaryButton : danger ? styles.dangerButton : styles.primaryButton,
+        outline ? styles.outlineButton : secondary ? styles.secondaryButton : danger ? styles.dangerButton : styles.primaryButton,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.label, secondary && styles.secondaryLabel, danger && styles.dangerLabel]}>{label}</Text>
+      <Text style={[styles.label, (secondary || outline) && styles.secondaryLabel, outline && styles.outlineLabel, danger && styles.dangerLabel]}>{label}</Text>
     </Pressable>
   );
 }
@@ -58,8 +58,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.3,
   },
+  outlineButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: palette.accentMedium,
+  },
   secondaryLabel: {
     color: palette.textSecondary,
+  },
+  outlineLabel: {
+    color: palette.accent,
   },
   dangerLabel: {
     color: palette.danger,
