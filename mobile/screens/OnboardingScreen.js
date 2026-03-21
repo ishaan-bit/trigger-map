@@ -130,12 +130,13 @@ const styles = StyleSheet.create({
   },
   list: {
     flexGrow: 0,
+    marginHorizontal: -20,
   },
   slide: {
     justifyContent: "center",
     gap: 18,
     paddingVertical: 32,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   slideIcon: {
     fontSize: 52,

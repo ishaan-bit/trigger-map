@@ -409,8 +409,6 @@ export function WeeklyReportScreen() {
               const trigColor = TRIGGER_COLORS[frictionTrigger] || palette.accent;
               return (
                 <View style={[s.dominantCard, {
-                  backgroundColor: frictionColor + "40",
-                  borderColor: frictionColor + "60",
                   borderLeftColor: frictionColor,
                 }]}>
                   <Text style={s.dominantIcon}>🔥</Text>
@@ -1006,10 +1004,11 @@ const s = StyleSheet.create({
   },
   trajectoryEmoji: { fontSize: 20 },
   trajectoryScore: { color: palette.text, fontSize: 14, fontWeight: "700" },
-  trajectoryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  trajectoryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   trajectoryDate: {
     color: palette.textSecondary, fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.4,
+    textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   trajectoryHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   trajectoryNote: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, fontStyle: "italic", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
@@ -1153,9 +1152,9 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: radius.md,
-    backgroundColor: "rgba(255, 107, 122, 0.35)",
+    backgroundColor: "rgba(13, 20, 36, 0.92)",
     borderWidth: 1,
-    borderColor: "rgba(255, 107, 122, 0.55)",
+    borderColor: palette.glassBorder,
     borderLeftWidth: 3,
     borderLeftColor: palette.danger,
   },
@@ -1171,9 +1170,6 @@ const s = StyleSheet.create({
     color: "#ffffff",
     fontSize: 14,
     lineHeight: 21,
-    textShadowColor: "rgba(0, 0, 0, 0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
   },
 
   /* Narrative-style cards */
@@ -1198,7 +1194,7 @@ const s = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     lineHeight: 19,
-    textShadowColor: "rgba(0, 0, 0, 0.8)",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
