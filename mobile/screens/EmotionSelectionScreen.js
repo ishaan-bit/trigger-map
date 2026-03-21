@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   tagChipActive: {
     borderColor: palette.accent,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.accentStrong,
   },
   tagChipDisabled: {
     opacity: 0.35,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   tagTextActive: {
-    color: palette.accent,
+    color: palette.text,
   },
   tagTextDisabled: {
     color: palette.muted,

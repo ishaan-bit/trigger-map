@@ -104,9 +104,9 @@ const styles = StyleSheet.create({
   wrap: {
     borderRadius: radius.md,
     padding: 14,
-    backgroundColor: "rgba(13, 20, 36, 0.50)",
+    backgroundColor: "rgba(13, 20, 36, 0.88)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.06)",
     gap: 10,
   },
   header: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 52,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     position: "relative",
   },
   bloomIcon: {

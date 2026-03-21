@@ -899,7 +899,7 @@ const s = StyleSheet.create({
   /* AI / insight */
   aiCard: {
     borderRadius: radius.md, padding: 18, gap: 10,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.accentMedium,
   },
   aiLabelRow: { flexDirection: "row" },
@@ -1053,7 +1053,7 @@ const s = StyleSheet.create({
   /* Data quality nudge */
   nudgeCard: {
     borderRadius: radius.md, padding: 20, gap: 10,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.accentMedium,
   },
   nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
@@ -1149,9 +1149,9 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: radius.md,
-    backgroundColor: "rgba(255, 107, 122, 0.08)",
+    backgroundColor: "rgba(255, 107, 122, 0.15)",
     borderWidth: 1,
-    borderColor: "rgba(255, 107, 122, 0.20)",
+    borderColor: "rgba(255, 107, 122, 0.30)",
     borderLeftWidth: 3,
     borderLeftColor: palette.danger,
   },

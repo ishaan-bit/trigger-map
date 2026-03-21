@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderRadius: radius.md,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.glass,
     borderWidth: 1,
     borderColor: palette.accentMedium,
   },

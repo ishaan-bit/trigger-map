@@ -75,15 +75,15 @@ export const EMOTION_STYLES = {
 
 /* ── Trigger Visual Styles ── */
 export const TRIGGER_STYLES = {
-  work:     { color: "#56d0e0", bg: "rgba(86, 208, 224, 0.08)",   border: "rgba(86, 208, 224, 0.20)" },
-  family:   { color: "#e0a356", bg: "rgba(224, 163, 86, 0.08)",   border: "rgba(224, 163, 86, 0.20)" },
-  partner:  { color: "#e05688", bg: "rgba(224, 86, 136, 0.08)",   border: "rgba(224, 86, 136, 0.20)" },
-  social:   { color: "#a78bfa", bg: "rgba(167, 139, 250, 0.08)",  border: "rgba(167, 139, 250, 0.20)" },
-  alone:    { color: "#9eb0c9", bg: "rgba(158, 176, 201, 0.08)",  border: "rgba(158, 176, 201, 0.18)" },
-  exercise: { color: "#5ee6a0", bg: "rgba(94, 230, 160, 0.08)",   border: "rgba(94, 230, 160, 0.20)" },
-  travel:   { color: "#56e0b0", bg: "rgba(86, 224, 176, 0.08)",   border: "rgba(86, 224, 176, 0.20)" },
-  health:   { color: "#ff6b7a", bg: "rgba(255, 107, 122, 0.08)",  border: "rgba(255, 107, 122, 0.20)" },
-  money:    { color: "#ffb347", bg: "rgba(255, 179, 71, 0.08)",   border: "rgba(255, 179, 71, 0.20)" },
+  work:     { color: "#56d0e0", bg: "rgba(86, 208, 224, 0.14)",   border: "rgba(86, 208, 224, 0.30)" },
+  family:   { color: "#e0a356", bg: "rgba(224, 163, 86, 0.14)",   border: "rgba(224, 163, 86, 0.30)" },
+  partner:  { color: "#e05688", bg: "rgba(224, 86, 136, 0.14)",   border: "rgba(224, 86, 136, 0.30)" },
+  social:   { color: "#a78bfa", bg: "rgba(167, 139, 250, 0.14)",  border: "rgba(167, 139, 250, 0.30)" },
+  alone:    { color: "#9eb0c9", bg: "rgba(158, 176, 201, 0.14)",  border: "rgba(158, 176, 201, 0.26)" },
+  exercise: { color: "#5ee6a0", bg: "rgba(94, 230, 160, 0.14)",   border: "rgba(94, 230, 160, 0.30)" },
+  travel:   { color: "#56e0b0", bg: "rgba(86, 224, 176, 0.14)",   border: "rgba(86, 224, 176, 0.30)" },
+  health:   { color: "#ff6b7a", bg: "rgba(255, 107, 122, 0.14)",  border: "rgba(255, 107, 122, 0.30)" },
+  money:    { color: "#ffb347", bg: "rgba(255, 179, 71, 0.14)",   border: "rgba(255, 179, 71, 0.30)" },
 };
 
 const DEFAULT_TRIGGER_STYLE = { color: palette.accent, bg: palette.accentSoft, border: palette.accentMedium };

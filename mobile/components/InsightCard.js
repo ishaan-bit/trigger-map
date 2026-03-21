@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   accent: {
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.card,
     borderColor: palette.accentMedium,
   },
   title: {

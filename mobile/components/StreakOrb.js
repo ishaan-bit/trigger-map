@@ -96,9 +96,9 @@ const styles = StyleSheet.create({
   wrap: {
     borderRadius: radius.md,
     padding: 14,
-    backgroundColor: "rgba(13, 20, 36, 0.60)",
+    backgroundColor: "rgba(13, 20, 36, 0.80)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.06)",
     overflow: "hidden",
     position: "relative",
   },

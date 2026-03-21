@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 320,
     borderRadius: 160,
-    backgroundColor: "rgba(86, 208, 224, 0.05)",
+    backgroundColor: "rgba(86, 208, 224, 0.08)",
   },
   glowMidLeft: {
     position: "absolute",
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "rgba(167, 139, 250, 0.04)",
+    backgroundColor: "rgba(167, 139, 250, 0.07)",
   },
   glowBottomCenter: {
     position: "absolute",
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: "rgba(46, 147, 168, 0.06)",
+    backgroundColor: "rgba(46, 147, 168, 0.09)",
   },
   safeArea: {
     flex: 1,

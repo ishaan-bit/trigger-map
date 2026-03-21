@@ -82,7 +82,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: radius.sm,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: "rgba(86, 208, 224, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(86, 208, 224, 0.20)",
     minWidth: 62,
   },
   optionPressed: {

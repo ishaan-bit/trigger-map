@@ -295,10 +295,14 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 21,
-    opacity: 0.3,
+    opacity: 0.55,
   },
   previewGradient: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "60%",
   },
   previewHint: {
     color: palette.muted,
@@ -310,7 +314,7 @@ const styles = StyleSheet.create({
   featureCard: {
     borderRadius: radius.md,
     padding: 18,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.glass,
     borderWidth: 1,
     borderColor: palette.accentMedium,
     gap: 12,

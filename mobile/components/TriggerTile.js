@@ -18,17 +18,17 @@ const TRIGGER_ICONS = {
 };
 
 const TRIGGER_TINTS = {
-  work: { bg: "rgba(167, 139, 250, 0.10)", glow: "rgba(167, 139, 250, 0.25)" },
-  social: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
-  money: { bg: "rgba(255, 179, 71, 0.10)", glow: "rgba(255, 179, 71, 0.25)" },
-  family: { bg: "rgba(94, 230, 160, 0.10)", glow: "rgba(94, 230, 160, 0.25)" },
-  exercise: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
-  health: { bg: "rgba(255, 107, 122, 0.10)", glow: "rgba(255, 107, 122, 0.25)" },
-  sleep: { bg: "rgba(167, 139, 250, 0.10)", glow: "rgba(167, 139, 250, 0.25)" },
-  partner: { bg: "rgba(255, 179, 71, 0.10)", glow: "rgba(255, 179, 71, 0.25)" },
-  alone: { bg: "rgba(94, 230, 160, 0.10)", glow: "rgba(94, 230, 160, 0.25)" },
-  travel: { bg: "rgba(86, 208, 224, 0.10)", glow: "rgba(86, 208, 224, 0.25)" },
-  other: { bg: "rgba(148, 180, 224, 0.08)", glow: "rgba(148, 180, 224, 0.20)" },
+  work: { bg: "rgba(167, 139, 250, 0.18)", glow: "rgba(167, 139, 250, 0.30)" },
+  social: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
+  money: { bg: "rgba(255, 179, 71, 0.18)", glow: "rgba(255, 179, 71, 0.30)" },
+  family: { bg: "rgba(94, 230, 160, 0.18)", glow: "rgba(94, 230, 160, 0.30)" },
+  exercise: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
+  health: { bg: "rgba(255, 107, 122, 0.18)", glow: "rgba(255, 107, 122, 0.30)" },
+  sleep: { bg: "rgba(167, 139, 250, 0.18)", glow: "rgba(167, 139, 250, 0.30)" },
+  partner: { bg: "rgba(255, 179, 71, 0.18)", glow: "rgba(255, 179, 71, 0.30)" },
+  alone: { bg: "rgba(94, 230, 160, 0.18)", glow: "rgba(94, 230, 160, 0.30)" },
+  travel: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
+  other: { bg: "rgba(148, 180, 224, 0.14)", glow: "rgba(148, 180, 224, 0.24)" },
 };
 
 export function TriggerTile({ label, onPress }) {
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
     shadowOffset: { width: 0, height: 2 },

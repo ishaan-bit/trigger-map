@@ -52,7 +52,7 @@ function computeWeather(moments) {
 
   // Variance check for "mixed" — only with enough data to be meaningful
   const distinctEmotions = Object.keys(counts).length;
-  if (recent.length >= 5 && distinctEmotions >= 3) {
+  if (recent.length >= 8 && distinctEmotions >= 4) {
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     if (sorted[0][1] - (sorted[1]?.[1] || 0) <= 1) return WEATHER_MAP.mixed;
   }

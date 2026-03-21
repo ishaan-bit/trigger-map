@@ -33,13 +33,13 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: emotionColor }]}>
       <View style={styles.row}>
-        <View style={[styles.iconWrap, { backgroundColor: `${emotionColor}12` }]}>
+        <View style={[styles.iconWrap, { backgroundColor: `${emotionColor}20` }]}>
           <Text style={styles.icon}>{TRIGGER_ICONS[moment.trigger] || "📌"}</Text>
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
             <Text style={styles.trigger}>{moment.trigger}</Text>
-            <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}18` }]}>
+            <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}28` }]}>
               <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || "•"}</Text>
               <Text style={[styles.emotionLabel, { color: emotionColor }]}>{moment.emotion}</Text>
             </View>
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: "rgba(86, 208, 224, 0.18)",
   },
   tagPillText: {
     color: palette.accent,

@@ -12,11 +12,11 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_TINTS = {
-  calm: { bg: "rgba(94,230,160,0.10)", border: "rgba(94,230,160,0.20)", active: "rgba(94,230,160,0.35)" },
-  neutral: { bg: "rgba(148,180,224,0.10)", border: "rgba(148,180,224,0.18)", active: "rgba(148,180,224,0.30)" },
-  anxious: { bg: "rgba(255,179,71,0.10)", border: "rgba(255,179,71,0.20)", active: "rgba(255,179,71,0.35)" },
-  frustrated: { bg: "rgba(255,107,122,0.10)", border: "rgba(255,107,122,0.20)", active: "rgba(255,107,122,0.35)" },
-  energized: { bg: "rgba(86,208,224,0.10)", border: "rgba(86,208,224,0.20)", active: "rgba(86,208,224,0.35)" },
+  calm: { bg: "rgba(94,230,160,0.14)", border: "rgba(94,230,160,0.24)", active: "rgba(94,230,160,0.45)" },
+  neutral: { bg: "rgba(148,180,224,0.14)", border: "rgba(148,180,224,0.22)", active: "rgba(148,180,224,0.40)" },
+  anxious: { bg: "rgba(255,179,71,0.14)", border: "rgba(255,179,71,0.24)", active: "rgba(255,179,71,0.45)" },
+  frustrated: { bg: "rgba(255,107,122,0.14)", border: "rgba(255,107,122,0.24)", active: "rgba(255,107,122,0.45)" },
+  energized: { bg: "rgba(86,208,224,0.14)", border: "rgba(86,208,224,0.24)", active: "rgba(86,208,224,0.45)" },
 };
 
 const EMOTION_ACCENT = {
@@ -53,11 +53,11 @@ export function EmotionChip({ label, active, onPress }) {
             backgroundColor: active ? tint.active : tint.bg,
             borderColor: active ? accentColor : tint.border,
           },
-          active && { shadowColor: accentColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
+          active && { shadowColor: accentColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
           pressed && styles.pressed,
         ]}
       >
-        <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}22` : "rgba(255,255,255,0.06)" }]}>
+        <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}33` : "rgba(255,255,255,0.08)" }]}>
           <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
         </View>
         <Text style={[styles.label, active && { color: palette.text }]}>{label}</Text>

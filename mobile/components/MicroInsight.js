@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderRadius: radius.md,
-    backgroundColor: palette.accentSoft,
+    backgroundColor: "rgba(13, 20, 36, 0.92)",
     borderWidth: 1,
     borderColor: palette.accentMedium,
   },
