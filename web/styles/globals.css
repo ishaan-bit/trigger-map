@@ -23,6 +23,7 @@ a {
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: auto;
 }
 
 .shell {
@@ -150,6 +151,8 @@ a {
   border-radius: 999px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   position: -webkit-sticky;
   position: sticky;
   top: max(10px, env(safe-area-inset-top, 10px));
@@ -157,6 +160,7 @@ a {
   backdrop-filter: blur(18px);
   z-index: 10;
 }
+.nav::-webkit-scrollbar { display: none; }
 
 .nav a {
   padding: 10px 16px;
@@ -226,7 +230,8 @@ textarea {
 }
 
 textarea {
-  min-height: 140px;
+  min-height: 100px;
+  resize: vertical;
 }
 
 .primaryButton,
@@ -689,8 +694,11 @@ button,
   gap: 12px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 4px 0;
 }
+.trajectoryRow::-webkit-scrollbar { display: none; }
 
 .trajectoryDay {
   display: flex;
@@ -1496,9 +1504,13 @@ button,
 }
 
 .loginDivider {
+  position: relative;
   height: 1px;
   background: rgba(197, 214, 235, 0.1);
-  margin: 4px 0;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ─── Nav sign-in link ─── */
@@ -2041,4 +2053,595 @@ button,
 
 .insightSectionCard:hover {
   box-shadow: 0 0 16px rgba(148, 180, 224, 0.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE · Comprehensive cross-device, cross-browser rules
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Global touch + scroll improvements */
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Ensure touch targets meet 44px iOS minimum */
+button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
+  min-height: 44px;
+}
+
+/* ─── Tablet (≤768px) ─── */
+@media (max-width: 768px) {
+  .shell {
+    padding: 20px 20px 48px;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hero h1 {
+    font-size: 2.4rem;
+  }
+
+  .nav {
+    gap: 4px;
+    padding: 6px 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .card {
+    padding: 20px;
+  }
+
+  .postLogScene {
+    padding: 48px 20px 36px;
+  }
+
+  .loginCard {
+    max-width: 100%;
+  }
+
+  .settingsRow {
+    gap: 8px;
+  }
+
+  .premiumGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Large mobile (≤640px) — override existing rules ─── */
+@media (max-width: 640px) {
+  .emotionChipRow {
+    gap: 8px;
+  }
+
+  .emotionChip {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .tagChipRow {
+    gap: 6px;
+  }
+
+  .tagChip {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .momentMeta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .momentCard {
+    padding: 16px;
+  }
+
+  .momentActions {
+    flex-wrap: wrap;
+  }
+
+  .logActions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .logActions .ghostButton,
+  .logActions .primaryButton {
+    width: 100%;
+  }
+
+  .postLogEcho {
+    max-width: 100%;
+    padding: 0 12px;
+  }
+
+  .dayHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chartLabel {
+    font-size: 12px;
+  }
+
+  .chartRow {
+    grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) 28px;
+    gap: 8px;
+  }
+
+  .correlationTrigger {
+    font-size: 13px;
+  }
+
+  .correlationChip {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .trajectoryDay {
+    min-width: 48px;
+    padding: 10px 6px;
+  }
+
+  .trajectoryEmoji {
+    font-size: 18px;
+  }
+
+  .trajectoryScore {
+    font-size: 12px;
+  }
+
+  .loginCard {
+    padding: 20px 16px;
+  }
+
+  .loginTrust {
+    font-size: 12px;
+  }
+
+  .loginSafetyRow {
+    padding: 8px 12px;
+  }
+
+  .loginSafetyText {
+    font-size: 10px;
+  }
+
+  .settingsSection {
+    padding: 16px;
+  }
+
+  .gutCheckCard {
+    gap: 10px;
+  }
+
+  .gutCheckEmoji {
+    font-size: 24px;
+  }
+
+  .experimentCard {
+    padding: 16px;
+  }
+
+  .insightSectionCard {
+    padding: 14px;
+  }
+
+  .insightStateCard {
+    padding: 20px 16px;
+  }
+}
+
+/* ─── Small mobile (≤480px) — already has some rules, extend ─── */
+@media (max-width: 480px) {
+  .shell {
+    padding: 14px 14px 40px;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(14px, env(safe-area-inset-left, 0px));
+    padding-right: max(14px, env(safe-area-inset-right, 0px));
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .hero {
+    margin-bottom: 16px;
+    gap: 16px;
+  }
+
+  .heroCopy {
+    gap: 8px;
+  }
+
+  .statusBadge {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .statusHint {
+    font-size: 13px;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .muted {
+    font-size: 13px;
+  }
+
+  .emotionChipRow {
+    gap: 6px;
+  }
+
+  .emotionChip {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 16px;
+  }
+
+  .emotionChipEmoji {
+    font-size: 14px;
+  }
+
+  .tagChip {
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 14px;
+  }
+
+  .triggerTile {
+    min-height: 84px;
+    padding: 12px 8px;
+    gap: 6px;
+  }
+
+  .triggerTileEmoji {
+    font-size: 24px;
+  }
+
+  .triggerTileLabel {
+    font-size: 12px;
+  }
+
+  textarea {
+    min-height: 100px;
+  }
+
+  .outlineButton {
+    min-height: 46px;
+    font-size: 13px;
+  }
+
+  .primaryButton,
+  .ghostButton,
+  .installButton,
+  button {
+    min-height: 46px;
+    font-size: 13px;
+  }
+
+  .loginCard {
+    padding: 16px 14px;
+    border-radius: 18px;
+  }
+
+  .loginWarmthOrb {
+    width: 90px;
+    height: 90px;
+    top: -20px;
+  }
+
+  .heroPill {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .takeawayBar {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .chartRow {
+    grid-template-columns: minmax(60px, 90px) minmax(0, 1fr) 24px;
+    gap: 6px;
+  }
+
+  .chartLabel {
+    font-size: 11px;
+  }
+
+  .chartValue {
+    font-size: 12px;
+  }
+
+  .correlationRow {
+    grid-template-columns: minmax(60px, 90px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .correlationTrigger {
+    font-size: 12px;
+  }
+
+  .correlationChip {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .metricCard {
+    min-height: 110px;
+    padding: 14px;
+  }
+
+  .metricValue {
+    font-size: 1rem;
+  }
+
+  .pairingChip {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .trajectoryDay {
+    min-width: 44px;
+    padding: 8px 4px;
+    border-radius: 12px;
+  }
+
+  .trajectoryEmoji {
+    font-size: 16px;
+  }
+
+  .trajectoryScore {
+    font-size: 11px;
+  }
+
+  .trajectoryDate {
+    font-size: 10px;
+  }
+
+  .trajectoryLabel {
+    font-size: 10px;
+  }
+
+  .gutCheckEmoji {
+    font-size: 22px;
+  }
+
+  .momentTrigger,
+  .momentEmotion {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .momentTag {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+
+  .momentActionBtn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .settingsSection {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .settingsRow {
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .premiumPrice {
+    font-size: 1rem;
+  }
+
+  .benefitRow {
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 13px;
+  }
+
+  .tierIcon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .insightSectionCard {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .insightSectionBody {
+    font-size: 13px;
+    line-height: 19px;
+  }
+
+  .teaserCard {
+    padding: 14px;
+    border-radius: 14px;
+  }
+}
+
+/* ─── Tiny screens (≤360px) — iPhone SE, Galaxy A series, compact devices ─── */
+@media (max-width: 360px) {
+  .shell {
+    padding: 10px 10px 36px;
+    padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hero h1 {
+    font-size: 1.6rem;
+  }
+
+  .nav a {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .emotionChip {
+    padding: 6px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .tileGrid {
+    gap: 8px;
+  }
+
+  .triggerTile {
+    min-height: 72px;
+    padding: 10px 6px;
+  }
+
+  .triggerTileEmoji {
+    font-size: 22px;
+  }
+
+  .triggerTileLabel {
+    font-size: 11px;
+  }
+
+  .chartRow {
+    grid-template-columns: minmax(50px, 80px) minmax(0, 1fr) 22px;
+    gap: 4px;
+  }
+
+  .chartLabel {
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .loginCard {
+    padding: 14px 12px;
+  }
+
+  .loginTrust {
+    font-size: 11px;
+  }
+}
+
+/* ─── Landscape phone ─── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero {
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .hero h1 {
+    font-size: 1.6rem;
+  }
+
+  .lede {
+    display: none;
+  }
+
+  .postLogScene {
+    padding: 24px 16px 20px;
+  }
+
+  .postLogOrb {
+    width: 60px;
+    height: 60px;
+  }
+
+  .postLogOrbInner {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ─── Safari-specific fixes ─── */
+@supports (-webkit-touch-callout: none) {
+  /* Fix for Safari's rubber banding */
+  .shell {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Safari 100vh fix — use dvh when supported */
+  body {
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* Prevent input zoom on iOS (16px minimum) */
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* ─── Dynamic viewport height for modern browsers ─── */
+@supports (min-height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
+}
+
+/* ─── Reduced motion preference ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .sceneIn {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ─── High contrast / forced colors ─── */
+@media (forced-colors: active) {
+  .card, .settingsSection, .triggerTile, .emotionChip {
+    border: 1px solid ButtonText;
+  }
+
+  .primaryButton, .installButton {
+    forced-color-adjust: none;
+  }
+}
+
+/* ─── Print ─── */
+@media print {
+  .nav, .shellGlow, .heroActions, .installButton,
+  .weatherShimmer, .stateGlow, .loginWarmthOrb {
+    display: none;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
 }
