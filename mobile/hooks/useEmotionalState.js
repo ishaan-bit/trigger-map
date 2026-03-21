@@ -5,11 +5,11 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { palette } from "@/utils/theme";
 
 const EMOTION_PALETTE = {
-  calm:      { primary: palette.success,  glow: "rgba(94, 230, 160, 0.18)",  glowDeep: "rgba(94, 230, 160, 0.10)" },
-  neutral:   { primary: palette.accent,   glow: "rgba(86, 208, 224, 0.14)",  glowDeep: "rgba(86, 208, 224, 0.08)" },
-  anxious:   { primary: palette.warning,  glow: "rgba(255, 179, 71, 0.18)",  glowDeep: "rgba(255, 179, 71, 0.10)" },
-  frustrated:{ primary: palette.danger,   glow: "rgba(255, 107, 122, 0.18)", glowDeep: "rgba(255, 107, 122, 0.10)" },
-  energized: { primary: palette.purple,   glow: "rgba(167, 139, 250, 0.18)", glowDeep: "rgba(167, 139, 250, 0.10)" },
+  calm:      { primary: palette.success,  glow: "rgba(94, 230, 160, 0.08)",  glowDeep: "rgba(94, 230, 160, 0.05)" },
+  neutral:   { primary: palette.accent,   glow: "rgba(86, 208, 224, 0.06)",  glowDeep: "rgba(86, 208, 224, 0.04)" },
+  anxious:   { primary: palette.warning,  glow: "rgba(255, 179, 71, 0.08)",  glowDeep: "rgba(255, 179, 71, 0.05)" },
+  frustrated:{ primary: palette.danger,   glow: "rgba(255, 107, 122, 0.08)", glowDeep: "rgba(255, 107, 122, 0.05)" },
+  energized: { primary: palette.purple,   glow: "rgba(167, 139, 250, 0.08)", glowDeep: "rgba(167, 139, 250, 0.05)" },
 };
 
 const DEFAULT_PALETTE = EMOTION_PALETTE.neutral;

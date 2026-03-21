@@ -74,7 +74,7 @@ export function SettingsScreen() {
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
   const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
 
-  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.08] });
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.05] });
 
   return (
     <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
@@ -288,6 +288,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   section: {
     gap: 10,
@@ -328,11 +331,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flexShrink: 1,
     textAlign: "right",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   hintText: {
     color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   planRow: {
     flexDirection: "row",
@@ -373,6 +382,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 12,
     lineHeight: 16,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   permissionNotice: {
     gap: 10,
@@ -386,6 +398,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   aboutName: {
     color: palette.text,
@@ -396,6 +411,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   aboutMeta: {
     gap: 4,
@@ -405,5 +423,8 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 12,
     marginTop: 4,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

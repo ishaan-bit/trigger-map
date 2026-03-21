@@ -87,8 +87,8 @@ export function PremiumScreen() {
             {"When work comes up, you tend to feel anxious — particularly around meetings and deadlines. This pattern appeared 4 times this week..."}
           </Text>
           <LinearGradient
-            colors={["transparent", "transparent", "rgba(13, 20, 36, 0.75)", "rgba(13, 20, 36, 0.98)"]}
-            locations={[0, 0.5, 0.75, 1]}
+            colors={["transparent", "transparent", "transparent", "rgba(13, 20, 36, 0.85)"]}
+            locations={[0, 0.6, 0.75, 1]}
             style={styles.previewGradient}
           />
         </View>
@@ -213,9 +213,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
 
   /* Transformation section */
@@ -243,6 +243,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     color: palette.textSecondary,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   transformLabelAfter: {
     color: palette.accent,
@@ -252,6 +255,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontStyle: "italic",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   transformAfter: {
     color: palette.text,
@@ -296,22 +302,25 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   previewBlurText: {
-    color: palette.textSecondary,
+    color: palette.text,
     fontSize: 14,
     lineHeight: 21,
-    opacity: 0.75,
+    opacity: 0.85,
   },
   previewGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "45%",
+    height: "30%",
   },
   previewHint: {
     color: palette.textSecondary,
     fontSize: 12,
     fontStyle: "italic",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   /* Feature card */
@@ -332,6 +341,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 13,
     marginTop: -6,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   featureRow: {
     flexDirection: "row",

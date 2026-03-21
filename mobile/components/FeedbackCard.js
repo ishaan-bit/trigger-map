@@ -7,11 +7,11 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_CARD_TINTS = {
-  calm:       { bg: "rgba(94, 230, 160, 0.25)",  border: "rgba(94, 230, 160, 0.42)",  iconBg: "rgba(94, 230, 160, 0.28)" },
-  neutral:    { bg: "rgba(148, 180, 224, 0.25)",  border: "rgba(148, 180, 224, 0.38)", iconBg: "rgba(148, 180, 224, 0.28)" },
-  anxious:    { bg: "rgba(255, 179, 71, 0.25)",   border: "rgba(255, 179, 71, 0.42)",  iconBg: "rgba(255, 179, 71, 0.28)" },
-  frustrated: { bg: "rgba(255, 107, 122, 0.25)",  border: "rgba(255, 107, 122, 0.42)", iconBg: "rgba(255, 107, 122, 0.28)" },
-  energized:  { bg: "rgba(86, 208, 224, 0.25)",   border: "rgba(86, 208, 224, 0.42)",  iconBg: "rgba(86, 208, 224, 0.28)" },
+  calm:       { bg: "rgba(94, 230, 160, 0.40)",  border: "rgba(94, 230, 160, 0.55)",  iconBg: "rgba(94, 230, 160, 0.35)" },
+  neutral:    { bg: "rgba(148, 180, 224, 0.40)",  border: "rgba(148, 180, 224, 0.52)", iconBg: "rgba(148, 180, 224, 0.35)" },
+  anxious:    { bg: "rgba(255, 179, 71, 0.40)",   border: "rgba(255, 179, 71, 0.55)",  iconBg: "rgba(255, 179, 71, 0.35)" },
+  frustrated: { bg: "rgba(255, 107, 122, 0.40)",  border: "rgba(255, 107, 122, 0.55)", iconBg: "rgba(255, 107, 122, 0.35)" },
+  energized:  { bg: "rgba(86, 208, 224, 0.40)",   border: "rgba(86, 208, 224, 0.55)",  iconBg: "rgba(86, 208, 224, 0.35)" },
 };
 
 const DEFAULT_CARD_TINT = EMOTION_CARD_TINTS.neutral;
@@ -154,17 +154,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 5,
   },
   reflection: {
-    color: palette.accent,
+    color: "#ffffff",
     fontSize: 13,
     lineHeight: 19,
     fontStyle: "italic",
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowColor: "rgba(0, 0, 0, 0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
 });

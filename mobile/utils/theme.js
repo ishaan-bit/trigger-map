@@ -5,8 +5,8 @@ export const palette = {
   border: "rgba(148, 180, 224, 0.10)",
   borderLight: "rgba(148, 180, 224, 0.16)",
   text: "#edf2fa",
-  textSecondary: "#c4d0e1",
-  muted: "#a4b4c8",
+  textSecondary: "#dfe8f2",
+  muted: "#b8c8d8",
   accent: "#56d0e0",
   accentSoft: "rgba(86, 208, 224, 0.22)",
   accentMedium: "rgba(86, 208, 224, 0.30)",
@@ -21,9 +21,9 @@ export const palette = {
   purple: "#a78bfa",
   purpleSoft: "rgba(167, 139, 250, 0.22)",
   cardGlow: "rgba(86, 208, 224, 0.12)",
-  glass: "rgba(13, 20, 36, 0.88)",
-  glassBorder: "rgba(148, 180, 224, 0.14)",
-  card: "rgba(13, 20, 36, 0.94)",
+  glass: "rgba(13, 20, 36, 0.94)",
+  glassBorder: "rgba(148, 180, 224, 0.18)",
+  card: "rgba(13, 20, 36, 0.96)",
 };
 
 export const spacing = {

@@ -61,7 +61,7 @@ export function LoginScreen() {
     ).start();
   }, [glowAnim]);
 
-  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.12] });
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.06] });
 
   async function submit() {
     tap();
@@ -272,9 +272,9 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
   trustRow: {
     flexDirection: "row",
@@ -317,13 +317,13 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   anonHint: {
-    color: palette.textSecondary,
+    color: palette.text,
     fontSize: 12,
     textAlign: "center",
     lineHeight: 16,
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
   privacyHint: {
     color: palette.textSecondary,
@@ -331,8 +331,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 15,
     marginTop: 12,
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
 });

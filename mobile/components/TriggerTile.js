@@ -18,17 +18,17 @@ const TRIGGER_ICONS = {
 };
 
 const TRIGGER_TINTS = {
-  work: { bg: "rgba(167, 139, 250, 0.32)", glow: "rgba(167, 139, 250, 0.40)" },
-  social: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
-  money: { bg: "rgba(255, 179, 71, 0.32)", glow: "rgba(255, 179, 71, 0.40)" },
-  family: { bg: "rgba(94, 230, 160, 0.32)", glow: "rgba(94, 230, 160, 0.40)" },
-  exercise: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
-  health: { bg: "rgba(255, 107, 122, 0.32)", glow: "rgba(255, 107, 122, 0.40)" },
-  sleep: { bg: "rgba(167, 139, 250, 0.32)", glow: "rgba(167, 139, 250, 0.40)" },
-  partner: { bg: "rgba(255, 179, 71, 0.32)", glow: "rgba(255, 179, 71, 0.40)" },
-  alone: { bg: "rgba(94, 230, 160, 0.32)", glow: "rgba(94, 230, 160, 0.40)" },
-  travel: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
-  other: { bg: "rgba(148, 180, 224, 0.28)", glow: "rgba(148, 180, 224, 0.36)" },
+  work: { bg: "rgba(167, 139, 250, 0.45)", glow: "rgba(167, 139, 250, 0.55)" },
+  social: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
+  money: { bg: "rgba(255, 179, 71, 0.45)", glow: "rgba(255, 179, 71, 0.55)" },
+  family: { bg: "rgba(94, 230, 160, 0.45)", glow: "rgba(94, 230, 160, 0.55)" },
+  exercise: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
+  health: { bg: "rgba(255, 107, 122, 0.45)", glow: "rgba(255, 107, 122, 0.55)" },
+  sleep: { bg: "rgba(167, 139, 250, 0.45)", glow: "rgba(167, 139, 250, 0.55)" },
+  partner: { bg: "rgba(255, 179, 71, 0.45)", glow: "rgba(255, 179, 71, 0.55)" },
+  alone: { bg: "rgba(94, 230, 160, 0.45)", glow: "rgba(94, 230, 160, 0.55)" },
+  travel: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
+  other: { bg: "rgba(148, 180, 224, 0.40)", glow: "rgba(148, 180, 224, 0.50)" },
 };
 
 export function TriggerTile({ label, onPress }) {
@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
     textAlign: "center",
     letterSpacing: 0.3,
-    textShadowColor: "rgba(0, 0, 0, 0.7)",
+    textShadowColor: "rgba(0, 0, 0, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
 });

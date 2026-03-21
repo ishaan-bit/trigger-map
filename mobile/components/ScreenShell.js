@@ -31,8 +31,8 @@ export function ScreenShell({
     ).start();
   }, [breathAnim]);
 
-  const breathScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
-  const breathOpacity = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  const breathScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const breathOpacity = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.5] });
 
   // Living gradient — tinted by emotional state
   const emotionTint = EMOTION_STYLES[dominantEmotion]?.glow || "rgba(86, 208, 224, 0.10)";
@@ -99,28 +99,28 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -100,
     right: -80,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(86, 208, 224, 0.08)",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(86, 208, 224, 0.04)",
   },
   glowMidLeft: {
     position: "absolute",
     top: "35%",
     left: -120,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: "rgba(167, 139, 250, 0.07)",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(167, 139, 250, 0.03)",
   },
   glowBottomCenter: {
     position: "absolute",
     bottom: -140,
     alignSelf: "center",
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: "rgba(46, 147, 168, 0.09)",
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: "rgba(46, 147, 168, 0.04)",
   },
   safeArea: {
     flex: 1,

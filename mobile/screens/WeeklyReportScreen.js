@@ -876,8 +876,8 @@ const s = StyleSheet.create({
   header: { gap: 6, marginTop: 10 },
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   title: { color: palette.text, fontSize: 26, fontWeight: "700" },
-  subtitle: { color: palette.textSecondary, fontSize: 13, marginTop: 2 },
-  freshness: { color: palette.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic" },
+  subtitle: { color: palette.textSecondary, fontSize: 13, marginTop: 2, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  freshness: { color: palette.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic", textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   heroRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   heroPill: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -915,8 +915,8 @@ const s = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.6,
   },
   aiSummary: { color: palette.text, fontSize: 14, lineHeight: 22 },
-  aiSuggestion: { color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
-  firstFreeHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4 },
+  aiSuggestion: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  firstFreeHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Micro-experiment */
   experimentCard: {
@@ -925,7 +925,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
     borderLeftWidth: 3, borderLeftColor: palette.success,
   },
-  experimentText: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
+  experimentText: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Metrics */
   metricsRow: { flexDirection: "row", gap: 8 },
@@ -937,6 +937,7 @@ const s = StyleSheet.create({
   metricLabel: {
     color: palette.textSecondary, fontSize: 11, fontWeight: "700",
     letterSpacing: 0.8, textTransform: "uppercase",
+    textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   metricValue: { color: palette.text, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
 
@@ -948,7 +949,7 @@ const s = StyleSheet.create({
     color: palette.accent, fontSize: 11, fontWeight: "700",
     letterSpacing: 1.2,
   },
-  sectionExtra: { color: palette.textSecondary, fontSize: 11 },
+  sectionExtra: { color: palette.textSecondary, fontSize: 11, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   freqBadge: {
     paddingHorizontal: 5, paddingVertical: 1, borderRadius: radius.pill,
     backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)",
@@ -981,7 +982,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   hbarFill: { height: "100%", borderRadius: radius.pill },
-  hbarValue: { width: 26, color: palette.textSecondary, fontSize: 12, textAlign: "right" },
+  hbarValue: { width: 26, color: palette.textSecondary, fontSize: 12, textAlign: "right", textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
   /* Pairings */
   pairingGroup: { gap: 6 },
@@ -1010,9 +1011,9 @@ const s = StyleSheet.create({
     color: palette.textSecondary, fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.4,
   },
-  trajectoryHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
-  trajectoryNote: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, fontStyle: "italic" },
-  metricHint: { color: palette.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  trajectoryHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  trajectoryNote: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, fontStyle: "italic", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  metricHint: { color: palette.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Correlation */
   correlationRow: {
@@ -1046,7 +1047,7 @@ const s = StyleSheet.create({
     backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
   },
   lockedTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  lockedTeaser: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280 },
+  lockedTeaser: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   lockedCta: {
     marginTop: 4, paddingHorizontal: 20, paddingVertical: 11,
     borderRadius: radius.pill, backgroundColor: palette.accentStrong,
@@ -1060,7 +1061,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.accentMedium,
   },
   nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
-  nudgeBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
+  nudgeBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   nudgeSecondary: {
     marginTop: 4, paddingVertical: 10, alignItems: "center",
   },
@@ -1076,7 +1077,7 @@ const s = StyleSheet.create({
   },
   starterEmoji: { fontSize: 40 },
   starterTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
-  starterBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
+  starterBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* State cards */
   stateCard: {
@@ -1086,14 +1087,14 @@ const s = StyleSheet.create({
   emptyStateCard: { alignItems: "center", paddingVertical: 32 },
   emptyIllustration: { width: 120, height: 120, marginBottom: 8, opacity: 0.9 },
   stateTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
-  stateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260 },
+  stateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Gut check (prediction accuracy) */
   gutCheckRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   gutCheckEmoji: { fontSize: 28, marginTop: 2 },
   gutCheckContent: { flex: 1, gap: 4 },
   gutCheckTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  gutCheckBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
+  gutCheckBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Teaser card (State 3) */
   teaserCard: {
@@ -1102,7 +1103,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   teaserTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
-  teaserBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
+  teaserBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   teaserFade: {
     position: "absolute", left: 0, right: 0, bottom: 0, height: 32,
   },
@@ -1112,7 +1113,7 @@ const s = StyleSheet.create({
     backgroundColor: palette.accentStrong,
   },
   teaserCtaButtonText: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  teaserSubtext: { color: palette.textSecondary, fontSize: 12, textAlign: "center", lineHeight: 17 },
+  teaserSubtext: { color: palette.textSecondary, fontSize: 12, textAlign: "center", lineHeight: 17, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* Insight state cards (States 1, 2, 5) */
   insightStateCard: {
@@ -1122,8 +1123,8 @@ const s = StyleSheet.create({
   },
   insightStateIcon: { fontSize: 28 },
   insightStateTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
-  insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
+  insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right", textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
   /* Insight 3-card layout */
   insightCardsRow: { gap: 10 },
@@ -1152,9 +1153,9 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: radius.md,
-    backgroundColor: "rgba(255, 107, 122, 0.28)",
+    backgroundColor: "rgba(255, 107, 122, 0.35)",
     borderWidth: 1,
-    borderColor: "rgba(255, 107, 122, 0.45)",
+    borderColor: "rgba(255, 107, 122, 0.55)",
     borderLeftWidth: 3,
     borderLeftColor: palette.danger,
   },
@@ -1170,9 +1171,9 @@ const s = StyleSheet.create({
     color: "#ffffff",
     fontSize: 14,
     lineHeight: 21,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 5,
   },
 
   /* Narrative-style cards */
@@ -1197,7 +1198,7 @@ const s = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     lineHeight: 19,
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },

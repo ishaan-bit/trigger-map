@@ -121,12 +121,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   skip: {
-    color: palette.textSecondary,
+    color: palette.text,
     fontSize: 14,
     fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
   list: {
     flexGrow: 0,
@@ -147,12 +147,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   slideBody: {
-    color: palette.textSecondary,
+    color: palette.text,
     fontSize: 16,
     lineHeight: 24,
-    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
   },
   dots: {
     flexDirection: "row",

@@ -12,11 +12,11 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_TINTS = {
-  calm: { bg: "rgba(94,230,160,0.28)", border: "rgba(94,230,160,0.38)", active: "rgba(94,230,160,0.50)" },
-  neutral: { bg: "rgba(148,180,224,0.28)", border: "rgba(148,180,224,0.36)", active: "rgba(148,180,224,0.48)" },
-  anxious: { bg: "rgba(255,179,71,0.28)", border: "rgba(255,179,71,0.38)", active: "rgba(255,179,71,0.50)" },
-  frustrated: { bg: "rgba(255,107,122,0.28)", border: "rgba(255,107,122,0.38)", active: "rgba(255,107,122,0.50)" },
-  energized: { bg: "rgba(86,208,224,0.28)", border: "rgba(86,208,224,0.38)", active: "rgba(86,208,224,0.50)" },
+  calm: { bg: "rgba(94,230,160,0.40)", border: "rgba(94,230,160,0.50)", active: "rgba(94,230,160,0.60)" },
+  neutral: { bg: "rgba(148,180,224,0.40)", border: "rgba(148,180,224,0.48)", active: "rgba(148,180,224,0.58)" },
+  anxious: { bg: "rgba(255,179,71,0.40)", border: "rgba(255,179,71,0.50)", active: "rgba(255,179,71,0.60)" },
+  frustrated: { bg: "rgba(255,107,122,0.40)", border: "rgba(255,107,122,0.50)", active: "rgba(255,107,122,0.60)" },
+  energized: { bg: "rgba(86,208,224,0.40)", border: "rgba(86,208,224,0.50)", active: "rgba(86,208,224,0.60)" },
 };
 
 const EMOTION_ACCENT = {
@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     textTransform: "capitalize",
-    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowColor: "rgba(0, 0, 0, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 6,
   },
 });
