@@ -1,14 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette } from "@/utils/theme";
 
 const EMOTION_PALETTE = {
-  calm:      { primary: palette.success,  glow: "rgba(94, 230, 160, 0.07)",  glowDeep: "rgba(94, 230, 160, 0.04)" },
-  neutral:   { primary: palette.accent,   glow: "rgba(86, 208, 224, 0.05)",  glowDeep: "rgba(86, 208, 224, 0.03)" },
-  anxious:   { primary: palette.warning,  glow: "rgba(255, 179, 71, 0.07)",  glowDeep: "rgba(255, 179, 71, 0.04)" },
-  frustrated:{ primary: palette.danger,   glow: "rgba(255, 107, 122, 0.07)", glowDeep: "rgba(255, 107, 122, 0.04)" },
-  energized: { primary: palette.purple,   glow: "rgba(167, 139, 250, 0.07)", glowDeep: "rgba(167, 139, 250, 0.04)" },
+  calm:      { primary: palette.success,  glow: "rgba(94, 230, 160, 0.18)",  glowDeep: "rgba(94, 230, 160, 0.10)" },
+  neutral:   { primary: palette.accent,   glow: "rgba(86, 208, 224, 0.14)",  glowDeep: "rgba(86, 208, 224, 0.08)" },
+  anxious:   { primary: palette.warning,  glow: "rgba(255, 179, 71, 0.18)",  glowDeep: "rgba(255, 179, 71, 0.10)" },
+  frustrated:{ primary: palette.danger,   glow: "rgba(255, 107, 122, 0.18)", glowDeep: "rgba(255, 107, 122, 0.10)" },
+  energized: { primary: palette.purple,   glow: "rgba(167, 139, 250, 0.18)", glowDeep: "rgba(167, 139, 250, 0.10)" },
 };
 
 const DEFAULT_PALETTE = EMOTION_PALETTE.neutral;
@@ -19,6 +20,7 @@ const EmotionalStateContext = createContext({
   glowColor: DEFAULT_PALETTE.glow,
   glowDeepColor: DEFAULT_PALETTE.glowDeep,
   momentCount: 0,
+  refresh: () => {},
 });
 
 const SCORE = { frustrated: 1, anxious: 2, neutral: 3, calm: 4, energized: 5 };
@@ -59,22 +61,32 @@ export function EmotionalStateProvider({ children }) {
   const loadRef = useRef(loadTimeline);
   loadRef.current = loadTimeline;
 
+  const doRefresh = useCallback(() => {
+    loadRef.current()
+      .then((moments) => {
+        const all = Array.isArray(moments) ? moments : [];
+        setState({
+          dominantEmotion: computeDominantEmotion(all),
+          momentCount: all.length,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  // Refresh on every tab focus (works because individual screens re-focus)
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      loadRef.current()
-        .then((moments) => {
-          if (!active) return;
-          const all = Array.isArray(moments) ? moments : [];
-          setState({
-            dominantEmotion: computeDominantEmotion(all),
-            momentCount: all.length,
-          });
-        })
-        .catch(() => {});
-      return () => { active = false; };
-    }, [])
+      doRefresh();
+    }, [doRefresh])
   );
+
+  // Also refresh when app comes back to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") doRefresh();
+    });
+    return () => sub.remove();
+  }, [doRefresh]);
 
   const value = useMemo(() => {
     const ep = EMOTION_PALETTE[state.dominantEmotion] || DEFAULT_PALETTE;
@@ -84,8 +96,9 @@ export function EmotionalStateProvider({ children }) {
       glowColor: ep.glow,
       glowDeepColor: ep.glowDeep,
       momentCount: state.momentCount,
+      refresh: doRefresh,
     };
-  }, [state]);
+  }, [state, doRefresh]);
 
   return (
     <EmotionalStateContext.Provider value={value}>

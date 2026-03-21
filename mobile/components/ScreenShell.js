@@ -35,7 +35,7 @@ export function ScreenShell({
   const breathOpacity = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
   // Living gradient — tinted by emotional state
-  const emotionTint = EMOTION_STYLES[dominantEmotion]?.glow || "rgba(86, 208, 224, 0.04)";
+  const emotionTint = EMOTION_STYLES[dominantEmotion]?.glow || "rgba(86, 208, 224, 0.10)";
   const gradientColors = ["#080e1a", emotionTint, "#040710"];
 
   useEffect(() => {

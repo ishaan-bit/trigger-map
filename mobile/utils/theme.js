@@ -6,7 +6,7 @@ export const palette = {
   borderLight: "rgba(148, 180, 224, 0.14)",
   text: "#edf2fa",
   textSecondary: "#c4d0e1",
-  muted: "#7b8faa",
+  muted: "#94a8c2",
   accent: "#56d0e0",
   accentSoft: "rgba(86, 208, 224, 0.12)",
   accentMedium: "rgba(86, 208, 224, 0.20)",

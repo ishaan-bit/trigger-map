@@ -14,7 +14,7 @@ import { emotionTap, selection, success as hapticSuccess, tap } from "@/utils/ha
 
 const EMOTION_COLORS = {
   calm: palette.success,
-  neutral: palette.muted,
+  neutral: "#b0c4de",
   anxious: palette.warning,
   frustrated: palette.danger,
   energized: palette.accent,
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   saveButtonTextDisabled: {
-    color: palette.muted,
+    color: palette.textSecondary,
   },
   feedbackWrap: {
     flex: 1,

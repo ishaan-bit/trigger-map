@@ -12,16 +12,16 @@ const EMOTION_ICONS = {
 };
 
 const EMOTION_TINTS = {
-  calm: { bg: "rgba(94,230,160,0.08)", border: "rgba(94,230,160,0.18)", active: "rgba(94,230,160,0.22)" },
-  neutral: { bg: "rgba(148,180,224,0.08)", border: "rgba(148,180,224,0.14)", active: "rgba(148,180,224,0.20)" },
-  anxious: { bg: "rgba(255,179,71,0.08)", border: "rgba(255,179,71,0.18)", active: "rgba(255,179,71,0.22)" },
-  frustrated: { bg: "rgba(255,107,122,0.08)", border: "rgba(255,107,122,0.18)", active: "rgba(255,107,122,0.22)" },
-  energized: { bg: "rgba(86,208,224,0.08)", border: "rgba(86,208,224,0.18)", active: "rgba(86,208,224,0.22)" },
+  calm: { bg: "rgba(94,230,160,0.10)", border: "rgba(94,230,160,0.20)", active: "rgba(94,230,160,0.35)" },
+  neutral: { bg: "rgba(148,180,224,0.10)", border: "rgba(148,180,224,0.18)", active: "rgba(148,180,224,0.30)" },
+  anxious: { bg: "rgba(255,179,71,0.10)", border: "rgba(255,179,71,0.20)", active: "rgba(255,179,71,0.35)" },
+  frustrated: { bg: "rgba(255,107,122,0.10)", border: "rgba(255,107,122,0.20)", active: "rgba(255,107,122,0.35)" },
+  energized: { bg: "rgba(86,208,224,0.10)", border: "rgba(86,208,224,0.20)", active: "rgba(86,208,224,0.35)" },
 };
 
 const EMOTION_ACCENT = {
   calm: palette.success,
-  neutral: palette.muted,
+  neutral: "#b0c4de",
   anxious: palette.warning,
   frustrated: palette.danger,
   energized: palette.accent,
@@ -60,7 +60,7 @@ export function EmotionChip({ label, active, onPress }) {
         <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}22` : "rgba(255,255,255,0.06)" }]}>
           <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
         </View>
-        <Text style={[styles.label, active && { color: accentColor }]}>{label}</Text>
+        <Text style={[styles.label, active && { color: palette.text }]}>{label}</Text>
       </Pressable>
     </Animated.View>
   );
