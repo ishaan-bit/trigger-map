@@ -350,10 +350,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   hint: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     fontWeight: "500",
     marginTop: 2,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   emotionWrap: {
     flexDirection: "row",
@@ -413,7 +416,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   noteLabel: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.8,
@@ -499,5 +502,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     letterSpacing: -0.3,
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });

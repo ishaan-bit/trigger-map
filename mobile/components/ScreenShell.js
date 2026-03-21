@@ -156,10 +156,13 @@ const styles = StyleSheet.create({
   },
   loaderBody: {
     maxWidth: 280,
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   placeholderStack: {
     width: "100%",

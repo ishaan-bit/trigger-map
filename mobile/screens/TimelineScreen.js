@@ -288,9 +288,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   subtitle: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   daySection: {
     gap: 4,
@@ -325,7 +328,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dayHeader: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.2,
@@ -334,6 +337,9 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
     borderBottomWidth: 1,
     borderBottomColor: palette.glassBorder,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   stateCard: {
     borderRadius: radius.md,
@@ -350,7 +356,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stateBody: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
@@ -374,11 +380,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   emptyBody: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     textAlign: "center",
     maxWidth: 260,
     marginBottom: 8,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

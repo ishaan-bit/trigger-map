@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   dangerButton: {
     backgroundColor: palette.dangerSoft,
     borderWidth: 1,
-    borderColor: "rgba(255,107,122,0.20)",
+    borderColor: "rgba(255,107,122,0.30)",
   },
   disabled: {
     opacity: 0.4,
@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     color: palette.textSecondary,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   dangerLabel: {
     color: palette.danger,

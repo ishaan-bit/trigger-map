@@ -82,9 +82,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: radius.sm,
-    backgroundColor: "rgba(86, 208, 224, 0.12)",
+    backgroundColor: "rgba(86, 208, 224, 0.28)",
     borderWidth: 1,
-    borderColor: "rgba(86, 208, 224, 0.20)",
+    borderColor: "rgba(86, 208, 224, 0.35)",
     minWidth: 62,
   },
   optionPressed: {
@@ -96,5 +96,8 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 11,
     fontWeight: "600",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

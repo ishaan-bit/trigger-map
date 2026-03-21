@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   subtitle: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   hintText: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     borderColor: palette.accentMedium,
   },
   planBadgeText: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   switchHint: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   aboutBody: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   aboutFooter: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },

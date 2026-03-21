@@ -156,7 +156,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   closeIcon: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 20,
     fontWeight: "600",
   },
@@ -167,7 +167,7 @@ const s = StyleSheet.create({
     gap: 16,
   },
   sectionLabel: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.2,
@@ -197,7 +197,7 @@ const s = StyleSheet.create({
     fontSize: 16,
   },
   chipText: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     fontWeight: "600",
     textTransform: "capitalize",
@@ -236,7 +236,7 @@ const s = StyleSheet.create({
     borderColor: palette.glassBorder,
   },
   cancelText: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 15,
     fontWeight: "600",
   },

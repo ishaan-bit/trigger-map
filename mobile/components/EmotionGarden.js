@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: "rgba(13, 20, 36, 0.88)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.12)",
     gap: 10,
   },
   header: {
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   count: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -152,11 +152,14 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   bloomLabel: {
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: "600",
     textTransform: "capitalize",
     marginTop: 2,
     letterSpacing: 0.2,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   emptySlot: {
     alignItems: "center",
@@ -164,14 +167,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 40,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.02)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.10)",
     borderStyle: "dashed",
   },
   emptyDot: {
     color: palette.muted,
     fontSize: 16,
-    opacity: 0.4,
   },
 });

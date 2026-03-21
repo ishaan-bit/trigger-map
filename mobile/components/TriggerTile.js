@@ -18,17 +18,17 @@ const TRIGGER_ICONS = {
 };
 
 const TRIGGER_TINTS = {
-  work: { bg: "rgba(167, 139, 250, 0.18)", glow: "rgba(167, 139, 250, 0.30)" },
-  social: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
-  money: { bg: "rgba(255, 179, 71, 0.18)", glow: "rgba(255, 179, 71, 0.30)" },
-  family: { bg: "rgba(94, 230, 160, 0.18)", glow: "rgba(94, 230, 160, 0.30)" },
-  exercise: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
-  health: { bg: "rgba(255, 107, 122, 0.18)", glow: "rgba(255, 107, 122, 0.30)" },
-  sleep: { bg: "rgba(167, 139, 250, 0.18)", glow: "rgba(167, 139, 250, 0.30)" },
-  partner: { bg: "rgba(255, 179, 71, 0.18)", glow: "rgba(255, 179, 71, 0.30)" },
-  alone: { bg: "rgba(94, 230, 160, 0.18)", glow: "rgba(94, 230, 160, 0.30)" },
-  travel: { bg: "rgba(86, 208, 224, 0.18)", glow: "rgba(86, 208, 224, 0.30)" },
-  other: { bg: "rgba(148, 180, 224, 0.14)", glow: "rgba(148, 180, 224, 0.24)" },
+  work: { bg: "rgba(167, 139, 250, 0.32)", glow: "rgba(167, 139, 250, 0.40)" },
+  social: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
+  money: { bg: "rgba(255, 179, 71, 0.32)", glow: "rgba(255, 179, 71, 0.40)" },
+  family: { bg: "rgba(94, 230, 160, 0.32)", glow: "rgba(94, 230, 160, 0.40)" },
+  exercise: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
+  health: { bg: "rgba(255, 107, 122, 0.32)", glow: "rgba(255, 107, 122, 0.40)" },
+  sleep: { bg: "rgba(167, 139, 250, 0.32)", glow: "rgba(167, 139, 250, 0.40)" },
+  partner: { bg: "rgba(255, 179, 71, 0.32)", glow: "rgba(255, 179, 71, 0.40)" },
+  alone: { bg: "rgba(94, 230, 160, 0.32)", glow: "rgba(94, 230, 160, 0.40)" },
+  travel: { bg: "rgba(86, 208, 224, 0.32)", glow: "rgba(86, 208, 224, 0.40)" },
+  other: { bg: "rgba(148, 180, 224, 0.28)", glow: "rgba(148, 180, 224, 0.36)" },
 };
 
 export function TriggerTile({ label, onPress }) {
@@ -62,7 +62,7 @@ export function TriggerTile({ label, onPress }) {
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.tile, { backgroundColor: tint.bg }]}
+        style={[styles.tile, { backgroundColor: tint.bg, borderColor: tint.glow }]}
       >
         <View style={[styles.iconWrap, { shadowColor: tint.glow }]}>
           <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.glassBorder,
     gap: 6,
     shadowColor: "rgba(86, 208, 224, 0.15)",
@@ -109,11 +109,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   label: {
-    color: palette.text,
-    fontSize: 12,
+    color: "#ffffff",
+    fontSize: 13,
     fontWeight: "700",
     textTransform: "capitalize",
     textAlign: "center",
     letterSpacing: 0.3,
+    textShadowColor: "rgba(0, 0, 0, 0.7)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });

@@ -6,6 +6,16 @@ const EMOTION_ICONS = {
   calm: "😌", neutral: "😐", anxious: "😰", frustrated: "😤", energized: "⚡",
 };
 
+const EMOTION_CARD_TINTS = {
+  calm:       { bg: "rgba(94, 230, 160, 0.25)",  border: "rgba(94, 230, 160, 0.42)",  iconBg: "rgba(94, 230, 160, 0.28)" },
+  neutral:    { bg: "rgba(148, 180, 224, 0.25)",  border: "rgba(148, 180, 224, 0.38)", iconBg: "rgba(148, 180, 224, 0.28)" },
+  anxious:    { bg: "rgba(255, 179, 71, 0.25)",   border: "rgba(255, 179, 71, 0.42)",  iconBg: "rgba(255, 179, 71, 0.28)" },
+  frustrated: { bg: "rgba(255, 107, 122, 0.25)",  border: "rgba(255, 107, 122, 0.42)", iconBg: "rgba(255, 107, 122, 0.28)" },
+  energized:  { bg: "rgba(86, 208, 224, 0.25)",   border: "rgba(86, 208, 224, 0.42)",  iconBg: "rgba(86, 208, 224, 0.28)" },
+};
+
+const DEFAULT_CARD_TINT = EMOTION_CARD_TINTS.neutral;
+
 /** Emotion-aware acknowledgment messages — the app echoes back what it heard */
 const EMOTION_ECHOES = {
   calm: [
@@ -73,6 +83,7 @@ export function FeedbackCard({ feedback, trigger, emotion, onDismiss }) {
   }, [fadeAnim, slideAnim, glowAnim, onDismiss]);
 
   const icon = EMOTION_ICONS[emotion] || "💫";
+  const cardTint = EMOTION_CARD_TINTS[emotion] || DEFAULT_CARD_TINT;
 
   // Use backend pattern feedback if available, otherwise echo the emotion
   const { patternFeedback, smartReflectionPrompt, pairCount } = feedback || {};
@@ -91,9 +102,9 @@ export function FeedbackCard({ feedback, trigger, emotion, onDismiss }) {
   });
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+    <Animated.View style={[styles.container, { backgroundColor: cardTint.bg, borderColor: cardTint.border, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <Animated.View style={[styles.glowBg, { opacity: glowOpacity }]} />
-      <View style={styles.iconWrap}>
+      <View style={[styles.iconWrap, { backgroundColor: cardTint.iconBg }]}>
         <Text style={styles.icon}>{icon}</Text>
       </View>
       <View style={styles.textWrap}>
@@ -113,9 +124,9 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 18,
     borderRadius: radius.lg,
-    backgroundColor: "rgba(86, 208, 224, 0.12)",
+    backgroundColor: "rgba(86, 208, 224, 0.25)",
     borderWidth: 1,
-    borderColor: "rgba(86, 208, 224, 0.22)",
+    borderColor: "rgba(86, 208, 224, 0.40)",
     overflow: "hidden",
   },
   glowBg: {
@@ -127,7 +138,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(86, 208, 224, 0.16)",
+    backgroundColor: "rgba(86, 208, 224, 0.28)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -139,15 +150,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   message: {
-    color: palette.text,
+    color: "#ffffff",
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   reflection: {
     color: palette.accent,
     fontSize: 13,
     lineHeight: 19,
     fontStyle: "italic",
+    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

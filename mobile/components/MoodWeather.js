@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   ribbon: {
     borderRadius: radius.md,
     padding: 14,
-    backgroundColor: "rgba(13, 20, 36, 0.80)",
+    backgroundColor: "rgba(13, 20, 36, 0.88)",
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -171,11 +171,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   desc: {
     color: palette.textSecondary,
     fontSize: 12,
     lineHeight: 17,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   breatheRow: {
     flexDirection: "row",
@@ -184,7 +190,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.04)",
+    borderTopColor: "rgba(255,255,255,0.10)",
   },
   breatheDot: {
     width: 12,
@@ -192,8 +198,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   breatheText: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontStyle: "italic",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -87,7 +87,8 @@ export function PremiumScreen() {
             {"When work comes up, you tend to feel anxious — particularly around meetings and deadlines. This pattern appeared 4 times this week..."}
           </Text>
           <LinearGradient
-            colors={["transparent", "rgba(13, 20, 36, 0.95)"]}
+            colors={["transparent", "transparent", "rgba(13, 20, 36, 0.75)", "rgba(13, 20, 36, 0.98)"]}
+            locations={[0, 0.5, 0.75, 1]}
             style={styles.previewGradient}
           />
         </View>
@@ -209,9 +210,12 @@ const styles = StyleSheet.create({
     lineHeight: 34,
   },
   subtitle: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   /* Transformation section */
@@ -238,13 +242,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,
-    color: palette.muted,
+    color: palette.textSecondary,
   },
   transformLabelAfter: {
     color: palette.accent,
   },
   transformBefore: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     fontStyle: "italic",
@@ -295,17 +299,17 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 21,
-    opacity: 0.55,
+    opacity: 0.75,
   },
   previewGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "60%",
+    height: "45%",
   },
   previewHint: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 12,
     fontStyle: "italic",
   },
@@ -325,7 +329,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   featureCardPrice: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     marginTop: -6,
   },

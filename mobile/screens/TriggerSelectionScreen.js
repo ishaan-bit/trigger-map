@@ -168,10 +168,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   hint: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     fontWeight: "500",
     marginTop: 2,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   grid: {
     flexDirection: "row",
@@ -189,7 +192,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderRadius: radius.md,
-    backgroundColor: palette.glass,
+    backgroundColor: "rgba(13, 20, 36, 0.90)",
     borderWidth: 1,
     borderColor: palette.accentMedium,
   },
@@ -197,9 +200,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   bottomText: {
-    color: palette.textSecondary,
+    color: "#ffffff",
     fontSize: 13,
     lineHeight: 18,
     flex: 1,
+    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

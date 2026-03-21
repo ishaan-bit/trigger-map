@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   note: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: "rgba(86, 208, 224, 0.18)",
+    backgroundColor: "rgba(86, 208, 224, 0.25)",
   },
   tagPillText: {
     color: palette.accent,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   time: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   actionLabel: {
-    color: palette.muted,
+    color: palette.textSecondary,
     fontSize: 12,
     fontWeight: "600",
   },
