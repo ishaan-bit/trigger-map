@@ -60,9 +60,6 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     color: palette.textSecondary,
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   dangerLabel: {
     color: palette.danger,

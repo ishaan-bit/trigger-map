@@ -9,6 +9,7 @@ import { DailyPrediction } from "@/components/DailyPrediction";
 import { MoodWeather } from "@/components/MoodWeather";
 import { StreakOrb } from "@/components/StreakOrb";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { palette, radius } from "@/utils/theme";
 import { STAGGER_DELAY } from "@/utils/designSystem";
 
@@ -35,14 +36,26 @@ const PROMPTS = [
   "What's on your mind?",
 ];
 
-function getPrompt(count) {
+const EMOTION_PROMPTS = {
+  calm: "Steady waters. What's on your mind?",
+  neutral: "What just happened?",
+  anxious: "Something pulling at you?",
+  frustrated: "Name what's grinding.",
+  energized: "Riding some energy.",
+};
+
+function getPrompt(count, dominantEmotion) {
   if (count >= 3) return "Back again, good habit.";
+  if (dominantEmotion && EMOTION_PROMPTS[dominantEmotion]) {
+    return EMOTION_PROMPTS[dominantEmotion];
+  }
   return PROMPTS[count % PROMPTS.length];
 }
 
 export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
+  const { dominantEmotion, dominantTrigger, emotionalTrend, emotionColor, momentCount } = useEmotionalState();
   const [todayCount, setTodayCount] = useState(0);
   const [moments, setMoments] = useState([]);
   const [predictionDone, setPredictionDone] = useState(true);
@@ -81,7 +94,7 @@ export function TriggerSelectionScreen() {
         <StaggerIn index={0}>
           <View style={styles.header}>
             <Text style={styles.kicker}>Quick log</Text>
-            <Text style={styles.prompt}>{getPrompt(todayCount)}</Text>
+            <Text style={styles.prompt}>{getPrompt(todayCount, dominantEmotion)}</Text>
             <Text style={styles.hint}>
               {todayCount > 0
                 ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
@@ -99,6 +112,29 @@ export function TriggerSelectionScreen() {
         <StaggerIn index={2}>
           <StreakOrb moments={moments} />
         </StaggerIn>
+
+        {/* State-aware pattern nudge */}
+        {dominantEmotion && momentCount >= 3 ? (
+          <StaggerIn index={2}>
+            <View style={[styles.patternNudge, { borderLeftColor: emotionColor }]}>
+              <View style={[styles.nudgeDot, { backgroundColor: emotionColor }]} />
+              <View style={styles.nudgeContent}>
+                <Text style={styles.nudgeLabel}>
+                  Trending {dominantEmotion}{emotionalTrend === "improving" ? " ↑" : emotionalTrend === "declining" ? " ↓" : ""}
+                </Text>
+                <Text style={styles.nudgeBody}>
+                  {dominantTrigger
+                    ? `${dominantTrigger} has been your most logged trigger this week.`
+                    : emotionalTrend === "improving"
+                      ? "Your emotional tone has been shifting positively."
+                      : emotionalTrend === "declining"
+                        ? "Things have felt heavier lately. Name what's contributing."
+                        : "Your patterns are building. Keep logging for sharper insights."}
+                </Text>
+              </View>
+            </View>
+          </StaggerIn>
+        ) : null}
 
         <Tooltip
           id="log_tooltip"
@@ -123,20 +159,22 @@ export function TriggerSelectionScreen() {
       </Animated.View>
 
       <StaggerIn index={4 + TRIGGERS.length}>
-        <View style={styles.bottomCard}>
+        <View style={[styles.bottomCard, dominantEmotion && { borderColor: emotionColor + "40" }]}>
           <Text style={styles.bottomEmoji}>
             {moments.length >= 10 ? "🌟" : todayCount >= 3 ? "✨" : todayCount > 0 ? "🔥" : "🌱"}
           </Text>
           <Text style={styles.bottomText}>
-            {moments.length >= 10
-              ? "Strong week so far. Your patterns are getting sharper."
-              : todayCount >= 3
-                ? "Nice pattern data building up. Check your report later."
-                : moments.length >= 5
-                  ? "Good momentum this week. Keep going for richer insights."
-                  : todayCount > 0
-                    ? `${3 - todayCount} more today to strengthen this week's observations.`
-                    : "Each moment you log sharpens your weekly pattern report."}
+            {moments.length >= 10 && dominantTrigger
+              ? `Strong data this week. ${dominantTrigger} and ${dominantEmotion || "your patterns"} are becoming clear.`
+              : moments.length >= 10
+                ? "Strong week so far. Your patterns are getting sharper."
+                : todayCount >= 3
+                  ? "Nice pattern data building up. Check your report later."
+                  : moments.length >= 5
+                    ? "Good momentum this week. Keep going for richer insights."
+                    : todayCount > 0
+                      ? `${3 - todayCount} more today to strengthen this week's observations.`
+                      : "Each moment you log sharpens your weekly pattern report."}
           </Text>
         </View>
       </StaggerIn>
@@ -172,9 +210,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     marginTop: 2,
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   grid: {
     flexDirection: "row",
@@ -200,12 +235,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   bottomText: {
-    color: "#ffffff",
+    color: palette.text,
     fontSize: 13,
     lineHeight: 18,
     flex: 1,
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  },
+  patternNudge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+    borderLeftWidth: 3,
+  },
+  nudgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  nudgeContent: {
+    flex: 1,
+    gap: 2,
+  },
+  nudgeLabel: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  nudgeBody: {
+    color: palette.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

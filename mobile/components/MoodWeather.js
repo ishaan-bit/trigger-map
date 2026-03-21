@@ -171,17 +171,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     letterSpacing: 0.3,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   desc: {
     color: palette.textSecondary,
     fontSize: 12,
     lineHeight: 17,
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   breatheRow: {
     flexDirection: "row",
@@ -201,8 +195,5 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 11,
     fontStyle: "italic",
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 });

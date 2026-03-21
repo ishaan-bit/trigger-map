@@ -157,9 +157,6 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
     marginTop: 2,
     letterSpacing: 0.2,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   emptySlot: {
     alignItems: "center",

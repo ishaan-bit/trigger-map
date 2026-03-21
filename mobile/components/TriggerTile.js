@@ -115,8 +115,5 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
     textAlign: "center",
     letterSpacing: 0.3,
-    textShadowColor: "rgba(0, 0, 0, 0.9)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
   },
 });

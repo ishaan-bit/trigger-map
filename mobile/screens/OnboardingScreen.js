@@ -124,9 +124,6 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   list: {
     flexGrow: 0,
@@ -136,7 +133,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 18,
     paddingVertical: 32,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   slideIcon: {
     fontSize: 52,
@@ -151,9 +148,6 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 16,
     lineHeight: 24,
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   dots: {
     flexDirection: "row",

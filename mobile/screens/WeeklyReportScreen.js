@@ -409,6 +409,7 @@ export function WeeklyReportScreen() {
               const trigColor = TRIGGER_COLORS[frictionTrigger] || palette.accent;
               return (
                 <View style={[s.dominantCard, {
+                  borderColor: frictionColor + "40",
                   borderLeftColor: frictionColor,
                 }]}>
                   <Text style={s.dominantIcon}>🔥</Text>
@@ -621,28 +622,30 @@ export function WeeklyReportScreen() {
                   {report.weeklyEmotionTrajectory?.length >= 1 ? (
                     <AnimatedSection index={7} style={s.section}>
                       <SectionHeader label="Emotional tone" badge="live" />
-                      <Text style={s.trajectoryHint}>
-                        {report.weeklyEmotionTrajectory.length === 1
-                          ? "Your tone from logged days. More days logged means a richer trajectory."
-                          : "How your average tone shifted day by day. Higher is calmer/more energized."}
-                      </Text>
-                      {report.trajectoryNote ? (
-                        <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
-                      ) : null}
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-                        {report.weeklyEmotionTrajectory.map((day) => {
-                          const tone = scoreTone(day.score);
-                          return (
-                          <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
-                            <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
-                            <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
-                            <Text style={s.trajectoryDate}>
-                              {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
-                            </Text>
-                          </Pressable>
-                          );
-                        })}
-                      </ScrollView>
+                      <View style={s.card}>
+                        <Text style={s.trajectoryHint}>
+                          {report.weeklyEmotionTrajectory.length === 1
+                            ? "Your tone from logged days. More days logged means a richer trajectory."
+                            : "How your average tone shifted day by day. Higher is calmer/more energized."}
+                        </Text>
+                        {report.trajectoryNote ? (
+                          <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text>
+                        ) : null}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
+                          {report.weeklyEmotionTrajectory.map((day) => {
+                            const tone = scoreTone(day.score);
+                            return (
+                            <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
+                              <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
+                              <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
+                              <Text style={s.trajectoryDate}>
+                                {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}
+                              </Text>
+                            </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
                     </AnimatedSection>
                   ) : null}
 
@@ -874,8 +877,8 @@ const s = StyleSheet.create({
   header: { gap: 6, marginTop: 10 },
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   title: { color: palette.text, fontSize: 26, fontWeight: "700" },
-  subtitle: { color: palette.textSecondary, fontSize: 13, marginTop: 2, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  freshness: { color: palette.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic", textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  subtitle: { color: palette.textSecondary, fontSize: 13, marginTop: 2 },
+  freshness: { color: palette.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic" },
   heroRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   heroPill: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -887,14 +890,11 @@ const s = StyleSheet.create({
   heroPillEmoji: { fontSize: 14 },
   heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
   takeaway: {
-    color: "#ffffff", fontSize: 14, lineHeight: 21, marginTop: 6,
+    color: palette.text, fontSize: 14, lineHeight: 21, marginTop: 6,
     paddingVertical: 10, paddingHorizontal: 14,
-    borderRadius: radius.sm, backgroundColor: "rgba(13, 20, 36, 0.90)",
+    borderRadius: radius.sm, backgroundColor: palette.card,
     borderLeftWidth: 3, borderLeftColor: palette.accent,
     overflow: "hidden",
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 
   /* AI / insight */
@@ -913,8 +913,8 @@ const s = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.6,
   },
   aiSummary: { color: palette.text, fontSize: 14, lineHeight: 22 },
-  aiSuggestion: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  firstFreeHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  aiSuggestion: { color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
+  firstFreeHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, fontStyle: "italic", marginTop: 4 },
 
   /* Micro-experiment */
   experimentCard: {
@@ -923,7 +923,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
     borderLeftWidth: 3, borderLeftColor: palette.success,
   },
-  experimentText: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  experimentText: { color: palette.text, fontSize: 14, lineHeight: 21 },
 
   /* Metrics */
   metricsRow: { flexDirection: "row", gap: 8 },
@@ -935,7 +935,6 @@ const s = StyleSheet.create({
   metricLabel: {
     color: palette.textSecondary, fontSize: 11, fontWeight: "700",
     letterSpacing: 0.8, textTransform: "uppercase",
-    textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   metricValue: { color: palette.text, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
 
@@ -947,7 +946,7 @@ const s = StyleSheet.create({
     color: palette.accent, fontSize: 11, fontWeight: "700",
     letterSpacing: 1.2,
   },
-  sectionExtra: { color: palette.textSecondary, fontSize: 11, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  sectionExtra: { color: palette.textSecondary, fontSize: 11 },
   freqBadge: {
     paddingHorizontal: 5, paddingVertical: 1, borderRadius: radius.pill,
     backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)",
@@ -980,7 +979,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   hbarFill: { height: "100%", borderRadius: radius.pill },
-  hbarValue: { width: 26, color: palette.textSecondary, fontSize: 12, textAlign: "right", textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  hbarValue: { width: 26, color: palette.textSecondary, fontSize: 12, textAlign: "right" },
 
   /* Pairings */
   pairingGroup: { gap: 6 },
@@ -999,20 +998,19 @@ const s = StyleSheet.create({
   trajectoryDay: {
     alignItems: "center", gap: 4, minWidth: 56,
     paddingVertical: 12, paddingHorizontal: 8,
-    borderRadius: radius.md, backgroundColor: palette.glass,
+    borderRadius: radius.md, backgroundColor: palette.card,
     borderWidth: 1, borderColor: palette.glassBorder,
   },
   trajectoryEmoji: { fontSize: 20 },
   trajectoryScore: { color: palette.text, fontSize: 14, fontWeight: "700" },
-  trajectoryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  trajectoryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
   trajectoryDate: {
     color: palette.textSecondary, fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.4,
-    textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  trajectoryHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  trajectoryNote: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, fontStyle: "italic", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  metricHint: { color: palette.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  trajectoryHint: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
+  trajectoryNote: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, fontStyle: "italic" },
+  metricHint: { color: palette.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
 
   /* Correlation */
   correlationRow: {
@@ -1046,7 +1044,7 @@ const s = StyleSheet.create({
     backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
   },
   lockedTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  lockedTeaser: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  lockedTeaser: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280 },
   lockedCta: {
     marginTop: 4, paddingHorizontal: 20, paddingVertical: 11,
     borderRadius: radius.pill, backgroundColor: palette.accentStrong,
@@ -1060,7 +1058,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.accentMedium,
   },
   nudgeTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
-  nudgeBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  nudgeBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
   nudgeSecondary: {
     marginTop: 4, paddingVertical: 10, alignItems: "center",
   },
@@ -1076,7 +1074,7 @@ const s = StyleSheet.create({
   },
   starterEmoji: { fontSize: 40 },
   starterTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
-  starterBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  starterBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
 
   /* State cards */
   stateCard: {
@@ -1086,14 +1084,14 @@ const s = StyleSheet.create({
   emptyStateCard: { alignItems: "center", paddingVertical: 32 },
   emptyIllustration: { width: 120, height: 120, marginBottom: 8, opacity: 0.9 },
   stateTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
-  stateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  stateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260 },
 
   /* Gut check (prediction accuracy) */
   gutCheckRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   gutCheckEmoji: { fontSize: 28, marginTop: 2 },
   gutCheckContent: { flex: 1, gap: 4 },
   gutCheckTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  gutCheckBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  gutCheckBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
 
   /* Teaser card (State 3) */
   teaserCard: {
@@ -1102,7 +1100,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   teaserTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
-  teaserBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  teaserBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
   teaserFade: {
     position: "absolute", left: 0, right: 0, bottom: 0, height: 32,
   },
@@ -1112,7 +1110,7 @@ const s = StyleSheet.create({
     backgroundColor: palette.accentStrong,
   },
   teaserCtaButtonText: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  teaserSubtext: { color: palette.textSecondary, fontSize: 12, textAlign: "center", lineHeight: 17, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  teaserSubtext: { color: palette.textSecondary, fontSize: 12, textAlign: "center", lineHeight: 17 },
 
   /* Insight state cards (States 1, 2, 5) */
   insightStateCard: {
@@ -1122,8 +1120,8 @@ const s = StyleSheet.create({
   },
   insightStateIcon: { fontSize: 28 },
   insightStateTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right", textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
+  insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
 
   /* Insight 3-card layout */
   insightCardsRow: { gap: 10 },
@@ -1152,11 +1150,9 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: radius.md,
-    backgroundColor: "rgba(13, 20, 36, 0.92)",
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: palette.glassBorder,
     borderLeftWidth: 3,
-    borderLeftColor: palette.danger,
   },
   dominantIcon: { fontSize: 24, marginTop: 2 },
   dominantContent: { flex: 1, gap: 4 },
@@ -1167,7 +1163,7 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
   },
   dominantText: {
-    color: "#ffffff",
+    color: palette.text,
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1179,7 +1175,7 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: radius.md,
-    backgroundColor: palette.glass,
+    backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.glassBorder,
   },
@@ -1191,11 +1187,8 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   narrativeText: {
-    color: "#ffffff",
+    color: palette.text,
     fontSize: 13,
     lineHeight: 19,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 });

@@ -96,8 +96,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     textTransform: "capitalize",
-    textShadowColor: "rgba(0, 0, 0, 0.9)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
   },
 });

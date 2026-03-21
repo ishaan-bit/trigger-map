@@ -213,9 +213,6 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
 
   /* Transformation section */
@@ -243,9 +240,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     color: palette.textSecondary,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   transformLabelAfter: {
     color: palette.accent,
@@ -255,9 +249,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontStyle: "italic",
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   transformAfter: {
     color: palette.text,
@@ -318,9 +309,6 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 12,
     fontStyle: "italic",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
 
   /* Feature card */
@@ -341,9 +329,6 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 13,
     marginTop: -6,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   featureRow: {
     flexDirection: "row",
