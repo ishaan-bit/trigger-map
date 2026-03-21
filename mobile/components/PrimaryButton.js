@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   outlineButton: {
-    backgroundColor: "transparent",
+    backgroundColor: palette.glass,
     borderWidth: 1.5,
     borderColor: palette.accentMedium,
   },
