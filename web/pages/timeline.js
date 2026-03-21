@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { EmotionGarden } from "../components/EmotionGarden";
-import { StreakOrb } from "../components/StreakOrb";
 import { MoodWeather } from "../components/MoodWeather";
 import { MicroInsight } from "../components/MicroInsight";
 import { EMOTION_COLORS } from "../lib/designSystem";
+import { generateMicroInsights } from "../lib/microInsights";
 
 const EMOTION_EMOJIS = {
   frustrated: "\u{1F624}", anxious: "\u{1F630}", neutral: "\u{1F610}", calm: "\u{1F60C}", energized: "\u26A1",
@@ -99,6 +99,7 @@ export default function TimelinePage() {
 
   const merged = mergeSimilarMoments(moments);
   const dayGroups = groupByDay(merged);
+  const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
 
   // Determine dominant emotion for state-adaptive glow
   const dominantEmotion = (() => {
@@ -132,8 +133,16 @@ export default function TimelinePage() {
       </div>
 
       <MoodWeather moments={moments} />
-      <StreakOrb moments={moments} />
       <EmotionGarden moments={moments} />
+
+      {/* Dynamic micro insights (only with enough data) */}
+      {microInsights.length > 0 ? (
+        <div className="microInsightsGroup">
+          {microInsights.map((text, idx) => (
+            <MicroInsight key={idx} text={text} />
+          ))}
+        </div>
+      ) : null}
 
       {loading ? <div className="card loadingCard">Loading your latest moments...</div> : null}
       {error ? (
@@ -223,9 +232,6 @@ export default function TimelinePage() {
         </section>
       ))}
 
-      {!loading && !error && moments.length >= 3 && (
-        <MicroInsight text="Patterns become clearer with more data. Keep logging to unlock deeper insights." />
-      )}
     </Layout>
   );
 }

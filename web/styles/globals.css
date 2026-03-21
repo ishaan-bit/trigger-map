@@ -1519,17 +1519,6 @@ button,
   color: #7bc9d8 !important;
 }
 
-/* ─── Bottom status card (log page) ─── */
-.bottomCard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 22px;
-  background: rgba(123, 201, 216, 0.06);
-  border: 1px solid rgba(123, 201, 216, 0.15);
-}
-
 /* ─── Google Sign-In button wrapper ─── */
 .googleBtnWrap {
   display: flex;
@@ -1927,6 +1916,154 @@ button,
   cursor: default;
 }
 
+/* ─── Pattern nudge (log page, matches Android) ─── */
+.patternNudge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(13, 20, 36, 0.80);
+  border: 1px solid rgba(123, 201, 216, 0.10);
+  border-left: 3px solid;
+}
+.nudgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.nudgeContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nudgeLabel {
+  color: rgba(255, 255, 255, 0.90);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+.nudgeBody {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  line-height: 17px;
+  margin: 0;
+}
+
+/* ─── Bottom card (log page, matches Android) ─── */
+.bottomCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(13, 20, 36, 0.90);
+  border: 1px solid rgba(123, 201, 216, 0.15);
+}
+.bottomCardEmoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.bottomCardText {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* ─── Back button (emotion step) ─── */
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.90);
+  background: none;
+  border: none;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.backButton:hover {
+  color: #7bc9d8;
+}
+
+/* ─── Emotion header (emotion step) ─── */
+.emotionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ─── Note card (emotion step) ─── */
+.noteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.noteLabel {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ─── Save button (full width) ─── */
+.saveButton {
+  width: 100%;
+}
+
+/* ─── Ripple ring animations (post-log) ─── */
+@-webkit-keyframes rippleExpand {
+  0%   { -webkit-transform: scale(1); transform: scale(1); opacity: 0.4; }
+  100% { -webkit-transform: scale(3); transform: scale(3); opacity: 0; }
+}
+@keyframes rippleExpand {
+  0%   { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(3); opacity: 0; }
+}
+.rippleRing {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ripple-color, #56d0e0);
+  -webkit-animation: rippleExpand 2.4s ease-out infinite;
+  animation: rippleExpand 2.4s ease-out infinite;
+  pointer-events: none;
+}
+.rippleRing2 { -webkit-animation-delay: 0.8s; animation-delay: 0.8s; }
+.rippleRing3 { -webkit-animation-delay: 1.6s; animation-delay: 1.6s; }
+
+/* ─── "View on timeline" button (post-log) ─── */
+.goTimelineBtn {
+  margin-top: 12px;
+  padding: 10px 24px;
+  border-radius: 22px;
+  background: rgba(123, 201, 216, 0.10);
+  border: 1px solid rgba(123, 201, 216, 0.20);
+  color: rgba(255, 255, 255, 0.80);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.goTimelineBtn:hover {
+  background: rgba(123, 201, 216, 0.18);
+  border-color: rgba(123, 201, 216, 0.35);
+}
+
+/* ─── Micro insights group (timeline) ─── */
+.microInsightsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CINEMATIC · Post-Log, Weather, Timeline Connectors, Animations
    ═══════════════════════════════════════════════════════════════════ */
@@ -1947,12 +2084,14 @@ button,
 
 /* ─── Post-log "Heard you." scene ─── */
 .postLogScene {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 18px;
   padding: 56px 24px 40px;
   text-align: center;
+  overflow: hidden;
 }
 
 @-webkit-keyframes breathe {
