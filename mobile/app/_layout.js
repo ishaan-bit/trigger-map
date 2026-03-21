@@ -91,8 +91,8 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="onboarding" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="emotion" options={{ presentation: "card" }} />
+              <Stack.Screen name="login" options={{ animation: "slide_from_right", gestureEnabled: true }} />
+              <Stack.Screen name="emotion" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
               <Stack.Screen name="(tabs)" />
             </Stack>
             </EmotionalStateProvider>

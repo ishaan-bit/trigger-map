@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -9,7 +10,7 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { useAppSession } from "@/hooks/useAppSession";
 import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
 import { palette, radius } from "@/utils/theme";
-import { emotionTap, selection, success as hapticSuccess } from "@/utils/haptics";
+import { emotionTap, selection, success as hapticSuccess, tap } from "@/utils/haptics";
 
 const EMOTION_COLORS = {
   calm: palette.success,
@@ -108,8 +109,8 @@ export function EmotionSelectionScreen() {
       hapticSuccess();
       showToast("Moment logged ✓");
 
-      // Auto-navigate back after feedback display
-      setTimeout(() => router.back(), 3000);
+      // Auto-navigate to timeline after feedback display
+      setTimeout(() => router.replace("/(tabs)/timeline"), 3000);
     } catch {
       showError("Save failed", "Could not log this moment. Please try again.");
     } finally {
@@ -124,6 +125,16 @@ export function EmotionSelectionScreen() {
   const ripple1 = useRef(new Animated.Value(0)).current;
   const ripple2 = useRef(new Animated.Value(0)).current;
   const ripple3 = useRef(new Animated.Value(0)).current;
+
+  // Handle Android back button — if saved, go to timeline instead of log loop
+  useEffect(() => {
+    if (!saved) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.replace("/(tabs)/timeline");
+      return true;
+    });
+    return () => handler.remove();
+  }, [saved, router]);
 
   if (saved && feedback) {
     const emotionColor = EMOTION_COLORS[selectedEmotion] || palette.accent;
@@ -195,6 +206,13 @@ export function EmotionSelectionScreen() {
             trigger={trigger}
             emotion={selectedEmotion}
           />
+          <Pressable
+            style={styles.goTimelineBtn}
+            onPress={() => { tap(); router.replace("/(tabs)/timeline"); }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.goTimelineText}>View on timeline →</Text>
+          </Pressable>
         </View>
       </ScreenShell>
     );
@@ -202,6 +220,12 @@ export function EmotionSelectionScreen() {
 
   return (
     <ScreenShell scroll>
+
+      {/* Back button */}
+      <Pressable style={styles.backButton} onPress={() => { tap(); router.back(); }} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={12}>
+        <Ionicons name="arrow-back" size={22} color={palette.text} />
+        <Text style={styles.backLabel}>Back</Text>
+      </Pressable>
 
       <View style={styles.header}>
         <Text style={styles.kicker}>{trigger}</Text>
@@ -294,6 +318,20 @@ export function EmotionSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingRight: 12,
+    marginTop: 4,
+  },
+  backLabel: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   header: {
     gap: 6,
     marginTop: 10,
@@ -424,6 +462,20 @@ const styles = StyleSheet.create({
     gap: 18,
     paddingTop: 80,
     paddingBottom: 40,
+  },
+  goTimelineBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
+  },
+  goTimelineText: {
+    color: palette.accent,
+    fontSize: 14,
+    fontWeight: "700",
   },
   feedbackOrb: {
     position: "absolute",

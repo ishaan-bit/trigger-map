@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
@@ -19,12 +19,14 @@ export function EditMomentModal({ visible, moment, onSave, onClose }) {
   const [note, setNote] = useState(moment?.note || "");
   const [saving, setSaving] = useState(false);
 
-  // Reset state when moment changes
-  if (moment && trigger === "" && emotion === "") {
-    setTrigger(moment.trigger);
-    setEmotion(moment.emotion);
-    setNote(moment.note || "");
-  }
+  // Sync state whenever a different moment is opened for editing
+  useEffect(() => {
+    if (moment) {
+      setTrigger(moment.trigger);
+      setEmotion(moment.emotion);
+      setNote(moment.note || "");
+    }
+  }, [moment]);
 
   async function handleSave() {
     if (!trigger || !emotion || saving) return;

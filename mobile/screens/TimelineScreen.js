@@ -1,6 +1,6 @@
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Animated, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TimelineGroup } from "@/components/TimelineGroup";
@@ -76,12 +76,22 @@ export function TimelineScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingMoment, setEditingMoment] = useState(null);
+  const [highlightId, setHighlightId] = useState(null);
+  const highlightAnim = useRef(new Animated.Value(0)).current;
 
   const dayGroups = useMemo(() => {
     const merged = mergeSimilarMoments(moments);
     return groupByDay(merged);
   }, [moments]);
   const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
+
+  // Identify the newest moment for highlighting
+  const newestMomentId = useMemo(() => {
+    if (!moments.length) return null;
+    return moments.reduce((newest, m) =>
+      new Date(m.timestamp) > new Date(newest.timestamp) ? m : newest
+    , moments[0]).id;
+  }, [moments]);
 
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
@@ -92,14 +102,29 @@ export function TimelineScreen() {
 
     try {
       const result = await loadTimelineRef.current();
-      setMoments(Array.isArray(result) ? result : []);
+      const loaded = Array.isArray(result) ? result : [];
+      setMoments(loaded);
+      // Highlight the newest moment briefly when timeline loads
+      if (loaded.length > 0) {
+        const newest = loaded.reduce((acc, m) =>
+          new Date(m.timestamp) > new Date(acc.timestamp) ? m : acc
+        , loaded[0]);
+        setHighlightId(newest.id);
+        highlightAnim.setValue(1);
+        Animated.timing(highlightAnim, {
+          toValue: 0,
+          duration: 3000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }).start(() => setHighlightId(null));
+      }
     } catch {
       setMoments([]);
       setError("Unable to load timeline. Check connection.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [highlightAnim]);
 
   useFocusEffect(
     useCallback(() => {
@@ -185,6 +210,13 @@ export function TimelineScreen() {
             {dayMoments.map((moment, idx) => {
               const emotionColor = EMOTION_COLORS[moment.emotion] || palette.muted;
               const isLast = idx === dayMoments.length - 1;
+              const isHighlighted = moment.id === highlightId;
+              const cardBorderColor = isHighlighted
+                ? highlightAnim.interpolate({ inputRange: [0, 1], outputRange: [palette.glassBorder, emotionColor] })
+                : undefined;
+              const cardShadowOpacity = isHighlighted
+                ? highlightAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] })
+                : undefined;
               return (
                 <View key={moment.id} style={styles.timelineItem}>
                   {/* Connector dot + line */}
@@ -192,14 +224,23 @@ export function TimelineScreen() {
                     <View style={[styles.connectorDot, { backgroundColor: emotionColor }]} />
                     {!isLast && <View style={[styles.connectorLine, { backgroundColor: `${emotionColor}40` }]} />}
                   </View>
-                  <View style={styles.timelineCardWrap}>
+                  <Animated.View style={[styles.timelineCardWrap, isHighlighted && {
+                    borderColor: cardBorderColor,
+                    borderWidth: 1.5,
+                    borderRadius: radius.md,
+                    shadowColor: emotionColor,
+                    shadowOpacity: cardShadowOpacity,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowRadius: 12,
+                    elevation: 4,
+                  }]}>
                     <TimelineGroup
                       moment={moment}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       groupCount={moment._count}
                     />
-                  </View>
+                  </Animated.View>
                 </View>
               );
             })}

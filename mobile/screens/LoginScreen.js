@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Easing, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Animated, Easing, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   GoogleSignin,
   isErrorWithCode,
   isSuccessResponse,
   statusCodes,
 } from "@react-native-google-signin/google-signin";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigation } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -33,6 +34,8 @@ function StaggerIn({ index, children, style }) {
 
 export function LoginScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const canGoBack = navigation.canGoBack();
   const { signInWithEmail, registerWithEmail, signInWithGoogle } = useAppSession();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
@@ -115,6 +118,13 @@ export function LoginScreen() {
     <ScreenShell>
       {/* Breathing glow orb */}
       <Animated.View style={[styles.glowOrb, { opacity: glowOpacity }]} />
+
+      {canGoBack ? (
+        <Pressable style={styles.backButton} onPress={() => { tap(); router.back(); }} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={12}>
+          <Ionicons name="arrow-back" size={22} color={palette.text} />
+          <Text style={styles.backLabel}>Back</Text>
+        </Pressable>
+      ) : null}
 
       <StaggerIn index={0}>
         <View style={styles.header}>
@@ -210,6 +220,20 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingRight: 12,
+    marginTop: 4,
+  },
+  backLabel: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   glowOrb: {
     position: "absolute",
     top: -60,
