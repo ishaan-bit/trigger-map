@@ -164,6 +164,7 @@ export default function SettingsPage() {
           <p className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
             Log moments, reflect on emotional triggers, and understand weekly patterns over time.
           </p>
+          <Row label="Version" value="v1.1.0" />
           <Row label="Developer" value="QuietDen (OPC) Pvt. Ltd." />
           <Row label="Website" value="qdenxp.com" />
           <p className="muted" style={{ fontSize: 11, textAlign: "center" }}>Registered December 2025, India</p>

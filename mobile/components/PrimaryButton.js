@@ -12,6 +12,7 @@ export function PrimaryButton({ label, onPress, disabled = false, secondary = fa
         outline ? styles.outlineButton : secondary ? styles.secondaryButton : danger ? styles.dangerButton : styles.primaryButton,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
+        pressed && !disabled && (secondary || outline) && styles.secondaryPressed,
       ]}
     >
       <Text style={[styles.label, (secondary || outline) && styles.secondaryLabel, outline && styles.outlineLabel, danger && styles.dangerLabel]}>{label}</Text>
@@ -49,8 +50,12 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
+  },
+  secondaryPressed: {
+    backgroundColor: palette.accentSoft,
+    borderColor: palette.accentMedium,
   },
   label: {
     color: palette.text,

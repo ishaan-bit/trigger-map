@@ -2,6 +2,9 @@
   "functions": {
     "pages/api/**/*.js": {
       "maxDuration": 10
+    },
+    "pages/api/internal/**/*.js": {
+      "maxDuration": 60
     }
   },
   "crons": [

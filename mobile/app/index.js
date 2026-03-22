@@ -33,7 +33,7 @@ export default function IndexRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060a12",
+    backgroundColor: "#e8f5f0",
   },
   image: {
     width: "100%",

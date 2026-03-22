@@ -213,7 +213,7 @@ export function LoginScreen() {
       </StaggerIn>
       <StaggerIn index={8}>
         <Text style={styles.privacyHint}>
-          End-to-end private. No tracking pixels. No data brokers. Your patterns belong to you.
+          Private by design. No tracking pixels. No data brokers. Your patterns belong to you.
         </Text>
       </StaggerIn>
     </ScreenShell>

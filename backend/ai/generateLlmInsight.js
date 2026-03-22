@@ -119,7 +119,9 @@ Rules:
 - 60-90 words total. Do not exceed 100 words.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
-- Tone: calm, direct, perceptive.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+- Tone: calm, direct, perceptive.
+- Use correct English spelling and grammar. No typos, no random numbers or characters.
+- Keep each section body to 1-2 sentences max. Be concise, not verbose.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
 export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
@@ -138,11 +140,11 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "Write concise emotional pattern observations. Plain sentences only. No em dashes, bullet points, numbered lists, or markdown. Never repeat the prompt or instructions in your response." },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.4,
-        max_tokens: 250,
+        temperature: 0.3,
+        max_tokens: 200,
       }),
       signal: controller.signal,
     });
@@ -163,10 +165,15 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
     content = content
       .replace(/\u2014/g, ", ")
       .replace(/\u2013/g, ", ")
+      .replace(/\u2018|\u2019/g, "'")   // smart quotes to straight
+      .replace(/\u201c|\u201d/g, '"')   // smart double quotes
       .replace(/\*\*/g, "")          // strip markdown bold
       .replace(/^[-*]\s+/gm, "")     // strip bullet markers
       .replace(/#{1,3}\s*/g, "")     // strip markdown headers
       .replace(/\n{3,}/g, "\n\n")    // collapse excess newlines
+      .replace(/[\u200b-\u200f\ufeff]/g, "") // strip zero-width chars
+      .replace(/(?:^|\n)\s*\d+\.\s*/g, "\n") // strip numbered list prefixes (1. 2. 3.)
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "") // strip control chars
       .trim();
 
     // Strip prompt echo lines the model may repeat back
@@ -235,7 +242,14 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       const body = afterHeader.slice(0, sectionEnd).replace(/^[\s:\-]*/, "").trim();
       // Truncate at paragraph break to discard trailing hallucinations
       const paraBreak = body.indexOf("\n\n");
-      const trimmedBody = paraBreak > 0 ? body.slice(0, paraBreak).trim() : body;
+      let trimmedBody = paraBreak > 0 ? body.slice(0, paraBreak).trim() : body;
+      // Clean stray LLM artifacts from section body
+      trimmedBody = trimmedBody
+        .replace(/^\d+[.)]\s*/gm, "")           // stray numbered prefixes
+        .replace(/\s{2,}/g, " ")                 // collapse double spaces
+        .replace(/([a-z])\s*\n\s*([a-z])/g, "$1 $2") // join broken sentences
+        .replace(/[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip non-printable/non-latin junk
+        .trim();
       if (trimmedBody.length >= 8) {
         extracted.push({ header, body: trimmedBody });
       }

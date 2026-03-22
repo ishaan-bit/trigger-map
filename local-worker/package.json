@@ -1,0 +1,14 @@
+{
+  "name": "triggermap-local-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local worker service for running LLM jobs from the ops dashboard",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

@@ -8,6 +8,10 @@ import { enforceRateLimit, incrementCounter, touchDailyActive } from "@/services
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken, getClientIp } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
+import { getWeeklyAggregates } from "@/services/aggregationService.js";
+import { generateWeeklyReport } from "@/services/patternEngine.js";
+import { generateInsight } from "@/ai/generateInsight.js";
+import { storeWeeklyInsight } from "@/services/reportStore.js";
 
 const schema = z.object({
   deviceId: z.string().min(1).optional(),
@@ -20,6 +24,21 @@ const schema = z.object({
   prediction: z.string().min(1).max(30).optional(),
   tags: z.array(z.string().min(1).max(40)).max(3).optional(),
 });
+
+async function refreshWeeklyInsight(ownerId) {
+  const aggregates = await getWeeklyAggregates(ownerId);
+  const report = generateWeeklyReport({ aggregates });
+  if (!report.totalMoments) return;
+  const insight = await generateInsight(report);
+  await storeWeeklyInsight(ownerId, {
+    windowEnd: new Date().toISOString().slice(0, 10),
+    summary: insight.summary,
+    microExperiment: insight.microExperiment || null,
+    confidence: insight.confidence,
+    model: insight.model,
+    generatedAt: insight.generatedAt,
+  });
+}
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) {
@@ -70,6 +89,9 @@ export default async function handler(req, res) {
         isAnonymous: moment.isAnonymous,
       }),
     ]);
+
+    // Fire-and-forget: regenerate rule-based weekly insight so report is fresh
+    refreshWeeklyInsight(ownerId).catch(() => {});
 
     return sendSuccess(res, {
       moment,

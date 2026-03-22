@@ -1,0 +1,664 @@
+import Head from 'next/head';
+import { useState, useEffect, useCallback } from 'react';
+import ConfirmAction from '../components/ConfirmAction';
+
+const LLM_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
+
+const JOBS = [
+  {
+    id: 'generateWeeklyReports',
+    label: 'Generate Weekly Reports',
+    description: 'Batch generate rule-based weekly insights for all users. Safe to run — skips users with recent reports.',
+    danger: false,
+    source: 'backend',
+  },
+  {
+    id: 'generateLlmInsights',
+    label: 'Generate LLM Insights',
+    description: 'Generate premium LLM-based insights for all eligible signed-in users.',
+    danger: false,
+    usesLlm: true,
+    source: 'local',
+    params: [
+      { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
+      { key: 'minMoments', label: 'Min moments', type: 'number', default: 5 },
+    ],
+  },
+  {
+    id: 'generateFreePass',
+    label: 'Generate Free Pass + LLM Insights',
+    description: 'Bulk LLM insight generation + 48h free-pass grant for all eligible users.',
+    danger: true,
+    usesLlm: true,
+    source: 'local',
+    params: [
+      { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
+      { key: 'minMoments', label: 'Min moments', type: 'number', default: 5 },
+    ],
+  },
+];
+
+const CACHE_ACTIONS = [
+  {
+    id: 'weekly_report',
+    label: 'Clear Weekly Reports Cache',
+    description: 'Remove all cached rule-based weekly reports. Next request will regenerate.',
+  },
+  {
+    id: 'llm_insight',
+    label: 'Clear LLM Insights Cache',
+    description: 'Remove all cached LLM insights. Next generation cycle will recreate.',
+  },
+  {
+    id: 'llm_free_pass',
+    label: 'Clear Free Pass Tokens',
+    description: 'Remove all active free-pass tokens.',
+  },
+];
+
+const QUICK_ACTIONS = [
+  {
+    id: 'ping-redis',
+    label: 'Ping Redis',
+    description: 'Test Redis connectivity and measure latency.',
+    action: 'ping',
+    target: 'redis',
+    noConfirm: true,
+  },
+  {
+    id: 'ping-backend',
+    label: 'Ping Backend',
+    description: 'Hit /api/health on the main backend to verify it responds.',
+    action: 'ping',
+    target: 'backend',
+    noConfirm: true,
+  },
+  {
+    id: 'ping-worker',
+    label: 'Ping Local Worker',
+    description: 'Check if the local worker process is running.',
+    action: 'ping',
+    target: 'local-worker',
+    noConfirm: true,
+  },
+  {
+    id: 'count-owners',
+    label: 'Count Owners',
+    description: 'Count total unique owner IDs in the triggermap:owners set.',
+    action: 'count-owners',
+    target: 'owners',
+    noConfirm: true,
+  },
+];
+
+function SourceBadge({ source }) {
+  const isLocal = source === 'local';
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      fontSize: 10,
+      fontWeight: 600,
+      padding: '2px 8px',
+      borderRadius: 10,
+      background: isLocal ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+      color: isLocal ? '#a78bfa' : '#60a5fa',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+      {isLocal ? 'Local' : 'Backend'}
+    </span>
+  );
+}
+
+function WorkerStatus({ status }) {
+  const isOnline = status === 'online';
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '8px 16px',
+      background: isOnline ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+      border: `1px solid ${isOnline ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+      borderRadius: 8,
+      fontSize: 13,
+    }}>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%',
+        background: isOnline ? 'var(--green)' : 'var(--red)',
+        boxShadow: isOnline ? '0 0 6px var(--green)' : '0 0 6px var(--red)',
+      }} />
+      <span style={{ fontWeight: 600 }}>Local Worker</span>
+      <span style={{ color: 'var(--text-muted)' }}>
+        {status === 'online' ? 'Online' : status === 'offline' ? 'Offline' : 'Checking...'}
+      </span>
+      {!isOnline && status !== 'checking' && (
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          LLM jobs will fail — start the worker with: cd local-worker && npm start
+        </span>
+      )}
+    </div>
+  );
+}
+
+function formatDuration(ms) {
+  if (!ms) return '';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+}
+
+function summarizeJobResult(result) {
+  if (!Array.isArray(result)) return null;
+  let generated = 0, skipped = 0, errored = 0;
+  const skipReasons = {};
+  for (const r of result) {
+    if (r.skipped) {
+      skipped++;
+      const reason = r.reason || 'unknown';
+      skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+    } else if (r.error) {
+      errored++;
+    } else {
+      generated++;
+    }
+  }
+  return { total: result.length, generated, skipped, errored, skipReasons };
+}
+
+function RunLogEntry({ entry, defaultOpen }) {
+  const [expanded, setExpanded] = useState(defaultOpen);
+  const [showRaw, setShowRaw] = useState(false);
+
+  const { timestamp, action, target, ok, data, status } = entry;
+  const source = data?.source || 'backend';
+  const duration = data?.durationMs || data?.result?.durationMs;
+  const jobResult = data?.result;
+  const stdout = data?.result?.stdout || data?.stdout;
+  const stderr = data?.result?.stderr || data?.stderr;
+  const summary = summarizeJobResult(jobResult);
+  const isJob = action === 'run-job';
+  const errorMsg = data?.error || (!ok && data?.message) || null;
+
+  return (
+    <div style={{
+      border: `1px solid ${ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.3)'}`,
+      borderRadius: 8,
+      overflow: 'hidden',
+      background: ok ? 'rgba(34,197,94,0.03)' : 'rgba(239,68,68,0.03)',
+    }}>
+      {/* Header bar — always visible */}
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+          cursor: 'pointer', userSelect: 'none',
+        }}
+      >
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          background: ok ? 'var(--green)' : 'var(--red)',
+          boxShadow: ok ? '0 0 6px var(--green)' : '0 0 6px var(--red)',
+        }} />
+        <span style={{ fontWeight: 600, fontSize: 13 }}>
+          {JOBS.find(j => j.id === target)?.label || target}
+        </span>
+        <SourceBadge source={source === 'local-worker' ? 'local' : 'backend'} />
+        {duration && (
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+            {formatDuration(duration)}
+          </span>
+        )}
+        {summary && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto', display: 'flex', gap: 10 }}>
+            {summary.generated > 0 && <span style={{ color: 'var(--green)' }}>{summary.generated} generated</span>}
+            {summary.skipped > 0 && <span>{summary.skipped} skipped</span>}
+            {summary.errored > 0 && <span style={{ color: 'var(--red)' }}>{summary.errored} errored</span>}
+          </span>
+        )}
+        {!summary && !ok && (
+          <span style={{ fontSize: 11, color: 'var(--red)', marginLeft: 'auto' }}>
+            {errorMsg?.slice(0, 80) || `HTTP ${status}`}
+          </span>
+        )}
+        {!summary && ok && !isJob && (
+          <span style={{ fontSize: 11, color: 'var(--green)', marginLeft: 'auto' }}>OK</span>
+        )}
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+          {new Date(timestamp).toLocaleTimeString()}
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          &#9654;
+        </span>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 14px' }}>
+          {/* Error message */}
+          {errorMsg && (
+            <div style={{
+              padding: '8px 12px', borderRadius: 6, marginBottom: 12,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              fontSize: 12, color: 'var(--red)', fontFamily: 'var(--font-mono)',
+            }}>
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Per-user results table for batch jobs */}
+          {isJob && Array.isArray(jobResult) && jobResult.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Per-User Results ({jobResult.length})
+              </div>
+              <div style={{ maxHeight: 320, overflowY: 'auto', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <table className="data-table" style={{ margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ fontSize: 11 }}>Owner ID</th>
+                      <th style={{ fontSize: 11 }}>Status</th>
+                      <th style={{ fontSize: 11 }}>Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobResult.map((r, i) => {
+                      const isSkipped = r.skipped;
+                      const isErr = !!r.error;
+                      const generated = !isSkipped && !isErr;
+                      return (
+                        <tr key={i}>
+                          <td className="mono" style={{ fontSize: 11 }}>
+                            {r.ownerId ? `${r.ownerId.slice(0, 8)}...` : '—'}
+                          </td>
+                          <td>
+                            <span style={{
+                              display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '1px 7px',
+                              borderRadius: 8,
+                              background: generated ? 'rgba(34,197,94,0.12)' : isErr ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.12)',
+                              color: generated ? 'var(--green)' : isErr ? 'var(--red)' : 'var(--text-muted)',
+                            }}>
+                              {generated ? 'GENERATED' : isErr ? 'ERROR' : 'SKIPPED'}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 320 }}>
+                            {isSkipped && (r.reason || '').replace(/-/g, ' ')}
+                            {isErr && (r.error || r.message || 'unknown error')}
+                            {generated && r.report && (
+                              <span>
+                                <span style={{ color: 'var(--accent)' }}>{r.report.confidence}</span>
+                                {r.report.summary && ` — ${r.report.summary.slice(0, 80)}${r.report.summary.length > 80 ? '...' : ''}`}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* Skip reason breakdown */}
+              {summary && Object.keys(summary.skipReasons).length > 0 && (
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                  {Object.entries(summary.skipReasons).map(([reason, count]) => (
+                    <span key={reason} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      <span style={{ fontWeight: 600 }}>{count}×</span> {reason.replace(/-/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Ping / quick action results */}
+          {!isJob && ok && data && typeof data === 'object' && (
+            <div style={{ marginBottom: 12 }}>
+              {data.latencyMs !== undefined && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Latency: <span className="mono">{data.latencyMs}ms</span>
+                </div>
+              )}
+              {data.count !== undefined && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Count: <span className="mono">{data.count}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Stdout for local worker jobs */}
+          {stdout && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>STDOUT</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--green)',
+                background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 240, overflowY: 'auto', margin: 0,
+              }}>
+                {stdout}
+              </pre>
+            </div>
+          )}
+
+          {/* Stderr */}
+          {stderr && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>STDERR</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--red)',
+                background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 160, overflowY: 'auto', margin: 0,
+              }}>
+                {stderr}
+              </pre>
+            </div>
+          )}
+
+          {/* Raw JSON toggle */}
+          <div>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11, padding: '2px 10px' }}
+              onClick={() => setShowRaw(!showRaw)}
+            >
+              {showRaw ? 'Hide' : 'Show'} Raw JSON
+            </button>
+            {showRaw && (
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+                background: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 6, marginTop: 8,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 280, overflowY: 'auto', margin: '8px 0 0',
+              }}>
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ControlPage() {
+  const [confirm, setConfirm] = useState(null);
+  const [results, setResults] = useState([]);
+  const [running, setRunning] = useState(null);
+  const [workerStatus, setWorkerStatus] = useState('checking');
+  const [workerInfo, setWorkerInfo] = useState(null);
+  const [jobParams, setJobParams] = useState(() => {
+    const defaults = {};
+    for (const job of JOBS) {
+      if (job.params) {
+        defaults[job.id] = {};
+        for (const p of job.params) {
+          if (p.default !== undefined) defaults[job.id][p.key] = p.default;
+        }
+      }
+      if (job.usesLlm) {
+        defaults[job.id] = { ...(defaults[job.id] || {}), llmModel: 'phi3' };
+      }
+    }
+    return defaults;
+  });
+
+  // Poll worker health
+  const checkWorker = useCallback(async () => {
+    try {
+      const res = await fetch('/api/control/worker-health');
+      const data = await res.json();
+      setWorkerStatus(data.ok ? 'online' : 'offline');
+      setWorkerInfo(data.ok ? data.data : null);
+    } catch {
+      setWorkerStatus('offline');
+      setWorkerInfo(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkWorker();
+    const interval = setInterval(checkWorker, 15000);
+    return () => clearInterval(interval);
+  }, [checkWorker]);
+
+  const executeAction = async (action, target, params) => {
+    setRunning(target);
+    const timestamp = new Date().toISOString();
+    try {
+      const res = await fetch('/api/control/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, target, params }),
+      });
+      const data = await res.json();
+      setResults((prev) => [
+        { timestamp, action, target, ok: res.ok, data, status: res.status },
+        ...prev,
+      ].slice(0, 50));
+      // After job run, refresh worker status (active jobs may have changed)
+      if (action === 'run-job' || action === 'cancel-job') checkWorker();
+    } catch (err) {
+      setResults((prev) => [
+        { timestamp, action, target, ok: false, data: { error: err.message }, status: 0 },
+        ...prev,
+      ].slice(0, 50));
+    } finally {
+      setRunning(null);
+      setConfirm(null);
+    }
+  };
+
+  const updateParam = (jobId, key, value) => {
+    setJobParams((prev) => ({
+      ...prev,
+      [jobId]: { ...(prev[jobId] || {}), [key]: value },
+    }));
+  };
+
+  const getJobParams = (job) => {
+    return { ...(jobParams[job.id] || {}) };
+  };
+
+  const hasActiveWorkerJob = (jobName) => {
+    return workerInfo?.activeJobs?.[jobName];
+  };
+
+  return (
+    <>
+      <Head><title>Control Panel — TriggerMap Ops</title></Head>
+
+      <div className="ops-page-header">
+        <h2>Control Panel</h2>
+        <span className="timestamp">All destructive actions require confirmation</span>
+      </div>
+
+      {/* Worker Status Banner */}
+      <WorkerStatus status={workerStatus} />
+
+      {/* Quick Actions */}
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-header">
+          <h3>Quick Actions</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Safe, read-only checks</span>
+        </div>
+        <div className="panel-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {QUICK_ACTIONS.map((qa) => (
+            <button
+              key={qa.id}
+              className="btn btn-ghost btn-sm"
+              disabled={running === qa.target}
+              onClick={() => executeAction(qa.action, qa.target)}
+              title={qa.description}
+            >
+              {running === qa.target ? '...' : qa.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Job Triggers */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>Jobs</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Run backend or local LLM jobs</span>
+        </div>
+        <div className="panel-body">
+          {JOBS.map((job) => {
+            const isLocalJob = job.source === 'local';
+            const workerDown = isLocalJob && workerStatus !== 'online';
+            const alreadyRunning = isLocalJob && hasActiveWorkerJob(job.id);
+
+            return (
+              <div key={job.id} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, marginRight: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600 }}>{job.label}</span>
+                      <SourceBadge source={job.source} />
+                      {alreadyRunning && (
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--yellow)', background: 'rgba(234, 179, 8, 0.12)', padding: '2px 8px', borderRadius: 10 }}>
+                          RUNNING
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 600 }}>{job.description}</div>
+                    {workerDown && (
+                      <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+                        Local worker is offline — this job cannot run
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {job.usesLlm && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>LLM Model</span>
+                          <select
+                            value={jobParams[job.id]?.llmModel || 'phi3'}
+                            onChange={(e) => updateParam(job.id, 'llmModel', e.target.value)}
+                            style={{
+                              padding: '3px 8px',
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 4,
+                              color: 'var(--text-primary)',
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                            }}
+                          >
+                            {LLM_MODELS.map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {job.params && job.params.map((p) => (
+                        <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          {p.type === 'checkbox' ? (
+                            <input
+                              type="checkbox"
+                              checked={jobParams[job.id]?.[p.key] ?? p.default ?? false}
+                              onChange={(e) => updateParam(job.id, p.key, e.target.checked)}
+                              style={{ width: 14, height: 14 }}
+                            />
+                          ) : (
+                            <input
+                              type="number"
+                              value={jobParams[job.id]?.[p.key] ?? p.default ?? ''}
+                              onChange={(e) => updateParam(job.id, p.key, parseInt(e.target.value, 10) || 0)}
+                              style={{ width: 60, padding: '2px 6px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, fontFamily: 'var(--font-mono)' }}
+                            />
+                          )}
+                          {p.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {alreadyRunning && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        disabled={running === `cancel-${job.id}`}
+                        onClick={() => {
+                          setRunning(`cancel-${job.id}`);
+                          executeAction('cancel-job', job.id);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      className={`btn ${job.danger ? 'btn-danger' : 'btn-primary'} btn-sm`}
+                      disabled={running === job.id || workerDown || alreadyRunning}
+                      onClick={() => setConfirm({ action: 'run-job', target: job.id, label: job.label, danger: job.danger, params: getJobParams(job), source: job.source })}
+                    >
+                      {running === job.id ? 'Running...' : 'Run'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Cache Actions */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>Cache Operations</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Clear cached data (runs on backend)</span>
+        </div>
+        <div className="panel-body">
+          {CACHE_ACTIONS.map((cache) => (
+            <div key={cache.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{cache.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{cache.description}</div>
+              </div>
+              <button
+                className="btn btn-danger btn-sm"
+                disabled={running === cache.id}
+                onClick={() => setConfirm({ action: 'clear-cache', target: cache.id, label: cache.label, danger: true })}
+              >
+                {running === cache.id ? 'Clearing...' : 'Clear'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Run Log */}
+      {results.length > 0 && (
+        <div className="panel">
+          <div className="panel-header">
+            <h3>Run Log</h3>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{results.length} entries</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => setResults([])}>Clear</button>
+            </div>
+          </div>
+          <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {results.map((r, i) => (
+              <RunLogEntry key={`${r.timestamp}-${i}`} entry={r} defaultOpen={i === 0} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirm && (
+        <ConfirmAction
+          title={`Confirm: ${confirm.label}`}
+          description={
+            confirm.params?.llmModel
+              ? `This will execute "${confirm.action}" on "${confirm.target}" using model "${confirm.params.llmModel}" via ${confirm.source === 'local' ? 'local worker' : 'backend'}. Are you sure?`
+              : `This will execute "${confirm.action}" on "${confirm.target}" via ${confirm.source || 'backend'}. Are you sure?`
+          }
+          danger={confirm.danger}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => executeAction(confirm.action, confirm.target, confirm.params)}
+        />
+      )}
+    </>
+  );
+}

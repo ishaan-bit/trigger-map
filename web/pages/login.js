@@ -119,7 +119,7 @@ export default function LoginPage() {
 
         <div className="loginSafetyRow">
           <span className="loginSafetyIcon">🔐</span>
-          <span className="loginSafetyText">End-to-end private. No tracking pixels. No data brokers. Your patterns belong to you.</span>
+          <span className="loginSafetyText">Private by design. No tracking pixels. No data brokers. Your patterns belong to you.</span>
         </div>
       </section>
     </Layout>
