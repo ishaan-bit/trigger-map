@@ -2,21 +2,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchHealth } from "../lib/api";
 import { useSession } from "../hooks/useSession";
+import { usePWAInstall } from "../hooks/usePWAInstall";
+import { InstallModalIOS } from "./InstallModalIOS";
 
 export function Layout({ title, children, actions = null }) {
   const { user, isSignedIn } = useSession();
-  const [installPrompt, setInstallPrompt] = useState(null);
+  const { canInstall, isStandalone, triggerInstall, showIOSModal, setShowIOSModal } = usePWAInstall();
   const [health, setHealth] = useState({ status: "loading", message: "Checking backend" });
-
-  useEffect(() => {
-    function handlePrompt(event) {
-      event.preventDefault();
-      setInstallPrompt(event);
-    }
-
-    window.addEventListener("beforeinstallprompt", handlePrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handlePrompt);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -59,19 +51,15 @@ export function Layout({ title, children, actions = null }) {
         </div>
         <div className="heroActions">
           {actions}
-          {installPrompt ? (
-            <button
-              className="installButton"
-              onClick={async () => {
-                await installPrompt.prompt();
-                setInstallPrompt(null);
-              }}
-            >
+          {canInstall && !isStandalone ? (
+            <button className="installButton" onClick={triggerInstall}>
               Install app
             </button>
           ) : null}
         </div>
       </header>
+
+      <InstallModalIOS open={showIOSModal} onClose={() => setShowIOSModal(false)} />
 
       <nav className="nav">
         <Link href="/">Log moment</Link>

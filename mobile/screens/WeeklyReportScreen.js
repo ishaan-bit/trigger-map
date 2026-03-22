@@ -360,7 +360,7 @@ export function WeeklyReportScreen() {
       timeoutMessage="Unable to load report. Check connection."
       onRetry={() => load(true)}
       scroll
-      edges={["top", "left", "right"]}
+      edges={["top", "left", "right", "bottom"]}
     >
       <View style={s.canvas}>
         <Image source={require("@/assets/report-bg.png")} style={s.bgImage} resizeMode="cover" accessible={false} />

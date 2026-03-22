@@ -5,6 +5,7 @@ import { ToastAndroid, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
+import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
@@ -17,6 +18,11 @@ import { fetchHealth, getApiOrigin } from "@/services/api";
 initCrashMonitoring();
 initAnalytics();
 SplashScreen.preventAutoHideAsync().catch(() => null);
+
+if (Platform.OS === "android") {
+  NavigationBar.setBackgroundColorAsync("transparent").catch(() => null);
+  NavigationBar.setPositionAsync("absolute").catch(() => null);
+}
 
 if (Platform.OS === "android") {
   Notifications.setNotificationChannelAsync("default", {

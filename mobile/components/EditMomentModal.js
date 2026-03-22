@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
 import { palette, radius } from "@/utils/theme";
@@ -14,6 +15,7 @@ const EMOTION_ICONS = {
 };
 
 export function EditMomentModal({ visible, moment, onSave, onClose }) {
+  const insets = useSafeAreaInsets();
   const [trigger, setTrigger] = useState(moment?.trigger || "");
   const [emotion, setEmotion] = useState(moment?.emotion || "");
   const [note, setNote] = useState(moment?.note || "");
@@ -107,7 +109,7 @@ export function EditMomentModal({ visible, moment, onSave, onClose }) {
           </ScrollView>
 
           {/* Footer buttons */}
-          <View style={s.footer}>
+          <View style={[s.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
             <Pressable style={s.cancelBtn} onPress={handleClose}>
               <Text style={s.cancelText}>Cancel</Text>
             </Pressable>

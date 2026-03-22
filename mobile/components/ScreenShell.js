@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
@@ -19,6 +19,7 @@ export function ScreenShell({
   edges,
 }) {
   const [showTimeout, setShowTimeout] = useState(false);
+  const insets = useSafeAreaInsets();
   const { glowColor, glowDeepColor, dominantEmotion } = useEmotionalState();
   const breathAnim = useRef(new Animated.Value(0)).current;
 
@@ -80,11 +81,11 @@ export function ScreenShell({
       <Animated.View style={[styles.glowBottomCenter, { backgroundColor: glowDeepColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
       <SafeAreaView style={styles.safeArea} edges={edges}>
         {scroll ? (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(48, insets.bottom + 16) }]} showsVerticalScrollIndicator={false}>
             {content}
           </ScrollView>
         ) : (
-          <View style={styles.content}>{content}</View>
+          <View style={[styles.content, { paddingBottom: Math.max(48, insets.bottom + 16) }]}>{content}</View>
         )}
       </SafeAreaView>
     </LinearGradient>
@@ -129,7 +130,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 48,
     gap: 20,
   },
   loaderWrap: {
