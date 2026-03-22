@@ -101,6 +101,14 @@ export default function TimelinePage() {
   const dayGroups = groupByDay(merged);
   const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
 
+  // Identify the newest moment for highlight animation (matching Android)
+  const newestMomentId = useMemo(() => {
+    if (!moments.length) return null;
+    return moments.reduce((newest, m) =>
+      new Date(m.timestamp) > new Date(newest.timestamp) ? m : newest
+    , moments[0]).id;
+  }, [moments]);
+
   // Determine dominant emotion for state-adaptive glow
   const dominantEmotion = (() => {
     if (!moments?.length) return null;
@@ -178,7 +186,13 @@ export default function TimelinePage() {
                     <div className="tlDot" style={{ background: eColor, boxShadow: `0 0 8px ${eColor}60` }} />
                     {!isLast ? <div className="tlLine" style={{ background: `${eColor}30` }} /> : null}
                   </div>
-                  <article className="card momentCard stack tlCard" style={{ borderLeft: `3px solid ${eColor}` }}>
+                  <article
+                    className={`card momentCard stack tlCard${moment.id === newestMomentId ? " tlCardNewest" : ""}`}
+                    style={{
+                      borderLeft: `3px solid ${eColor}`,
+                      ...(moment.id === newestMomentId ? { "--glow-color": eColor } : {}),
+                    }}
+                  >
                     {editing === moment.id ? (
                       <div className="stack">
                         <div className="momentMeta">

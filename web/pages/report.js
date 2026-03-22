@@ -278,6 +278,24 @@ export default function ReportPage() {
             {hasRuleInsight ? (
               <div className="takeawayBar" style={{ borderLeftColor: stateColor }}>{colorizeInsightText(cleanText(report.aiInsight.summary))}</div>
             ) : null}
+
+            {/* PRIMARY FRICTION callout (matches Android) */}
+            {report?.frictionZones?.length > 0 ? (() => {
+              const fz = report.frictionZones[0];
+              const frictionColor = EMOTION_COLORS[fz.emotion] || "#ff6b7a";
+              return (
+                <div className="dominantCard" style={{ borderColor: `${frictionColor}40`, borderLeftColor: frictionColor }}>
+                  <span className="dominantIcon">🔥</span>
+                  <div className="dominantContent">
+                    <span className="dominantLabel" style={{ color: frictionColor }}>PRIMARY FRICTION</span>
+                    <p className="dominantText">
+                      <span style={{ color: "#7bc9d8", fontWeight: 600 }}>{fz.trigger}</span> tends to leave you feeling{" "}
+                      <span style={{ color: frictionColor, fontWeight: 600 }}>{fz.emotion}</span> — this showed up {fz.count} time{fz.count !== 1 ? "s" : ""} this week.
+                    </p>
+                  </div>
+                </div>
+              );
+            })() : null}
           </div>
 
           {/* Starter state */}

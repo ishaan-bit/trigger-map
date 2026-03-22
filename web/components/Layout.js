@@ -33,6 +33,7 @@ export function Layout({ title, children, actions = null }) {
     <main className="shell">
       <div className="shellGlow shellGlowOne" />
       <div className="shellGlow shellGlowTwo" />
+      <div className="shellGlow shellGlowThree" />
       <header className="hero">
         <div className="heroCopy">
           <p className="eyebrow">TriggerMap</p>

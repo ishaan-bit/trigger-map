@@ -4,10 +4,10 @@ body {
   padding: 0;
   font-family: "Trebuchet MS", "Avenir Next", system-ui, sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(123, 201, 216, 0.08), transparent 42%),
-    radial-gradient(circle at top right, rgba(240, 185, 106, 0.1), transparent 36%),
-    linear-gradient(180deg, #0b1220 0%, #08101c 54%, #050912 100%);
-  color: #f1f5fb;
+    radial-gradient(circle at top left, rgba(86, 208, 224, 0.06), transparent 42%),
+    radial-gradient(circle at top right, rgba(167, 139, 250, 0.04), transparent 36%),
+    linear-gradient(180deg, #080e1a 0%, #060a12 54%, #040710 100%);
+  color: #edf2fa;
 }
 
 body {
@@ -36,6 +36,11 @@ a {
   padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 
+@keyframes shellGlowBreathe {
+  0%, 100% { opacity: 0.12; transform: scale(1); }
+  50%      { opacity: 0.22; transform: scale(1.08); }
+}
+
 .shellGlow {
   position: fixed;
   inset: auto;
@@ -44,19 +49,31 @@ a {
   border-radius: 999px;
   filter: blur(100px);
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.12;
+  animation: shellGlowBreathe 8s ease-in-out infinite;
 }
 
 .shellGlowOne {
   top: 10px;
   left: -110px;
-  background: rgba(123, 201, 216, 0.14);
+  background: rgba(86, 208, 224, 0.12);
 }
 
 .shellGlowTwo {
   top: 220px;
   right: -100px;
-  background: rgba(240, 127, 132, 0.1);
+  background: rgba(167, 139, 250, 0.08);
+  animation-delay: -3s;
+}
+
+.shellGlowThree {
+  bottom: -140px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  height: 340px;
+  background: rgba(46, 147, 168, 0.06);
+  animation-delay: -5s;
 }
 
 .hero {
@@ -83,10 +100,10 @@ a {
 
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: #8db5bd;
+  letter-spacing: 0.12em;
+  color: #56d0e0;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
 }
 
@@ -136,7 +153,7 @@ a {
 
 .statusHint,
 .muted {
-  color: #9eb0c9;
+  color: #b8c8d8;
   line-height: 1.55;
   margin: 0;
 }
@@ -280,10 +297,10 @@ button,
 .metricLabel {
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   font-size: 11px;
   font-weight: 700;
-  color: #8db5bd;
+  color: #56d0e0;
 }
 
 .pillRow {
@@ -374,6 +391,20 @@ button,
   gap: 20px;
   position: relative;
 }
+
+.reportStack > * {
+  animation: sceneIn 0.45s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+.reportStack > *:nth-child(1) { animation-delay: 0ms; }
+.reportStack > *:nth-child(2) { animation-delay: 80ms; }
+.reportStack > *:nth-child(3) { animation-delay: 160ms; }
+.reportStack > *:nth-child(4) { animation-delay: 240ms; }
+.reportStack > *:nth-child(5) { animation-delay: 320ms; }
+.reportStack > *:nth-child(6) { animation-delay: 400ms; }
+.reportStack > *:nth-child(7) { animation-delay: 480ms; }
+.reportStack > *:nth-child(8) { animation-delay: 560ms; }
+.reportStack > *:nth-child(9) { animation-delay: 640ms; }
+.reportStack > *:nth-child(10) { animation-delay: 720ms; }
 
 .reportAtmosphere::before {
   content: "";
@@ -782,10 +813,15 @@ button,
 }
 
 /* ─── Trigger tile grid (log page step 1) ─── */
+@keyframes tileStagger {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .tileGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .triggerTile {
@@ -793,35 +829,101 @@ button,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 100px;
-  padding: 16px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(197, 214, 235, 0.1);
+  gap: 6px;
+  aspect-ratio: 1.1;
+  padding: 10px 8px;
+  border-radius: 24px;
+  border: 1.5px solid rgba(197, 214, 235, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   cursor: pointer;
-  transition: transform 0.12s, background 0.15s, border-color 0.15s;
+  transition: transform 0.12s, filter 0.15s, border-color 0.15s;
+  box-shadow: 0 4px 12px rgba(86, 208, 224, 0.08);
+  animation: tileStagger 0.5s cubic-bezier(0.25, 1, 0.5, 1) both;
 }
+.triggerTile:nth-child(1)  { animation-delay: 0ms; }
+.triggerTile:nth-child(2)  { animation-delay: 40ms; }
+.triggerTile:nth-child(3)  { animation-delay: 80ms; }
+.triggerTile:nth-child(4)  { animation-delay: 120ms; }
+.triggerTile:nth-child(5)  { animation-delay: 160ms; }
+.triggerTile:nth-child(6)  { animation-delay: 200ms; }
+.triggerTile:nth-child(7)  { animation-delay: 240ms; }
+.triggerTile:nth-child(8)  { animation-delay: 280ms; }
+.triggerTile:nth-child(9)  { animation-delay: 320ms; }
+.triggerTile:nth-child(10) { animation-delay: 360ms; }
+.triggerTile:nth-child(11) { animation-delay: 400ms; }
 
 .triggerTile:hover {
-  background: rgba(123, 201, 216, 0.08);
-  border-color: rgba(123, 201, 216, 0.22);
+  filter: brightness(1.12);
   transform: scale(1.03);
 }
 
 .triggerTile:active {
-  transform: scale(0.97);
+  transform: scale(0.92);
 }
 
 .triggerTileEmoji {
-  font-size: 28px;
+  width: 42px;
+  height: 42px;
+  border-radius: 21px;
+  background: rgba(255, 255, 255, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
 }
 
 .triggerTileLabel {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: capitalize;
-  color: #d0dae8;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Per-trigger tint colors (match Android) ─── */
+.triggerTile[data-trigger="work"] {
+  background: rgba(167, 139, 250, 0.45);
+  border-color: rgba(167, 139, 250, 0.55);
+}
+.triggerTile[data-trigger="social"] {
+  background: rgba(86, 208, 224, 0.45);
+  border-color: rgba(86, 208, 224, 0.55);
+}
+.triggerTile[data-trigger="money"] {
+  background: rgba(255, 179, 71, 0.45);
+  border-color: rgba(255, 179, 71, 0.55);
+}
+.triggerTile[data-trigger="family"] {
+  background: rgba(94, 230, 160, 0.45);
+  border-color: rgba(94, 230, 160, 0.55);
+}
+.triggerTile[data-trigger="exercise"] {
+  background: rgba(86, 208, 224, 0.45);
+  border-color: rgba(86, 208, 224, 0.55);
+}
+.triggerTile[data-trigger="health"] {
+  background: rgba(255, 107, 122, 0.45);
+  border-color: rgba(255, 107, 122, 0.55);
+}
+.triggerTile[data-trigger="sleep"] {
+  background: rgba(167, 139, 250, 0.45);
+  border-color: rgba(167, 139, 250, 0.55);
+}
+.triggerTile[data-trigger="partner"] {
+  background: rgba(255, 179, 71, 0.45);
+  border-color: rgba(255, 179, 71, 0.55);
+}
+.triggerTile[data-trigger="alone"] {
+  background: rgba(94, 230, 160, 0.45);
+  border-color: rgba(94, 230, 160, 0.55);
+}
+.triggerTile[data-trigger="travel"] {
+  background: rgba(86, 208, 224, 0.45);
+  border-color: rgba(86, 208, 224, 0.55);
+}
+.triggerTile[data-trigger="other"] {
+  background: rgba(148, 180, 224, 0.40);
+  border-color: rgba(148, 180, 224, 0.50);
 }
 
 /* ─── Emotion chips (log page step 2) ─── */
@@ -834,15 +936,17 @@ button,
 .emotionChip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 18px;
+  border-radius: 18px;
   border: 1px solid rgba(197, 214, 235, 0.12);
   background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  color: #b8c8dc;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: capitalize;
   transition: background 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
   -webkit-appearance: none;
   appearance: none;
@@ -850,28 +954,49 @@ button,
 }
 
 .emotionChip:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(197, 214, 235, 0.2);
+  filter: brightness(1.1);
   transform: scale(1.03);
 }
 
+/* Default per-emotion tinted backgrounds (match Android EMOTION_TINTS) */
+.emotionChip[data-emotion="calm"] { background: rgba(94, 230, 160, 0.40); border-color: rgba(94, 230, 160, 0.50); }
+.emotionChip[data-emotion="neutral"] { background: rgba(148, 180, 224, 0.40); border-color: rgba(148, 180, 224, 0.48); }
+.emotionChip[data-emotion="anxious"] { background: rgba(255, 179, 71, 0.40); border-color: rgba(255, 179, 71, 0.50); }
+.emotionChip[data-emotion="frustrated"] { background: rgba(255, 107, 122, 0.40); border-color: rgba(255, 107, 122, 0.50); }
+.emotionChip[data-emotion="energized"] { background: rgba(86, 208, 224, 0.40); border-color: rgba(86, 208, 224, 0.50); }
+
+@keyframes chipPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
 .emotionChipActive {
-  background: rgba(123, 201, 216, 0.18) !important;
-  border-color: rgba(123, 201, 216, 0.45) !important;
-  color: #f1f5fb;
-  transform: scale(1.05);
+  animation: chipPulse 0.25s ease-out;
   box-shadow: 0 0 16px rgba(123, 201, 216, 0.2);
 }
 
-.emotionChip[data-emotion="frustrated"].emotionChipActive { background: rgba(255, 107, 122, 0.18) !important; border-color: rgba(255, 107, 122, 0.5) !important; box-shadow: 0 0 16px rgba(255, 107, 122, 0.2); }
-.emotionChip[data-emotion="anxious"].emotionChipActive { background: rgba(255, 179, 71, 0.18) !important; border-color: rgba(255, 179, 71, 0.5) !important; box-shadow: 0 0 16px rgba(255, 179, 71, 0.2); }
-.emotionChip[data-emotion="neutral"].emotionChipActive { background: rgba(158, 176, 201, 0.18) !important; border-color: rgba(158, 176, 201, 0.5) !important; box-shadow: 0 0 16px rgba(158, 176, 201, 0.15); }
-.emotionChip[data-emotion="calm"].emotionChipActive { background: rgba(94, 230, 160, 0.18) !important; border-color: rgba(94, 230, 160, 0.5) !important; box-shadow: 0 0 16px rgba(94, 230, 160, 0.2); }
-.emotionChip[data-emotion="energized"].emotionChipActive { background: rgba(167, 139, 250, 0.18) !important; border-color: rgba(167, 139, 250, 0.5) !important; box-shadow: 0 0 16px rgba(167, 139, 250, 0.2); }
+.emotionChip[data-emotion="frustrated"].emotionChipActive { background: rgba(255, 107, 122, 0.60) !important; border-color: #ff6b7a !important; box-shadow: 0 4px 16px rgba(255, 107, 122, 0.4); }
+.emotionChip[data-emotion="anxious"].emotionChipActive { background: rgba(255, 179, 71, 0.60) !important; border-color: #ffb347 !important; box-shadow: 0 4px 16px rgba(255, 179, 71, 0.4); }
+.emotionChip[data-emotion="neutral"].emotionChipActive { background: rgba(148, 180, 224, 0.58) !important; border-color: #b0c4de !important; box-shadow: 0 4px 16px rgba(148, 180, 224, 0.35); }
+.emotionChip[data-emotion="calm"].emotionChipActive { background: rgba(94, 230, 160, 0.60) !important; border-color: #5ee6a0 !important; box-shadow: 0 4px 16px rgba(94, 230, 160, 0.4); }
+.emotionChip[data-emotion="energized"].emotionChipActive { background: rgba(86, 208, 224, 0.60) !important; border-color: #56d0e0 !important; box-shadow: 0 4px 16px rgba(86, 208, 224, 0.4); }
 
 .emotionChipEmoji {
-  font-size: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
   filter: none;
+  flex-shrink: 0;
+}
+
+.emotionChipActive .emotionChipEmoji {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .emotionChipLabel {
@@ -1034,6 +1159,43 @@ button,
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border-left: 3px solid #7bc9d8;
+}
+
+/* ─── Primary friction callout (matches Android dominantCard) ─── */
+.dominantCard {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid;
+}
+
+.dominantIcon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.dominantContent {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dominantLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dominantText {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #cfd8e8;
+  margin: 0;
 }
 
 /* ─── Pairing chips (regulators/friction zones) ─── */
@@ -1497,6 +1659,68 @@ button,
   background: rgba(240, 127, 132, 0.18) !important;
 }
 
+/* ─── Settings toggle switches (matches Android notification toggles) ─── */
+.settingsSwitchRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: 28px;
+}
+
+.settingsSwitchLabel {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settingsSwitchTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d0dae8;
+}
+
+.settingsSwitchHint {
+  font-size: 12px;
+  color: #7e8fa6;
+  line-height: 1.4;
+}
+
+.toggleSwitch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(197, 214, 235, 0.12);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+  padding: 0;
+}
+
+.toggleSwitch .toggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #7e8fa6;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggleSwitchOn {
+  background: rgba(123, 201, 216, 0.25);
+  border-color: rgba(123, 201, 216, 0.4);
+}
+
+.toggleSwitchOn .toggleThumb {
+  transform: translateX(20px);
+  background: #7bc9d8;
+}
+
 /* ─── Login page ─── */
 .loginCard {
   max-width: 440px;
@@ -1692,8 +1916,8 @@ button,
   width: 80px;
   height: 80px;
   border-radius: 40px;
-  -webkit-animation: orbPulse 3.6s ease-in-out infinite;
-  animation: orbPulse 3.6s ease-in-out infinite;
+  -webkit-animation: orbPulse 1.8s ease-in-out infinite;
+  animation: orbPulse 1.8s ease-in-out infinite;
 }
 
 .streakOrbContent {
@@ -1749,8 +1973,8 @@ button,
   width: 12px;
   height: 12px;
   border-radius: 6px;
-  -webkit-animation: breatheDot 6s ease-in-out infinite;
-  animation: breatheDot 6s ease-in-out infinite;
+  -webkit-animation: breatheDot 3s ease-in-out infinite;
+  animation: breatheDot 3s ease-in-out infinite;
   flex-shrink: 0;
 }
 
@@ -1852,16 +2076,22 @@ button,
 }
 
 /* ─── Feedback Card (Post-log) ─── */
+@keyframes feedbackSlideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .feedbackCardWeb {
   display: flex;
   align-items: flex-start;
   gap: 14px;
   padding: 18px;
-  border-radius: 22px;
+  border-radius: 24px;
   border: 1px solid;
   overflow: hidden;
   max-width: 360px;
   width: 100%;
+  position: relative;
+  animation: feedbackSlideIn 0.5s ease-out both;
 }
 
 .feedbackCardIcon {
@@ -1958,9 +2188,10 @@ button,
   align-items: center;
   gap: 10px;
   padding: 14px;
-  border-radius: 16px;
+  border-radius: 18px;
   background: rgba(13, 20, 36, 0.90);
   border: 1px solid rgba(123, 201, 216, 0.15);
+  border-left: 3px solid rgba(123, 201, 216, 0.30);
 }
 .bottomCardEmoji {
   font-size: 18px;
@@ -2070,16 +2301,16 @@ button,
 
 /* ─── Scene transition ─── */
 @-webkit-keyframes sceneIn {
-  from { opacity: 0; -webkit-transform: translateY(14px); transform: translateY(14px); }
+  from { opacity: 0; -webkit-transform: translateY(18px); transform: translateY(18px); }
   to   { opacity: 1; -webkit-transform: translateY(0);    transform: translateY(0); }
 }
 @keyframes sceneIn {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .sceneIn {
-  -webkit-animation: sceneIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation: sceneIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-animation: sceneIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: sceneIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) both;
 }
 
 /* ─── Post-log "Heard you." scene ─── */
@@ -2174,7 +2405,7 @@ button,
   gap: 14px;
   padding: 16px 18px;
   border-radius: 18px;
-  background: rgba(123, 201, 216, 0.05);
+  background: rgba(13, 20, 36, 0.88);
   border: 1px solid rgba(123, 201, 216, 0.10);
 }
 
@@ -2191,8 +2422,8 @@ button,
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, rgba(123, 201, 216, 0.06), transparent);
-  -webkit-animation: shimmer 6s ease-in-out infinite;
-  animation: shimmer 6s ease-in-out infinite;
+  -webkit-animation: shimmer 4s linear infinite;
+  animation: shimmer 4s linear infinite;
   pointer-events: none;
 }
 
@@ -2211,8 +2442,9 @@ button,
 
 .weatherLabel {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.3px;
 }
 
 .weatherDesc {
@@ -2260,7 +2492,18 @@ button,
 .tlCard {
   flex: 1;
   min-width: 0;
-  border-left: none !important;
+}
+
+/* Newest-moment highlight glow (matches Android 3s fade-out) */
+@keyframes newestGlow {
+  0%   { box-shadow: 0 0 12px var(--glow-color, rgba(86,208,224,0.4)), 0 4px 12px var(--glow-color, rgba(86,208,224,0.25)); }
+  100% { box-shadow: 0 0 0px transparent, 0 0 0px transparent; }
+}
+.tlCardNewest {
+  animation: newestGlow 3s ease-out forwards;
+  border: 1.5px solid var(--glow-color, rgba(86,208,224,0.4));
+  border-left-width: 3px;
+  border-radius: 18px;
 }
 
 .momentBadge {
@@ -2801,13 +3044,16 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
   }
 
   .triggerTile {
-    min-height: 84px;
-    padding: 12px 8px;
-    gap: 6px;
+    padding: 8px 6px;
+    gap: 4px;
+    border-radius: 18px;
   }
 
   .triggerTileEmoji {
-    font-size: 24px;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    font-size: 18px;
   }
 
   .triggerTileLabel {
@@ -3094,12 +3340,16 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
   }
 
   .triggerTile {
-    min-height: 72px;
-    padding: 10px 6px;
+    padding: 6px 4px;
+    gap: 3px;
+    border-radius: 16px;
   }
 
   .triggerTileEmoji {
-    font-size: 22px;
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    font-size: 16px;
   }
 
   .triggerTileLabel {

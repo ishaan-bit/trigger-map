@@ -12,8 +12,8 @@ import { FeedbackCard } from "../components/FeedbackCard";
 import { EMOTION_COLORS } from "../lib/designSystem";
 
 const TRIGGER_EMOJIS = {
-  work: "\u{1F4BC}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
-  alone: "\u{1F9D8}", exercise: "\u{1F3C3}", travel: "\u2708\uFE0F", health: "\u{1FA7A}", money: "\u{1F4B0}",
+  work: "\u{1F3E2}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
+  alone: "\u{1F9D8}", exercise: "\u{1F3C3}", travel: "\u{1F4CD}", health: "\u{1F48A}", money: "\u{1F4B0}",
   sleep: "\u{1F634}", other: "\u{1F4CC}",
 };
 
@@ -231,6 +231,7 @@ export default function HomePage() {
               <button
                 key={t}
                 className="triggerTile"
+                data-trigger={t}
                 onClick={() => { setTrigger(t); setStep("emotion"); }}
                 type="button"
               >

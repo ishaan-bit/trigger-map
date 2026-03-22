@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
@@ -23,10 +24,51 @@ function Row({ label, value }) {
   );
 }
 
+function Toggle({ label, hint, checked, onChange }) {
+  return (
+    <div className="settingsSwitchRow">
+      <div className="settingsSwitchLabel">
+        <span className="settingsSwitchTitle">{label}</span>
+        {hint ? <span className="settingsSwitchHint">{hint}</span> : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        className={`toggleSwitch ${checked ? "toggleSwitchOn" : ""}`}
+        onClick={() => onChange(!checked)}
+      >
+        <span className="toggleThumb" />
+      </button>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { user, subscription, signOut, exportLogs, deleteAllUserData, isPremium } = useSession();
   const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
+
+  const [dailyCheckin, setDailyCheckin] = useState(false);
+  const [weeklyInsights, setWeeklyInsights] = useState(false);
+  const [gentleNudges, setGentleNudges] = useState(false);
+
+  useEffect(() => {
+    try {
+      const prefs = JSON.parse(localStorage.getItem("tm_notification_prefs") || "{}");
+      if (prefs.dailyCheckin) setDailyCheckin(true);
+      if (prefs.weeklyInsights) setWeeklyInsights(true);
+      if (prefs.gentleNudges) setGentleNudges(true);
+    } catch {}
+  }, []);
+
+  function updateNotifPref(key, value) {
+    try {
+      const prefs = JSON.parse(localStorage.getItem("tm_notification_prefs") || "{}");
+      prefs[key] = value;
+      localStorage.setItem("tm_notification_prefs", JSON.stringify(prefs));
+    } catch {}
+  }
 
   return (
     <Layout title="Settings">
@@ -63,6 +105,28 @@ export default function SettingsPage() {
             <p className="muted" style={{ fontSize: 13 }}>Create a free account to sync, or go Premium for AI insights.</p>
           )}
           <button className="ghostButton" type="button" onClick={() => router.push("/premium")}>View plans</button>
+        </Section>
+
+        {/* Notifications */}
+        <Section icon="🔔" title="Notifications">
+          <Toggle
+            label="Daily check-in"
+            hint="A gentle evening reminder to log how your day went."
+            checked={dailyCheckin}
+            onChange={(v) => { setDailyCheckin(v); updateNotifPref("dailyCheckin", v); }}
+          />
+          <Toggle
+            label="Weekly insights"
+            hint="Get notified when your weekly pattern report is ready."
+            checked={weeklyInsights}
+            onChange={(v) => { setWeeklyInsights(v); updateNotifPref("weeklyInsights", v); }}
+          />
+          <Toggle
+            label="Gentle nudges"
+            hint="Encouraging prompts if you haven't logged in a while."
+            checked={gentleNudges}
+            onChange={(v) => { setGentleNudges(v); updateNotifPref("gentleNudges", v); }}
+          />
         </Section>
 
         {/* Data */}
