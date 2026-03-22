@@ -11,57 +11,75 @@ function windowElapsed(existing) {
   return Date.now() - new Date(existing.generatedAt).getTime() >= INSIGHT_WINDOW_MS;
 }
 
-export async function runGenerateWeeklyReports() {
-  const owners = await listOwnerIds();
-  const results = [];
+const CONCURRENCY = 5;
 
-  for (const ownerId of owners) {
-    try {
-      const existing = await getStoredWeeklyInsight(ownerId);
+async function processOwner(ownerId, force) {
+  const existing = await getStoredWeeklyInsight(ownerId);
 
-      if (!windowElapsed(existing)) {
-        results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
-        continue;
-      }
-
-      const aggregates = await getWeeklyAggregates(ownerId);
-      const report = generateWeeklyReport({ aggregates });
-      if (!report.totalMoments) {
-        results.push({ ownerId, skipped: true, reason: "no-data" });
-        continue;
-      }
-
-      let insight;
-      try {
-        insight = await generateInsight(report);
-      } catch (aiError) {
-        results.push({ ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` });
-        continue;
-      }
-
-      const payload = {
-        windowEnd: new Date().toISOString().slice(0, 10),
-        summary: insight.summary,
-        microExperiment: insight.microExperiment || null,
-        confidence: insight.confidence,
-        model: insight.model,
-        generatedAt: insight.generatedAt,
-      };
-
-      await storeWeeklyInsight(ownerId, payload);
-      results.push({ ownerId, report: payload });
-    } catch (error) {
-      results.push({ ownerId, skipped: true, reason: error.message || "generation-failed" });
-    }
+  if (!force && !windowElapsed(existing)) {
+    return { ownerId, skipped: true, reason: "window-not-elapsed" };
   }
 
-  return results;
+  const aggregates = await getWeeklyAggregates(ownerId);
+  const report = generateWeeklyReport({ aggregates });
+  if (!report.totalMoments) {
+    return { ownerId, skipped: true, reason: "no-data" };
+  }
+
+  let insight;
+  try {
+    insight = await generateInsight(report);
+  } catch (aiError) {
+    return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
+  }
+
+  const payload = {
+    windowEnd: new Date().toISOString().slice(0, 10),
+    summary: insight.summary,
+    microExperiment: insight.microExperiment || null,
+    confidence: insight.confidence,
+    model: insight.model,
+    generatedAt: insight.generatedAt,
+  };
+
+  await storeWeeklyInsight(ownerId, payload);
+  console.log(`[generateWeeklyReports] Generated for ${ownerId.slice(0, 8)}... (${insight.confidence})`);
+  return { ownerId, report: payload };
+}
+
+export async function runGenerateWeeklyReports({ force = false } = {}) {
+  const startTime = Date.now();
+  const owners = await listOwnerIds();
+  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force})`);
+
+  // Process in parallel batches
+  const results = [];
+  for (let i = 0; i < owners.length; i += CONCURRENCY) {
+    const batch = owners.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((ownerId) =>
+        processOwner(ownerId, force).catch((error) => {
+          console.error(`[generateWeeklyReports] Error for ${ownerId.slice(0, 8)}...: ${error.message}`);
+          return { ownerId, skipped: true, reason: error.message || "generation-failed" };
+        })
+      )
+    );
+    results.push(...batchResults);
+  }
+
+  const durationMs = Date.now() - startTime;
+  const generated = results.filter(r => r.report).length;
+  const skipped = results.filter(r => r.skipped).length;
+  console.log(`[generateWeeklyReports] Done in ${durationMs}ms — ${generated} generated, ${skipped} skipped`);
+
+  return { users: owners.length, generated, skipped, durationMs, results };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runGenerateWeeklyReports()
-    .then((results) => {
-      console.log(JSON.stringify({ ok: true, generated: results.length, results }, null, 2));
+  const force = process.argv.includes('--force');
+  runGenerateWeeklyReports({ force })
+    .then((output) => {
+      console.log(JSON.stringify({ ok: true, ...output }, null, 2));
     })
     .catch((error) => {
       console.error(JSON.stringify({ ok: false, error: error.message }, null, 2));

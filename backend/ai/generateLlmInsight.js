@@ -11,6 +11,57 @@
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
 const REQUEST_TIMEOUT_MS = 300_000;
+const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
+
+/**
+ * Ensure the requested model is available in Ollama.
+ * If not, pull it automatically. Uses the Ollama native API (not /v1).
+ */
+async function ensureModelAvailable(ollamaBase, model) {
+  // ollamaBase is like "http://localhost:11434/v1" — strip /v1 for native API
+  const nativeBase = ollamaBase.replace(/\/v1\/?$/, "");
+
+  // Check if model exists
+  try {
+    const showRes = await fetch(`${nativeBase}/api/show`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model }),
+    });
+    if (showRes.ok) return; // model already available
+  } catch {
+    // Ollama might not be running — let the main call handle the error
+    return;
+  }
+
+  // Model not found — pull it
+  console.log(`[LLM] Model "${model}" not found locally. Pulling from Ollama registry...`);
+  const controller = new AbortController();
+  const pullTimeout = setTimeout(() => controller.abort(), PULL_TIMEOUT_MS);
+
+  try {
+    const pullRes = await fetch(`${nativeBase}/api/pull`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model, stream: false }),
+      signal: controller.signal,
+    });
+
+    if (!pullRes.ok) {
+      const text = await pullRes.text();
+      throw new Error(`Pull failed (${pullRes.status}): ${text}`);
+    }
+
+    console.log(`[LLM] Model "${model}" pulled successfully.`);
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`Model pull timed out after ${PULL_TIMEOUT_MS / 1000}s. Try pulling "${model}" manually: ollama pull ${model}`);
+    }
+    throw new Error(`Failed to pull model "${model}": ${err.message}`);
+  } finally {
+    clearTimeout(pullTimeout);
+  }
+}
 
 function buildSignals(report, recentNotes) {
   const lines = [];
@@ -127,6 +178,9 @@ Rules:
 export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
+
+  // Auto-pull model if not available locally
+  await ensureModelAvailable(apiUrl, model);
 
   const prompt = buildPrompt(weeklyReport, recentNotes);
 

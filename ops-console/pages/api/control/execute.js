@@ -1,6 +1,6 @@
 import { requireAuth } from '../../../lib/auth.js';
 import { triggerJob, clearCache, getBackendHealth } from '../../../lib/backendClient.js';
-import { runLlmInsights, runFreePass, cancelWorkerJob, getWorkerHealth } from '../../../lib/workerClient.js';
+import { runLlmInsights, runFreePass, cancelWorkerJob, getWorkerHealth, listModels, pullModel } from '../../../lib/workerClient.js';
 import { pingRedis, sMembers, redisKey } from '../../../lib/redis.js';
 
 // Jobs that run on the local worker (LLM inference)
@@ -113,6 +113,27 @@ export default async function handler(req, res) {
     if (action === 'count-owners') {
       const owners = await sMembers(redisKey('owners'));
       return res.status(200).json({ ok: true, action, target: 'owners', result: { count: owners.length } });
+    }
+
+    // ── List Models ──
+    if (action === 'list-models') {
+      const result = await listModels();
+      return res.status(result.ok ? 200 : 502).json({
+        ok: result.ok,
+        action,
+        result: result.data,
+      });
+    }
+
+    // ── Pull Model ──
+    if (action === 'pull-model') {
+      const result = await pullModel(target);
+      return res.status(result.ok ? 200 : 502).json({
+        ok: result.ok,
+        action,
+        target,
+        result: result.data,
+      });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

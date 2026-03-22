@@ -22,12 +22,8 @@ export default async function handler(req, res) {
 
   try {
     if (req.query.mode === "scheduled") {
-      const results = await runGenerateWeeklyReports();
-      return sendSuccess(res, {
-        generated: results.filter((entry) => entry.report).length,
-        skipped: results.filter((entry) => entry.skipped).length,
-        results,
-      });
+      const output = await runGenerateWeeklyReports();
+      return sendSuccess(res, output);
     }
 
     const token = getBearerToken(req);

@@ -3,6 +3,9 @@
     "pages/api/**/*.js": {
       "maxDuration": 10
     },
+    "pages/api/weeklyReport.js": {
+      "maxDuration": 60
+    },
     "pages/api/internal/**/*.js": {
       "maxDuration": 60
     }

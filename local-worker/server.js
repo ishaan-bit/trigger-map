@@ -135,6 +135,16 @@ async function handleRequest(req, res) {
     return json(res, 401, { error: 'Unauthorized' });
   }
 
+  // GET /models — list available Ollama models
+  if (path === '/models' && req.method === 'GET') {
+    return handleListModels(req, res);
+  }
+
+  // POST /pull-model — pull a model into Ollama
+  if (path === '/pull-model' && req.method === 'POST') {
+    return handlePullModel(req, res);
+  }
+
   // POST /run-llm-insights
   if (path === '/run-llm-insights' && req.method === 'POST') {
     return handleRunJob(req, res, 'generateLlmInsights.js', 'generateLlmInsights');
@@ -177,7 +187,6 @@ async function handleRunJob(req, res, scriptName, jobName) {
   const { model, force, minMoments } = body;
 
   // Validate model if provided
-  const ALLOWED_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
   if (model && !ALLOWED_MODELS.includes(model)) {
     return json(res, 400, { error: `Invalid model: ${model}. Allowed: ${ALLOWED_MODELS.join(', ')}` });
   }
@@ -230,6 +239,73 @@ async function handleRunJob(req, res, scriptName, jobName) {
   });
 }
 
+// ── Ollama model management ──
+const OLLAMA_BASE = process.env.LLM_API_URL
+  ? process.env.LLM_API_URL.replace(/\/v1\/?$/, '')
+  : 'http://localhost:11434';
+
+const ALLOWED_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
+
+async function handleListModels(_req, res) {
+  try {
+    const ollamaRes = await fetch(`${OLLAMA_BASE}/api/tags`);
+    if (!ollamaRes.ok) throw new Error(`Ollama returned ${ollamaRes.status}`);
+    const data = await ollamaRes.json();
+    const installed = (data.models || []).map(m => m.name);
+
+    // Map installed model names to our dropdown names
+    const available = ALLOWED_MODELS.map(name => {
+      const ready = installed.some(i =>
+        i === name || i.startsWith(name + ':')
+      );
+      const match = installed.find(i => i === name || i.startsWith(name + ':'));
+      return { name, ready, installedAs: match || null };
+    });
+
+    return json(res, 200, { ok: true, models: available, raw: installed });
+  } catch (err) {
+    return json(res, 502, { ok: false, error: `Cannot reach Ollama: ${err.message}` });
+  }
+}
+
+async function handlePullModel(req, res) {
+  const body = await readBody(req);
+  const { model } = body;
+
+  if (!model || !ALLOWED_MODELS.includes(model)) {
+    return json(res, 400, { error: `Invalid model: ${model}. Allowed: ${ALLOWED_MODELS.join(', ')}` });
+  }
+
+  // Prevent concurrent pulls
+  const pullKey = `pull:${model}`;
+  if (activeJobs.has(pullKey)) {
+    return json(res, 409, { error: `Already pulling "${model}"` });
+  }
+
+  activeJobs.set(pullKey, { startedAt: Date.now() });
+
+  try {
+    console.log(`[Worker] Pulling model "${model}"...`);
+    const pullRes = await fetch(`${OLLAMA_BASE}/api/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: model, stream: false }),
+    });
+
+    if (!pullRes.ok) {
+      const text = await pullRes.text();
+      throw new Error(`Ollama pull returned ${pullRes.status}: ${text}`);
+    }
+
+    console.log(`[Worker] Model "${model}" pulled successfully.`);
+    return json(res, 200, { ok: true, model, message: `Model "${model}" is now available.` });
+  } catch (err) {
+    return json(res, 500, { ok: false, model, error: err.message });
+  } finally {
+    activeJobs.delete(pullKey);
+  }
+}
+
 // ── Start ──
 const server = http.createServer(handleRequest);
 server.listen(PORT, '127.0.0.1', () => {
@@ -239,6 +315,8 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`  Backend dir: ${BACKEND_DIR}`);
   console.log(`  Endpoints:`);
   console.log(`    GET  /health          (no auth)`);
+  console.log(`    GET  /models          (list Ollama models)`);
+  console.log(`    POST /pull-model      (pull a model)`);
   console.log(`    POST /run-llm-insights`);
   console.log(`    POST /run-freepass`);
   console.log(`    POST /cancel-job`);

@@ -8,9 +8,12 @@ const JOBS = [
   {
     id: 'generateWeeklyReports',
     label: 'Generate Weekly Reports',
-    description: 'Batch generate rule-based weekly insights for all users. Safe to run — skips users with recent reports.',
+    description: 'Batch generate rule-based weekly insights for all users. Safe to run — skips users with recent reports unless Force is checked.',
     danger: false,
     source: 'backend',
+    params: [
+      { key: 'force', label: 'Force (ignore 7-day window)', type: 'checkbox', default: false },
+    ],
   },
   {
     id: 'generateLlmInsights',
@@ -403,6 +406,8 @@ export default function ControlPage() {
     }
     return defaults;
   });
+  const [modelStatus, setModelStatus] = useState([]);
+  const [pullingModel, setPullingModel] = useState(null);
 
   // Poll worker health
   const checkWorker = useCallback(async () => {
@@ -422,6 +427,56 @@ export default function ControlPage() {
     const interval = setInterval(checkWorker, 15000);
     return () => clearInterval(interval);
   }, [checkWorker]);
+
+  // Fetch model availability from Ollama via worker
+  const fetchModels = useCallback(async () => {
+    try {
+      const res = await fetch('/api/control/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list-models', target: 'models' }),
+      });
+      const data = await res.json();
+      if (data.ok !== false && data.data?.models) {
+        setModelStatus(data.data.models);
+      } else if (Array.isArray(data.models)) {
+        setModelStatus(data.models);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchModels();
+  }, [fetchModels]);
+
+  // Refresh models when worker comes online
+  useEffect(() => {
+    if (workerStatus === 'online') fetchModels();
+  }, [workerStatus, fetchModels]);
+
+  const pullModelAction = async (model) => {
+    setPullingModel(model);
+    try {
+      const res = await fetch('/api/control/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pull-model', target: model }),
+      });
+      const data = await res.json();
+      setResults((prev) => [
+        { timestamp: new Date().toISOString(), action: 'pull-model', target: model, ok: res.ok, data, status: res.status },
+        ...prev,
+      ].slice(0, 50));
+    } catch (err) {
+      setResults((prev) => [
+        { timestamp: new Date().toISOString(), action: 'pull-model', target: model, ok: false, data: { error: err.message }, status: 0 },
+        ...prev,
+      ].slice(0, 50));
+    } finally {
+      setPullingModel(null);
+      fetchModels();
+    }
+  };
 
   const executeAction = async (action, target, params) => {
     setRunning(target);
@@ -498,7 +553,53 @@ export default function ControlPage() {
         </div>
       </div>
 
-      {/* Job Triggers */}
+      {/* LLM Models */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>LLM Models</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {modelStatus.filter(m => m.ready).length}/{modelStatus.length} ready
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={fetchModels} disabled={workerStatus !== 'online'}>
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div className="panel-body">
+          {workerStatus !== 'online' ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Worker offline — cannot check models</div>
+          ) : modelStatus.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading model status…</div>
+          ) : (
+            modelStatus.map((m) => (
+              <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.ready ? 'var(--green)' : 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>{m.name}</span>
+                  {m.ready && m.installedAs && m.installedAs !== m.name && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({m.installedAs})</span>
+                  )}
+                </div>
+                {m.ready ? (
+                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>Ready</span>
+                ) : (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ fontSize: 11, padding: '2px 12px' }}
+                    disabled={pullingModel !== null}
+                    onClick={() => pullModelAction(m.name)}
+                  >
+                    {pullingModel === m.name ? 'Pulling…' : 'Pull'}
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Job Triggers */
       <div className="panel">
         <div className="panel-header">
           <h3>Jobs</h3>
@@ -546,9 +647,11 @@ export default function ControlPage() {
                               fontFamily: 'var(--font-mono)',
                             }}
                           >
-                            {LLM_MODELS.map((m) => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
+                            {LLM_MODELS.map((m) => {
+                              const ms = modelStatus.find(s => s.name === m);
+                              const prefix = modelStatus.length > 0 ? (ms?.ready ? '✓ ' : '↓ ') : '';
+                              return <option key={m} value={m}>{prefix}{m}</option>;
+                            })}
                           </select>
                         </label>
                       )}

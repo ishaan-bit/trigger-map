@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
     if (job === 'generateWeeklyReports') {
       const { runGenerateWeeklyReports } = await import('../../../../jobs/generateWeeklyReports.js');
-      result = await runGenerateWeeklyReports();
+      result = await runGenerateWeeklyReports({ force: !!force });
     } else if (job === 'generateLlmInsights') {
       const { runGenerateLlmInsights } = await import('../../../../jobs/generateLlmInsights.js');
       result = await runGenerateLlmInsights({

@@ -64,3 +64,14 @@ export async function getWorkerHealth() {
     return { ok: false, data: null };
   }
 }
+
+export async function listModels() {
+  return workerRequest('/models', { method: 'GET' });
+}
+
+export async function pullModel(model) {
+  return workerRequest('/pull-model', {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
+}
