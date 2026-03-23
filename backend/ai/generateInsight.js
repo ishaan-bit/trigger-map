@@ -1,4 +1,5 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
+import { lintText, triggerLabel } from "../utils/textGrammar.js";
 
 /**
  * Confidence-aware rule-based insight generator.
@@ -114,7 +115,7 @@ function buildEmergingSummary(report, firstName) {
   }
 
   if (report.topEmotion) {
-    parts.push(`${report.topEmotion} was your most common feeling.`);
+    parts.push(`You felt ${report.topEmotion} most often this week.`);
   }
 
   if (report.regulators.length) {
@@ -179,7 +180,7 @@ function buildStrongSummary(report, firstName) {
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `${f.trigger} and ${f.emotion} kept pairing up (${f.count}×). That's a pattern worth noticing.`;
+    let fLine = `${triggerLabel(f.trigger)} and feeling ${f.emotion} kept showing up together (${f.count}×). That's a pattern worth noticing.`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -267,10 +268,10 @@ export async function generateInsight(report, opts = {}) {
   const bm = report.baselineMetrics;
 
   return {
-    summary: appendPredictionContext(appendTagContext(summary, report), report),
+    summary: lintText(appendPredictionContext(appendTagContext(summary, report), report)),
     microExperiment,
-    whatWorking,
-    whereToFocus,
+    whatWorking: whatWorking?.map(item => ({ ...item, text: lintText(item.text) })) || null,
+    whereToFocus: whereToFocus?.map(item => ({ ...item, text: lintText(item.text) })) || null,
     stateOfMind: bm?.stateOfMind || null,
     baselineSummary: bm?.baseline?.reliable
       ? `Your emotional baseline sits around ${bm.baseline.label}. ${bm.drift ? `This week you're ${bm.drift.label} compared to your norm.` : ""}`

@@ -5,6 +5,8 @@
  * Fallback: always returns original text on any failure.
  */
 
+import { lintText } from "./textGrammar.js";
+
 // ── Local polish ────────────────────────────────────────────────────────────
 
 /**
@@ -13,7 +15,9 @@
  */
 function localPolish(text) {
   if (!text || typeof text !== "string") return text ?? "";
-  return text
+  // Grammar lint first — catches adjective-as-noun, bare "alone", verb agreement
+  let t = lintText(text);
+  return t
     // Unicode normalization
     .replace(/\u2014/g, " - ")                 // em dash
     .replace(/\u2013/g, " - ")                 // en dash

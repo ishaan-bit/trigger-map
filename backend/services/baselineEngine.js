@@ -202,7 +202,7 @@ function recoveryLabel(latency) {
   if (latency <= 1) return "bounce back quickly";
   if (latency <= 2) return "recover within a couple of days";
   if (latency <= 4) return "take a few days to settle";
-  return "slow to return to baseline";
+  return "take longer to return to baseline";
 }
 
 /**

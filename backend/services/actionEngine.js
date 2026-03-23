@@ -6,6 +6,9 @@
  * Feedback is stored via the HiTL loop (/api/actions POST).
  */
 
+import { lintText } from "../utils/textGrammar.js";
+ */
+
 const ACTION_META = {
   regulate:   { icon: "🌿", category: "Try this" },
   awareness:  { icon: "👁️", category: "Notice" },
@@ -147,6 +150,8 @@ export function generateActions(report) {
 
   return actions.slice(0, 5).map((a, i) => ({
     ...a,
+    title: lintText(a.title),
+    reason: lintText(a.reason),
     ...(ACTION_META[a.type] || ACTION_META.awareness),
     order: i,
   }));

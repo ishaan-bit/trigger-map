@@ -1,5 +1,6 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
 import { computeBaselineMetrics } from "./baselineEngine.js";
+import { lintText } from "../utils/textGrammar.js";
 
 // --- Confidence thresholds ---
 const MIN_LOGS_FOR_PATTERNS = 5;
@@ -165,11 +166,11 @@ function buildChangeHighlights(deltas, report) {
   const emotionDeltas = Object.entries(deltas.emotionDeltas || {}).sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta));
   if (emotionDeltas.length) {
     const [emotion, d] = emotionDeltas[0];
-    if (d.delta > 0) highlights.push(`${emotion} was felt ${d.delta} more time${d.delta !== 1 ? "s" : ""} than last week.`);
-    else if (d.delta < 0) highlights.push(`${emotion} was felt ${Math.abs(d.delta)} fewer time${Math.abs(d.delta) !== 1 ? "s" : ""} than last week.`);
+    if (d.delta > 0) highlights.push(`You felt ${emotion} ${d.delta} more time${d.delta !== 1 ? "s" : ""} than last week.`);
+    else if (d.delta < 0) highlights.push(`You felt ${emotion} ${Math.abs(d.delta)} fewer time${Math.abs(d.delta) !== 1 ? "s" : ""} than last week.`);
   }
 
-  return highlights.slice(0, 3);
+  return highlights.slice(0, 3).map(lintText);
 }
 
 // --- Main generator ---
