@@ -35,6 +35,54 @@ export default function InsightsPage() {
             />
           </div>
 
+          {/* Action Engine Metrics */}
+          {data.actionEngine && (
+            <div className="panel">
+              <div className="panel-header"><h3>Action Engine (HiTL)</h3></div>
+              <div className="panel-body">
+                <div className="metrics-grid">
+                  <MetricCard label="Users with Actions" value={data.actionEngine.usersWithActions} color="var(--cyan, #06b6d4)" />
+                  <MetricCard label="Actions Generated" value={data.actionEngine.totalActionsGenerated} color="var(--blue)" />
+                  <MetricCard label="Feedback Entries" value={data.actionEngine.totalFeedbackEntries} color="var(--accent)" />
+                  <MetricCard
+                    label="Tried"
+                    value={data.actionEngine.triedCount}
+                    sub={data.actionEngine.totalFeedbackEntries > 0 ? `${data.actionEngine.triedPercent}%` : undefined}
+                    color="var(--green)"
+                  />
+                  <MetricCard
+                    label="Skipped"
+                    value={data.actionEngine.skippedCount}
+                    sub={data.actionEngine.totalFeedbackEntries > 0 ? `${100 - data.actionEngine.triedPercent}%` : undefined}
+                    color="var(--yellow)"
+                  />
+                </div>
+                {data.actionEngine.actionTypeBreakdown && Object.keys(data.actionEngine.actionTypeBreakdown).length > 0 && (
+                  <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Action Types</div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {Object.entries(data.actionEngine.actionTypeBreakdown)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([type, count]) => (
+                          <span key={type} style={{
+                            fontSize: 12,
+                            padding: '3px 10px',
+                            borderRadius: 12,
+                            background: 'var(--bg-tertiary)',
+                            color: 'var(--text-secondary)',
+                            fontFamily: 'var(--font-mono)',
+                          }}>
+                            {type.replace(/_/g, ' ')}: <span style={{ fontWeight: 600 }}>{count}</span>
+                          </span>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Model usage breakdown */}
           {data.insightModels && Object.keys(data.insightModels).length > 0 && (
             <div className="panel">

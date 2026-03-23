@@ -4,6 +4,7 @@ import {
   redisKey,
   pipeline,
   get,
+  lRange,
 } from '../../../lib/redis.js';
 
 export default async function handler(req, res) {
@@ -14,13 +15,14 @@ export default async function handler(req, res) {
     const ownerIds = await sMembers(redisKey('owners'));
     const sample = ownerIds.slice(0, 200);
 
-    // Fetch stored insights + user hash for each user
+    // Fetch stored insights + user hash + action feedback for each user
     const pipeCommands = [];
     for (const oid of sample) {
       pipeCommands.push(['GET', redisKey('weekly_report', oid)]);
       pipeCommands.push(['GET', redisKey('llm_insight', oid)]);
       pipeCommands.push(['GET', redisKey('llm_free_pass', oid)]);
       pipeCommands.push(['HGETALL', redisKey('user', oid)]);
+      pipeCommands.push(['LRANGE', redisKey('action_feedback', oid), '0', '-1']);
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
@@ -32,11 +34,20 @@ export default async function handler(req, res) {
     const recentInsights = [];
     const insightModels = {};
 
+    // Action engine metrics
+    let usersWithActions = 0;
+    let totalActionsGenerated = 0;
+    let totalFeedbackEntries = 0;
+    let triedCount = 0;
+    let skippedCount = 0;
+    const actionTypeBreakdown = {};
+
     for (let i = 0; i < n; i++) {
-      const ruleRaw = results[i * 4];
-      const llmRaw = results[i * 4 + 1];
-      const freePass = results[i * 4 + 2];
-      const userHash = flatArr(results[i * 4 + 3]);
+      const ruleRaw = results[i * 5];
+      const llmRaw = results[i * 5 + 1];
+      const freePass = results[i * 5 + 2];
+      const userHash = flatArr(results[i * 5 + 3]);
+      const feedbackRaw = results[i * 5 + 4] || [];
 
       if (ruleRaw) {
         ruleBasedCount++;
@@ -55,6 +66,17 @@ export default async function handler(req, res) {
           }
           const model = parsed.model || 'rule-based';
           insightModels[model] = (insightModels[model] || 0) + 1;
+
+          // Count actions from weekly report
+          if (Array.isArray(parsed.actions) && parsed.actions.length > 0) {
+            usersWithActions++;
+            totalActionsGenerated += parsed.actions.length;
+            for (const action of parsed.actions) {
+              if (action.type) {
+                actionTypeBreakdown[action.type] = (actionTypeBreakdown[action.type] || 0) + 1;
+              }
+            }
+          }
         } catch {}
       }
 
@@ -79,6 +101,18 @@ export default async function handler(req, res) {
       }
 
       if (freePass) freePassCount++;
+
+      // Action feedback
+      if (Array.isArray(feedbackRaw) && feedbackRaw.length > 0) {
+        for (const raw of feedbackRaw) {
+          try {
+            const fb = JSON.parse(raw);
+            totalFeedbackEntries++;
+            if (fb.response === 'tried') triedCount++;
+            else if (fb.response === 'skipped') skippedCount++;
+          } catch {}
+        }
+      }
     }
 
     // Sort recent insights by date desc
@@ -92,6 +126,15 @@ export default async function handler(req, res) {
         activeFreePass: freePassCount,
         coveragePercent: n > 0 ? Math.round((ruleBasedCount / n) * 100) : 0,
         llmCoveragePercent: n > 0 ? Math.round((llmCount / n) * 100) : 0,
+      },
+      actionEngine: {
+        usersWithActions,
+        totalActionsGenerated,
+        totalFeedbackEntries,
+        triedCount,
+        skippedCount,
+        triedPercent: totalFeedbackEntries > 0 ? Math.round((triedCount / totalFeedbackEntries) * 100) : 0,
+        actionTypeBreakdown,
       },
       insightModels,
       recentInsights: recentInsights.slice(0, 50),

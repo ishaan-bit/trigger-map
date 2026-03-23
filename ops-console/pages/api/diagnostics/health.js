@@ -8,6 +8,8 @@ import {
   dbSize,
   get,
   keys,
+  lLen,
+  lRange,
 } from '../../../lib/redis.js';
 import { todayKey, daysAgoKey } from '../../../lib/utils.js';
 import { getBackendHealth } from '../../../lib/backendClient.js';
@@ -21,11 +23,12 @@ export default async function handler(req, res) {
 
   try {
     // ── Parallel health checks ──
-    const [redisHealth, backendHealth, workerHealth, ollamaModels] = await Promise.all([
+    const [redisHealth, backendHealth, workerHealth, ollamaModels, crashLogCount] = await Promise.all([
       pingRedis(),
       getBackendHealth().catch((err) => ({ ok: false, data: { error: err.message } })),
       getWorkerHealth().catch(() => ({ ok: false, data: null })),
       listModels().catch(() => ({ ok: false, data: null })),
+      lLen(redisKey('crash_logs')).catch(() => 0),
     ]);
 
     // ── Environment validation ──
@@ -49,7 +52,7 @@ export default async function handler(req, res) {
     const sample = ownerIds.slice(0, 100);
     const today = todayKey();
 
-    // ── Per-user pipeline: moments count, daily agg, subscription, insight, report ──
+    // ── Per-user pipeline: moments count, daily agg, subscription, insight, report, action feedback ──
     const pipeCommands = [];
     for (const oid of sample) {
       pipeCommands.push(['LLEN', redisKey('moments', oid)]);
@@ -57,6 +60,7 @@ export default async function handler(req, res) {
       pipeCommands.push(['HGETALL', redisKey('subscription', oid)]);
       pipeCommands.push(['GET', redisKey('llm_insight', oid)]);
       pipeCommands.push(['GET', redisKey('weekly_report', oid)]);
+      pipeCommands.push(['LLEN', redisKey('action_feedback', oid)]);
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
@@ -71,16 +75,18 @@ export default async function handler(req, res) {
       subscriptions: { premium: 0, expired: 0, gracePeriod: 0, cancelled: 0, none: 0 },
       llmInsights: { hasInsight: 0, staleInsight: 0 },
       weeklyReports: { hasReport: 0, staleReport: 0 },
+      actionFeedback: { usersWithFeedback: 0, totalEntries: 0 },
     };
     const STALE_THRESHOLD = 8 * 24 * 60 * 60 * 1000; // 8 days
 
     for (let i = 0; i < sample.length; i++) {
-      const base = i * 5;
+      const base = i * 6;
       const momentCount = results[base] || 0;
       const dayAgg = flatArr(results[base + 1]);
       const subData = flatArr(results[base + 2]);
       const insightRaw = results[base + 3];
       const reportRaw = results[base + 4];
+      const feedbackCount = results[base + 5] || 0;
       const dayTotal = parseInt(dayAgg.total || '0', 10);
 
       // Data quality
@@ -130,10 +136,16 @@ export default async function handler(req, res) {
           }
         } catch { /* ignore parse errors */ }
       }
+
+      // Action feedback coverage
+      if (feedbackCount > 0) {
+        coverage.actionFeedback.usersWithFeedback++;
+        coverage.actionFeedback.totalEntries += feedbackCount;
+      }
     }
 
     dataQuality.zeroTodayActivity = sample.length - sample.filter((_, i) => {
-      const dayAgg = flatArr(results[i * 5 + 1]);
+      const dayAgg = flatArr(results[i * 6 + 1]);
       return parseInt(dayAgg.total || '0', 10) > 0;
     }).length;
 
@@ -216,6 +228,15 @@ export default async function handler(req, res) {
     const severityOrder = { critical: 0, warn: 1, info: 2 };
     anomalies.sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
 
+    // ── Crash log check ──
+    if (crashLogCount > 0) {
+      anomalies.unshift({
+        type: 'crash_reports', severity: crashLogCount >= 10 ? 'critical' : 'warn',
+        value: crashLogCount,
+        message: `${crashLogCount} unreviewed crash report(s) in the log`,
+      });
+    }
+
     const diagnosticDuration = Date.now() - diagnosticStart;
 
     return res.status(200).json({
@@ -250,6 +271,7 @@ export default async function handler(req, res) {
       dataQuality,
       coverage,
       anomalies,
+      crashLogCount: crashLogCount || 0,
       weeklyTrend: trend,
     });
   } catch (err) {

@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import { useState } from 'react';
 import { useFetch } from '../hooks/useData';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
@@ -35,9 +36,108 @@ function CoverageBar({ label, count, total, color }) {
   );
 }
 
+function CrashLogEntry({ log, defaultOpen }) {
+  const [expanded, setExpanded] = useState(defaultOpen);
+
+  return (
+    <div style={{
+      border: '1px solid rgba(239, 68, 68, 0.2)',
+      borderRadius: 8,
+      overflow: 'hidden',
+      background: 'rgba(239, 68, 68, 0.03)',
+      marginBottom: 8,
+    }}>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+          cursor: 'pointer', userSelect: 'none',
+        }}
+      >
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          background: 'var(--red)', boxShadow: '0 0 6px var(--red)',
+        }} />
+        <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {log.message}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {log.platform && (
+            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', textTransform: 'uppercase' }}>
+              {log.platform}
+            </span>
+          )}
+          {log.appVersion && (
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+              v{log.appVersion}
+            </span>
+          )}
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+            {log.timestamp ? timeAgo(log.timestamp) : '—'}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+            &#9654;
+          </span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 14px' }}>
+          {log.screen && (
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              <span style={{ fontWeight: 600 }}>Screen:</span> {log.screen}
+            </div>
+          )}
+          {log.deviceId && (
+            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Device: {log.deviceId.slice(0, 12)}...
+            </div>
+          )}
+          {log.stack && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Stack Trace</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--red)',
+                background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 240, overflowY: 'auto', margin: 0,
+              }}>
+                {log.stack}
+              </pre>
+            </div>
+          )}
+          {log.componentStack && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Component Stack</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--yellow)',
+                background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflowY: 'auto', margin: 0,
+              }}>
+                {log.componentStack}
+              </pre>
+            </div>
+          )}
+          {log.extra && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Extra Context</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+                background: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 120, overflowY: 'auto', margin: 0,
+              }}>
+                {log.extra}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DiagnosticsPage() {
   const { data: health, loading: loadingHealth, refetch: refetchHealth } = useFetch('/api/diagnostics/health');
   const { data: activity, loading: loadingActivity } = useFetch('/api/diagnostics/activity');
+  const { data: crashData, loading: loadingCrash, refetch: refetchCrash } = useFetch('/api/diagnostics/crash-logs');
 
   const isLoading = loadingHealth || loadingActivity;
 
@@ -259,6 +359,12 @@ export default function DiagnosticsPage() {
                 total={health.sampleSize}
                 color="var(--green)"
               />
+              <CoverageBar
+                label="Action Feedback (HiTL)"
+                count={health.coverage?.actionFeedback?.usersWithFeedback || 0}
+                total={health.sampleSize}
+                color="var(--cyan, #06b6d4)"
+              />
               {(health.coverage?.llmInsights?.staleInsight > 0 || health.coverage?.weeklyReports?.staleReport > 0) && (
                 <div style={{ fontSize: 12, color: 'var(--yellow)', marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   {health.coverage.llmInsights.staleInsight > 0 && (
@@ -301,6 +407,38 @@ export default function DiagnosticsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crash Logs */}
+      {crashData && (
+        <div className="panel">
+          <div className="panel-header">
+            <h3>Crash Logs</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {crashData.total > 0 && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--red)' }}>
+                  {crashData.total} report{crashData.total !== 1 ? 's' : ''}
+                </span>
+              )}
+              <button className="btn btn-ghost btn-sm" onClick={refetchCrash} disabled={loadingCrash}>
+                {loadingCrash ? '...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+          <div className="panel-body">
+            {(!crashData.logs || crashData.logs.length === 0) ? (
+              <div style={{ color: 'var(--green)', textAlign: 'center', padding: 16 }}>
+                No crash reports
+              </div>
+            ) : (
+              <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+                {crashData.logs.map((log, i) => (
+                  <CrashLogEntry key={i} log={log} defaultOpen={i === 0} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

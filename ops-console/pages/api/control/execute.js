@@ -13,6 +13,7 @@ const ALLOWED_CACHES = [
   'weekly_report',
   'llm_insight',
   'llm_free_pass',
+  'action_feedback',
 ];
 
 export default async function handler(req, res) {

@@ -59,6 +59,11 @@ const CACHE_ACTIONS = [
     label: 'Clear Free Pass Tokens',
     description: 'Remove all active free-pass tokens.',
   },
+  {
+    id: 'action_feedback',
+    label: 'Clear Action Feedback',
+    description: 'Remove all stored HiTL action feedback (tried/skipped responses). Users will see fresh action cards.',
+  },
 ];
 
 const QUICK_ACTIONS = [
