@@ -223,7 +223,8 @@ Rules:
 - Tone: calm, direct, perceptive.
 - If action feedback data is provided, use it: acknowledge actions the user tried and tailor "One thing to try" to avoid suggesting things they already skipped. Build on what they engaged with.
 - IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
-- Use correct English spelling and grammar. No typos, no random numbers or characters.
+- Use correct English spelling and grammar. No typos, no random numbers or characters mixed into words.
+- Always use "Your" as the possessive form. Never write "You's" which is not valid English.
 - Each section body must be ${sentencesPerSection} sentences.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
@@ -264,7 +265,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'Your' as the possessive form — never 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
@@ -310,6 +311,8 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       .replace(/\bthis user\b/gi, "you")  // convert 3rd person to 2nd person
       .replace(/\bthe user\b/gi, "you")
       .replace(/\btheir (?=emotion|trigger|pattern|mood|feeling|week|day|log)/gi, "your ")
+      .replace(/\bYou's\b/g, "Your")   // fix broken LLM possessive
+      .replace(/\byou's\b/g, "your")
       .trim();
 
     // Strip prompt echo lines the model may repeat back
@@ -384,6 +387,10 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       // Clean stray LLM artifacts from section body
       trimmedBody = trimmedBody
         .replace(/^\d+[.)]\s*/gm, "")           // stray numbered prefixes
+        .replace(/\b[a-zA-Z]+\d+[a-zA-Z]+\b/g, "")  // garbled tokens: letters+digits+letters (e.g. "exer0376fing")
+        .replace(/\b[a-zA-Z]{2,}\d{3,}\b/g, "")      // garbled tokens: letters then 3+ random digits
+        .replace(/\bYou's\b/g, "Your")          // broken possessive (final pass)
+        .replace(/\byou's\b/g, "your")
         .replace(/\s{2,}/g, " ")                 // collapse double spaces
         .replace(/([a-z])\s*\n\s*([a-z])/g, "$1 $2") // join broken sentences
         .replace(/[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip non-printable/non-latin junk

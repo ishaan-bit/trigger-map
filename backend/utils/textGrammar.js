@@ -136,5 +136,14 @@ export function lintText(text) {
   t = t.replace(/\btend to recovers\b/gi, "tend to recover");
   t = t.replace(/\btend to takes\b/gi, "tend to take");
 
+  // 10. "You's" → "Your" (broken LLM possessive, not valid English)
+  t = t.replace(/\bYou's\b/g, "Your");
+  t = t.replace(/\byou's\b/g, "your");
+
+  // 11. Garbled tokens: digits mixed into letter sequences (LLM hallucination)
+  t = t.replace(/\b[a-zA-Z]+\d+[a-zA-Z]+\b/g, "");   // "exer0376fing"
+  t = t.replace(/\b[a-zA-Z]{2,}\d{3,}\b/g, "");        // "exer0376"
+  t = t.replace(/\s{2,}/g, " ").trim();                 // clean up gaps
+
   return t;
 }

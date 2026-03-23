@@ -53,7 +53,15 @@ function localPolish(text) {
  */
 export async function phraseText(inputText, opts = {}) {
   if (!inputText || typeof inputText !== "string") return inputText ?? "";
-  return localPolish(inputText);
+  let result = localPolish(inputText);
+
+  // Personalize with firstName — "Your" at sentence start → "Kumar's"
+  const name = opts.firstName;
+  if (name) {
+    result = result.replace(/(^|[.!?]\s+)Your\b/g, `$1${name}'s`);
+  }
+
+  return result;
 }
 
 /**
