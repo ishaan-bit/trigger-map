@@ -18,6 +18,7 @@
 10. [Insights Screen Rendering (WeeklyReportScreen.js)](#10-insights-screen-rendering)
 11. [Access Tiers & Gating](#11-access-tiers--gating)
 12. [HF Phrasing Layer & Personalization (v80)](#12-hf-phrasing-layer--personalization-v80)
+13. [Continuity Layer — Recurrence, Streaks & Baseline Language (v81)](#13-continuity-layer--recurrence-streaks--baseline-language-v81)
 
 ---
 
@@ -942,4 +943,71 @@ Existing push infrastructure (`push-token.js`, `send-push.js`, Expo Push API) wa
 
 ---
 
-*Generated from source code as of v80. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`.*
+## 13. Continuity Layer — Recurrence, Streaks & Baseline Language (v81)
+
+### Recurrence Detection (`patternEngine.js`)
+
+Detects repeated trigger–emotion pairs within the current 7-day window:
+
+| Count | Classification |
+|-------|---------------|
+| ≥ 3   | `recurring`   |
+| 2     | `emerging`    |
+
+Top 3 pairs exposed as `report.recurrence[]` — each entry: `{ trigger, emotion, count, label }`.
+
+### Streak Detection (`patternEngine.js`)
+
+Uses the existing `weeklyEmotionTrajectory` array to find consecutive-day runs:
+
+| Type | Threshold | Output |
+|------|-----------|--------|
+| Positive streak | score > 3.5 for ≥ 2 consecutive days | `report.positiveStreak: { days, startDate }` |
+| Negative streak | score < 2.5 for ≥ 2 consecutive days | `report.negativeStreak: { days, startDate }` |
+
+Purely derived — no Redis storage, no historical lookback beyond the 7-day window.
+
+### Baseline Context Flags (`patternEngine.js`)
+
+Exposes already-computed baseline signals in a flat consumable shape:
+
+```js
+report.baselineContext = {
+  driftDirection: "improving" | "declining" | "stable",
+  stabilityLevel: "very steady" | "mostly steady" | ... | null,
+  recoveryLabel: "bounces back quickly" | ... | null,
+}
+```
+
+### Insight Language Upgrades (`generateInsight.js`)
+
+Three additive enrichments wired into the moderate and strong summary builders:
+
+1. **Recurrence language** — When the top friction zone or pair is also a recurrence, appends: "This pattern has come up a few times this week." (recurring) or "This showed up more than once this week." (emerging).
+
+2. **Baseline-aware language** — Uses `baselineContext.driftDirection` to add relative phrasing (max once per summary): "slightly better than your usual pattern" / "a bit below your usual pattern" / "fairly consistent with your usual pattern".
+
+3. **Streak language** — If a meaningful streak exists (≥ 2 days), adds: "You had a N-day stretch of lower energy before recovering." or "You maintained a steady stretch of higher energy for N days."
+
+### LLM Signal Alignment (`generateLlmInsight.js`)
+
+Two new signal lines added to `buildSignals()`:
+- `Recurring patterns this week: work + anxious (3x, recurring); family + frustrated (2x, emerging).`
+- `Positive streak: 3 consecutive days of higher energy.` / `Low stretch: 2 consecutive days of lower energy.`
+
+Anti-negativity bias strengthened in system prompt: added explicit instructions to default to supportive tone, emphasize resilience, and reflect positive data positively.
+
+### UI Changes (`WeeklyReportScreen.js`)
+
+- **This Week tab → Trajectory section**: Small inline note under the day cards when a streak exists, e.g., "3-day low stretch mid-week" or "3-day high-energy stretch".
+- No new components, no layout shifts.
+
+### Ops Console (`control.js`)
+
+Per-user report rows now show:
+- **↻** Top recurrence (yellow, e.g., `↻ work+anxious (3x, recurring)`)
+- **↓/↑** Streak indicator (red for negative, green for positive, e.g., `2d↓` or `3d↑`)
+
+---
+
+*Generated from source code as of v81. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`.*

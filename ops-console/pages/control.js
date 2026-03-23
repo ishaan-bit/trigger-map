@@ -315,6 +315,14 @@ function RunLogEntry({ entry, defaultOpen }) {
                                 {r.report.hasDeltaData && (
                                   <span style={{ color: '#a78bfa', marginLeft: 6 }}>Δ</span>
                                 )}
+                                {r.report.topRecurrence && (
+                                  <span style={{ color: '#facc15', marginLeft: 6 }} title="Top recurrence">↻ {r.report.topRecurrence}</span>
+                                )}
+                                {(r.report.positiveStreakDays || r.report.negativeStreakDays) && (
+                                  <span style={{ color: r.report.negativeStreakDays ? '#f87171' : '#34d399', marginLeft: 6 }}>
+                                    {r.report.negativeStreakDays ? `${r.report.negativeStreakDays}d↓` : `${r.report.positiveStreakDays}d↑`}
+                                  </span>
+                                )}
                                 {r.report.summary && ` — ${r.report.summary.slice(0, 60)}${r.report.summary.length > 60 ? '...' : ''}`}
                               </span>
                             )}

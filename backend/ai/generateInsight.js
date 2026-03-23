@@ -61,6 +61,35 @@ function pickExperiment(trigger) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// --- Continuity language helpers (v81) ---
+
+function recurrenceNote(trigger, emotion, recurrence) {
+  if (!recurrence?.length) return null;
+  const match = recurrence.find(r => r.trigger === trigger && r.emotion === emotion);
+  if (!match) return null;
+  return match.label === "recurring"
+    ? "This pattern has come up a few times this week."
+    : "This showed up more than once this week.";
+}
+
+function baselineLanguage(direction) {
+  if (direction === "improving") return "slightly better than your usual pattern";
+  if (direction === "declining") return "a bit below your usual pattern";
+  if (direction === "stable") return "fairly consistent with your usual pattern";
+  return null;
+}
+
+function streakNote(positiveStreak, negativeStreak) {
+  const parts = [];
+  if (negativeStreak?.days >= 2) {
+    parts.push(`You had a ${negativeStreak.days}-day stretch of lower energy before recovering.`);
+  }
+  if (positiveStreak?.days >= 2) {
+    parts.push(`You maintained a steady stretch of higher energy for ${positiveStreak.days} days.`);
+  }
+  return parts.length ? parts[0] : null;
+}
+
 function buildTooEarlySummary() {
   return "You're just getting started — every moment you log helps us learn how you tick. A few more and we'll start spotting patterns.";
 }
@@ -113,7 +142,10 @@ function buildModerateSummary(report) {
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    parts.push(`When ${f.trigger} came up, it often left you feeling ${f.emotion} — that happened ${f.count} times.`);
+    let fLine = `When ${f.trigger} came up, it often left you feeling ${f.emotion} — that happened ${f.count} times.`;
+    const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
+    if (rn) fLine += " " + rn;
+    parts.push(fLine);
   }
 
   if (report.regulators.length) {
@@ -121,11 +153,15 @@ function buildModerateSummary(report) {
     parts.push(`On the flip side, ${r.trigger} kept bringing ${r.emotion}, which is a good anchor.`);
   }
 
+  const bl = baselineLanguage(report.baselineContext?.driftDirection);
   if (bm?.stateOfMind) {
-    parts.push(`Overall, you're ${bm.stateOfMind}.`);
+    parts.push(`Overall, you're ${bm.stateOfMind}${bl ? " — " + bl : ""}.`);
   } else if (report.trajectoryNote) {
     parts.push(report.trajectoryNote);
   }
+
+  const sn = streakNote(report.positiveStreak, report.negativeStreak);
+  if (sn) parts.push(sn);
 
   return parts.join(" ");
 }
@@ -142,7 +178,10 @@ function buildStrongSummary(report) {
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    parts.push(`${f.trigger} and ${f.emotion} kept pairing up (${f.count}×) — that's a pattern worth noticing.`);
+    let fLine = `${f.trigger} and ${f.emotion} kept pairing up (${f.count}×) — that's a pattern worth noticing.`;
+    const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
+    if (rn) fLine += " " + rn;
+    parts.push(fLine);
   }
 
   if (report.regulators.length) {
@@ -150,8 +189,9 @@ function buildStrongSummary(report) {
     parts.push(`${r.trigger} has been a consistent source of ${r.emotion} for you.`);
   }
 
+  const bl = baselineLanguage(report.baselineContext?.driftDirection);
   if (bm?.stateOfMind) {
-    parts.push(`Right now, you're ${bm.stateOfMind}.`);
+    parts.push(`Right now, you're ${bm.stateOfMind}${bl ? " — " + bl : ""}.`);
   } else {
     if (report.volatilityScore !== null) {
       parts.push(report.volatilityScore < 0.5 ? "Emotionally, things have been pretty steady." : "There's been some emotional range this week.");
@@ -164,6 +204,9 @@ function buildStrongSummary(report) {
   if (bm?.recoveryLatency) {
     parts.push(`When things dip, you tend to ${bm.recoveryLatency.label}.`);
   }
+
+  const sn = streakNote(report.positiveStreak, report.negativeStreak);
+  if (sn) parts.push(sn);
 
   return parts.join(" ");
 }

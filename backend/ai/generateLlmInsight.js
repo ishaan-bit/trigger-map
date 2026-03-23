@@ -100,6 +100,18 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Trajectory: ${report.trajectoryNote}`);
   }
 
+  // Recurrence & streak signals (v81)
+  if (report.recurrence?.length) {
+    const top = report.recurrence.slice(0, 2).map(r => `${r.trigger} + ${r.emotion} (${r.count}x, ${r.label})`);
+    lines.push(`Recurring patterns this week: ${top.join("; ")}.`);
+  }
+  if (report.positiveStreak) {
+    lines.push(`Positive streak: ${report.positiveStreak.days} consecutive days of higher energy.`);
+  }
+  if (report.negativeStreak) {
+    lines.push(`Low stretch: ${report.negativeStreak.days} consecutive days of lower energy.`);
+  }
+
   if (report.busiestTime) {
     lines.push(`Busiest time of day: ${report.busiestTime}.`);
   }
@@ -252,7 +264,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so." },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,

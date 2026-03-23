@@ -449,6 +449,13 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
                 );
               })}
             </ScrollView>
+            {(report.positiveStreak?.days >= 2 || report.negativeStreak?.days >= 2) ? (
+              <Text style={[s.trajectoryNote, { marginTop: 6 }]}>
+                {report.negativeStreak?.days >= 2
+                  ? `${report.negativeStreak.days}-day low stretch mid-week`
+                  : `${report.positiveStreak.days}-day high-energy stretch`}
+              </Text>
+            ) : null}
           </View>
         </AnimatedSection>
       ) : null}

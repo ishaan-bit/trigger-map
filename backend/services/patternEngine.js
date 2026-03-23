@@ -314,6 +314,48 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     : null;
   const changeHighlights = buildChangeHighlights(weeklyDeltas, { topTrigger, topEmotion });
 
+  // --- Recurrence detection (v81) ---
+  const recurrence = [];
+  for (const [pairKey, count] of Object.entries(pairFrequency)) {
+    if (count >= 2) {
+      const { trigger, emotion } = pairFromKey(pairKey);
+      recurrence.push({ trigger, emotion, count, label: count >= 3 ? "recurring" : "emerging" });
+    }
+  }
+  recurrence.sort((a, b) => b.count - a.count);
+  const topRecurrence = recurrence.slice(0, 3);
+
+  // --- Streak detection from trajectory (v81) ---
+  let positiveStreak = null;
+  let negativeStreak = null;
+  if (weeklyEmotionTrajectory.length >= 2) {
+    let bestPos = { len: 0, start: 0 };
+    let bestNeg = { len: 0, start: 0 };
+    let curPos = 0, curNeg = 0, posStart = 0, negStart = 0;
+    for (let i = 0; i < weeklyEmotionTrajectory.length; i++) {
+      const s = weeklyEmotionTrajectory[i].score;
+      if (s > 3.5) {
+        if (curPos === 0) posStart = i;
+        curPos++;
+        if (curPos > bestPos.len) bestPos = { len: curPos, start: posStart };
+      } else { curPos = 0; }
+      if (s < 2.5) {
+        if (curNeg === 0) negStart = i;
+        curNeg++;
+        if (curNeg > bestNeg.len) bestNeg = { len: curNeg, start: negStart };
+      } else { curNeg = 0; }
+    }
+    if (bestPos.len >= 2) positiveStreak = { days: bestPos.len, startDate: weeklyEmotionTrajectory[bestPos.start].date };
+    if (bestNeg.len >= 2) negativeStreak = { days: bestNeg.len, startDate: weeklyEmotionTrajectory[bestNeg.start].date };
+  }
+
+  // --- Baseline context flags (v81) ---
+  const baselineContext = baselineMetrics ? {
+    driftDirection: baselineMetrics.drift?.direction || "stable",
+    stabilityLevel: baselineMetrics.stability?.label || null,
+    recoveryLabel: baselineMetrics.recoveryLatency?.label || null,
+  } : null;
+
   return {
     topTrigger,
     topEmotion,
@@ -346,6 +388,10 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     baselineMetrics,
     weeklyDeltas,
     changeHighlights,
+    recurrence: topRecurrence,
+    positiveStreak,
+    negativeStreak,
+    baselineContext,
     aiInsight,
   };
 }
