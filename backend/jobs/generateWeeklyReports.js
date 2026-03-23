@@ -4,6 +4,8 @@ import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationServic
 import { generateWeeklyReport } from "../services/patternEngine.js";
 import { generateActions } from "../services/actionEngine.js";
 import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportStore.js";
+import { getUserById } from "../services/authService.js";
+import { phraseText, extractFirstName } from "../utils/phrasingLayer.js";
 
 const INSIGHT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -38,6 +40,14 @@ async function processOwner(ownerId, force) {
 
   // Generate action cards from the full report
   const actions = generateActions(report);
+
+  // HF phrasing pass (batch only, not in request path)
+  const user = await getUserById(ownerId).catch(() => null);
+  const firstName = extractFirstName(user?.name);
+  insight.summary = await phraseText(insight.summary, { firstName });
+  for (const a of actions) {
+    a.reason = await phraseText(a.reason, { firstName });
+  }
 
   const bm = report.baselineMetrics;
   const payload = {

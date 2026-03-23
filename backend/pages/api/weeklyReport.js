@@ -121,6 +121,10 @@ export default async function handler(req, res) {
     report.actions = generateActions(report);
     report.actionFeedback = actionFeedback || [];
 
+    // Strip internal model names from LLM output before sending to client
+    if (report.llmInsight) delete report.llmInsight.model;
+    if (report.llmTeaser) delete report.llmTeaser.model;
+
     // Fire-and-forget analytics — don't block the response
     trackServerEvent("weekly_report_viewed", ownerId, { totalMoments: report.totalMoments }).catch(() => {});
 

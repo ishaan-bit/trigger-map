@@ -15,6 +15,7 @@ import { getTimeline } from "../services/momentService.js";
 import { getUserById } from "../services/authService.js";
 import { redis, redisKey } from "../services/redisClient.js";
 import { getStoredLlmInsight, getLlmInsightKey, getActionFeedback } from "../services/reportStore.js";
+import { phraseText, extractFirstName } from "../utils/phrasingLayer.js";
 
 const LLM_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -105,6 +106,25 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
             throw retryErr;
           }
         }
+      }
+
+      // HF phrasing pass on LLM output (batch only)
+      const firstName = extractFirstName(user?.name);
+      if (insight.narrative) {
+        const sections = insight.narrative.split(/\n\n/);
+        const phrased = [];
+        for (const section of sections) {
+          const headerMatch = section.match(/^(What stood out|What may be contributing|One thing to try)\n/i);
+          if (headerMatch) {
+            const header = headerMatch[1];
+            const body = section.slice(header.length).trim();
+            const polished = await phraseText(body, { firstName });
+            phrased.push(`${header}\n${polished}`);
+          } else {
+            phrased.push(section);
+          }
+        }
+        insight.narrative = phrased.join("\n\n");
       }
 
       await storeLlmInsight(ownerId, insight);
