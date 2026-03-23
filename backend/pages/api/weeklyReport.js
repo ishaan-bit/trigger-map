@@ -7,7 +7,7 @@ import { phraseText, extractFirstName } from "@/utils/phrasingLayer.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredLlmInsight, hasFreePass, getActionFeedback } from "@/services/reportStore.js";
+import { getStoredWeeklyInsight, getStoredLlmInsight, hasFreePass, getActionFeedback } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -39,12 +39,13 @@ export default async function handler(req, res) {
 
     const isAuthenticated = Boolean(user);
 
-    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, first-free check, free pass, action feedback
-    const [aggregates, allAggregates, subscription, llmInsight, firstFreeAvailable, freePass, actionFeedback] = await Promise.all([
+    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, stored report, first-free check, free pass, action feedback
+    const [aggregates, allAggregates, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
       getStoredLlmInsight(ownerId),
+      getStoredWeeklyInsight(ownerId),
       isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
       isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
       getActionFeedback(ownerId),
@@ -63,6 +64,11 @@ export default async function handler(req, res) {
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report, { firstName });
+
+      // Use LLM-rewritten summary if available (from rewriteSummaries job)
+      if (report.aiInsight && storedReport?.rewrittenBy && storedReport.summary) {
+        report.aiInsight.summary = storedReport.summary;
+      }
     }
 
     // Attach LLM insight for premium users, first-free eligible, OR free-pass holders
