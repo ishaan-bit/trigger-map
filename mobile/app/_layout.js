@@ -57,8 +57,6 @@ export default function RootLayout() {
             ToastAndroid.show("Offline mode, data saved locally", ToastAndroid.SHORT);
           }
         }
-      } finally {
-        SplashScreen.hideAsync().catch(() => null);
       }
     }
 

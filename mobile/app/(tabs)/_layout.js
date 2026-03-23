@@ -10,7 +10,7 @@ export default function TabLayout() {
   const tabOptions = (icon, label) => createTabOptions(icon, label, insets.bottom, emotionColor);
 
   return (
-    <Tabs screenListeners={{ tabPress: () => tap() }}>
+    <Tabs screenOptions={{ lazy: true }} screenListeners={{ tabPress: () => tap() }}>
       <Tabs.Screen name="log" options={tabOptions("flash-outline", "Log")} />
       <Tabs.Screen name="timeline" options={tabOptions("time-outline", "Timeline")} />
       <Tabs.Screen name="report" options={tabOptions("sparkles-outline", "Insights")} />

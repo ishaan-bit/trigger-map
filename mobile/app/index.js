@@ -1,26 +1,23 @@
 import { Redirect } from "expo-router";
-import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { useCallback } from "react";
+import { Image, StyleSheet, View } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
 import { useAppSession } from "@/hooks/useAppSession";
 
 export default function IndexRoute() {
   const { ready, onboardingComplete } = useAppSession();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
+  const onLayout = useCallback(() => {
+    // Hide the native splash as soon as the JS splash image is laid out
+    SplashScreen.hideAsync().catch(() => null);
+  }, []);
 
   if (!ready) {
     return (
-      <View style={styles.container}>
-        <Animated.Image
+      <View style={styles.container} onLayout={onLayout}>
+        <Image
           source={require("@/assets/splash.png")}
-          style={[styles.image, { opacity: fadeAnim }]}
+          style={styles.image}
           resizeMode="cover"
         />
       </View>
@@ -33,7 +30,7 @@ export default function IndexRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#e8f5f0",
+    backgroundColor: "#060a12",
   },
   image: {
     width: "100%",

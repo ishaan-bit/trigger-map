@@ -13,7 +13,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#e8f5f0"
+      "backgroundColor": "#060a12"
     },
     "plugins": [
       "expo-router",
@@ -30,11 +30,11 @@
         {
           "image": "./assets/splash.png",
           "resizeMode": "cover",
-          "backgroundColor": "#e8f5f0",
+          "backgroundColor": "#060a12",
           "android": {
             "image": "./assets/splash.png",
             "resizeMode": "cover",
-            "backgroundColor": "#e8f5f0"
+            "backgroundColor": "#060a12"
           }
         }
       ],
@@ -55,7 +55,7 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 71,
+      "versionCode": 73,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
