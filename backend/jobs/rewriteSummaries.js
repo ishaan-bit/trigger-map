@@ -22,15 +22,17 @@ import { getUserById } from "../services/authService.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
-const DEFAULT_MODEL = "mistral";
-const REWRITE_TIMEOUT_MS = 15000;
+const DEFAULT_MODEL = "phi3";
+const REWRITE_TIMEOUT_MS = 30000;
 
 /**
  * Call local Ollama to rewrite a text block.
- * Returns original text on any failure.
+ * Returns { text, changed, error } so callers can track failures.
  */
 async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
-  if (!text || typeof text !== "string" || text.length < 10) return text;
+  if (!text || typeof text !== "string" || text.length < 10) {
+    return { text, changed: false, error: "input-too-short" };
+  }
 
   const nameInstruction = firstName
     ? ` If natural, address the reader as "${firstName}" once.`
@@ -68,20 +70,29 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
       signal: controller.signal,
     });
 
-    if (!res.ok) return text;
+    if (!res.ok) {
+      return { text, changed: false, error: `ollama-http-${res.status}` };
+    }
     const data = await res.json();
     const output = data.choices?.[0]?.message?.content?.trim();
-    if (!output || output.length < 10) return text;
+    if (!output || output.length < 10) {
+      return { text, changed: false, error: "empty-or-short-response" };
+    }
 
     // Basic quality check: reject if too short/long vs original
-    if (output.length < text.length * 0.3 || output.length > text.length * 2.5) return text;
+    if (output.length < text.length * 0.3 || output.length > text.length * 2.5) {
+      return { text, changed: false, error: "length-mismatch" };
+    }
 
     // Reject if the model echoed the prompt
-    if (/rewrite|copy editor|wellness app/i.test(output)) return text;
+    if (/rewrite|copy editor|wellness app/i.test(output)) {
+      return { text, changed: false, error: "prompt-echo" };
+    }
 
-    return output;
-  } catch {
-    return text;
+    return { text: output, changed: true, error: null };
+  } catch (err) {
+    const reason = err.name === "AbortError" ? "timeout" : `fetch-error: ${err.message}`;
+    return { text, changed: false, error: reason };
   } finally {
     clearTimeout(timer);
   }
@@ -90,6 +101,27 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
 export async function runRewriteSummaries({ force = false, ownerIds, model } = {}) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const llmModel = model || process.env.LLM_MODEL || DEFAULT_MODEL;
+
+  // ── Ollama health check ──────────────────────────────────────────────
+  try {
+    const healthRes = await fetch(`${apiUrl.replace(/\/v1$/, "")}/api/tags`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!healthRes.ok) {
+      const msg = `Ollama not reachable at ${apiUrl} (HTTP ${healthRes.status})`;
+      console.error(`[rewriteSummaries] ${msg}`);
+      return { rewritten: 0, skipped: 0, unchanged: 0, model: llmModel, error: msg, results: [] };
+    }
+    const tagData = await healthRes.json();
+    const available = (tagData.models || []).map((m) => m.name?.split(":")[0]);
+    if (available.length && !available.includes(llmModel)) {
+      console.warn(`[rewriteSummaries] Warning: model "${llmModel}" not found in Ollama. Available: ${available.join(", ")}`);
+    }
+  } catch (err) {
+    const msg = `Ollama not reachable at ${apiUrl} (${err.message})`;
+    console.error(`[rewriteSummaries] ${msg}`);
+    return { rewritten: 0, skipped: 0, unchanged: 0, model: llmModel, error: msg, results: [] };
+  }
 
   const envIds = process.env.LLM_OWNER_IDS;
   const owners = Array.isArray(ownerIds) && ownerIds.length > 0
@@ -102,6 +134,7 @@ export async function runRewriteSummaries({ force = false, ownerIds, model } = {
 
   let rewritten = 0;
   let skipped = 0;
+  let unchanged = 0;
   const results = [];
 
   for (const ownerId of owners) {
@@ -127,12 +160,19 @@ export async function runRewriteSummaries({ force = false, ownerIds, model } = {
       console.log(`  Rewriting for ${ownerId.slice(0, 8)}...`);
 
       // Rewrite summary
-      const newSummary = await llmRewrite(stored.summary, { firstName, apiUrl, model: llmModel });
+      const summaryResult = await llmRewrite(stored.summary, { firstName, apiUrl, model: llmModel });
+
+      if (!summaryResult.changed) {
+        results.push({ ownerId, skipped: true, reason: `rewrite-failed: ${summaryResult.error}` });
+        unchanged++;
+        console.log(`  Unchanged for ${ownerId.slice(0, 8)} (${summaryResult.error})`);
+        continue;
+      }
 
       // Store updated report with rewrite metadata
       const updated = {
         ...stored,
-        summary: newSummary,
+        summary: summaryResult.text,
         rewrittenBy: llmModel,
         rewrittenAt: new Date().toISOString(),
       };
@@ -140,15 +180,15 @@ export async function runRewriteSummaries({ force = false, ownerIds, model } = {
       await storeWeeklyInsight(ownerId, updated);
       rewritten++;
       results.push({ ownerId, generated: true, model: llmModel });
-      console.log(`  Done (${newSummary.slice(0, 60)}...)`);
+      console.log(`  Done (${summaryResult.text.slice(0, 60)}...)`);
     } catch (error) {
       results.push({ ownerId, skipped: true, reason: error.message });
       console.error(`  Failed for ${ownerId.slice(0, 8)}: ${error.message}`);
     }
   }
 
-  console.log(`[rewriteSummaries] Done — ${rewritten} rewritten, ${skipped} skipped`);
-  return { rewritten, skipped, model: llmModel, results };
+  console.log(`[rewriteSummaries] Done — ${rewritten} rewritten, ${skipped} skipped, ${unchanged} unchanged (LLM failures)`);
+  return { rewritten, skipped, unchanged, model: llmModel, results };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

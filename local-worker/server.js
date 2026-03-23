@@ -76,8 +76,9 @@ function json(res, status, body) {
 
 // ── Job runner (spawns CLI process) ──
 function runJob(scriptName, { model, force, minMoments } = {}) {
+  const scriptPath = resolve(BACKEND_DIR, 'jobs', scriptName);
   return new Promise((resolve, reject) => {
-    const args = [resolve(BACKEND_DIR, 'jobs', scriptName)];
+    const args = [scriptPath];
     if (force) args.push('--force');
     if (minMoments != null) args.push(`--min-moments=${minMoments}`);
 
