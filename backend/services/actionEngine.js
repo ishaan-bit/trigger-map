@@ -88,6 +88,63 @@ export function generateActions(report) {
     });
   }
 
+  // ── Fallback strategies ────────────────────────────────
+  // When the 5 primary strategies produce nothing (e.g. data is spread
+  // thin or emotions are mostly neutral), use always-available fields.
+
+  const topPair = report.topPair;
+  const topTrigger = report.topTrigger;
+  const topEmotion = report.topEmotion;
+  const triggerFreq = report.triggerFrequency || {};
+  const dq = report.dataQuality || {};
+
+  // 6. Top-pair awareness: surface the most common pairing even if
+  //    it doesn't meet friction/regulator thresholds
+  if (!actions.length && topPair?.trigger && topPair?.emotion) {
+    actions.push({
+      id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
+      type: "awareness",
+      title: `Notice when ${topPair.trigger} brings ${topPair.emotion}`,
+      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week — your most common combo.`,
+      trigger: topPair.trigger,
+      emotion: topPair.emotion,
+    });
+  }
+
+  // 7. Dominant trigger check-in
+  if (actions.length < 2 && topTrigger) {
+    const already = actions.some((a) => a.id?.includes(topTrigger.toLowerCase().replace(/\s+/g, "-")));
+    if (!already) {
+      actions.push({
+        id: `top-trigger-${topTrigger}`.toLowerCase().replace(/\s+/g, "-"),
+        type: "awareness",
+        title: `Pay attention to ${topTrigger}`,
+        reason: `It's your top trigger this week. Notice how it makes you feel each time.`,
+        trigger: topTrigger,
+      });
+    }
+  }
+
+  // 8. Variety experiment: if few unique triggers, encourage exploration
+  if (actions.length < 3 && dq.uniqueTriggers && dq.uniqueTriggers <= 3 && dq.totalMoments >= 5) {
+    actions.push({
+      id: "explore-triggers",
+      type: "experiment",
+      title: "Try logging a new trigger",
+      reason: `You've logged ${dq.uniqueTriggers} different trigger${dq.uniqueTriggers === 1 ? "" : "s"} so far. Broadening your map reveals more patterns.`,
+    });
+  }
+
+  // 9. Logging consistency: if < 4 days logged, encourage regularity
+  if (actions.length < 3 && dq.daysLogged && dq.daysLogged < 4) {
+    actions.push({
+      id: "log-consistency",
+      type: "experiment",
+      title: "Log at a different time of day",
+      reason: `You've logged on ${dq.daysLogged} day${dq.daysLogged === 1 ? "" : "s"}. More days give sharper patterns.`,
+    });
+  }
+
   return actions.slice(0, 5).map((a, i) => ({
     ...a,
     ...(ACTION_META[a.type] || ACTION_META.awareness),
