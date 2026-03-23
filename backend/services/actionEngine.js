@@ -7,7 +7,6 @@
  */
 
 import { lintText } from "../utils/textGrammar.js";
- */
 
 const ACTION_META = {
   regulate:   { icon: "🌿", category: "Try this" },
