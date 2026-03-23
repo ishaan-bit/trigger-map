@@ -1,6 +1,6 @@
 import enableCors from "@/lib/cors.js";
 import { redis, redisKey } from "@/services/redisClient.js";
-import { sendError, sendJSON } from "@/services/response.js";
+import { sendError, sendSuccess } from "@/services/response.js";
 
 const MAX_CRASH_LOGS = 500;
 const CRASH_TTL = 60 * 60 * 24 * 30; // 30 days
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     await redis(["LTRIM", key, "0", String(MAX_CRASH_LOGS - 1)]);
     await redis(["EXPIRE", key, String(CRASH_TTL)]);
 
-    return sendJSON(res, { ok: true });
+    return sendSuccess(res, { ok: true });
   } catch (err) {
     console.error("Crash report storage error:", err);
     return sendError(res, 500, "INTERNAL_ERROR", "Failed to store crash report");
