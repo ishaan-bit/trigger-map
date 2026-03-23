@@ -20,6 +20,7 @@
 12. [Text Polish & Personalization (v80–v84)](#12-text-polish--personalization-v80v84)
 13. [Continuity Layer — Recurrence, Streaks & Baseline Language (v81)](#13-continuity-layer--recurrence-streaks--baseline-language-v81)
 14. [Text Quality Hardening (v82–v84)](#14-text-quality-hardening-v82v84)
+15. [Grammar-Safe Text Composition (v85)](#15-grammar-safe-text-composition-v85)
 
 ---
 
@@ -344,10 +345,10 @@ Unclosed episodes (user hasn't recovered yet) are excluded.
 
 | Days  | Label                             |
 |-------|-----------------------------------|
-| ≤ 1   | "bounces back quickly"            |
-| ≤ 2   | "recovers within a couple of days"|
-| ≤ 4   | "takes a few days to settle"      |
-| > 4   | "slow to return to baseline"      |
+| ≤ 1   | "bounce back quickly"             |
+| ≤ 2   | "recover within a couple of days" |
+| ≤ 4   | "take a few days to settle"       |
+| > 4   | "take longer to return to baseline" |
 
 ### State of Mind
 
@@ -992,7 +993,7 @@ Exposes already-computed baseline signals in a flat consumable shape:
 report.baselineContext = {
   driftDirection: "improving" | "declining" | "stable",
   stabilityLevel: "very steady" | "mostly steady" | ... | null,
-  recoveryLabel: "bounces back quickly" | ... | null,
+  recoveryLabel: "bounce back quickly" | ... | null,
 }
 ```
 
@@ -1059,4 +1060,69 @@ Expanded to match backend sanitization: strips smart quotes, zero-width/control 
 
 ---
 
-*Generated from source code as of v84. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `rewriteSummaries.js`, `control.js`, `execute.js`, `workerClient.js`, `server.js`.*
+## 15. Grammar-Safe Text Composition (v85)
+
+**File:** `backend/utils/textGrammar.js`
+
+Two-layer defense against grammar errors in template-composed text.
+
+### Problem
+
+Emotions (`calm`, `anxious`, `frustrated`, `energized`, `neutral`) are **adjectives**. Templates that interpolate them as nouns or prepositional objects produce broken sentences: "leads to anxious", "source of energized", "anxious was felt". Similarly, `alone` is an adverb, not a noun — "Keep alone in your week" is ungrammatical.
+
+### Layer 1: Composition Helpers (proactive)
+
+| Helper              | Purpose                                              | Example                                   |
+|---------------------|------------------------------------------------------|-------------------------------------------|
+| `emotionNoun(e)`    | Noun form for prepositional objects                  | `emotionNoun("anxious")` → `"anxiety"`    |
+| `triggerLabel(t)`   | Display-safe trigger for subject/object positions    | `triggerLabel("alone")` → `"time alone"`  |
+
+**Emotion noun forms:**
+
+| Emotion      | Noun Form          |
+|--------------|--------------------|
+| `calm`       | "calmness"         |
+| `neutral`    | "a neutral state"  |
+| `anxious`    | "anxiety"          |
+| `frustrated` | "frustration"      |
+| `energized`  | "energy"           |
+
+### Layer 2: `lintText()` Safety Net (defensive)
+
+Post-generation regex pass that scans any generated string for known broken patterns and fixes them. **Idempotent** — safe to call on already-correct text.
+
+| Pattern Detected                        | Fix Applied                                                    |
+|-----------------------------------------|----------------------------------------------------------------|
+| `leads to {adj-emotion}`               | → `leads to feeling {emotion}`                                 |
+| `brings {adj-emotion}` (no "you")      | → `leads to feeling {emotion}`                                 |
+| `bringing {adj-emotion}` (no "you")    | → `bringing you {emotion}`                                     |
+| `source of {adj-emotion}`              | → `source of {noun-form}` (e.g. "anxiety")                    |
+| `{adj-emotion} was felt`               | → `You felt {emotion}`                                         |
+| `{adj-emotion} was your`               | → `Feeling {emotion} was your`                                 |
+| `{x} and {adj-emotion} kept`           | → `and feeling {emotion} kept`                                 |
+| Bare `alone` as trigger                 | → `time alone` (with sentence-start capitalization)            |
+| `tend to bounces/recovers/takes`        | → infinitive form (`bounce`/`recover`/`take`)                  |
+
+### Integration Points
+
+`lintText()` runs at multiple levels for belt-and-suspenders coverage:
+
+| Integration Point        | What Gets Linted                                          |
+|--------------------------|-----------------------------------------------------------|
+| `phrasingLayer.js`       | Inside `localPolish()` → covers `summary` + `action.reason` via `phraseText()` |
+| `generateInsight.js`     | `whatWorking[].text`, `whereToFocus[].text`, `summary`    |
+| `actionEngine.js`        | All `action.title` and `action.reason` in final `map()`  |
+| `patternEngine.js`       | All `changeHighlights[]` strings                          |
+
+### Source-Level Template Fixes (v85)
+
+| File                    | Old Template                                    | New Template                                      |
+|-------------------------|-------------------------------------------------|---------------------------------------------------|
+| `generateInsight.js`    | `${emotion} was your most common feeling`       | `You felt ${emotion} most often this week`        |
+| `generateInsight.js`    | `${trigger} and ${emotion} kept pairing up`     | `${trigger} and feeling ${emotion} kept showing up together` |
+| `patternEngine.js`      | `${emotion} was felt N times`                   | `You felt ${emotion} N times`                     |
+| `baselineEngine.js`     | `"slow to return to baseline"`                  | `"take longer to return to baseline"`             |
+
+---
+
+*Generated from source code as of v85. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `textGrammar.js`, `rewriteSummaries.js`, `control.js`, `execute.js`, `workerClient.js`, `server.js`.*
