@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { SignJWT, jwtVerify } from "jose";
 import { flatArrayToObject, hgetallObject, pipeline, redis, redisKey } from "./redisClient.js";
+import { getOwnerIndexKey } from "./aggregationService.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID?.trim());
 const encoder = new TextEncoder();
@@ -97,6 +98,7 @@ export async function registerEmailUser({ email, password, name }) {
       createdAt,
     ],
     ["SET", emailLookupKey(normalizedEmail), userId],
+    ["SADD", getOwnerIndexKey(), userId],
   ]);
 
   return getUserById(userId);
@@ -187,6 +189,7 @@ export async function loginGoogleUser({ idToken }) {
     ],
     ["SET", emailLookupKey(email), userId],
     ["SET", googleLookupKey(googleSub), userId],
+    ["SADD", getOwnerIndexKey(), userId],
   ]);
 
   return getUserById(userId);

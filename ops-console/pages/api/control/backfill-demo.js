@@ -1,5 +1,6 @@
 import { requireAuth } from '../../../lib/auth.js';
-import { pipeline, redisKey } from '../../../lib/redis.js';
+import { pipeline, redisKey, keys, redis } from '../../../lib/redis.js';
+import { randomUUID } from 'node:crypto';
 
 /**
  * POST /api/control/backfill-demo
@@ -29,14 +30,14 @@ const PERSONALITIES = {
       {
         name: 'burnout-a-pressure-cycle',
         moments: [
-          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'frustrated', note: 'Back-to-back meetings, no time to breathe' },
-          { dayOffset: 0, hour: 13, trigger: 'work',     emotion: 'anxious',    note: 'Deadline moved up again' },
+          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'frustrated', note: 'Back-to-back meetings, no time to breathe', tags: ['meetings'] },
+          { dayOffset: 0, hour: 13, trigger: 'work',     emotion: 'anxious',    note: 'Deadline moved up again', tags: ['deadline'] },
           { dayOffset: 0, hour: 21, trigger: 'alone',    emotion: 'frustrated', note: 'Too tired to do anything, just staring at the wall' },
           { dayOffset: 1, hour: 8,  trigger: 'work',     emotion: 'anxious',    note: 'Woke up already dreading the day' },
           { dayOffset: 1, hour: 18, trigger: 'exercise',  emotion: 'neutral',    note: 'Forced myself to walk, felt nothing' },
-          { dayOffset: 2, hour: 9,  trigger: 'work',     emotion: 'frustrated', note: 'More firefighting, zero progress on actual work' },
+          { dayOffset: 2, hour: 9,  trigger: 'work',     emotion: 'frustrated', note: 'More firefighting, zero progress on actual work', tags: ['meetings'] },
           { dayOffset: 2, hour: 20, trigger: 'partner',   emotion: 'frustrated', note: 'Snapped over something small' },
-          { dayOffset: 3, hour: 10, trigger: 'work',     emotion: 'anxious',    note: 'Performance review coming up' },
+          { dayOffset: 3, hour: 10, trigger: 'work',     emotion: 'anxious',    note: 'Performance review coming up', tags: ['deadline'] },
           { dayOffset: 3, hour: 19, trigger: 'social',    emotion: 'neutral',    note: 'Cancelled dinner plans, stayed home' },
           { dayOffset: 4, hour: 9,  trigger: 'money',     emotion: 'anxious',    note: 'Rent increase on top of everything' },
           { dayOffset: 4, hour: 16, trigger: 'health',   emotion: 'anxious',    note: 'Headaches all week, probably stress' },
@@ -72,17 +73,17 @@ const PERSONALITIES = {
       {
         name: 'steady-a-strong-routine',
         moments: [
-          { dayOffset: 0, hour: 7,  trigger: 'exercise',  emotion: 'energized',  note: 'Morning run, best way to start the week' },
+          { dayOffset: 0, hour: 7,  trigger: 'exercise',  emotion: 'energized',  note: 'Morning run, best way to start the week', tags: ['morning-routine'] },
           { dayOffset: 0, hour: 14, trigger: 'work',     emotion: 'calm',       note: 'Productive deep-work block' },
           { dayOffset: 1, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Standard day, knocked out my tasks' },
           { dayOffset: 1, hour: 18, trigger: 'exercise',  emotion: 'calm',       note: 'Evening walk, watching the sunset' },
           { dayOffset: 2, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Good feedback on my presentation' },
-          { dayOffset: 2, hour: 12, trigger: 'social',    emotion: 'energized',  note: 'Lunch with a colleague, great conversation' },
-          { dayOffset: 3, hour: 7,  trigger: 'exercise',  emotion: 'energized',  note: 'New personal best on my run' },
+          { dayOffset: 2, hour: 12, trigger: 'social',    emotion: 'energized',  note: 'Lunch with a colleague, great conversation', tags: ['lunch'] },
+          { dayOffset: 3, hour: 7,  trigger: 'exercise',  emotion: 'energized',  note: 'New personal best on my run', tags: ['morning-routine'] },
           { dayOffset: 3, hour: 15, trigger: 'work',     emotion: 'frustrated', note: 'Annoying blocker, but sorted it out' },
           { dayOffset: 4, hour: 10, trigger: 'alone',    emotion: 'calm',       note: 'Reading with coffee, quiet morning' },
           { dayOffset: 4, hour: 16, trigger: 'family',   emotion: 'energized',  note: 'Video call with sister, catching up' },
-          { dayOffset: 5, hour: 8,  trigger: 'exercise',  emotion: 'energized',  note: 'Saturday long run, feeling alive' },
+          { dayOffset: 5, hour: 8,  trigger: 'exercise',  emotion: 'energized',  note: 'Saturday long run, feeling alive', tags: ['morning-routine'] },
           { dayOffset: 5, hour: 14, trigger: 'partner',   emotion: 'calm',       note: 'Cooking together, nice afternoon' },
           { dayOffset: 6, hour: 10, trigger: 'health',   emotion: 'calm',       note: 'Meal prepped for the week, feeling organized' },
         ],
@@ -270,6 +271,7 @@ function generateWeekMoments(weekStartDate, arcIndex, personality) {
       trigger: m.trigger,
       emotion: m.emotion,
       note: m.note,
+      tags: m.tags || [],
       timeBucket: bucketForHour(m.hour),
     };
   });
@@ -325,6 +327,7 @@ export default async function handler(req, res) {
           const dailyKey = redisKey('daily', ownerId, m.dateStr);
           const pairKey = `${m.trigger}|${m.emotion}`;
 
+          // Daily aggregate (what the pattern engine reads)
           cmds.push(['HINCRBY', dailyKey, 'total', '1']);
           cmds.push(['HINCRBY', dailyKey, `trigger:${m.trigger}`, '1']);
           cmds.push(['HINCRBY', dailyKey, `emotion:${m.emotion}`, '1']);
@@ -332,6 +335,26 @@ export default async function handler(req, res) {
           cmds.push(['HINCRBY', dailyKey, `time:${m.timeBucket}`, '1']);
           cmds.push(['HSET', dailyKey, 'date', m.dateStr]);
           cmds.push(['EXPIRE', dailyKey, String(AGGREGATE_TTL)]);
+
+          // Tag aggregates
+          if (m.tags && m.tags.length) {
+            for (const tag of m.tags) {
+              cmds.push(['HINCRBY', dailyKey, `tag:${tag}`, '1']);
+            }
+          }
+
+          // Individual moment (what the timeline screen reads)
+          const momentObj = {
+            id: randomUUID(),
+            ownerId,
+            trigger: m.trigger,
+            emotion: m.emotion,
+            note: m.note || '',
+            timestamp: m.date.toISOString(),
+            isAnonymous: false,
+            ...(m.tags && m.tags.length ? { tags: m.tags } : {}),
+          };
+          cmds.push(['RPUSH', redisKey('moments', ownerId), JSON.stringify(momentObj)]);
 
           totalMoments++;
           daysSet.add(m.dateStr);
