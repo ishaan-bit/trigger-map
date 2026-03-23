@@ -14,7 +14,7 @@ function sanitizeString(str) {
     .replace(/\*\*/g, "")                       // stray bold markers
     .replace(/#{1,3}\s+/g, "")                 // stray markdown headers
     .replace(/^\s*[-*•]\s+/gm, "")            // bullet markers at line start
-    .replace(/\s{2,}/g, " ")                   // collapse multiple spaces
+    .replace(/[^\S\n]{2,}/g, " ")                // collapse multiple spaces (preserve newlines)
     .replace(/\n{3,}/g, "\n\n")               // collapse excess newlines
     .trim();
 }

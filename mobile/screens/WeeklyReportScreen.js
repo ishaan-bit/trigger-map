@@ -38,7 +38,8 @@ function cleanText(str) {
     .replace(/\*\*/g, "")
     .replace(/#{1,3}\s+/g, "")
     .replace(/^\s*[-*\u2022]\s+/gm, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
