@@ -1060,15 +1060,15 @@ Expanded to match backend sanitization: strips smart quotes, zero-width/control 
 
 ---
 
-## 15. Grammar-Safe Text Composition (v85)
+## 15. Grammar-Safe Text Composition (v85–v85b)
 
 **File:** `backend/utils/textGrammar.js`
 
-Two-layer defense against grammar errors in template-composed text.
+Two-layer defense against grammar errors in template-composed text, plus **mandatory use of composition helpers at every template site** (v85b).
 
 ### Problem
 
-Emotions (`calm`, `anxious`, `frustrated`, `energized`, `neutral`) are **adjectives**. Templates that interpolate them as nouns or prepositional objects produce broken sentences: "leads to anxious", "source of energized", "anxious was felt". Similarly, `alone` is an adverb, not a noun — "Keep alone in your week" is ungrammatical.
+Emotions (`calm`, `anxious`, `frustrated`, `energized`, `neutral`) are **adjectives**. Templates that interpolate them as nouns or prepositional objects produce broken sentences: "leads to anxious", "source of energized", "anxious was felt". Similarly, `alone` is an adverb, not a noun — "Keep alone in your week" is ungrammatical. And `social` is an adjective — "social and feeling anxious" is incomplete.
 
 ### Layer 1: Composition Helpers (proactive)
 
@@ -1076,6 +1076,15 @@ Emotions (`calm`, `anxious`, `frustrated`, `energized`, `neutral`) are **adjecti
 |---------------------|------------------------------------------------------|-------------------------------------------|
 | `emotionNoun(e)`    | Noun form for prepositional objects                  | `emotionNoun("anxious")` → `"anxiety"`    |
 | `triggerLabel(t)`   | Display-safe trigger for subject/object positions    | `triggerLabel("alone")` → `"time alone"`  |
+| `cap(s)`            | Capitalize first letter for sentence starts          | `cap("social life")` → `"Social life"`    |
+
+**Trigger display forms:**
+
+| Trigger      | Display Form       |
+|--------------|--------------------|
+| `alone`      | "time alone"       |
+| `social`     | "social life"      |
+| all others   | pass-through       |
 
 **Emotion noun forms:**
 
@@ -1095,13 +1104,45 @@ Post-generation regex pass that scans any generated string for known broken patt
 |-----------------------------------------|----------------------------------------------------------------|
 | `leads to {adj-emotion}`               | → `leads to feeling {emotion}`                                 |
 | `brings {adj-emotion}` (no "you")      | → `leads to feeling {emotion}`                                 |
-| `bringing {adj-emotion}` (no "you")    | → `bringing you {emotion}`                                     |
+| `bringing [you] {adj-emotion}`          | → `leaving you feeling {emotion}`                              |
 | `source of {adj-emotion}`              | → `source of {noun-form}` (e.g. "anxiety")                    |
 | `{adj-emotion} was felt`               | → `You felt {emotion}`                                         |
 | `{adj-emotion} was your`               | → `Feeling {emotion} was your`                                 |
 | `{x} and {adj-emotion} kept`           | → `and feeling {emotion} kept`                                 |
 | Bare `alone` as trigger                 | → `time alone` (with sentence-start capitalization)            |
 | `tend to bounces/recovers/takes`        | → infinitive form (`bounce`/`recover`/`take`)                  |
+| `You's`                                 | → `Your` (LLM possessive artifact)                             |
+| Garbled tokens (digits in words)        | → removed (LLM hallucination cleanup)                          |
+
+### Template Coverage (v85b)
+
+**Every** trigger/emotion interpolation site now uses `triggerLabel()` + `cap()`:
+
+| File                    | Sites Fixed | Pattern Used                                                    |
+|-------------------------|:-----------:|-----------------------------------------------------------------|
+| `generateInsight.js`    | 15          | `cap(triggerLabel(t))` for subjects, `triggerLabel(t)` for objects; `triggerList(arr)` for tied triggers |
+| `actionEngine.js`       | 7           | `cap(triggerLabel(t))` for subjects, `triggerLabel(t)` for objects |
+| `patternEngine.js`      | 2           | `cap(triggerLabel(t))` for changeHighlights sentence starts     |
+| `WeeklyReportScreen.js` | 1           | `triggerDisplay(t)` for NarrativeCard trigger names             |
+
+**Safe sentence patterns** used across all templates (emotions always follow "feeling" or "feel"):
+
+| Pattern                          | Example Output                                       |
+|----------------------------------|------------------------------------------------------|
+| `left you feeling {emotion}`     | "Exercise has consistently left you feeling energized"|
+| `leaves you feeling {emotion}`   | "Social life often leaves you feeling anxious"        |
+| `helps you feel {emotion}`       | "Exercise helps you feel energized" (mobile)          |
+| `You felt {emotion}`             | "You felt anxious most often this week"               |
+| `feeling {emotion}`              | "Social life and feeling anxious kept showing up"     |
+| `back to feeling {emotion}`      | "exercise seems to bring you back to feeling calm"    |
+
+**`triggerList()`** helper in generateInsight.js — natural-language join for tied triggers:
+
+| Input                          | Output                               |
+|--------------------------------|--------------------------------------|
+| `["exercise"]`                 | `"exercise"`                         |
+| `["exercise", "partner"]`      | `"exercise and partner"`             |
+| `["exercise", "partner", "social"]` | `"exercise, partner, and social life"` |
 
 ### Integration Points
 
@@ -1114,15 +1155,6 @@ Post-generation regex pass that scans any generated string for known broken patt
 | `actionEngine.js`        | All `action.title` and `action.reason` in final `map()`  |
 | `patternEngine.js`       | All `changeHighlights[]` strings                          |
 
-### Source-Level Template Fixes (v85)
-
-| File                    | Old Template                                    | New Template                                      |
-|-------------------------|-------------------------------------------------|---------------------------------------------------|
-| `generateInsight.js`    | `${emotion} was your most common feeling`       | `You felt ${emotion} most often this week`        |
-| `generateInsight.js`    | `${trigger} and ${emotion} kept pairing up`     | `${trigger} and feeling ${emotion} kept showing up together` |
-| `patternEngine.js`      | `${emotion} was felt N times`                   | `You felt ${emotion} N times`                     |
-| `baselineEngine.js`     | `"slow to return to baseline"`                  | `"take longer to return to baseline"`             |
-
 ---
 
-*Generated from source code as of v85. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `textGrammar.js`, `rewriteSummaries.js`, `control.js`, `execute.js`, `workerClient.js`, `server.js`.*
+*Generated from source code as of v85b. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `textGrammar.js`, `rewriteSummaries.js`, `control.js`, `execute.js`, `workerClient.js`, `server.js`.*
