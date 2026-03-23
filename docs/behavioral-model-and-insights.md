@@ -467,7 +467,10 @@ Fire when primary strategies produce nothing — ensures users with 3+ moments a
 
 ### HiTL Feedback Loop
 
-Users respond to each action with **tried** or **skipped**. Feedback is stored via `POST /api/actions` with `{ actionId, response }` and persisted in Redis (`RPUSH`, 90-day TTL). Feedback data feeds back into the ops console's Action Engine (HiTL) metrics panel.
+Users respond to each action with **tried** or **skipped**. Feedback is stored via `POST /api/actions` with `{ actionId, response }` and persisted in Redis (`RPUSH`, 90-day TTL). Feedback data feeds back into:
+
+1. **Ops console** — Action Engine (HiTL) metrics panel shows tried/skipped counts.
+2. **LLM insight generation** — `buildSignals()` includes action feedback so the LLM can tailor "One thing to try" based on what the user engaged with or skipped. This closes the HiTL loop: actions → feedback → personalized LLM suggestions.
 
 ---
 
@@ -556,6 +559,7 @@ Premium feature. Runs against a local OpenAI-compatible API (Ollama/llama.cpp/LM
 12. Prediction accuracy
 13. Daily prediction vs reality comparisons
 14. Recent user notes (up to 15, truncated to 120 chars each)
+15. **Action feedback** — lists of action IDs the user tried or skipped (closes the HiTL loop)
 
 ### System Prompt
 
@@ -563,6 +567,7 @@ Key instructions to the LLM:
 - "You are a concise emotional pattern analyst"
 - **Anti-negativity bias**: "Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly."
 - No markdown, em dashes, bullet points, numbered lists
+- If action feedback is provided, acknowledge what the user tried and avoid re-suggesting things they skipped
 
 ### User Prompt Structure
 
@@ -890,4 +895,4 @@ Conditional rendering based on user tier:
 
 ---
 
-*Generated from source code as of v78. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`.*
+*Generated from source code as of v79. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`.*

@@ -10,6 +10,7 @@ const JOBS = [
     label: 'Generate Weekly Reports',
     description: 'Batch generate rule-based weekly insights, action cards, deltas, and change highlights for all users. Skips users with recent reports unless Force is checked.',
     danger: false,
+    hasUserPicker: true,
     source: 'backend',
     params: [
       { key: 'force', label: 'Force (ignore 7-day window)', type: 'checkbox', default: false },
@@ -18,9 +19,10 @@ const JOBS = [
   {
     id: 'generateLlmInsights',
     label: 'Generate LLM Insights',
-    description: 'Generate premium LLM-based narratives for all eligible signed-in users. Signals now include deltas, action engine output, and change highlights.',
+    description: 'Generate premium LLM-based narratives for all eligible signed-in users. Signals now include deltas, action feedback, and change highlights.',
     danger: false,
     usesLlm: true,
+    hasUserPicker: true,
     source: 'local',
     params: [
       { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
@@ -34,6 +36,7 @@ const JOBS = [
     description: 'Bulk LLM insight generation + 48h free-pass grant for all eligible users. Includes enhanced signals (deltas, actions, highlights).',
     danger: true,
     usesLlm: true,
+    hasUserPicker: true,
     source: 'local',
     params: [
       { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
@@ -742,8 +745,8 @@ export default function ControlPage() {
                         </label>
                       ))}
                     </div>
-                    {/* User picker for LLM jobs */}
-                    {job.usesLlm && (
+                    {/* User picker */}
+                    {job.hasUserPicker && (
                       <div style={{ marginTop: 10 }}>
                         <button
                           type="button"

@@ -63,7 +63,7 @@ async function ensureModelAvailable(ollamaBase, model) {
   }
 }
 
-function buildSignals(report, recentNotes) {
+function buildSignals(report, recentNotes, actionFeedback) {
   const lines = [];
   const dq = report.dataQuality || {};
 
@@ -149,6 +149,18 @@ function buildSignals(report, recentNotes) {
     lines.push(`Daily predictions vs reality: ${pLines.join("; ")}.`);
   }
 
+  // Action feedback signals — what the user tried or skipped
+  if (actionFeedback?.length) {
+    const tried = actionFeedback.filter(f => f.response === "tried");
+    const skipped = actionFeedback.filter(f => f.response === "skipped");
+    if (tried.length) {
+      lines.push(`Actions the user tried: ${tried.map(f => f.actionId).join(", ")}.`);
+    }
+    if (skipped.length) {
+      lines.push(`Actions the user skipped: ${skipped.map(f => f.actionId).join(", ")}.`);
+    }
+  }
+
   if (recentNotes?.length) {
     const noteLines = recentNotes.map(n => `[${n.trigger}/${n.emotion}] "${n.note}"`);
     lines.push(`Recent user notes:\n${noteLines.join("\n")}`);
@@ -157,8 +169,8 @@ function buildSignals(report, recentNotes) {
   return lines.join("\n");
 }
 
-function buildPrompt(report, recentNotes) {
-  const signals = buildSignals(report, recentNotes);
+function buildPrompt(report, recentNotes, actionFeedback) {
+  const signals = buildSignals(report, recentNotes, actionFeedback);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
   const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
@@ -197,6 +209,7 @@ Rules:
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive.
+- If action feedback data is provided, use it: acknowledge actions the user tried and tailor "One thing to try" to avoid suggesting things they already skipped. Build on what they engaged with.
 - IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
 - Use correct English spelling and grammar. No typos, no random numbers or characters.
 - Each section body must be ${sentencesPerSection} sentences.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
@@ -215,7 +228,7 @@ function trimIncomplete(text) {
   return text;
 }
 
-export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
+export async function generateLlmInsight({ weeklyReport, recentNotes = [], actionFeedback = [] }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
   const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
@@ -223,7 +236,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
   // Auto-pull model if not available locally
   await ensureModelAvailable(apiUrl, model);
 
-  const prompt = buildPrompt(weeklyReport, recentNotes);
+  const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback);
 
   // Scale max_tokens generously so the model never hits the ceiling mid-sentence.
   // The prompt word-limit is the real constraint; tokens are just a safety net.

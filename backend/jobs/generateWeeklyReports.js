@@ -66,10 +66,12 @@ async function processOwner(ownerId, force) {
   return { ownerId, report: payload };
 }
 
-export async function runGenerateWeeklyReports({ force = false } = {}) {
+export async function runGenerateWeeklyReports({ force = false, ownerIds } = {}) {
   const startTime = Date.now();
-  const owners = await listOwnerIds();
-  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force})`);
+  const owners = Array.isArray(ownerIds) && ownerIds.length > 0
+    ? ownerIds
+    : await listOwnerIds();
+  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force}${ownerIds ? ', filtered' : ''})`);
 
   // Process in parallel batches
   const results = [];

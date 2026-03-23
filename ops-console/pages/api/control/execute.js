@@ -59,7 +59,11 @@ export default async function handler(req, res) {
 
       // Backend jobs (rule-based)
       if (BACKEND_JOBS.has(target)) {
-        const result = await triggerJob(target, params || {});
+        const jobParams = { force: !!params?.force };
+        if (Array.isArray(params?.ownerIds) && params.ownerIds.length) {
+          jobParams.ownerIds = params.ownerIds;
+        }
+        const result = await triggerJob(target, jobParams);
         const duration = Date.now() - startTime;
         return res.status(result.ok ? 200 : 502).json({
           ok: result.ok,

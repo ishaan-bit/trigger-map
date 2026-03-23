@@ -653,7 +653,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
                     disabled={!!submitting}
                     accessibilityRole="button"
                   >
-                    <Text style={s.actionBtnText}>👍 Tried it</Text>
+                    <Text style={s.actionBtnTryText}>👍 Tried it</Text>
                   </Pressable>
                   <Pressable
                     style={[s.actionBtn, s.actionBtnSkip]}
@@ -661,7 +661,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
                     disabled={!!submitting}
                     accessibilityRole="button"
                   >
-                    <Text style={s.actionBtnText}>👎 Skip</Text>
+                    <Text style={s.actionBtnSkipText}>👎 Skip</Text>
                   </Pressable>
                 </View>
               )}
@@ -1381,8 +1381,9 @@ const s = StyleSheet.create({
     borderRadius: radius.sm, borderWidth: 1, borderColor: palette.glassBorder,
   },
   actionBtnTry: { backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)", borderColor: (palette.success || "#34C759") + "40" },
-  actionBtnSkip: { backgroundColor: palette.glass },
-  actionBtnText: { fontSize: 13, fontWeight: "600" },
+  actionBtnSkip: { backgroundColor: "rgba(148, 180, 224, 0.10)", borderColor: "rgba(148, 180, 224, 0.25)" },
+  actionBtnTryText: { fontSize: 13, fontWeight: "600", color: palette.text },
+  actionBtnSkipText: { fontSize: 13, fontWeight: "600", color: palette.muted },
   actionFeedbackDone: { alignItems: "center", paddingVertical: 8 },
   actionFeedbackDoneText: { color: palette.muted, fontSize: 12, fontStyle: "italic" },
 

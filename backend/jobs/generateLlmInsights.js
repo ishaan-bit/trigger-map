@@ -14,7 +14,7 @@ import { generateWeeklyReport } from "../services/patternEngine.js";
 import { getTimeline } from "../services/momentService.js";
 import { getUserById } from "../services/authService.js";
 import { redis, redisKey } from "../services/redisClient.js";
-import { getStoredLlmInsight, getLlmInsightKey } from "../services/reportStore.js";
+import { getStoredLlmInsight, getLlmInsightKey, getActionFeedback } from "../services/reportStore.js";
 
 const LLM_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -81,13 +81,16 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
         .slice(0, 15)
         .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
 
+      // Fetch action feedback for HiTL-aware LLM personalization
+      const actionFeedback = await getActionFeedback(ownerId);
+
       console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
 
       let insight;
       let bestSoFar = null;
       for (let attempt = 1; attempt <= 5; attempt++) {
         try {
-          insight = await generateLlmInsight({ weeklyReport, recentNotes });
+          insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback });
           if (insight.sectionCount >= 3) break;
           bestSoFar = bestSoFar || insight;
           console.log(`  Attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying...`);
