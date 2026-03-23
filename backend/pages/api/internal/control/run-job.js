@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireInternalAuth(req, res)) return;
 
-  const { job, force, minMoments, llmModel, ownerIds } = req.body || {};
+  const { job, force, minMoments, llmModel, ownerIds, skipHf, personalize } = req.body || {};
 
   if (!job || !ALLOWED_JOBS[job]) {
     return res.status(400).json({ error: `Unknown or disallowed job: ${job}` });
@@ -31,12 +31,13 @@ export default async function handler(req, res) {
 
     if (job === 'generateWeeklyReports') {
       const { runGenerateWeeklyReports } = await import('../../../../jobs/generateWeeklyReports.js');
-      result = await runGenerateWeeklyReports({ force: !!force, ownerIds });
+      result = await runGenerateWeeklyReports({ force: !!force, ownerIds, skipHf: !!skipHf, personalize: personalize !== false });
     } else if (job === 'generateLlmInsights') {
       const { runGenerateLlmInsights } = await import('../../../../jobs/generateLlmInsights.js');
       result = await runGenerateLlmInsights({
         force: !!force,
         minMoments: minMoments || 1,
+        ownerIds,
       });
     } else if (job === 'generateFreePass') {
       const { runGenerateFreePass } = await import('../../../../jobs/generateFreePass.js');

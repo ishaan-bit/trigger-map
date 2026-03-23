@@ -14,6 +14,8 @@ const JOBS = [
     source: 'backend',
     params: [
       { key: 'force', label: 'Force (ignore 7-day window)', type: 'checkbox', default: false },
+      { key: 'personalize', label: 'Personalize (use first name)', type: 'checkbox', default: true },
+      { key: 'skipHf', label: 'Skip HF phrasing layer', type: 'checkbox', default: false },
     ],
   },
   {
@@ -588,7 +590,18 @@ export default function ControlPage() {
   };
 
   const getJobParams = (job) => {
-    const p = { ...(jobParams[job.id] || {}) };
+    const p = {};
+    // Merge defaults with any user-overridden values
+    if (job.params) {
+      for (const param of job.params) {
+        p[param.key] = jobParams[job.id]?.[param.key] ?? param.default;
+      }
+    }
+    // Copy non-param values (like llmModel)
+    const stored = jobParams[job.id] || {};
+    for (const key of Object.keys(stored)) {
+      if (!(key in p)) p[key] = stored[key];
+    }
     // If user picker was opened for this job, include selected ownerIds
     const sel = selectedUsers[job.id];
     const all = eligibleUsers[job.id];

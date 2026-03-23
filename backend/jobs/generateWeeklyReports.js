@@ -16,7 +16,7 @@ function windowElapsed(existing) {
 
 const CONCURRENCY = 5;
 
-async function processOwner(ownerId, force) {
+async function processOwner(ownerId, force, { skipHf = false, personalize = true } = {}) {
   const existing = await getStoredWeeklyInsight(ownerId);
 
   if (!force && !windowElapsed(existing)) {
@@ -32,8 +32,8 @@ async function processOwner(ownerId, force) {
   }
 
   // Fetch user for name personalization
-  const user = await getUserById(ownerId).catch(() => null);
-  const firstName = extractFirstName(user?.name);
+  const user = personalize ? await getUserById(ownerId).catch(() => null) : null;
+  const firstName = personalize ? extractFirstName(user?.name) : null;
 
   let insight;
   try {
@@ -46,9 +46,11 @@ async function processOwner(ownerId, force) {
   const actions = generateActions(report);
 
   // HF phrasing pass (batch only, not in request path)
-  insight.summary = await phraseText(insight.summary, { firstName });
-  for (const a of actions) {
-    a.reason = await phraseText(a.reason, { firstName });
+  if (!skipHf) {
+    insight.summary = await phraseText(insight.summary, { firstName });
+    for (const a of actions) {
+      a.reason = await phraseText(a.reason, { firstName });
+    }
   }
 
   const bm = report.baselineMetrics;
@@ -82,12 +84,12 @@ async function processOwner(ownerId, force) {
   return { ownerId, report: payload };
 }
 
-export async function runGenerateWeeklyReports({ force = false, ownerIds } = {}) {
+export async function runGenerateWeeklyReports({ force = false, ownerIds, skipHf = false, personalize = true } = {}) {
   const startTime = Date.now();
   const owners = Array.isArray(ownerIds) && ownerIds.length > 0
     ? ownerIds
     : await listOwnerIds();
-  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force}${ownerIds ? ', filtered' : ''})`);
+  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force}${ownerIds ? ', filtered' : ''}${skipHf ? ', skipHf' : ''}${!personalize ? ', no-personalize' : ''})`);
 
   // Process in parallel batches
   const results = [];
@@ -95,7 +97,7 @@ export async function runGenerateWeeklyReports({ force = false, ownerIds } = {})
     const batch = owners.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
       batch.map((ownerId) =>
-        processOwner(ownerId, force).catch((error) => {
+        processOwner(ownerId, force, { skipHf, personalize }).catch((error) => {
           console.error(`[generateWeeklyReports] Error for ${ownerId.slice(0, 8)}...: ${error.message}`);
           return { ownerId, skipped: true, reason: error.message || "generation-failed" };
         })

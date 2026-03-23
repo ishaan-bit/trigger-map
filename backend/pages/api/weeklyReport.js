@@ -3,7 +3,7 @@ import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { generateInsight } from "@/ai/generateInsight.js";
 import { generateActions } from "@/services/actionEngine.js";
 import { sanitizeDeep } from "@/utils/sanitizeOutput.js";
-import { extractFirstName } from "@/utils/phrasingLayer.js";
+import { phraseText, extractFirstName } from "@/utils/phrasingLayer.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
@@ -60,8 +60,8 @@ export default async function handler(req, res) {
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
     const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
+    const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
-      const firstName = extractFirstName(user?.name);
       report.aiInsight = await generateInsight(report, { firstName });
     }
 
@@ -123,6 +123,14 @@ export default async function handler(req, res) {
     // Generate contextual actions from the report
     report.actions = generateActions(report);
     report.actionFeedback = actionFeedback || [];
+
+    // HF phrasing pass on summary + action reasons (1.5s timeout per call, degrades silently)
+    if (report.aiInsight?.summary) {
+      report.aiInsight.summary = await phraseText(report.aiInsight.summary, { firstName });
+      for (const a of report.actions) {
+        a.reason = await phraseText(a.reason, { firstName });
+      }
+    }
 
     // Strip internal model names from LLM output before sending to client
     if (report.llmInsight) delete report.llmInsight.model;

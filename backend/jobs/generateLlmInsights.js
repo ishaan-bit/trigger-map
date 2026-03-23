@@ -36,11 +36,13 @@ async function storeLlmInsight(ownerId, payload) {
   return payload;
 }
 
-export async function runGenerateLlmInsights({ force = false, minMoments = 1 } = {}) {
+export async function runGenerateLlmInsights({ force = false, minMoments = 1, ownerIds } = {}) {
   const envIds = process.env.LLM_OWNER_IDS;
-  const owners = envIds
-    ? envIds.split(',').filter(Boolean)
-    : await listOwnerIds();
+  const owners = Array.isArray(ownerIds) && ownerIds.length > 0
+    ? ownerIds
+    : envIds
+      ? envIds.split(',').filter(Boolean)
+      : await listOwnerIds();
   const results = [];
   let processed = 0;
   let skipped = 0;
