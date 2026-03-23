@@ -71,7 +71,10 @@ export async function phraseText(inputText, opts = {}) {
  */
 export function extractFirstName(displayName) {
   if (!displayName || typeof displayName !== "string") return null;
-  const first = displayName.trim().split(/\s+/)[0];
+  const trimmed = displayName.trim();
+  // Reject system-default placeholder names
+  if (/^quietden\b/i.test(trimmed)) return null;
+  const first = trimmed.split(/\s+/)[0];
   return first && first.length >= 2 ? first : null;
 }
 

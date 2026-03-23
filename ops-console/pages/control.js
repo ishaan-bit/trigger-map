@@ -4,6 +4,14 @@ import ConfirmAction from '../components/ConfirmAction';
 
 const LLM_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
+const BACKFILL_PERSONALITIES = [
+  { id: 'burnout-candidate',     label: '🔥 Burnout Candidate',     desc: 'Work-dominated stress, declining energy, exercise barely helps' },
+  { id: 'steady-achiever',       label: '⚖️ Steady Achiever',       desc: 'Balanced routines, exercise is a strong regulator, mostly positive' },
+  { id: 'social-butterfly',      label: '🦋 Social Butterfly',      desc: 'Energized by people, solo time is draining, social-dominant' },
+  { id: 'relationship-focused',  label: '💞 Relationship-Focused',  desc: 'Partner interactions drive mood swings, family stabilizes' },
+  { id: 'wellness-warrior',      label: '💪 Wellness Warrior',      desc: 'Exercise/health dominant, high baseline, only work causes dips' },
+];
+
 const JOBS = [
   {
     id: 'generateWeeklyReports',
@@ -469,6 +477,7 @@ export default function ControlPage() {
   const [pushBody, setPushBody] = useState('');
   const [pushSending, setPushSending] = useState(false);
   const [backfillWeeks, setBackfillWeeks] = useState(3);
+  const [backfillPersonality, setBackfillPersonality] = useState('steady-achiever');
   const [backfillRunning, setBackfillRunning] = useState(false);
 
   // Persist jobParams to localStorage
@@ -1019,12 +1028,25 @@ export default function ControlPage() {
       <div className="panel">
         <div className="panel-header">
           <h3>Backfill Demo Data</h3>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Seed curated moments for demos</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Seed personality-typed moments for demos</span>
         </div>
         <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Generates curated demo moments (work stress, exercise recovery, social energy, travel resets) going back N weeks.
-            Each week uses a different narrative arc. Data is written directly to Redis aggregates.
+            Generates curated demo moments based on a personality type going back N weeks.
+            Each personality produces distinct trigger-emotion patterns. Data is written directly to Redis aggregates.
+          </div>
+          {/* Personality picker */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Personality type</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {BACKFILL_PERSONALITIES.map(p => (
+                <label key={p.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, cursor: 'pointer', padding: '4px 8px', borderRadius: 6, background: backfillPersonality === p.id ? 'rgba(139,92,246,0.1)' : 'transparent', border: backfillPersonality === p.id ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent' }}>
+                  <input type="radio" name="backfillPersonality" value={p.id} checked={backfillPersonality === p.id} onChange={() => setBackfillPersonality(p.id)} />
+                  <span style={{ fontWeight: 600 }}>{p.label}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{p.desc}</span>
+                </label>
+              ))}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -1109,13 +1131,13 @@ export default function ControlPage() {
                 const res = await fetch('/api/control/backfill-demo', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ ownerIds: [...sel], weeks: backfillWeeks }),
+                  body: JSON.stringify({ ownerIds: [...sel], weeks: backfillWeeks, personality: backfillPersonality }),
                 });
                 const data = await res.json();
                 setResults(prev => [{
                   timestamp: ts,
                   action: 'backfill-demo',
-                  target: `${sel.size} accounts x ${backfillWeeks}w`,
+                  target: `${sel.size} accounts x ${backfillWeeks}w (${backfillPersonality})`,
                   ok: res.ok,
                   data,
                   status: res.status,
@@ -1134,7 +1156,7 @@ export default function ControlPage() {
               }
             }}
           >
-            {backfillRunning ? 'Backfilling...' : `Backfill ${backfillWeeks} week${backfillWeeks > 1 ? 's' : ''}`}
+            {backfillRunning ? 'Backfilling...' : `Backfill ${backfillWeeks} week${backfillWeeks > 1 ? 's' : ''} — ${BACKFILL_PERSONALITIES.find(p => p.id === backfillPersonality)?.label || backfillPersonality}`}
           </button>
         </div>
       </div>
