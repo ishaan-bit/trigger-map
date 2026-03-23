@@ -1,6 +1,6 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
 import { computeBaselineMetrics } from "./baselineEngine.js";
-import { lintText } from "../utils/textGrammar.js";
+import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 
 // --- Confidence thresholds ---
 const MIN_LOGS_FOR_PATTERNS = 5;
@@ -159,8 +159,8 @@ function buildChangeHighlights(deltas, report) {
   const triggerDeltas = Object.entries(deltas.triggerDeltas || {}).sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta));
   if (triggerDeltas.length) {
     const [trigger, d] = triggerDeltas[0];
-    if (d.delta > 0) highlights.push(`${trigger} appeared ${d.delta} more time${d.delta !== 1 ? "s" : ""} this week.`);
-    else if (d.delta < 0) highlights.push(`${trigger} dropped by ${Math.abs(d.delta)} compared to last week.`);
+    if (d.delta > 0) highlights.push(`${cap(triggerLabel(trigger))} appeared ${d.delta} more time${d.delta !== 1 ? "s" : ""} this week.`);
+    else if (d.delta < 0) highlights.push(`${cap(triggerLabel(trigger))} dropped by ${Math.abs(d.delta)} compared to last week.`);
   }
 
   const emotionDeltas = Object.entries(deltas.emotionDeltas || {}).sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta));

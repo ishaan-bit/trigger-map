@@ -1,5 +1,5 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
-import { lintText, triggerLabel } from "../utils/textGrammar.js";
+import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 
 /**
  * Confidence-aware rule-based insight generator.
@@ -8,6 +8,15 @@ import { lintText, triggerLabel } from "../utils/textGrammar.js";
  * and generates grounded, honest observations — never faking
  * certainty when data is thin.
  */
+
+// Natural-language list join for trigger names
+function triggerList(triggers) {
+  const items = (triggers || []).map(triggerLabel);
+  if (items.length === 0) return "several areas";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return items.slice(0, -1).join(", ") + ", and " + items[items.length - 1];
+}
 
 const MICRO_EXPERIMENTS = {
   work: [
@@ -99,7 +108,7 @@ function buildLowSummary(report, firstName) {
   const n = report.dataQuality.totalMoments;
   const opener = firstName ? `${firstName}, you've` : "You've";
   if (report.topTrigger) {
-    return `${opener} logged ${n} moments so far, and ${report.topTrigger} has come up the most. Keep going, a few more days and your patterns will really start to take shape.`;
+    return `${opener} logged ${n} moments so far, and ${triggerLabel(report.topTrigger)} has come up the most. Keep going, a few more days and your patterns will really start to take shape.`;
   }
   return `${n} moments logged across a few areas. No single theme stands out yet, which is fine. Patterns emerge with a bit more data.`;
 }
@@ -109,9 +118,9 @@ function buildEmergingSummary(report, firstName) {
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} has been on your mind the most this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${cap(triggerLabel(report.topTrigger))} has been on your mind the most this week.`);
   } else if (report.tiedTriggers?.length) {
-    parts.push(`${firstName ? firstName + ", your" : "Your"} week was split between ${report.tiedTriggers.join(" and ")}.`);
+    parts.push(`${firstName ? firstName + ", your" : "Your"} week was split between ${triggerList(report.tiedTriggers)}.`);
   }
 
   if (report.topEmotion) {
@@ -120,7 +129,7 @@ function buildEmergingSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`Good news: ${r.trigger} seems to bring you back to feeling ${r.emotion}. That's worth protecting.`);
+    parts.push(`Good news: ${triggerLabel(r.trigger)} seems to bring you back to feeling ${r.emotion}. That's worth protecting.`);
   }
 
   if (bm?.drift?.direction === "declining") {
@@ -137,14 +146,14 @@ function buildModerateSummary(report, firstName) {
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} showed up the most this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${cap(triggerLabel(report.topTrigger))} showed up the most this week.`);
   } else {
-    parts.push(`${firstName ? firstName + ", no" : "No"} single trigger dominated. Your attention was spread across ${report.tiedTriggers?.join(", ") || "a few areas"}.`);
+    parts.push(`${firstName ? firstName + ", no" : "No"} single trigger dominated. Your attention was spread across ${triggerList(report.tiedTriggers)}.`);
   }
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `When ${f.trigger} came up, it often left you feeling ${f.emotion}. That happened ${f.count} times.`;
+    let fLine = `When ${triggerLabel(f.trigger)} came up, it often left you feeling ${f.emotion}. That happened ${f.count} times.`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -152,7 +161,7 @@ function buildModerateSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`On the flip side, ${r.trigger} kept bringing you ${r.emotion}, which is a good anchor.`);
+    parts.push(`On the flip side, ${triggerLabel(r.trigger)} kept leaving you feeling ${r.emotion}, which is a good anchor.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -173,14 +182,14 @@ function buildStrongSummary(report, firstName) {
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} was the main theme this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${cap(triggerLabel(report.topTrigger))} was the main theme this week.`);
   } else {
-    parts.push(`${firstName ? firstName + ", your" : "Your"} week touched on ${report.tiedTriggers?.join(", ") || "several areas"} without one standing out.`);
+    parts.push(`${firstName ? firstName + ", your" : "Your"} week touched on ${triggerList(report.tiedTriggers)} without one standing out.`);
   }
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `${triggerLabel(f.trigger)} and feeling ${f.emotion} kept showing up together (${f.count}×). That's a pattern worth noticing.`;
+    let fLine = `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} kept showing up together (${f.count}×). That's a pattern worth noticing.`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -188,7 +197,7 @@ function buildStrongSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`${r.trigger} has been consistently bringing you ${r.emotion}.`);
+    parts.push(`${cap(triggerLabel(r.trigger))} has consistently left you feeling ${r.emotion}.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -286,7 +295,7 @@ function buildWhatWorking(report) {
   const items = [];
   for (const r of (report.regulators || []).slice(0, 3)) {
     items.push({
-      text: `${r.trigger} tends to leave you feeling ${r.emotion}`,
+      text: `${cap(triggerLabel(r.trigger))} tends to leave you feeling ${r.emotion}`,
       trigger: r.trigger,
       emotion: r.emotion,
       count: r.count,
@@ -306,7 +315,7 @@ function buildWhereToFocus(report) {
   const items = [];
   for (const f of (report.frictionZones || []).slice(0, 3)) {
     items.push({
-      text: `${f.trigger} often leads to ${f.emotion}, worth noticing`,
+      text: `${cap(triggerLabel(f.trigger))} often leaves you feeling ${f.emotion} - worth noticing`,
       trigger: f.trigger,
       emotion: f.emotion,
       count: f.count,

@@ -28,6 +28,7 @@ const EMOTION_NOUNS = {
 
 const TRIGGER_LABELS = {
   alone: "time alone",
+  social: "social life",
 };
 
 // ── Regex building blocks ────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ export function triggerLabel(trigger) {
 /**
  * Capitalize first letter of a string.
  */
-function cap(s) {
+export function cap(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
@@ -92,10 +93,10 @@ export function lintText(text) {
     (_, e) => `leads to feeling ${e.toLowerCase()}`
   );
 
-  // 3. "bringing {emotion}" (without "you") → "bringing you {emotion}"
+  // 3. "bringing [you] {emotion}" → "leaving you feeling {emotion}"
   t = t.replace(
-    new RegExp(`\\bbringing (?!you )(${EMO})\\b`, "gi"),
-    (_, e) => `bringing you ${e.toLowerCase()}`
+    new RegExp(`\\bbringing (?:you )?(?!you feeling )(${EMO})\\b`, "gi"),
+    (_, e) => `leaving you feeling ${e.toLowerCase()}`
   );
 
   // 4. "source of {emotion}" → "source of {noun-form}"

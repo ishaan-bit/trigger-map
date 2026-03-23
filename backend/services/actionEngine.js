@@ -6,7 +6,7 @@
  * Feedback is stored via the HiTL loop (/api/actions POST).
  */
 
-import { lintText } from "../utils/textGrammar.js";
+import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 
 const ACTION_META = {
   regulate:   { icon: "🌿", category: "Try this" },
@@ -30,8 +30,8 @@ export function generateActions(report) {
     actions.push({
       id: `reg-${f.trigger}-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
-      title: `Try ${r.trigger} when ${f.trigger} gets tough`,
-      reason: `${f.trigger} often leads to ${f.emotion}. ${r.trigger} has been helping you feel ${r.emotion}.`,
+      title: `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`,
+      reason: `${cap(triggerLabel(f.trigger))} often leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,
       trigger: f.trigger,
       emotion: f.emotion,
     });
@@ -43,7 +43,7 @@ export function generateActions(report) {
     actions.push({
       id: `friction-${f2.trigger}-${f2.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${f2.trigger} leads to ${f2.emotion}`,
+      title: `Notice when ${triggerLabel(f2.trigger)} leaves you feeling ${f2.emotion}`,
       reason: `This pairing appeared ${f2.count} times. Awareness is the first step.`,
       trigger: f2.trigger,
       emotion: f2.emotion,
@@ -70,7 +70,7 @@ export function generateActions(report) {
       actions.push({
         id: `rising-${trigger}`.toLowerCase().replace(/\s+/g, "-"),
         type: "awareness",
-        title: `${trigger} is showing up more`,
+        title: `${cap(triggerLabel(trigger))} is showing up more`,
         reason: `Appeared ${d.delta} more times than last week. Worth paying attention.`,
         trigger,
       });
@@ -83,8 +83,8 @@ export function generateActions(report) {
     actions.push({
       id: `reinforce-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
-      title: `Keep ${r.trigger} in your week`,
-      reason: `It consistently leads to ${r.emotion}. Protecting what works matters.`,
+      title: `Keep ${triggerLabel(r.trigger)} in your week`,
+      reason: `It consistently leaves you feeling ${r.emotion}. Protecting what works matters.`,
       trigger: r.trigger,
       emotion: r.emotion,
     });
@@ -106,7 +106,7 @@ export function generateActions(report) {
     actions.push({
       id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${topPair.trigger} leads to ${topPair.emotion}`,
+      title: `Notice when ${triggerLabel(topPair.trigger)} leaves you feeling ${topPair.emotion}`,
       reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week. Your most common combo.`,
       trigger: topPair.trigger,
       emotion: topPair.emotion,
@@ -120,7 +120,7 @@ export function generateActions(report) {
       actions.push({
         id: `top-trigger-${topTrigger}`.toLowerCase().replace(/\s+/g, "-"),
         type: "awareness",
-        title: `Pay attention to ${topTrigger}`,
+        title: `Pay attention to ${triggerLabel(topTrigger)}`,
         reason: `It's your top trigger this week. Notice how it makes you feel each time.`,
         trigger: topTrigger,
       });

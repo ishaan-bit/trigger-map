@@ -110,6 +110,9 @@ function topEntries(record, limit = 5) {
 
 function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : str; }
 
+const TRIGGER_DISPLAY = { alone: "Time alone", social: "Social life" };
+function triggerDisplay(t) { return TRIGGER_DISPLAY[t] || capitalize(t); }
+
 function scoreTone(score) {
   if (score >= 4.2) return { emoji: "🌟", label: "Great", color: "#a78bfa" };
   if (score >= 3.5) return { emoji: "😌", label: "Good", color: "#5ee6a0" };
@@ -217,8 +220,8 @@ function NarrativeCard({ icon, title, items, positive }) {
           <Text key={i} style={s.narrativeText}>
             {item.trigger ? (
               <>
-                <Text style={{ color: TRIGGER_COLORS[item.trigger] || palette.accent, fontWeight: "600" }}>{capitalize(item.trigger)}</Text>
-                {positive ? " brings you " : " tends to leave you "}
+                <Text style={{ color: TRIGGER_COLORS[item.trigger] || palette.accent, fontWeight: "600" }}>{triggerDisplay(item.trigger)}</Text>
+                {positive ? " helps you feel " : " tends to leave you feeling "}
                 <Text style={{ color: EMOTION_COLORS[item.emotion] || palette.textSecondary, fontWeight: "600" }}>{item.emotion}</Text>
                 {item.count ? ` (${item.count}×)` : ""}
               </>
