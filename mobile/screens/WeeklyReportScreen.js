@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { submitActionFeedback } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
@@ -223,9 +224,10 @@ function NarrativeCard({ icon, title, items, positive }) {
 /* ── Tab pill selector ── */
 
 const TABS = [
-  { key: "summary", label: "Your Week", icon: "✨" },
-  { key: "patterns", label: "Patterns", icon: "🔗" },
-  { key: "analytics", label: "Analytics", icon: "📊" },
+  { key: "mirror", label: "Mirror", icon: "🪞" },
+  { key: "week", label: "This Week", icon: "📅" },
+  { key: "actions", label: "Actions", icon: "⚡" },
+  { key: "premium", label: "Premium", icon: "💎" },
 ];
 
 function TabBar({ activeTab, onTabChange }) {
@@ -251,261 +253,212 @@ function TabBar({ activeTab, onTabChange }) {
   );
 }
 
-/* ── Tab 1: Your Week (Summary) ── */
+/* ── Delta chip ── */
 
-function SummaryTab({ report, dq, confidence, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, router }) {
-  const hasRuleInsight = !!report?.aiInsight?.summary;
+function DeltaChip({ value, label, inverted = false }) {
+  if (value == null || value === 0) return null;
+  const positive = inverted ? value < 0 : value > 0;
+  const color = positive ? palette.success : palette.danger;
+  const arrow = value > 0 ? "↑" : "↓";
+  const display = label || `${value > 0 ? "+" : ""}${typeof value === "number" ? (Number.isInteger(value) ? value : value.toFixed(1)) : value}`;
+  return (
+    <View style={[s.deltaChip, { backgroundColor: color + "15", borderColor: color + "40" }]}>
+      <Text style={[s.deltaChipText, { color }]}>{display} {arrow}</Text>
+    </View>
+  );
+}
+
+/* ── Tab 1: Mirror (persistent identity) ── */
+
+function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
   const bm = report?.baselineMetrics;
+  const deltas = report?.weeklyDeltas;
+  const highlights = report?.changeHighlights || [];
 
   return (
     <View style={s.tabContent}>
-      {/* State of mind hero */}
+      {/* State of Mind */}
       {bm?.stateOfMind ? (
-        <AnimatedSection index={0} style={s.stateOfMindCard}>
-          <Text style={s.stateOfMindLabel}>HOW YOU'RE DOING</Text>
-          <Text style={s.stateOfMindText}>{capitalize(bm.stateOfMind)}</Text>
-          {bm?.baseline?.reliable && bm?.drift ? (
-            <Text style={s.stateOfMindSub}>
-              {bm.drift.direction === "stable"
-                ? "Tracking close to your personal baseline."
-                : bm.drift.direction === "improving"
-                  ? "Trending a bit better than your usual."
-                  : "A bit below your usual — temporary dips are normal."}
-            </Text>
-          ) : null}
-        </AnimatedSection>
-      ) : null}
-
-      {/* Human-readable summary */}
-      {hasRuleInsight ? (
-        <AnimatedSection index={1} style={s.summaryCard}>
-          <Text style={s.summaryText}>{cleanText(report.aiInsight.summary)}</Text>
-        </AnimatedSection>
-      ) : null}
-
-      {/* What's working well */}
-      {report.aiInsight?.whatWorking?.length > 0 ? (
-        <NarrativeCard icon="🌿" title="What's working" items={report.aiInsight.whatWorking} positive />
-      ) : report.regulators?.length > 0 ? (
-        <NarrativeCard icon="🌿" title="What's working" items={report.regulators.slice(0, 3).map(r => ({ trigger: r.trigger, emotion: r.emotion, count: r.count }))} positive />
-      ) : null}
-
-      {/* Where to focus */}
-      {report.aiInsight?.whereToFocus?.length > 0 ? (
-        <NarrativeCard icon="🔥" title="Worth noticing" items={report.aiInsight.whereToFocus} positive={false} />
-      ) : report.frictionZones?.length > 0 ? (
-        <NarrativeCard icon="🔥" title="Worth noticing" items={report.frictionZones.slice(0, 3).map(f => ({ trigger: f.trigger, emotion: f.emotion, count: f.count }))} positive={false} />
-      ) : null}
-
-      {/* Try this week */}
-      {report.aiInsight?.microExperiment ? (
-        <AnimatedSection index={3} style={s.experimentCard}>
-          <View style={s.aiLabelRow}>
-            <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft || palette.glass }]}>
-              <Text style={[s.aiLabelText, { color: palette.success }]}>Try this week</Text>
-            </View>
-          </View>
-          <Text style={s.experimentText}>{cleanText(report.aiInsight.microExperiment)}</Text>
-        </AnimatedSection>
-      ) : null}
-
-      {/* LLM Insight section */}
-      {renderLlmInsightSection({ report, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, router })}
-    </View>
-  );
-}
-
-function renderLlmInsightSection({ report, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, router }) {
-  /* Anonymous */
-  if (!isSignedIn) {
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Deeper insights" badge="weekly" />
-        <View style={s.insightStateCard}>
-          <Text style={s.insightStateIcon}>🔒</Text>
-          <Text style={s.insightStateTitle}>Unlock personalised insights</Text>
-          <Text style={s.insightStateBody}>Sign in for free to get pattern analysis tailored to your data. The more you log, the better it gets.</Text>
-          <PrimaryButton label="Sign in to unlock" onPress={handleSignIn} />
-        </View>
-      </View>
-    );
-  }
-
-  /* Premium + full insight */
-  if (isPremium && hasLlmInsight) {
-    const sections = parseLlmSections(report.llmInsight.narrative);
-    const generatedAt = report.llmInsight.generatedAt;
-    const daysAgo = generatedAt ? Math.max(0, Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86400000)) : null;
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Your personalised insight" badge="weekly" />
-        {sections ? (
-          <View style={s.insightCardsRow}>
-            {INSIGHT_SECTION_META.map((meta, i) => (
-              sections[i] ? <InsightCard key={meta.label} icon={meta.icon} label={meta.label} body={sections[i]} color={meta.color} index={i} /> : null
-            ))}
-          </View>
-        ) : (
-          <InsightCard icon="🔍" label="Insight" body={cleanText(report.llmInsight.narrative)} color={palette.accent} index={0} />
-        )}
-        {daysAgo !== null ? (
-          <Text style={s.insightFooter}>Updated {daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`}</Text>
-        ) : null}
-      </View>
-    );
-  }
-
-  /* Premium, no insight yet */
-  if (isPremium && !hasLlmInsight) {
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Your personalised insight" badge="weekly" />
-        <View style={s.insightStateCard}>
-          <Text style={s.insightStateIcon}>✨</Text>
-          <Text style={s.insightStateTitle}>Your insight is on its way</Text>
-          <Text style={s.insightStateBody}>Analysing your patterns — this usually takes under a minute. Insights sharpen the more you log.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  /* Free + first-free or free pass: show all 3 cards */
-  if (hasLlmInsight && (report.llmInsight.firstFree || report.llmInsight.freePass)) {
-    const fullSections = parseLlmSections(report.llmInsight.narrative);
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Your personalised insight" badge="weekly" />
-        <View style={s.aiLabelRow}>
-          <View style={[s.aiLabelPill, { backgroundColor: palette.successSoft, marginLeft: 0 }]}>
-            <Text style={[s.aiLabelText, { color: palette.success }]}>Free preview</Text>
-          </View>
-        </View>
-        {fullSections ? (
-          <View style={s.insightCardsRow}>
-            {INSIGHT_SECTION_META.map((meta, i) => (
-              fullSections[i] ? <InsightCard key={meta.label} icon={meta.icon} label={meta.label} body={fullSections[i]} color={meta.color} index={i} /> : null
-            ))}
-          </View>
-        ) : (
-          <InsightCard icon="🔍" label="Insight" body={cleanText(report.llmInsight.narrative)} color={palette.accent} index={0} />
-        )}
-        <Text style={s.firstFreeHint}>Future personalised insights require Premium.</Text>
-      </View>
-    );
-  }
-
-  /* Free + teaser */
-  if (hasLlmTeaser) {
-    const narrativeSource = report.llmTeaser?.narrative;
-    const sections = parseLlmSections(narrativeSource);
-    const teaserText = sections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Personalised insight" badge="weekly" />
-        <View style={s.teaserCard}>
-          <Text style={s.teaserTitle}>{teaserText ? "Your pattern insight is ready" : "A deeper pattern is emerging…"}</Text>
-          {teaserText ? <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text> : null}
-          <LinearGradient colors={["transparent", palette.glass]} locations={[0, 1]} style={s.teaserFade} />
-        </View>
-        <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-          <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "See the full picture"}</Text>
-        </Pressable>
-        <Text style={s.teaserSubtext}>Unlock full personalised insights</Text>
-      </View>
-    );
-  }
-
-  /* Signed-in free, enough data */
-  if (report.totalMoments >= 5) {
-    return (
-      <View style={s.section}>
-        <SectionHeader label="Personalised insight" badge="weekly" />
-        <View style={s.insightStateCard}>
-          <Text style={s.insightStateIcon}>🔓</Text>
-          <Text style={s.insightStateTitle}>Your insight is ready to unlock</Text>
-          <Text style={s.insightStateBody}>You have enough data for a personalised deep-dive. Upgrade to see what your moments are really saying.</Text>
-          <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-            <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  /* Signed-in free, not enough data */
-  const remaining = Math.max(0, 5 - (report.totalMoments || 0));
-  return (
-    <View style={s.section}>
-      <SectionHeader label="Deeper insights" badge="weekly" />
-      <View style={s.insightStateCard}>
-        <Text style={s.insightStateIcon}>📊</Text>
-        <Text style={s.insightStateTitle}>Building your insight</Text>
-        <Text style={s.insightStateBody}>
-          {remaining > 0 ? `Log ${remaining} more moment${remaining !== 1 ? "s" : ""} to unlock your first personalised insight. Every log makes it sharper.` : "Your personalised insight is being prepared. Check back soon."}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-/* ── Tab 2: Patterns ── */
-
-function PatternsTab({ report, dq, isSignedIn, handleSignIn }) {
-  const bm = report?.baselineMetrics;
-
-  return (
-    <View style={s.tabContent}>
-      {/* Baseline & drift */}
-      {bm?.baseline?.reliable ? (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="Your baseline" badge="weekly" />
-          <View style={s.card}>
-            <View style={s.baselineRow}>
-              <View style={s.baselineStat}>
-                <Text style={s.baselineLabel}>Emotional baseline</Text>
-                <Text style={[s.baselineValue, { color: bm.baseline.score >= 3.5 ? palette.success : bm.baseline.score >= 2.5 ? palette.warning : palette.danger }]}>
-                  {bm.baseline.score.toFixed(1)}/5
-                </Text>
-                <Text style={s.baselineHint}>{capitalize(bm.baseline.label)}</Text>
-              </View>
-              {bm.recentAverage !== null ? (
-                <View style={s.baselineStat}>
-                  <Text style={s.baselineLabel}>This week</Text>
-                  <Text style={[s.baselineValue, { color: bm.recentAverage >= 3.5 ? palette.success : bm.recentAverage >= 2.5 ? palette.warning : palette.danger }]}>
-                    {bm.recentAverage.toFixed(1)}/5
-                  </Text>
-                  {bm.drift ? <Text style={s.baselineHint}>{capitalize(bm.drift.label)}</Text> : null}
-                </View>
+          <SectionHeader label="State of mind" badge="weekly" />
+          <View style={s.stateOfMindCard}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={s.stateOfMindText}>{capitalize(bm.stateOfMind)}</Text>
+              {bm.baselineDeltas?.deltaDrift != null ? (
+                <DeltaChip value={bm.baselineDeltas.deltaDrift} />
               ) : null}
             </View>
-            {bm.stability ? (
-              <View style={s.baselineMeta}>
-                <Text style={s.baselineMetaText}>Stability: <Text style={{ fontWeight: "700", color: bm.stability.score >= 0.6 ? palette.success : palette.warning }}>{bm.stability.label}</Text></Text>
-                {bm.recoveryLatency ? <Text style={s.baselineMetaText}>Recovery: {bm.recoveryLatency.label}</Text> : null}
-              </View>
-            ) : null}
-            <Text style={s.baselineExplainer}>
-              Your baseline is learned from {bm.baseline.daysUsed} days of logging. The more you log, the more accurate it becomes at detecting when something shifts.
-            </Text>
+            {bm.baseline?.reliable ? (
+              <Text style={s.stateOfMindSub}>
+                Baseline {bm.baseline.score.toFixed(1)}/5 · This week {bm.recentAverage?.toFixed(1) || "—"}/5
+                {bm.drift ? ` · ${capitalize(bm.drift.label)}` : ""}
+              </Text>
+            ) : (
+              <Text style={s.stateOfMindSub}>Keep logging — your baseline is still forming.</Text>
+            )}
           </View>
         </AnimatedSection>
       ) : (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="Your baseline" badge="weekly" />
+          <SectionHeader label="State of mind" badge="weekly" />
           <View style={s.card}>
-            <Text style={s.baselineExplainer}>
-              We're still learning your personal emotional baseline. Keep logging — after about 5 days, we'll be able to show you how your current week compares to your normal and detect when things start to shift.
-            </Text>
+            <Text style={s.aiSummary}>Log a few more moments to see your state of mind emerge.</Text>
           </View>
         </AnimatedSection>
       )}
 
+      {/* Core Patterns — persistent view */}
+      {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
+        <AnimatedSection index={1} style={s.section}>
+          <SectionHeader label="Core patterns" badge="weekly" />
+          {report.regulators?.length ? (
+            <NarrativeCard
+              icon="🌿"
+              title="What helps"
+              items={report.regulators.slice(0, 3).map((r) => ({ trigger: r.trigger, emotion: r.emotion, count: r.count }))}
+              positive
+            />
+          ) : null}
+          {report.frictionZones?.length ? (
+            <NarrativeCard
+              icon="🔥"
+              title="Friction zones"
+              items={report.frictionZones.slice(0, 3).map((f) => ({ trigger: f.trigger, emotion: f.emotion, count: f.count }))}
+              positive={false}
+            />
+          ) : null}
+        </AnimatedSection>
+      ) : null}
+
+      {/* Stability & Recovery */}
+      {bm?.stability ? (
+        <AnimatedSection index={2} style={s.section}>
+          <SectionHeader label="Stability" badge="weekly" />
+          <View style={s.card}>
+            <View style={s.baselineRow}>
+              <View style={s.baselineStat}>
+                <Text style={s.baselineLabel}>Stability</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={[s.baselineValue, { color: bm.stability.score >= 0.6 ? palette.success : palette.warning }]}>
+                    {bm.stability.label}
+                  </Text>
+                  {bm.baselineDeltas?.deltaStability != null ? (
+                    <DeltaChip value={bm.baselineDeltas.deltaStability} />
+                  ) : null}
+                </View>
+              </View>
+              {bm.recoveryLatency ? (
+                <View style={s.baselineStat}>
+                  <Text style={s.baselineLabel}>Recovery</Text>
+                  <Text style={s.baselineValue}>{bm.recoveryLatency.label}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Change Highlights */}
+      {highlights.length > 0 ? (
+        <AnimatedSection index={3} style={s.section}>
+          <SectionHeader label="What changed" badge="live" />
+          <View style={s.card}>
+            {highlights.map((h, i) => (
+              <View key={i} style={s.highlightRow}>
+                <Text style={s.highlightBullet}>•</Text>
+                <Text style={s.highlightText}>{h}</Text>
+              </View>
+            ))}
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Confidence */}
+      <AnimatedSection index={4} style={s.section}>
+        <View style={s.card}>
+          <Text style={s.cardLabel}>Confidence</Text>
+          <Text style={s.aiSummary}>{CONFIDENCE_LABELS[confidence] || confidence}</Text>
+          <Text style={{ color: palette.muted, fontSize: 11 }}>
+            Based on {dq.totalMoments || 0} moments across {dq.daysLogged || 0} days
+          </Text>
+        </View>
+      </AnimatedSection>
+
+      {!isSignedIn ? (
+        <View style={{ marginTop: 8 }}>
+          <PrimaryButton label="Sign in to deepen your patterns" onPress={handleSignIn} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ── Tab 2: This Week (temporal) ── */
+
+function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
+  const bm = report?.baselineMetrics;
+  const deltas = report?.weeklyDeltas;
+  const triggerEntries = topEntries(report?.triggerFrequency, 9);
+  const emotionEntries = topEntries(report?.emotionFrequency, 5);
+  const triggerMax = triggerEntries[0]?.[1] || 1;
+  const emotionMax = emotionEntries[0]?.[1] || 1;
+  const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
+  const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
+
+  return (
+    <View style={s.tabContent}>
+      {/* Weekly summary */}
+      {report?.aiInsight?.summary ? (
+        <AnimatedSection index={0} style={s.section}>
+          <SectionHeader label="Weekly summary" badge="weekly" />
+          <View style={s.summaryCard}>
+            <Text style={s.summaryText}>{cleanText(report.aiInsight.summary)}</Text>
+          </View>
+          {deltas ? (
+            <View style={[s.card, { marginTop: 6 }]}>
+              <Text style={{ color: palette.textSecondary, fontSize: 12 }}>
+                {deltas.totalMomentsDelta > 0
+                  ? `${deltas.totalMomentsDelta} more moment${deltas.totalMomentsDelta !== 1 ? "s" : ""} than last week`
+                  : deltas.totalMomentsDelta < 0
+                    ? `${Math.abs(deltas.totalMomentsDelta)} fewer moment${Math.abs(deltas.totalMomentsDelta) !== 1 ? "s" : ""} than last week`
+                    : "Same number of moments as last week"}
+              </Text>
+            </View>
+          ) : null}
+        </AnimatedSection>
+      ) : null}
+
+      {/* Emotional trajectory */}
+      {report.weeklyEmotionTrajectory?.length >= 1 ? (
+        <AnimatedSection index={1} style={s.section}>
+          <SectionHeader label="Emotional tone" badge="live" />
+          <View style={s.card}>
+            <Text style={s.trajectoryHint}>
+              {report.weeklyEmotionTrajectory.length === 1 ? "Your tone from logged days." : "How your average tone shifted day by day."}
+            </Text>
+            {report.trajectoryNote ? <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text> : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
+              {report.weeklyEmotionTrajectory.map((day) => {
+                const tone = scoreTone(day.score);
+                return (
+                  <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
+                    <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
+                    <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
+                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
       {/* Drift timeline */}
       {bm?.dailyDrift?.length >= 2 ? (
-        <AnimatedSection index={1} style={s.section}>
+        <AnimatedSection index={2} style={s.section}>
           <SectionHeader label="Drift from baseline" badge="live" />
           <View style={s.card}>
-            <Text style={s.trajectoryHint}>How your daily emotional tone compared to your personal baseline. Above zero = better than usual, below = tougher.</Text>
+            <Text style={s.trajectoryHint}>Above zero = better than usual, below = tougher.</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
               {bm.dailyDrift.map((day) => {
                 const color = day.deviation >= 0.2 ? palette.success : day.deviation <= -0.2 ? palette.danger : palette.muted;
@@ -521,126 +474,9 @@ function PatternsTab({ report, dq, isSignedIn, handleSignIn }) {
         </AnimatedSection>
       ) : null}
 
-      {/* Emotional loops */}
-      {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
-        <>
-          <SectionHeader label="Emotional loops" badge="live" />
-          {report.frictionZones?.length ? (
-            <NarrativeCard icon="🔥" title="Friction zones" items={report.frictionZones.slice(0, 3).map((f) => ({ trigger: f.trigger, emotion: f.emotion, count: f.count }))} positive={false} />
-          ) : null}
-          {report.regulators?.length ? (
-            <NarrativeCard icon="🌿" title="What helps" items={report.regulators.slice(0, 3).map((r) => ({ trigger: r.trigger, emotion: r.emotion, count: r.count }))} positive />
-          ) : null}
-        </>
-      ) : null}
-
-      {/* Correlations */}
-      {!isSignedIn ? (
-        <LockedSection title="Patterns and pairings" teaser="Create a free account to see emotional correlations and trajectory." ctaLabel="Sign in to unlock" onPress={handleSignIn}>
-          <View style={s.card}><Text style={[s.aiSummary, { color: palette.muted }]}>Deeper correlations appear here once you sign in.</Text></View>
-        </LockedSection>
-      ) : (
-        <>
-          {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
-            <AnimatedSection index={2} style={s.section}>
-              <SectionHeader label="Trigger → Emotion" badge="live" />
-              <View style={s.card}>
-                {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => {
-                  const tColor = TRIGGER_COLORS[trigger] || palette.accent;
-                  return (
-                    <View style={s.correlationRow} key={trigger}>
-                      <Text style={[s.correlationTrigger, { color: tColor }]}>{trigger}</Text>
-                      <View style={s.correlationChips}>
-                        {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
-                          const emoColor = EMOTION_COLORS[emo] || palette.text;
-                          return (
-                            <View style={[s.correlationChip, { backgroundColor: emoColor + "15", borderColor: emoColor + "40" }]} key={emo}>
-                              <Text style={[s.correlationChipText, { color: emoColor }]}>{EMOTION_EMOJIS[emo] || ""} {emo} ×{count}</Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </AnimatedSection>
-          ) : null}
-
-          {/* Stability */}
-          {dq.hasEnoughForStability ? (
-            <AnimatedSection index={3} style={s.section}>
-              <SectionHeader label="Stability" badge="weekly" />
-              <View style={s.metricsRow}>
-                {report.volatilityScore !== null ? (
-                  <View style={s.metricCard}>
-                    <Text style={s.metricLabel}>Day-to-day shifts</Text>
-                    <Text style={[s.metricValue, { color: report.volatilityScore < 0.8 ? "#5ee6a0" : report.volatilityScore < 1.5 ? "#ffb347" : "#ff6b7a" }]}>
-                      {report.volatilityLabel || "Steady"}
-                    </Text>
-                    <Text style={s.metricHint}>
-                      {report.volatilityScore < 0.8 ? "Emotions stayed fairly consistent." : report.volatilityScore < 1.5 ? "Some emotional range within your days." : "Wide swings between emotions."}
-                    </Text>
-                  </View>
-                ) : null}
-                {report.mostStableDay ? (
-                  <View style={s.metricCard}>
-                    <Text style={s.metricLabel}>Steadiest day</Text>
-                    <Text style={s.metricValue}>{new Date(report.mostStableDay).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </AnimatedSection>
-          ) : null}
-
-          {/* Trajectory */}
-          {report.weeklyEmotionTrajectory?.length >= 1 ? (
-            <AnimatedSection index={4} style={s.section}>
-              <SectionHeader label="Emotional tone" badge="live" />
-              <View style={s.card}>
-                <Text style={s.trajectoryHint}>
-                  {report.weeklyEmotionTrajectory.length === 1 ? "Your tone from logged days. More days = richer picture." : "How your average tone shifted day by day."}
-                </Text>
-                {report.trajectoryNote ? <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text> : null}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-                  {report.weeklyEmotionTrajectory.map((day) => {
-                    const tone = scoreTone(day.score);
-                    return (
-                      <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
-                        <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
-                        <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
-                        <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </AnimatedSection>
-          ) : null}
-        </>
-      )}
-    </View>
-  );
-}
-
-/* ── Tab 3: Analytics ── */
-
-function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
-  const triggerEntries = topEntries(report?.triggerFrequency, 9);
-  const emotionEntries = topEntries(report?.emotionFrequency, 5);
-  const triggerMax = triggerEntries[0]?.[1] || 1;
-  const emotionMax = emotionEntries[0]?.[1] || 1;
-  const energyEntries = Object.entries(report?.energyDistribution || {}).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
-  const energyMax = energyEntries[0]?.[1] || 1;
-  const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
-  const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
-  const bm = report?.baselineMetrics;
-
-  return (
-    <View style={s.tabContent}>
       {/* Emotions breakdown */}
       {emotionEntries.length ? (
-        <AnimatedSection index={0} style={s.section}>
+        <AnimatedSection index={3} style={s.section}>
           <SectionHeader label="Emotions" badge="live" extra={`${dq.uniqueEmotions || 0} recorded`} />
           <View style={s.card}>
             {emotionEntries.map(([key, value]) => (
@@ -652,7 +488,7 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
 
       {/* Triggers breakdown */}
       {triggerEntries.length ? (
-        <AnimatedSection index={1} style={s.section}>
+        <AnimatedSection index={4} style={s.section}>
           <SectionHeader label="Triggers" badge="live" extra={`${dq.uniqueTriggers || 0} areas`} />
           <View style={s.card}>
             {triggerEntries.map(([key, value]) => (
@@ -664,7 +500,7 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
 
       {/* Time of day */}
       {dq.hasEnoughForRhythm && timeEntries.length ? (
-        <AnimatedSection index={2} style={s.section}>
+        <AnimatedSection index={5} style={s.section}>
           <SectionHeader label="When you logged" badge="live" />
           <View style={s.card}>
             {timeEntries.map(([key, value]) => (
@@ -674,21 +510,36 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
         </AnimatedSection>
       ) : null}
 
-      {/* Energy flow */}
-      {isSignedIn && energyEntries.length ? (
-        <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label="Energy flow" badge="live" />
+      {/* Correlations */}
+      {isSignedIn && dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
+        <AnimatedSection index={6} style={s.section}>
+          <SectionHeader label="Trigger → Emotion" badge="live" />
           <View style={s.card}>
-            {energyEntries.map(([key, value]) => (
-              <HBar key={key} label={key} value={value} max={energyMax} color={ENERGY_COLORS[key] || palette.accent} />
-            ))}
+            {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => {
+              const tColor = TRIGGER_COLORS[trigger] || palette.accent;
+              return (
+                <View style={s.correlationRow} key={trigger}>
+                  <Text style={[s.correlationTrigger, { color: tColor }]}>{trigger}</Text>
+                  <View style={s.correlationChips}>
+                    {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
+                      const emoColor = EMOTION_COLORS[emo] || palette.text;
+                      return (
+                        <View style={[s.correlationChip, { backgroundColor: emoColor + "15", borderColor: emoColor + "40" }]} key={emo}>
+                          <Text style={[s.correlationChipText, { color: emoColor }]}>{EMOTION_EMOJIS[emo] || ""} {emo} ×{count}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         </AnimatedSection>
       ) : null}
 
       {/* Gut check */}
       {report.predictionAccuracy ? (
-        <AnimatedSection index={4} style={s.section}>
+        <AnimatedSection index={7} style={s.section}>
           <SectionHeader label="Gut check" badge="live" />
           <View style={s.card}>
             <View style={s.gutCheckRow}>
@@ -696,10 +547,10 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
               <View style={s.gutCheckContent}>
                 <Text style={s.gutCheckTitle}>{report.predictionAccuracy.correct} of {report.predictionAccuracy.daysCompared} days</Text>
                 <Text style={s.gutCheckBody}>
-                  {report.predictionAccuracy.rate >= 0.8 ? "You read yourself almost perfectly. Your gut is dialled in."
+                  {report.predictionAccuracy.rate >= 0.8 ? "You read yourself almost perfectly."
                     : report.predictionAccuracy.rate >= 0.6 ? "Strong self-awareness. Your morning read mostly matched the day."
                     : report.predictionAccuracy.rate >= 0.4 ? "Hit-and-miss — your days had more turns than expected."
-                    : report.predictionAccuracy.correct === 0 ? "None of your predictions landed. Your days unfolded in unexpected ways."
+                    : report.predictionAccuracy.correct === 0 ? "None of your predictions landed."
                     : "Mostly off the mark, but surprises teach you something."}
                 </Text>
               </View>
@@ -708,19 +559,296 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
         </AnimatedSection>
       ) : null}
 
-      {/* Baseline advanced */}
+      {/* Timeline CTA */}
+      <AnimatedSection index={8} style={s.section}>
+        <Pressable style={s.ctaCard} onPress={() => { tap(); router.push("/(tabs)/timeline"); }} accessibilityRole="button">
+          <Text style={s.ctaCardText}>📖 View full timeline</Text>
+        </Pressable>
+      </AnimatedSection>
+
+      {!isSignedIn ? (
+        <View style={{ marginTop: 8 }}>
+          <PrimaryButton label="Sign in for deeper analytics" onPress={handleSignIn} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ── Tab 3: Actions (behavioural) ── */
+
+function ActionsTab({ report, deviceId, token, onFeedback }) {
+  const actions = report?.actions || [];
+  const feedback = report?.actionFeedback || [];
+  const [responded, setResponded] = useState(() => {
+    const map = {};
+    for (const f of feedback) { map[f.actionId] = f.response; }
+    return map;
+  });
+  const [submitting, setSubmitting] = useState(null);
+
+  async function handleResponse(actionId, response) {
+    if (responded[actionId] || submitting) return;
+    setSubmitting(actionId);
+    tap();
+    try {
+      await submitActionFeedback(actionId, response, deviceId, token);
+      setResponded((prev) => ({ ...prev, [actionId]: response }));
+      trackEvent("action_feedback", { actionId, response });
+      if (onFeedback) onFeedback(actionId, response);
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  if (!actions.length) {
+    return (
+      <View style={s.tabContent}>
+        <View style={s.insightStateCard}>
+          <Text style={s.insightStateIcon}>⚡</Text>
+          <Text style={s.insightStateTitle}>Actions are on their way</Text>
+          <Text style={s.insightStateBody}>
+            Log a few more moments with different triggers and emotions. Once your patterns are clearer, actions will appear here.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.tabContent}>
+      <AnimatedSection index={0} style={s.section}>
+        <SectionHeader label="This week's actions" badge="live" extra={`${actions.length} suggestion${actions.length !== 1 ? "s" : ""}`} />
+        <Text style={{ color: palette.textSecondary, fontSize: 12, marginBottom: 4 }}>
+          Based on your patterns. Try one and let us know.
+        </Text>
+      </AnimatedSection>
+
+      {actions.map((action, i) => {
+        const done = responded[action.id];
+        return (
+          <AnimatedSection key={action.id} index={i + 1} style={s.section}>
+            <View style={[s.actionCard, done && s.actionCardDone]}>
+              <View style={s.actionHeader}>
+                <Text style={s.actionIcon}>{action.icon || "⚡"}</Text>
+                <View style={s.actionHeaderText}>
+                  <Text style={s.actionCategory}>{action.category || "Action"}</Text>
+                  <Text style={s.actionTitle}>{action.title}</Text>
+                </View>
+              </View>
+              <Text style={s.actionReason}>{action.reason}</Text>
+              {done ? (
+                <View style={s.actionFeedbackDone}>
+                  <Text style={s.actionFeedbackDoneText}>
+                    {done === "tried" ? "👍 You tried this" : "👎 Skipped"}
+                  </Text>
+                </View>
+              ) : (
+                <View style={s.actionButtons}>
+                  <Pressable
+                    style={[s.actionBtn, s.actionBtnTry]}
+                    onPress={() => handleResponse(action.id, "tried")}
+                    disabled={!!submitting}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.actionBtnText}>👍 Tried it</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.actionBtn, s.actionBtnSkip]}
+                    onPress={() => handleResponse(action.id, "skipped")}
+                    disabled={!!submitting}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.actionBtnText}>👎 Skip</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </AnimatedSection>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ── Tab 4: Premium (deep learning) ── */
+
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing }) {
+  const bm = report?.baselineMetrics;
+  const regulators = report?.regulators || [];
+  const feedback = report?.actionFeedback || [];
+  const triedCount = feedback.filter((f) => f.response === "tried").length;
+  const skippedCount = feedback.filter((f) => f.response === "skipped").length;
+
+  function renderLlmInsight() {
+    if (!isSignedIn) {
+      return (
+        <LockedSection
+          title="Personal insight"
+          teaser="Sign in to unlock personalised AI-powered pattern analysis."
+          ctaLabel="Sign in to unlock"
+          onPress={handleSignIn}
+        >
+          <View style={s.card}><Text style={[s.aiSummary, { color: palette.muted }]}>Deeper pattern analysis appears here.</Text></View>
+        </LockedSection>
+      );
+    }
+
+    if (isPremium && hasLlmInsight) {
+      const sections = parseLlmSections(report.llmInsight.narrative);
+      if (sections) {
+        return (
+          <View style={s.section}>
+            <SectionHeader label="Personal insight" badge="weekly" />
+            <View style={s.insightCardsRow}>
+              {sections.map((body, idx) => {
+                if (!body) return null;
+                const meta = INSIGHT_SECTION_META[idx] || {};
+                return (
+                  <View key={idx} style={s.insightSectionCard}>
+                    <View style={s.insightSectionHeader}>
+                      <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
+                      <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
+                        {meta.label || `Section ${idx + 1}`}
+                      </Text>
+                    </View>
+                    <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
+                  </View>
+                );
+              })}
+              <Text style={s.insightFooter}>
+                {report.llmInsight.model || "model"} · {report.llmInsight.generatedAt
+                  ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                  : ""}
+              </Text>
+            </View>
+          </View>
+        );
+      }
+      return (
+        <View style={s.section}>
+          <SectionHeader label="Personal insight" badge="weekly" />
+          <View style={s.card}>
+            <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (hasLlmTeaser) {
+      const narrativeSource = report.llmTeaser?.narrative;
+      const teaserSections = parseLlmSections(narrativeSource);
+      const teaserText = teaserSections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
+      return (
+        <View style={s.section}>
+          <SectionHeader label="Personal insight" badge="weekly" />
+          <View style={s.teaserCard}>
+            <Text style={s.teaserTitle}>{teaserText ? "Your pattern insight is ready" : "A deeper pattern is emerging…"}</Text>
+            {teaserText ? <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text> : null}
+            <LinearGradient colors={["transparent", palette.glass]} locations={[0, 1]} style={s.teaserFade} />
+          </View>
+          <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+            <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "See the full picture"}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (!isPremium) {
+      return (
+        <View style={s.section}>
+          <SectionHeader label="Personal insight" badge="weekly" />
+          <View style={s.insightStateCard}>
+            <Text style={s.insightStateIcon}>💎</Text>
+            <Text style={s.insightStateTitle}>Unlock Premium insights</Text>
+            <Text style={s.insightStateBody}>
+              Get a personalised AI deep-dive into your patterns, effect sizes, and behavioural profile.
+            </Text>
+            <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+              <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  }
+
+  return (
+    <View style={s.tabContent}>
+      {/* What Works For You — effect sizes from regulators */}
+      {regulators.length ? (
+        <AnimatedSection index={0} style={s.section}>
+          <SectionHeader label="What works for you" badge="weekly" />
+          <View style={s.card}>
+            {regulators.slice(0, 5).map((r, i) => (
+              <View key={i} style={s.effectRow}>
+                <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
+                  <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
+                </View>
+                <View style={s.effectContent}>
+                  <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
+                  <Text style={s.effectCount}>{r.count} time{r.count !== 1 ? "s" : ""} this period</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Behaviour Profile — chips */}
       {bm?.baseline?.reliable ? (
-        <AnimatedSection index={5} style={s.section}>
+        <AnimatedSection index={1} style={s.section}>
+          <SectionHeader label="Behaviour profile" badge="weekly" />
+          <View style={s.card}>
+            <View style={s.profileChips}>
+              <View style={s.profileChip}><Text style={s.profileChipText}>Baseline: {bm.baseline.label}</Text></View>
+              {bm.stability ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(bm.stability.label)}</Text></View> : null}
+              {bm.recoveryLatency ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(bm.recoveryLatency.label)}</Text></View> : null}
+              {report.volatilityLabel ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(report.volatilityLabel)}</Text></View> : null}
+            </View>
+            <Text style={s.baselineExplainer}>
+              Built from {bm.baseline.daysUsed} days of data. The more you log, the richer this profile becomes.
+            </Text>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Action Effectiveness */}
+      {(triedCount > 0 || skippedCount > 0) ? (
+        <AnimatedSection index={2} style={s.section}>
+          <SectionHeader label="Action effectiveness" badge="live" />
+          <View style={s.card}>
+            <View style={s.metricsRow}>
+              <View style={s.metricCard}>
+                <Text style={s.metricLabel}>Tried</Text>
+                <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
+              </View>
+              <View style={s.metricCard}>
+                <Text style={s.metricLabel}>Skipped</Text>
+                <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
+              </View>
+            </View>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Baseline advanced details */}
+      {bm?.baseline?.reliable ? (
+        <AnimatedSection index={3} style={s.section}>
           <SectionHeader label="Baseline details" badge="weekly" />
           <View style={s.card}>
             <View style={s.analyticsGrid}>
               <View style={s.analyticsStat}>
-                <Text style={s.analyticsStatLabel}>Baseline score</Text>
+                <Text style={s.analyticsStatLabel}>Baseline</Text>
                 <Text style={s.analyticsStatValue}>{bm.baseline.score.toFixed(2)}/5</Text>
               </View>
               {bm.recentAverage != null ? (
                 <View style={s.analyticsStat}>
-                  <Text style={s.analyticsStatLabel}>7-day average</Text>
+                  <Text style={s.analyticsStatLabel}>7-day avg</Text>
                   <Text style={s.analyticsStatValue}>{bm.recentAverage.toFixed(2)}/5</Text>
                 </View>
               ) : null}
@@ -753,11 +881,8 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
         </AnimatedSection>
       ) : null}
 
-      {!isSignedIn ? (
-        <View style={{ marginTop: 12 }}>
-          <PrimaryButton label="Sign in for deeper analytics" onPress={handleSignIn} />
-        </View>
-      ) : null}
+      {/* LLM Insight */}
+      {renderLlmInsight()}
     </View>
   );
 }
@@ -765,14 +890,14 @@ function AnalyticsTab({ report, dq, isSignedIn, handleSignIn }) {
 /* ── Main screen ── */
 
 export function WeeklyReportScreen() {
-  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe } = useAppSession();
+  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId } = useAppSession();
   const router = useRouter();
   const { dominantEmotion } = useEmotionalState();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [purchasing, setPurchasing] = useState(false);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("mirror");
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -905,18 +1030,20 @@ export function WeeklyReportScreen() {
               <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
               {/* Tab content */}
-              {activeTab === "summary" ? (
-                <SummaryTab
+              {activeTab === "mirror" ? (
+                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} />
+              ) : activeTab === "week" ? (
+                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} />
+              ) : activeTab === "actions" ? (
+                <ActionsTab report={report} deviceId={deviceId} token={token} />
+              ) : (
+                <PremiumTab
                   report={report} dq={dq} confidence={confidence}
                   isSignedIn={isSignedIn} isPremium={isPremium}
                   hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                  purchasing={purchasing} router={router}
+                  purchasing={purchasing}
                 />
-              ) : activeTab === "patterns" ? (
-                <PatternsTab report={report} dq={dq} isSignedIn={isSignedIn} handleSignIn={handleSignIn} />
-              ) : (
-                <AnalyticsTab report={report} dq={dq} isSignedIn={isSignedIn} handleSignIn={handleSignIn} />
               )}
             </>
           ) : null}
@@ -1221,4 +1348,72 @@ const s = StyleSheet.create({
   dominantContent: { flex: 1, gap: 4 },
   dominantLabel: { color: palette.danger, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
   dominantText: { color: palette.text, fontSize: 14, lineHeight: 21 },
+
+  /* Delta chips */
+  deltaChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  deltaChipText: { fontSize: 11, fontWeight: "700" },
+
+  /* Action cards */
+  actionCard: {
+    borderRadius: radius.md, padding: 16, gap: 10,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  actionCardDone: { opacity: 0.6 },
+  actionHeader: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+  },
+  actionHeaderText: {
+    flexDirection: "column", flex: 1, gap: 2,
+  },
+  actionIcon: { fontSize: 22 },
+  actionCategory: {
+    color: palette.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase",
+  },
+  actionTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
+  actionReason: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
+  actionButtons: { flexDirection: "row", gap: 8, marginTop: 4 },
+  actionBtn: {
+    flex: 1, alignItems: "center", paddingVertical: 10,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  actionBtnTry: { backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)", borderColor: (palette.success || "#34C759") + "40" },
+  actionBtnSkip: { backgroundColor: palette.glass },
+  actionBtnText: { fontSize: 13, fontWeight: "600" },
+  actionFeedbackDone: { alignItems: "center", paddingVertical: 8 },
+  actionFeedbackDoneText: { color: palette.muted, fontSize: 12, fontStyle: "italic" },
+
+  /* Effect rows (premium) */
+  effectRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: palette.glassBorder,
+  },
+  effectDot: { width: 8, height: 8, borderRadius: 4 },
+  effectContent: { flex: 1, gap: 2 },
+  effectTitle: { color: palette.text, fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
+  effectCount: { color: palette.textSecondary, fontSize: 11 },
+
+  /* Profile chips */
+  profileChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  profileChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  profileChipText: { color: palette.text, fontSize: 12, fontWeight: "600" },
+
+  /* Change highlights */
+  highlightRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 4 },
+  highlightBullet: { fontSize: 14, marginTop: 1 },
+  highlightText: { flex: 1, color: palette.text, fontSize: 13, lineHeight: 19 },
+
+  /* CTA card */
+  ctaCard: {
+    borderRadius: radius.md, padding: 16, gap: 6,
+    backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
+    alignItems: "center",
+  },
+  ctaCardText: { color: palette.text, fontSize: 14, fontWeight: "600", textAlign: "center" },
 });

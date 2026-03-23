@@ -53,3 +53,25 @@ export async function consumeFreePass(ownerId) {
   // This allows the user to view the insight on multiple devices/sessions
   // within the 48-hour window. No-op if pass already expired.
 }
+
+// --- Action feedback (HiTL) ---
+
+export function getActionFeedbackKey(ownerId) {
+  return redisKey("action_feedback", ownerId);
+}
+
+export async function storeActionFeedback(ownerId, actionId, response) {
+  const key = getActionFeedbackKey(ownerId);
+  const entry = JSON.stringify({ actionId, response, timestamp: Date.now() });
+  await redis(["RPUSH", key, entry]);
+  await redis(["EXPIRE", key, String(60 * 60 * 24 * 90)]); // 90-day TTL
+}
+
+export async function getActionFeedback(ownerId) {
+  const key = getActionFeedbackKey(ownerId);
+  const raw = await redis(["LRANGE", key, "0", "-1"]);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r) => { try { return JSON.parse(r); } catch { return null; } })
+    .filter(Boolean);
+}

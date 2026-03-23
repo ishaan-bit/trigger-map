@@ -280,6 +280,10 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       .replace(/[\u200b-\u200f\ufeff]/g, "") // strip zero-width chars
       .replace(/(?:^|\n)\s*\d+\.\s*/g, "\n") // strip numbered list prefixes (1. 2. 3.)
       .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "") // strip control chars
+      .replace(/\b(?:END OF (?:ANSWER|RESPONSE|OUTPUT)|<\/?(?:answer|response|output)>)\s*/gi, "") // strip end markers
+      .replace(/\bthis user\b/gi, "you")  // convert 3rd person to 2nd person
+      .replace(/\bthe user\b/gi, "you")
+      .replace(/\btheir (?=emotion|trigger|pattern|mood|feeling|week|day|log)/gi, "your ")
       .trim();
 
     // Strip prompt echo lines the model may repeat back

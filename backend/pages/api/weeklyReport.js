@@ -1,10 +1,11 @@
 import { getWeeklyAggregates } from "@/services/aggregationService.js";
 import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { generateInsight } from "@/ai/generateInsight.js";
+import { generateActions } from "@/services/actionEngine.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredLlmInsight, hasFreePass } from "@/services/reportStore.js";
+import { getStoredLlmInsight, hasFreePass, getActionFeedback } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -36,23 +37,27 @@ export default async function handler(req, res) {
 
     const isAuthenticated = Boolean(user);
 
-    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, first-free check, free pass
-    const [aggregates, allAggregates, subscription, llmInsight, firstFreeAvailable, freePass] = await Promise.all([
+    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, first-free check, free pass, action feedback
+    const [aggregates, allAggregates, subscription, llmInsight, firstFreeAvailable, freePass, actionFeedback] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
       getStoredLlmInsight(ownerId),
       isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
       isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
+      getActionFeedback(ownerId),
     ]);
 
     const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
     const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated, subscription });
 
+    // Previous week aggregates (days 8-14 ago) for delta comparison
+    const previousAggregates = allAggregates.length >= 14 ? allAggregates.slice(-14, -7) : null;
+
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
-    const report = generateWeeklyReport({ aggregates, allAggregates });
+    const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report);
     }
@@ -111,6 +116,10 @@ export default async function handler(req, res) {
         };
       }
     }
+
+    // Generate contextual actions from the report
+    report.actions = generateActions(report);
+    report.actionFeedback = actionFeedback || [];
 
     // Fire-and-forget analytics — don't block the response
     trackServerEvent("weekly_report_viewed", ownerId, { totalMoments: report.totalMoments }).catch(() => {});

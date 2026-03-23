@@ -109,9 +109,72 @@ function concentrationIndex(record) {
   return Number(sumSq.toFixed(3));
 }
 
+// --- Weekly Deltas ---
+
+function computeFrequencyDeltas(current, previous) {
+  const allKeys = new Set([...Object.keys(current), ...Object.keys(previous)]);
+  const deltas = {};
+  for (const key of allKeys) {
+    const curr = current[key] || 0;
+    const prev = previous[key] || 0;
+    if (curr !== prev) {
+      deltas[key] = { current: curr, previous: prev, delta: curr - prev };
+    }
+  }
+  return deltas;
+}
+
+function computeWeeklyDeltas(currentFreqs, previousAggregates) {
+  const prevTriggers = {};
+  const prevEmotions = {};
+  let prevTotal = 0;
+
+  for (const snap of (previousAggregates || []).filter(s => s && s.date)) {
+    prevTotal += Number(snap.total || 0);
+    mergeCounts(prevTriggers, snap.triggers);
+    mergeCounts(prevEmotions, snap.emotions);
+  }
+
+  if (prevTotal === 0) return null;
+
+  return {
+    totalMomentsDelta: currentFreqs.totalMoments - prevTotal,
+    previousTotal: prevTotal,
+    triggerDeltas: computeFrequencyDeltas(currentFreqs.triggerFrequency, prevTriggers),
+    emotionDeltas: computeFrequencyDeltas(currentFreqs.emotionFrequency, prevEmotions),
+  };
+}
+
+function buildChangeHighlights(deltas, report) {
+  if (!deltas) return [];
+  const highlights = [];
+
+  if (deltas.totalMomentsDelta > 0) {
+    highlights.push(`You logged ${deltas.totalMomentsDelta} more moment${deltas.totalMomentsDelta !== 1 ? "s" : ""} than last week.`);
+  } else if (deltas.totalMomentsDelta < 0) {
+    highlights.push(`You logged ${Math.abs(deltas.totalMomentsDelta)} fewer moment${Math.abs(deltas.totalMomentsDelta) !== 1 ? "s" : ""} than last week.`);
+  }
+
+  const triggerDeltas = Object.entries(deltas.triggerDeltas || {}).sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta));
+  if (triggerDeltas.length) {
+    const [trigger, d] = triggerDeltas[0];
+    if (d.delta > 0) highlights.push(`${trigger} appeared ${d.delta} more time${d.delta !== 1 ? "s" : ""} this week.`);
+    else if (d.delta < 0) highlights.push(`${trigger} dropped by ${Math.abs(d.delta)} compared to last week.`);
+  }
+
+  const emotionDeltas = Object.entries(deltas.emotionDeltas || {}).sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta));
+  if (emotionDeltas.length) {
+    const [emotion, d] = emotionDeltas[0];
+    if (d.delta > 0) highlights.push(`${emotion} was felt ${d.delta} more time${d.delta !== 1 ? "s" : ""} than last week.`);
+    else if (d.delta < 0) highlights.push(`${emotion} was felt ${Math.abs(d.delta)} fewer time${Math.abs(d.delta) !== 1 ? "s" : ""} than last week.`);
+  }
+
+  return highlights.slice(0, 3);
+}
+
 // --- Main generator ---
 
-export function generateWeeklyReport({ aggregates = [], allAggregates = null, aiInsight = null } = {}) {
+export function generateWeeklyReport({ aggregates = [], allAggregates = null, previousAggregates = null, aiInsight = null } = {}) {
   const filledAggregates = aggregates.filter((s) => s && s.date);
 
   const triggerFrequency = {};
@@ -245,6 +308,12 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, ai
   const baselineInput = allAggregates || filledAggregates;
   const baselineMetrics = computeBaselineMetrics(baselineInput, rawVolatility);
 
+  // Weekly deltas — compare this week vs previous week
+  const weeklyDeltas = previousAggregates
+    ? computeWeeklyDeltas({ totalMoments, triggerFrequency, emotionFrequency }, previousAggregates)
+    : null;
+  const changeHighlights = buildChangeHighlights(weeklyDeltas, { topTrigger, topEmotion });
+
   return {
     topTrigger,
     topEmotion,
@@ -275,6 +344,8 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, ai
     totalMoments,
     dailyAggregates: filledAggregates,
     baselineMetrics,
+    weeklyDeltas,
+    changeHighlights,
     aiInsight,
   };
 }

@@ -216,3 +216,11 @@ export function unregisterPushToken({ deviceId }, authToken) {
     token: authToken,
   });
 }
+
+export function submitActionFeedback(actionId, response, deviceId, token) {
+  return fetchJson("/actions", {
+    method: "POST",
+    body: { actionId, response, deviceId },
+    token,
+  });
+}

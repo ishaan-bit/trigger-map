@@ -257,6 +257,32 @@ export function computeBaselineMetrics(aggregates, volatilityScore = null) {
   const stateOfMind = computeStateOfMind(drift, stability, volatilityScore);
   const dailyDrift = computeDailyDrift(aggregates.slice(-RECENT_WINDOW_DAYS), baseline.score);
 
+  // Previous week comparison (days 8-14 ago)
+  let baselineDeltas = null;
+  if (aggregates.length >= 14 && drift !== null) {
+    const prevWeekSlice = aggregates.slice(-14, -7);
+    const prevScores = [];
+    for (const snap of prevWeekSlice) {
+      if (Number(snap.total || 0) === 0) continue;
+      const s = dayScore(snap);
+      if (s !== null) prevScores.push(s);
+    }
+    if (prevScores.length) {
+      const prevRecentAvg = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
+      const prevDrift = Number((prevRecentAvg - baseline.score).toFixed(3));
+      const prevStab = computeStability(prevWeekSlice, baseline.score);
+      baselineDeltas = {
+        deltaDrift: Number((drift - prevDrift).toFixed(3)),
+        deltaStability: prevStab !== null && stability !== null
+          ? Number((stability - prevStab).toFixed(2))
+          : null,
+        previousDrift: prevDrift,
+        previousStability: prevStab,
+        previousRecentAverage: Number(prevRecentAvg.toFixed(2)),
+      };
+    }
+  }
+
   return {
     baseline: {
       score: baseline.score,
@@ -283,5 +309,6 @@ export function computeBaselineMetrics(aggregates, volatilityScore = null) {
     } : null,
     stateOfMind,
     dailyDrift,
+    baselineDeltas,
   };
 }
