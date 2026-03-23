@@ -110,7 +110,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
         }
       }
 
-      // HF phrasing pass on LLM output (batch only)
+      // Polish LLM output — local deterministic cleanup (no HF API by default)
       const firstName = extractFirstName(user?.name);
       if (insight.narrative) {
         const sections = insight.narrative.split(/\n\n/);

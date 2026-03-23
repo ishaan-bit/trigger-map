@@ -1,11 +1,50 @@
 /**
- * HF Phrasing Layer — lightweight text polishing via HuggingFace Inference API.
+ * Phrasing Layer — text polishing for user-facing content.
  *
- * Fallback: returns original text on error, timeout, quality failure, or missing HF_TOKEN.
+ * Local deterministic polisher by default; optional HF API call when explicitly
+ * requested (e.g. via ops console toggle). The local path is fast, reliable,
+ * and never degrades already well-written text.
+ *
+ * Fallback: always returns original text on any failure.
  */
 
-const HF_TIMEOUT_MS = 3000;
+const HF_TIMEOUT_MS = 4000;
 const HF_MODEL = "google/gemma-2b-it";
+
+// ── Local polish (default) ──────────────────────────────────────────────────
+
+/**
+ * Deterministic text polish: fix common artifacts without calling any external API.
+ * Safe to call on every path (live API, batch, console-triggered).
+ */
+function localPolish(text) {
+  if (!text || typeof text !== "string") return text ?? "";
+  return text
+    // Unicode normalization
+    .replace(/\u2014/g, " - ")                 // em dash
+    .replace(/\u2013/g, " - ")                 // en dash
+    .replace(/\u2018|\u2019/g, "'")            // smart single quotes
+    .replace(/\u201c|\u201d/g, '"')            // smart double quotes
+    .replace(/[\u200b-\u200f\ufeff]/g, "")     // zero-width chars
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "") // control chars
+    // Stray formatting
+    .replace(/\*\*/g, "")                       // bold markers
+    .replace(/#{1,3}\s+/g, "")                 // markdown headers
+    .replace(/^\s*[-*•]\s+/gm, "")            // bullet markers
+    // Whitespace
+    .replace(/\s{2,}/g, " ")                   // collapse multiple spaces
+    .replace(/\n{3,}/g, "\n\n")               // collapse excess newlines
+    // Trailing/leading cleanup
+    .replace(/^\s+|\s+$/g, "")                 // trim
+    // Fix common double-period artifacts
+    .replace(/\.{2,}/g, ".")
+    // Fix space before punctuation
+    .replace(/\s+([.,;:!?])/g, "$1")
+    // Fix missing space after punctuation (but not in numbers like 3.5)
+    .replace(/([.!?])([A-Z])/g, "$1 $2");
+}
+
+// ── HF API path (opt-in only) ───────────────────────────────────────────────
 
 // Prompt fragments that indicate the model echoed instructions
 const PROMPT_LEAK_PATTERNS = [
@@ -23,45 +62,40 @@ const PROMPT_LEAK_PATTERNS = [
 
 /**
  * Check if HF output passes quality bar vs the original.
- * Returns true only if the output is clean enough to use.
  */
 function passesQualityGate(original, candidate) {
   if (!candidate || candidate.length < 10) return false;
+  if (candidate.length < original.length * 0.4) return false;
+  if (candidate.length > original.length * 2) return false;
 
-  // Reject if too short (lost >60% of content)
-  if (candidate.length < original.length * 0.35) return false;
-
-  // Reject if way too long (ballooned, likely hallucinated)
-  if (candidate.length > original.length * 2.2) return false;
-
-  // Reject if it contains prompt leak fragments
   for (const pat of PROMPT_LEAK_PATTERNS) {
     if (pat.test(candidate)) return false;
   }
 
-  // Reject if high ratio of non-word characters (garbled output)
+  // Reject if high ratio of non-word characters
   const wordChars = candidate.replace(/[^a-zA-Z0-9\s]/g, "").length;
-  const ratio = wordChars / candidate.length;
-  if (ratio < 0.65) return false;
+  if (wordChars / candidate.length < 0.7) return false;
 
-  // Reject if it has consecutive special chars (garbled)
+  // Reject consecutive special chars
   if (/[^a-zA-Z0-9\s]{4,}/.test(candidate)) return false;
 
-  // Reject if it has orphaned single characters suggesting broken encoding
-  if ((/(?:^|\s)[^aAiI\d](?:\s|$)/g.exec(candidate) || []).length > 2) return false;
-
-  // Reject if it has suspicious repeated characters (e.g. "zzzzz", "????")
+  // Reject repeated characters
   if (/(.)\1{4,}/.test(candidate)) return false;
+
+  // Reject if too many words differ (meaning was likely changed)
+  const origWords = new Set(original.toLowerCase().split(/\s+/));
+  const candWords = candidate.toLowerCase().split(/\s+/);
+  const overlap = candWords.filter(w => origWords.has(w)).length;
+  if (candWords.length > 5 && overlap / candWords.length < 0.3) return false;
 
   return true;
 }
 
 /**
- * Polish a short text block: tighten grammar, shorten, keep meaning.
+ * Call HuggingFace API to polish text. Only used when explicitly enabled.
  * Returns original text on any failure or quality concern.
  */
-export async function phraseText(inputText, opts = {}) {
-  if (!inputText || typeof inputText !== "string") return inputText ?? "";
+async function hfPolish(inputText, opts = {}) {
   const token = process.env.HF_TOKEN;
   if (!token) return inputText;
 
@@ -70,16 +104,9 @@ export async function phraseText(inputText, opts = {}) {
     ? `\nIf natural, address the reader as "${firstName}" once (not forced).`
     : "";
 
-  const prompt = `Rewrite the following text to be:
-- clear and natural
-- concise (max 2 sentences)
-- grammatically correct
+  const prompt = `Rewrite the following text to be clearer and more natural. Keep it concise (max 2 sentences). Use correct grammar and spelling.
 
-DO NOT:
-- add new information
-- change numbers
-- change meaning
-- introduce new insights${nameInstruction}
+Do not add new information. Do not change numbers or meaning.${nameInstruction}
 
 Text:
 ${inputText}`;
@@ -98,7 +125,7 @@ ${inputText}`;
         },
         body: JSON.stringify({
           inputs: prompt,
-          parameters: { max_new_tokens: 120, temperature: 0.3 },
+          parameters: { max_new_tokens: 120, temperature: 0.2 },
         }),
         signal: controller.signal,
       }
@@ -111,8 +138,7 @@ ${inputText}`;
       : data?.generated_text?.trim();
     if (!generated || generated.length < 5) return inputText;
 
-    // Strip the prompt echo — HF text-generation returns full input+output.
-    // Try several echo markers to find where the original input ended.
+    // Strip echo
     let cleaned = generated;
     const echoMarkers = ["Text:\n", "Text: \n", "Text:\r\n", "\nText:"];
     for (const marker of echoMarkers) {
@@ -123,35 +149,46 @@ ${inputText}`;
       }
     }
 
-    // If we still have the full prompt, try splitting on the original text
+    // If still includes prompt, try splitting on original
     if (cleaned.length > inputText.length * 1.8 && cleaned.includes(inputText)) {
-      const afterOriginal = cleaned.slice(cleaned.lastIndexOf(inputText) + inputText.length).trim();
-      if (afterOriginal.length >= 10) cleaned = afterOriginal;
+      const after = cleaned.slice(cleaned.lastIndexOf(inputText) + inputText.length).trim();
+      if (after.length >= 10) cleaned = after;
     }
 
-    // Strip common HF artifacts
-    cleaned = cleaned
-      .replace(/^\s*[-*•]\s*/gm, "")          // leading bullet markers
-      .replace(/\*\*/g, "")                     // bold markers
-      .replace(/#{1,3}\s*/g, "")               // headers
-      .replace(/[\u200b-\u200f\ufeff]/g, "")   // zero-width chars
-      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "") // control chars
-      .replace(/\u2014/g, ", ")                // em dash
-      .replace(/\u2013/g, ", ")                // en dash
-      .replace(/\u2018|\u2019/g, "'")          // smart single quotes
-      .replace(/\u201c|\u201d/g, '"')          // smart double quotes
-      .replace(/\s{2,}/g, " ")                 // collapse double spaces
-      .trim();
+    // Clean artifacts then run through local polish too
+    cleaned = localPolish(cleaned);
 
-    // Quality gate: reject garbled, truncated, or hallucinated output
     if (!passesQualityGate(inputText, cleaned)) return inputText;
-
     return cleaned;
   } catch {
     return inputText;
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Polish a text block. By default uses fast local deterministic cleaning.
+ * Set opts.useHf = true to also run through HuggingFace API (with fallback).
+ *
+ * @param {string} inputText
+ * @param {{ firstName?: string|null, useHf?: boolean }} [opts]
+ * @returns {Promise<string>}
+ */
+export async function phraseText(inputText, opts = {}) {
+  if (!inputText || typeof inputText !== "string") return inputText ?? "";
+
+  // Always run local polish first
+  let result = localPolish(inputText);
+
+  // Only call HF if explicitly opted in
+  if (opts.useHf) {
+    result = await hfPolish(result, opts);
+  }
+
+  return result;
 }
 
 /**
@@ -167,9 +204,8 @@ export function extractFirstName(displayName) {
 
 /**
  * Batch-phrase an array of text strings.
- * Processes sequentially to respect HF rate limits.
  * @param {string[]} texts
- * @param {{ firstName?: string|null }} [opts]
+ * @param {{ firstName?: string|null, useHf?: boolean }} [opts]
  * @returns {Promise<string[]>}
  */
 export async function phraseTexts(texts, opts = {}) {

@@ -15,7 +15,7 @@ const JOBS = [
     params: [
       { key: 'force', label: 'Force (ignore 7-day window)', type: 'checkbox', default: false },
       { key: 'personalize', label: 'Personalize (use first name)', type: 'checkbox', default: true },
-      { key: 'skipHf', label: 'Skip HF phrasing layer', type: 'checkbox', default: false },
+      { key: 'useHf', label: 'Use HF phrasing (API rewrite)', type: 'checkbox', default: false },
     ],
   },
   {

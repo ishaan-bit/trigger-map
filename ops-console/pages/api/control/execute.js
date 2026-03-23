@@ -63,7 +63,7 @@ export default async function handler(req, res) {
         if (Array.isArray(params?.ownerIds) && params.ownerIds.length) {
           jobParams.ownerIds = params.ownerIds;
         }
-        if (params?.skipHf) jobParams.skipHf = true;
+        if (params?.useHf) jobParams.useHf = true;
         if (params?.personalize === false) jobParams.personalize = false;
         const result = await triggerJob(target, jobParams);
         const duration = Date.now() - startTime;

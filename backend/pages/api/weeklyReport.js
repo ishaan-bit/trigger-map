@@ -124,7 +124,7 @@ export default async function handler(req, res) {
     report.actions = generateActions(report);
     report.actionFeedback = actionFeedback || [];
 
-    // HF phrasing pass on summary + action reasons (1.5s timeout per call, degrades silently)
+    // Local text polish on summary + action reasons (fast, no external API)
     if (report.aiInsight?.summary) {
       report.aiInsight.summary = await phraseText(report.aiInsight.summary, { firstName });
       for (const a of report.actions) {
