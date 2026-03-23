@@ -41,7 +41,7 @@ export function generateActions(report) {
     actions.push({
       id: `friction-${f2.trigger}-${f2.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${f2.trigger} brings ${f2.emotion}`,
+      title: `Notice when ${f2.trigger} leads to ${f2.emotion}`,
       reason: `This pairing appeared ${f2.count} times. Awareness is the first step.`,
       trigger: f2.trigger,
       emotion: f2.emotion,
@@ -104,7 +104,7 @@ export function generateActions(report) {
     actions.push({
       id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${topPair.trigger} brings ${topPair.emotion}`,
+      title: `Notice when ${topPair.trigger} leads to ${topPair.emotion}`,
       reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week. Your most common combo.`,
       trigger: topPair.trigger,
       emotion: topPair.emotion,

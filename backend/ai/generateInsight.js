@@ -119,7 +119,7 @@ function buildEmergingSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`Good news: ${r.trigger} seems to bring you back to ${r.emotion}. That's worth protecting.`);
+    parts.push(`Good news: ${r.trigger} seems to bring you back to feeling ${r.emotion}. That's worth protecting.`);
   }
 
   if (bm?.drift?.direction === "declining") {
@@ -151,7 +151,7 @@ function buildModerateSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`On the flip side, ${r.trigger} kept bringing ${r.emotion}, which is a good anchor.`);
+    parts.push(`On the flip side, ${r.trigger} kept bringing you ${r.emotion}, which is a good anchor.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -187,7 +187,7 @@ function buildStrongSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`${r.trigger} has been a consistent source of ${r.emotion} for you.`);
+    parts.push(`${r.trigger} has been consistently bringing you ${r.emotion}.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -203,7 +203,7 @@ function buildStrongSummary(report, firstName) {
   }
 
   if (bm?.recoveryLatency) {
-    parts.push(`When things dip, you tend to ${bm.recoveryLatency.label}.`);
+    parts.push(`When things dip, you tend to ${bm.recoveryLatency.label}. That's a good sign.`);
   }
 
   const sn = streakNote(report.positiveStreak, report.negativeStreak);
@@ -285,7 +285,7 @@ function buildWhatWorking(report) {
   const items = [];
   for (const r of (report.regulators || []).slice(0, 3)) {
     items.push({
-      text: `${r.trigger} tends to bring you ${r.emotion}`,
+      text: `${r.trigger} tends to leave you feeling ${r.emotion}`,
       trigger: r.trigger,
       emotion: r.emotion,
       count: r.count,
@@ -316,7 +316,7 @@ function buildWhereToFocus(report) {
     items.push({ text: "Your emotional tone has dipped below your usual baseline this week" });
   }
   if (bm?.recoveryLatency?.days > 3) {
-    items.push({ text: `It's been taking a few days to bounce back after tough spots. ${bm.recoveryLatency.label}` });
+    items.push({ text: "It's been taking a few days to bounce back after tough spots" });
   }
   return items.length > 0 ? items : null;
 }
