@@ -8,7 +8,7 @@ const JOBS = [
   {
     id: 'generateWeeklyReports',
     label: 'Generate Weekly Reports',
-    description: 'Batch generate rule-based weekly insights for all users. Safe to run — skips users with recent reports unless Force is checked.',
+    description: 'Batch generate rule-based weekly insights, action cards, deltas, and change highlights for all users. Skips users with recent reports unless Force is checked.',
     danger: false,
     source: 'backend',
     params: [
@@ -18,7 +18,7 @@ const JOBS = [
   {
     id: 'generateLlmInsights',
     label: 'Generate LLM Insights',
-    description: 'Generate premium LLM-based insights for all eligible signed-in users.',
+    description: 'Generate premium LLM-based narratives for all eligible signed-in users. Signals now include deltas, action engine output, and change highlights.',
     danger: false,
     usesLlm: true,
     source: 'local',
@@ -31,7 +31,7 @@ const JOBS = [
   {
     id: 'generateFreePass',
     label: 'Generate Free Pass + LLM Insights',
-    description: 'Bulk LLM insight generation + 48h free-pass grant for all eligible users.',
+    description: 'Bulk LLM insight generation + 48h free-pass grant for all eligible users. Includes enhanced signals (deltas, actions, highlights).',
     danger: true,
     usesLlm: true,
     source: 'local',
@@ -163,7 +163,7 @@ function formatDuration(ms) {
 
 function summarizeJobResult(result) {
   if (!Array.isArray(result)) return null;
-  let generated = 0, skipped = 0, errored = 0;
+  let generated = 0, skipped = 0, errored = 0, totalActions = 0, withDeltas = 0;
   const skipReasons = {};
   for (const r of result) {
     if (r.skipped) {
@@ -174,9 +174,11 @@ function summarizeJobResult(result) {
       errored++;
     } else {
       generated++;
+      if (r.report?.actionsCount) totalActions += r.report.actionsCount;
+      if (r.report?.hasDeltaData) withDeltas++;
     }
   }
-  return { total: result.length, generated, skipped, errored, skipReasons };
+  return { total: result.length, generated, skipped, errored, skipReasons, totalActions, withDeltas };
 }
 
 function RunLogEntry({ entry, defaultOpen }) {
@@ -227,6 +229,8 @@ function RunLogEntry({ entry, defaultOpen }) {
             {summary.generated > 0 && <span style={{ color: 'var(--green)' }}>{summary.generated} generated</span>}
             {summary.skipped > 0 && <span>{summary.skipped} skipped</span>}
             {summary.errored > 0 && <span style={{ color: 'var(--red)' }}>{summary.errored} errored</span>}
+            {summary.totalActions > 0 && <span style={{ color: '#a78bfa' }}>{summary.totalActions} actions</span>}
+            {summary.withDeltas > 0 && <span style={{ color: '#60a5fa' }}>{summary.withDeltas} Δ</span>}
           </span>
         )}
         {!summary && !ok && (
@@ -300,7 +304,15 @@ function RunLogEntry({ entry, defaultOpen }) {
                             {generated && r.report && (
                               <span>
                                 <span style={{ color: 'var(--accent)' }}>{r.report.confidence}</span>
-                                {r.report.summary && ` — ${r.report.summary.slice(0, 80)}${r.report.summary.length > 80 ? '...' : ''}`}
+                                {r.report.actionsCount > 0 && (
+                                  <span style={{ color: 'var(--green)', marginLeft: 6 }}>
+                                    {r.report.actionsCount} actions
+                                  </span>
+                                )}
+                                {r.report.hasDeltaData && (
+                                  <span style={{ color: '#a78bfa', marginLeft: 6 }}>Δ</span>
+                                )}
+                                {r.report.summary && ` — ${r.report.summary.slice(0, 60)}${r.report.summary.length > 60 ? '...' : ''}`}
                               </span>
                             )}
                           </td>

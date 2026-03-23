@@ -11,11 +11,12 @@
 3. [Daily Aggregation](#3-daily-aggregation)
 4. [Pattern Engine (patternEngine.js)](#4-pattern-engine)
 5. [Baseline Engine (baselineEngine.js)](#5-baseline-engine)
-6. [Rule-Based Insight Generation (generateInsight.js)](#6-rule-based-insight-generation)
-7. [LLM Insight Generation (generateLlmInsight.js)](#7-llm-insight-generation)
-8. [Weekly Report API Flow](#8-weekly-report-api-flow)
-9. [Insights Screen Rendering (WeeklyReportScreen.js)](#9-insights-screen-rendering)
-10. [Access Tiers & Gating](#10-access-tiers--gating)
+6. [Action Engine (actionEngine.js)](#6-action-engine)
+7. [Rule-Based Insight Generation (generateInsight.js)](#7-rule-based-insight-generation)
+8. [LLM Insight Generation (generateLlmInsight.js)](#8-llm-insight-generation)
+9. [Weekly Report API Flow](#9-weekly-report-api-flow)
+10. [Insights Screen Rendering (WeeklyReportScreen.js)](#10-insights-screen-rendering)
+11. [Access Tiers & Gating](#11-access-tiers--gating)
 
 ---
 
@@ -98,7 +99,7 @@ Redis key: triggermap:daily:{ownerId}:{YYYY-MM-DD}
 
 **File:** `backend/services/patternEngine.js`
 
-`generateWeeklyReport({ aggregates, allAggregates, aiInsight })` — the core analysis function. Takes 7-day aggregates (and optionally 45-day for baseline) and computes everything.
+`generateWeeklyReport({ aggregates, allAggregates, previousAggregates })` — the core analysis function. Takes 7-day aggregates, optionally 45-day for baseline, and optionally the previous week's aggregates (days 8–14 ago) for delta comparisons.
 
 ### Variables Computed
 
@@ -212,6 +213,31 @@ Computed by the **Baseline Engine** (see next section). The pattern engine calls
 const baselineInput = allAggregates || filledAggregates;
 const baselineMetrics = computeBaselineMetrics(baselineInput, rawVolatility);
 ```
+
+#### Weekly Deltas (v78)
+
+**`computeWeeklyDeltas(currentFreqs, previousAggregates)`** — Compares this week's frequency maps against the previous week (days 8–14 ago). Returns `null` if no previous data.
+
+**`weeklyDeltas` output:**
+
+| Field                | Type   | Description                                       |
+|----------------------|--------|---------------------------------------------------|
+| `totalMomentsDelta`  | number | Change in total moments vs last week              |
+| `previousTotal`      | number | Last week's total moment count                    |
+| `triggerDeltas`      | object | `{ [trigger]: { current, previous, delta } }` — only changed triggers |
+| `emotionDeltas`      | object | `{ [emotion]: { current, previous, delta } }` — only changed emotions |
+
+**`computeFrequencyDeltas(current, previous)`** — Generic comparator for two frequency maps. Returns per-key `{ current, previous, delta }` for keys that changed.
+
+#### Change Highlights (v78)
+
+**`buildChangeHighlights(deltas, report)`** — Generates up to 3 human-readable highlight sentences:
+
+1. Total moments compared to last week ("You logged N more/fewer moments than last week")
+2. Biggest trigger change ("work appeared N more times" / "travel dropped by N")
+3. Biggest emotion change ("You felt calm N more times" / "frustrated showed up N fewer times")
+
+Only computed when `weeklyDeltas` is available.
 
 ---
 
@@ -356,13 +382,76 @@ For each day in the last 7 days with logged data:
   stability:       { score, label } | null,
   recoveryLatency: { days, label } | null,
   stateOfMind:     string | null,
-  dailyDrift:      [{ date, score, deviation }]
+  dailyDrift:      [{ date, score, deviation }],
+  baselineDeltas:  { deltaDrift, deltaStability, previousDrift, previousStability, previousRecentAverage } | null,
 }
 ```
 
+### Baseline Deltas (v78)
+
+Computed when `aggregates.length >= 14` and drift is available. Compares the current 7-day window against the **previous 7-day window** (days 8–14 ago):
+
+| Field                    | Type         | Description                                               |
+|--------------------------|--------------|-----------------------------------------------------------|
+| `deltaDrift`             | number       | This week's drift minus last week's drift                 |
+| `deltaStability`         | number\|null | This week's stability minus last week's stability         |
+| `previousDrift`          | number       | Last week's drift value                                   |
+| `previousStability`      | number\|null | Last week's stability score                               |
+| `previousRecentAverage`  | number       | Last week's 7-day average emotion score                   |
+
+Used by the MirrorTab's `DeltaChip` arrows (↑/↓) to indicate week-over-week direction for State of Mind and Stability.
+
 ---
 
-## 6. Rule-Based Insight Generation
+## 6. Action Engine
+
+**File:** `backend/services/actionEngine.js`
+
+`generateActions(report)` — Rule-based engine that produces 3–5 contextual behavioral actions from the full weekly report.
+
+### Action Meta
+
+Maps action types to display metadata:
+
+| Type         | Icon | Label        |
+|--------------|------|--------------|
+| `regulate`   | 🌿   | "Try this"   |
+| `awareness`  | 👁️   | "Notice"     |
+| `experiment` | 🧪   | "Experiment" |
+
+### Strategies (5 rules, evaluated in order)
+
+| # | Strategy                       | Type         | Input Fields Used                                        |
+|---|--------------------------------|--------------|----------------------------------------------------------|
+| 1 | Friction + Regulator pairing   | `regulate`   | `frictionZones[0]`, `regulators[0]`                      |
+| 2 | Repeated uncountered friction  | `awareness`  | `frictionZones[1]`                                        |
+| 3 | Drift-based check-in           | `awareness`  | `baselineMetrics.drift.direction === 'declining'`         |
+| 4 | Rising trigger alert           | `awareness`  | `weeklyDeltas.triggerDeltas` (triggers with `delta >= 2`) |
+| 5 | Stability reinforcement        | `regulate`   | `regulators` (≥2) and drift not declining                 |
+
+### Action Object Shape
+
+```js
+{
+  id:       string,    // Unique identifier
+  type:     string,    // 'regulate' | 'awareness' | 'experiment'
+  title:    string,    // Human-readable action title
+  reason:   string,    // Why this action was suggested
+  trigger:  string?,   // Related trigger (if applicable)
+  emotion:  string?,   // Related emotion (if applicable)
+  icon:     string,    // Emoji icon from ACTION_META
+  category: string,    // Display label from ACTION_META
+  order:    number,    // Position in the action list
+}
+```
+
+### HiTL Feedback Loop
+
+Users respond to each action with **tried** or **skipped**. Feedback is stored via `POST /api/actions` with `{ actionId, response }` and persisted in Redis (`RPUSH`, 90-day TTL). Feedback data feeds back into the ops console's Action Engine (HiTL) metrics panel.
+
+---
+
+## 7. Rule-Based Insight Generation
 
 **File:** `backend/ai/generateInsight.js`
 
@@ -423,7 +512,7 @@ Array of items:
 
 ---
 
-## 7. LLM Insight Generation
+## 8. LLM Insight Generation
 
 **File:** `backend/ai/generateLlmInsight.js`
 
@@ -494,7 +583,7 @@ Up to 5 attempts to get 3 valid sections. Keeps the best result across attempts.
 
 ---
 
-## 8. Weekly Report API Flow
+## 9. Weekly Report API Flow
 
 **File:** `backend/pages/api/weeklyReport.js`
 
@@ -513,19 +602,25 @@ GET /api/weeklyReport?deviceId=xxx
 4. `getStoredLlmInsight(ownerId)` — cached LLM insight from Redis
 5. `isFirstAiFreeAvailable(ownerId)` — first-free eligibility
 6. `hasFreePass(ownerId)` — free pass check
+7. `getActionFeedback(ownerId)` — stored HiTL action responses (tried/skipped)
 
 ### Report Assembly
 
-1. `generateWeeklyReport({ aggregates, allAggregates })` — pattern engine builds the full report
-2. If user has access to rule-based insights AND has moments → `generateInsight(report)` runs and attaches as `report.aiInsight`
-3. LLM insight attached conditionally (see Access Tiers)
+1. Compute `previousAggregates` from `allAggregates.slice(-14, -7)` (previous week) if ≥ 14 days available
+2. `generateWeeklyReport({ aggregates, allAggregates, previousAggregates })` — pattern engine builds the full report with deltas and change highlights
+3. If user has access to rule-based insights AND has moments → `generateInsight(report)` runs and attaches as `report.aiInsight`
+4. `generateActions(report)` — action engine produces 3–5 contextual actions, attached as `report.actions`
+5. `actionFeedback` attached to response for the ActionsTab's feedback state
+6. LLM insight attached conditionally (see Access Tiers)
 
 ### Cron/Scheduled Jobs
 
 **`generateWeeklyReports.js`** — Batch job to pre-compute and cache rule-based reports for all users:
 - Runs per-owner with concurrency of 5
 - Skips if last generation was within 7 days (unless `--force`)
-- Stores in Redis: summary, micro-experiment, confidence, baseline fields (score, drift, stability, recovery)
+- Now also runs `generateActions(report)` and stores action metadata (count, types)
+- Passes `previousAggregates` for delta computation
+- Stores in Redis: summary, micro-experiment, confidence, baseline fields (score, drift, stability, recovery), actionsCount, actionTypes, hasDeltaData, changeHighlightsCount
 
 **`generateLlmInsights.js`** — Batch job for LLM insights:
 - Runs per-owner, sequential
@@ -537,13 +632,13 @@ GET /api/weeklyReport?deviceId=xxx
 
 ---
 
-## 9. Insights Screen Rendering
+## 10. Insights Screen Rendering
 
 **File:** `mobile/screens/WeeklyReportScreen.js`
 
 ### Screen Architecture
 
-The Insights screen is a scrollable view with a shared header, a 3-tab pill selector, and conditional content.
+The Insights screen is a scrollable view with a shared header, a **4-tab pill selector**, and conditional content.
 
 ```
 ScreenShell (loading state, retry, background glow)
@@ -553,8 +648,8 @@ ScreenShell (loading state, retry, background glow)
     ├── Error State (if API fails)
     ├── Starter State (if confidence = "too_early")
     └── Main Content (if confidence > "too_early")
-        ├── TabBar (3 pills)
-        └── [SummaryTab | PatternsTab | AnalyticsTab]
+        ├── TabBar (4 pills)
+        └── [MirrorTab | ThisWeekTab | ActionsTab | PremiumTab]
 ```
 
 ### Hero Header (always visible when report exists)
@@ -570,92 +665,72 @@ ScreenShell (loading state, retry, background glow)
 
 ### Tab Bar
 
-Three pills: **📊 Your Week** | **🧩 Patterns** | **📈 Analytics**
+Four pills: **🪞 Mirror** | **📊 This Week** | **⚡ Actions** | **✨ Premium**
+
+Default tab: `"mirror"`.
+
+### Shared Sub-Components
+
+| Component         | Description                                                        |
+|-------------------|--------------------------------------------------------------------|
+| `DeltaChip`       | Shows ↑/↓ colored chip for week-over-week changes. Props: `value`, `label`, `inverted`. Green for positive, red for negative. |
+| `TabBar`          | Pill-style tab selector with active highlight                      |
+| `AnimatedSection` | Fade-in + slide-up wrapper with configurable stagger delay         |
+| `NarrativeCard`   | Pattern card showing trigger→emotion pair items with icon and colored border |
+| `LockedSection`   | Gradient overlay + lock icon + CTA for gated content               |
+| `InsightCard`     | Parsed LLM insight section card with colored left border           |
+| `SectionHeader`   | Section title with optional LIVE/WEEKLY badge                      |
+| `HBar`            | Horizontal frequency bar chart with colored fills                  |
 
 ---
 
-### Tab 1: Your Week (SummaryTab)
+### Tab 1: Mirror (MirrorTab) — Persistent identity view
 
-Rendered top-to-bottom in this order:
+The "who you are" tab — shows stable patterns and baselines that persist across weeks.
 
 #### 1. State of Mind Hero Card
 - **Shows when:** `baselineMetrics.stateOfMind` exists
 - **Data:** `bm.stateOfMind` (label), `bm.drift.direction` (sub-text)
 - **Visual:** Accent-bordered card with "HOW YOU'RE DOING" kicker
+- **Delta:** `DeltaChip` showing `baselineDeltas.deltaDrift` (↑/↓ vs last week)
 - **Sub-text logic:**
   - `stable` → "Tracking close to your personal baseline."
   - `improving` → "Trending a bit better than your usual."
   - `declining` → "A bit below your usual — temporary dips are normal."
 
-#### 2. Human Summary Card
-- **Shows when:** `report.aiInsight.summary` exists
-- **Data:** Rule-based summary text
-- **Visual:** Card with accent left border, plain text
+#### 2. Core Patterns (NarrativeCards)
+- **Shows when:** Regulators or friction zones exist
+- **Components:** Two NarrativeCards:
+  - "What helps" (🌿, green border) — regulator pairs: `"{Trigger} brings you {emotion} ({count}×)"`
+  - "Friction zones" (🔥, red border) — friction pairs: `"{Trigger} tends to leave you {emotion} ({count}×)"`
 
-#### 3. What's Working (NarrativeCard)
-- **Shows when:** `aiInsight.whatWorking` has items, OR `report.regulators` has items
-- **Data:** Array of `{ trigger, emotion, count }` items
-- **Visual:** 🌿 icon, green left border. Each item rendered as: `"{Trigger} brings you {emotion} ({count}×)"`
+#### 3. Stability & Recovery
+- **Shows when:** `baselineMetrics.stability` exists
+- **Data:** Stability label, recovery latency label
+- **Delta:** `DeltaChip` showing `baselineDeltas.deltaStability` (↑/↓ vs last week)
 
-#### 4. Worth Noticing (NarrativeCard)
-- **Shows when:** `aiInsight.whereToFocus` has items, OR `report.frictionZones` has items
-- **Data:** Array of friction zone items
-- **Visual:** 🔥 icon, red left border. Each item: `"{Trigger} tends to leave you {emotion} ({count}×)"`
+#### 4. Change Highlights
+- **Shows when:** `changeHighlights` array has items
+- **Data:** Up to 3 human-readable sentences from `buildChangeHighlights()`
+- **Visual:** Bullet list with highlight icon
 
-#### 5. Try This Week (Experiment Card)
-- **Shows when:** `aiInsight.microExperiment` exists
-- **Data:** Micro-experiment text
-- **Visual:** Card with green left border, "Try this week" pill label
-
-#### 6. LLM Insight Section
-Conditional rendering based on user tier (see Access Tiers). Possible states:
-
-| User State            | What Renders                                                              |
-|-----------------------|---------------------------------------------------------------------------|
-| Anonymous             | "Unlock personalised insights" + Sign in button                           |
-| Premium + has insight | 3 InsightCards: 🔍 What stood out, 🧩 What may be contributing, 💡 One thing to try. Each parsed from the LLM narrative. Shows "Updated X days ago" footer. |
-| Premium + no insight  | "Your insight is on its way" spinner state                                |
-| Free + first-free/pass| All 3 InsightCards shown + "Free preview" label + "Future insights require Premium" hint |
-| Free + teaser         | Truncated first section with fade gradient + "See the full picture" CTA   |
-| Free + enough data    | "Your insight is ready to unlock" + Upgrade button                        |
-| Free + not enough     | "Building your insight — log {N} more moments"                            |
-
-**InsightCard component:** Animated slide-in card with colored left border. Each card has an icon, uppercase label, and body text. Colors: What stood out = accent, Contributing = purple, Try = green.
+#### 5. Confidence Badge
+- **Shows when:** Always (when report exists)
+- **Data:** `dataQuality.totalMoments`, `dq.daysLogged`
 
 ---
 
-### Tab 2: Patterns (PatternsTab)
+### Tab 2: This Week (ThisWeekTab) — Temporal data
 
-#### 1. Your Baseline
-- **Shows when:** `bm.baseline.reliable` is true (OR shows "still learning" placeholder)
-- **Data:** Baseline score (/5), recent average (/5), drift label, stability label, recovery label, days used
-- **Visual:** Two-column stat layout. Scores colored: green (≥ 3.5), yellow (≥ 2.5), red (< 2.5)
-- **Explainer:** "Your baseline is learned from {N} days of logging..."
+The "what happened" tab — shows this week's specific data, charts, and weekly summary.
 
-#### 2. Drift from Baseline (Timeline)
-- **Shows when:** `bm.dailyDrift` has ≥ 2 entries
-- **Data:** Array of `{ date, deviation }` for last 7 days
-- **Visual:** Horizontal scrolling day cards. Each shows `+0.3` / `-0.5` colored green/red/muted. Day name below.
-- **Hint text:** "How your daily emotional tone compared to your personal baseline."
+#### 1. Weekly Summary Card
+- **Shows when:** `aiInsight.summary` exists
+- **Data:** Rule-based summary text
+- **Visual:** Card with accent left border, plain text
+- **Delta:** Shows `weeklyDeltas.totalMomentsDelta` beneath card (e.g., "+3 vs last week")
 
-#### 3. Emotional Loops
-- **Shows when:** Regulators or friction zones exist
-- **Components:** Two NarrativeCards — "Friction zones" (🔥) and "What helps" (🌿)
-
-#### 4. Trigger → Emotion Correlations
-- **Shows when:** Signed in AND `hasEnoughForPairings` AND correlations exist
-- **Gated:** Locked behind sign-in for anonymous users
-- **Data:** Top 5 triggers, each showing up to 3 emotion chips with counts
-- **Visual:** Each trigger name colored by trigger color. Emotion chips with tinted backgrounds: `{emoji} {emotion} ×{count}`
-
-#### 5. Stability
-- **Shows when:** `hasEnoughForStability` is true
-- **Data:** `volatilityLabel`, `volatilityScore`, `mostStableDay`
-- **Visual:** Two metric cards side by side
-  - "Day-to-day shifts" — label colored by severity
-  - "Steadiest day" — formatted date
-
-#### 6. Emotional Tone (Trajectory)
+#### 2. Emotional Tone (Trajectory)
 - **Shows when:** `weeklyEmotionTrajectory` has ≥ 1 entry
 - **Data:** Day-by-day score mapped through `scoreTone()`:
   - ≥ 4.2 → 🌟 Great (purple)
@@ -666,41 +741,104 @@ Conditional rendering based on user tier (see Access Tiers). Possible states:
 - **Visual:** Horizontal scrolling day cards with emoji, label, and day name
 - **Includes:** `trajectoryNote` if available
 
----
+#### 3. Drift from Baseline (Timeline)
+- **Shows when:** `bm.dailyDrift` has ≥ 2 entries
+- **Data:** Array of `{ date, deviation }` for last 7 days
+- **Visual:** Horizontal scrolling day cards. Each shows `+0.3` / `-0.5` colored green/red/muted. Day name below.
 
-### Tab 3: Analytics (AnalyticsTab)
-
-#### 1. Emotions Breakdown
+#### 4. Emotions Breakdown
 - **Data:** Top 5 emotions from `emotionFrequency`
-- **Visual:** Horizontal bar chart (`HBar` component). Bar color matches emotion color. Top entry highlighted.
+- **Visual:** Horizontal bar chart (`HBar`). Bar color matches emotion color.
 
-#### 2. Triggers Breakdown
+#### 5. Triggers Breakdown
 - **Data:** Top 9 triggers from `triggerFrequency`
 - **Visual:** Horizontal bar chart. Bar color matches trigger color.
 
-#### 3. When You Logged
+#### 6. When You Logged
 - **Shows when:** `hasEnoughForRhythm` AND time entries exist
 - **Data:** `timeOfDayPatterns`
 - **Visual:** Horizontal bars with time-of-day icons (🌅 morning, ☀️ afternoon, 🌆 evening, 🌙 night)
 
-#### 4. Energy Flow
-- **Shows when:** Signed in AND energy entries exist
-- **Data:** `energyDistribution` — steady/balanced/tense/drained/uplifted counts
-- **Visual:** Horizontal bars. Colors: steady=green, balanced=accent, tense=orange, drained=red, uplifted=purple
+#### 7. Trigger → Emotion Correlations
+- **Shows when:** Signed in AND `hasEnoughForPairings` AND correlations exist
+- **Gated:** Locked behind sign-in for anonymous users
+- **Data:** Top 5 triggers, each showing up to 3 emotion chips with counts
 
-#### 5. Gut Check (Prediction Accuracy)
+#### 8. Gut Check (Prediction Accuracy)
 - **Shows when:** `predictionAccuracy` exists
 - **Data:** `correct` / `daysCompared`, `rate`
-- **Visual:** Large emoji (🎯 if ≥ 50%, 🔮 otherwise) + title + descriptive copy based on rate tier
+- **Visual:** Large emoji (🎯 if ≥ 50%, 🔮 otherwise) + descriptive copy
 
-#### 6. Baseline Details
-- **Shows when:** `bm.baseline.reliable` is true
-- **Data:** Baseline score, 7-day average, drift value (colored), stability %, recovery days, days used
-- **Visual:** 3-column grid of stats
+#### 9. Try This Week (Experiment Card)
+- **Shows when:** `aiInsight.microExperiment` exists
+- **Data:** Micro-experiment text
+- **Visual:** Card with green left border, "Try this week" pill label
 
 ---
 
-## 10. Access Tiers & Gating
+### Tab 3: Actions (ActionsTab) — **NEW in v78**
+
+The "what to do" tab — surfaces contextual behavioral actions from the Action Engine with a human-in-the-loop feedback mechanism.
+
+#### Action Cards
+- **Shows when:** `report.actions` has items
+- **Data:** Array of action objects from `generateActions(report)`
+- **Each card shows:**
+  - Icon (from `ACTION_META`)
+  - Category label (Try this / Notice / Experiment)
+  - Title (human-readable action)
+  - Reason (why this action was suggested)
+- **Feedback buttons:** "👍 Tried it" / "👎 Skip"
+  - Calls `submitActionFeedback(actionId, response, deviceId, token)` on tap
+  - Tracks `action_feedback` analytics event
+  - Disabled once feedback is submitted for that action (from `report.actionFeedback`)
+
+#### Empty State
+- **Shows when:** No actions available (insufficient data)
+- **Visual:** Encouragement to log more moments
+
+---
+
+### Tab 4: Premium (PremiumTab) — Deep learning / paywall
+
+The "deeper insights" tab — premium-oriented content including behaviour profiles, action effectiveness, and LLM narratives.
+
+#### 1. What Works For You
+- **Shows when:** Regulators exist
+- **Data:** Regulator pairs with effect sizes (count-based)
+- **Visual:** Effect rows showing trigger→emotion with strength indicator
+
+#### 2. Behaviour Profile
+- **Shows when:** `baselineMetrics.baseline.reliable` is true
+- **Data:** Chips for baseline label, stability label, recovery label, volatility label
+- **Visual:** Horizontal chip row with colored badges
+
+#### 3. Action Effectiveness
+- **Shows when:** Any action feedback exists
+- **Data:** Tried/skipped counts from `actionFeedback`
+- **Visual:** Summary with tried vs skipped breakdown
+
+#### 4. Baseline Details
+- **Shows when:** `bm.baseline.reliable` is true
+- **Data:** Baseline score (/5), 7-day average, drift value (colored), stability %, recovery days, days used
+- **Visual:** 3-column grid of stats
+
+#### 5. Personal Insight (LLM)
+Conditional rendering based on user tier:
+
+| User State            | What Renders                                                              |
+|-----------------------|---------------------------------------------------------------------------|
+| Anonymous             | `LockedSection` — "Unlock personalised insights" + Sign in button         |
+| Premium + has insight | 3 InsightCards: 🔍 What stood out, 🧩 What may be contributing, 💡 One thing to try. Shows "Updated X days ago" footer. |
+| Premium + no insight  | "Your insight is on its way" spinner state                                |
+| Free + first-free/pass| All 3 InsightCards shown + "Free preview" label + "Future insights require Premium" hint |
+| Free + teaser         | Truncated first section with fade gradient + "See the full picture" CTA   |
+| Free + enough data    | "Your insight is ready to unlock" + Upgrade button                        |
+| Free + not enough     | "Building your insight — log {N} more moments"                            |
+
+---
+
+## 11. Access Tiers & Gating
 
 ### What Each Tier Sees
 
@@ -711,12 +849,16 @@ Conditional rendering based on user tier (see Access Tiers). Possible states:
 | Micro-experiment         | ❌        | ✅                 | ✅                 |
 | What's working / Focus   | ❌        | ✅                 | ✅                 |
 | Baseline & drift         | ✅        | ✅                 | ✅                 |
+| Weekly deltas & highlights| ✅       | ✅                 | ✅                 |
+| Action cards (ActionsTab)| ✅        | ✅                 | ✅                 |
+| Action feedback (HiTL)  | ❌        | ✅                 | ✅                 |
 | Correlations             | ❌ (locked)| ✅                | ✅                 |
 | Stability                | ❌ (locked)| ✅                | ✅                 |
 | Trajectory               | ❌ (locked)| ✅                | ✅                 |
+| Behaviour profile        | ❌        | ❌                 | ✅                 |
+| Action effectiveness     | ❌        | ❌                 | ✅                 |
 | LLM insight (full)       | ❌        | First-free or pass | ✅                 |
 | LLM insight (teaser)     | ❌        | ✅ (truncated)     | N/A                |
-| Analytics tab (full)     | ✅        | ✅                 | ✅                 |
 
 ### LLM Insight Gating Logic
 
@@ -728,4 +870,4 @@ Conditional rendering based on user tier (see Access Tiers). Possible states:
 
 ---
 
-*Generated from source code as of v73. Files: `baselineEngine.js`, `patternEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`.*
+*Generated from source code as of v78. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`.*

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { generateInsight } from "../ai/generateInsight.js";
 import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationService.js";
 import { generateWeeklyReport } from "../services/patternEngine.js";
+import { generateActions } from "../services/actionEngine.js";
 import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportStore.js";
 
 const INSIGHT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -22,7 +23,8 @@ async function processOwner(ownerId, force) {
 
   const aggregates = await getWeeklyAggregates(ownerId);
   const allAggregates = await getWeeklyAggregates(ownerId, 45);
-  const report = generateWeeklyReport({ aggregates, allAggregates });
+  const previousAggregates = allAggregates.length >= 14 ? allAggregates.slice(-14, -7) : null;
+  const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
   if (!report.totalMoments) {
     return { ownerId, skipped: true, reason: "no-data" };
   }
@@ -33,6 +35,9 @@ async function processOwner(ownerId, force) {
   } catch (aiError) {
     return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
   }
+
+  // Generate action cards from the full report
+  const actions = generateActions(report);
 
   const bm = report.baselineMetrics;
   const payload = {
@@ -49,6 +54,11 @@ async function processOwner(ownerId, force) {
     driftLabel: bm?.drift?.label ?? null,
     stabilityScore: bm?.stability?.score ?? null,
     recoveryDays: bm?.recoveryLatency?.days ?? null,
+    // New v78 fields
+    actionsCount: actions.length,
+    actionTypes: actions.map(a => a.type),
+    hasDeltaData: !!report.weeklyDeltas,
+    changeHighlightsCount: report.changeHighlights?.length ?? 0,
   };
 
   await storeWeeklyInsight(ownerId, payload);
