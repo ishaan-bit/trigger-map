@@ -37,11 +37,13 @@ async function storeLlmInsight(ownerId, payload) {
   await redis(["SET", getLlmInsightKey(ownerId), JSON.stringify(payload)]);
 }
 
-export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}) {
+export async function runGenerateFreePass({ force = false, minMoments = 5, ownerIds } = {}) {
   const envIds = process.env.LLM_OWNER_IDS;
-  const owners = envIds
-    ? envIds.split(',').filter(Boolean)
-    : await listOwnerIds();
+  const owners = Array.isArray(ownerIds) && ownerIds.length > 0
+    ? ownerIds
+    : envIds
+      ? envIds.split(',').filter(Boolean)
+      : await listOwnerIds();
   let scanned = 0;
   let eligible = 0;
   let generated = 0;

@@ -44,6 +44,7 @@ export default async function handler(req, res) {
       result = await runGenerateFreePass({
         force: !!force,
         minMoments: minMoments || 5,
+        ownerIds,
       });
     }
 

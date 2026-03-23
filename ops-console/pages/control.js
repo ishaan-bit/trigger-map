@@ -485,10 +485,10 @@ export default function ControlPage() {
       const data = await res.json();
       const users = data.users || [];
       setEligibleUsers((p) => ({ ...p, [jobId]: users }));
-      // Default: all selected
+      // Default: none selected — user must explicitly pick
       setSelectedUsers((p) => ({
         ...p,
-        [jobId]: new Set(users.map((u) => u.ownerId)),
+        [jobId]: p[jobId] ?? new Set(),
       }));
     } catch {
       setEligibleUsers((p) => ({ ...p, [jobId]: [] }));
@@ -613,10 +613,9 @@ export default function ControlPage() {
     for (const key of Object.keys(stored)) {
       if (!(key in p)) p[key] = stored[key];
     }
-    // If user picker was opened for this job, include selected ownerIds
+    // If user explicitly selected users, include ownerIds filter
     const sel = selectedUsers[job.id];
-    const all = eligibleUsers[job.id];
-    if (sel && all && sel.size > 0 && sel.size < all.length) {
+    if (sel && sel.size > 0) {
       p.ownerIds = [...sel];
     }
     return p;
