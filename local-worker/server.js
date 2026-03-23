@@ -165,6 +165,11 @@ async function handleRequest(req, res) {
     return handleRunJob(req, res, 'generateFreePass.js', 'generateFreePass');
   }
 
+  // POST /rewrite-summaries
+  if (path === '/rewrite-summaries' && req.method === 'POST') {
+    return handleRunJob(req, res, 'rewriteSummaries.js', 'rewriteSummaries');
+  }
+
   // POST /cancel-job
   if (path === '/cancel-job' && req.method === 'POST') {
     const body = await readBody(req);
@@ -333,6 +338,7 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`    POST /pull-model      (pull a model)`);
   console.log(`    POST /run-llm-insights`);
   console.log(`    POST /run-freepass`);
+  console.log(`    POST /rewrite-summaries`);
   console.log(`    POST /cancel-job`);
   console.log(`  Auth: Bearer token required\n`);
 });

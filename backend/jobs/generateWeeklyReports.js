@@ -16,7 +16,7 @@ function windowElapsed(existing) {
 
 const CONCURRENCY = 5;
 
-async function processOwner(ownerId, force, { useHf = false, personalize = true } = {}) {
+async function processOwner(ownerId, force, { personalize = true } = {}) {
   const existing = await getStoredWeeklyInsight(ownerId);
 
   if (!force && !windowElapsed(existing)) {
@@ -45,10 +45,10 @@ async function processOwner(ownerId, force, { useHf = false, personalize = true 
   // Generate action cards from the full report
   const actions = generateActions(report);
 
-  // Polish text: local deterministic by default, HF API only when opted in
-  insight.summary = await phraseText(insight.summary, { firstName, useHf });
+  // Polish text: local deterministic cleanup
+  insight.summary = await phraseText(insight.summary, { firstName });
   for (const a of actions) {
-    a.reason = await phraseText(a.reason, { firstName, useHf });
+    a.reason = await phraseText(a.reason, { firstName });
   }
 
   const bm = report.baselineMetrics;
@@ -82,12 +82,12 @@ async function processOwner(ownerId, force, { useHf = false, personalize = true 
   return { ownerId, report: payload };
 }
 
-export async function runGenerateWeeklyReports({ force = false, ownerIds, useHf = false, personalize = true } = {}) {
+export async function runGenerateWeeklyReports({ force = false, ownerIds, personalize = true } = {}) {
   const startTime = Date.now();
   const owners = Array.isArray(ownerIds) && ownerIds.length > 0
     ? ownerIds
     : await listOwnerIds();
-  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force}${ownerIds ? ', filtered' : ''}${useHf ? ', useHf' : ''}${!personalize ? ', no-personalize' : ''})`);
+  console.log(`[generateWeeklyReports] Starting for ${owners.length} users (force=${force}${ownerIds ? ', filtered' : ''}${!personalize ? ', no-personalize' : ''})`);
 
   // Process in parallel batches
   const results = [];
@@ -95,7 +95,7 @@ export async function runGenerateWeeklyReports({ force = false, ownerIds, useHf 
     const batch = owners.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
       batch.map((ownerId) =>
-        processOwner(ownerId, force, { useHf, personalize }).catch((error) => {
+        processOwner(ownerId, force, { personalize }).catch((error) => {
           console.error(`[generateWeeklyReports] Error for ${ownerId.slice(0, 8)}...: ${error.message}`);
           return { ownerId, skipped: true, reason: error.message || "generation-failed" };
         })

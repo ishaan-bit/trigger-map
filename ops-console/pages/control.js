@@ -15,7 +15,6 @@ const JOBS = [
     params: [
       { key: 'force', label: 'Force (ignore 7-day window)', type: 'checkbox', default: false },
       { key: 'personalize', label: 'Personalize (use first name)', type: 'checkbox', default: true },
-      { key: 'useHf', label: 'Use HF phrasing (API rewrite)', type: 'checkbox', default: false },
     ],
   },
   {
@@ -44,6 +43,18 @@ const JOBS = [
       { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
       { key: 'minMoments', label: 'Min moments', type: 'number', default: 5 },
       { key: 'maxWords', label: 'Max words (total)', type: 'number', default: 150 },
+    ],
+  },
+  {
+    id: 'rewriteSummaries',
+    label: 'Rewrite Summaries (LLM)',
+    description: 'Rewrite stored rule-based weekly summaries using a local LLM model. Polishes the summary text to sound more natural and human. Does not regenerate reports — only rewrites existing text.',
+    danger: false,
+    usesLlm: true,
+    hasUserPicker: true,
+    source: 'local',
+    params: [
+      { key: 'force', label: 'Force (re-rewrite already rewritten)', type: 'checkbox', default: false },
     ],
   },
 ];

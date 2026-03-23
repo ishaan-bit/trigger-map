@@ -44,6 +44,13 @@ export async function runFreePass({ model, force, minMoments, maxWords, ownerIds
   });
 }
 
+export async function runRewriteSummaries({ model, force, ownerIds } = {}) {
+  return workerRequest('/rewrite-summaries', {
+    method: 'POST',
+    body: JSON.stringify({ model, force, ownerIds }),
+  });
+}
+
 export async function cancelWorkerJob(jobName) {
   return workerRequest('/cancel-job', {
     method: 'POST',

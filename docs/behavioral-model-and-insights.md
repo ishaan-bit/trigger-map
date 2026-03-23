@@ -17,9 +17,9 @@
 9. [Weekly Report API Flow](#9-weekly-report-api-flow)
 10. [Insights Screen Rendering (WeeklyReportScreen.js)](#10-insights-screen-rendering)
 11. [Access Tiers & Gating](#11-access-tiers--gating)
-12. [HF Phrasing Layer & Personalization (v80)](#12-hf-phrasing-layer--personalization-v80)
+12. [Text Polish & Personalization (v80–v84)](#12-text-polish--personalization-v80v84)
 13. [Continuity Layer — Recurrence, Streaks & Baseline Language (v81)](#13-continuity-layer--recurrence-streaks--baseline-language-v81)
-14. [Text Quality Hardening (v82–v83)](#14-text-quality-hardening-v82v83)
+14. [Text Quality Hardening (v82–v84)](#14-text-quality-hardening-v82v84)
 
 ---
 
@@ -898,36 +898,52 @@ Conditional rendering based on user tier:
 
 ---
 
-## 12. HF Phrasing Layer & Personalization (v80)
+## 12. Text Polish & Personalization (v80–v84)
 
 ### Phrasing Layer (`backend/utils/phrasingLayer.js`)
 
-A **batch-only** post-processing step that polishes generated text via the HuggingFace Inference API (`google/gemma-2b-it`).
+Deterministic local text polisher that runs on every user-facing text path. Fixes encoding artifacts, smart quotes, stray markdown formatting, and spacing issues without calling any external API.
 
 | Property | Value |
 |----------|-------|
-| Model | `google/gemma-2b-it` |
-| Timeout | 1.5 s |
+| Function | `localPolish()` — regex-based cleanup |
 | Fallback | Returns original text unchanged on any failure |
-| Env var | `HF_TOKEN` (not hardcoded) |
-| Request path? | **No** — only called during batch jobs |
+| Request path? | **Yes** — runs on live API + batch jobs |
 
-**Rules enforced by the prompt:**
-- Max 2 sentences
-- No new information added
-- No numbers changed
-- No meaning altered
+**What it cleans:**
+- Em/en dashes → hyphens
+- Smart quotes → straight quotes
+- Zero-width/control characters → removed
+- Markdown bold, headers, bullet markers → stripped
+- Double spaces, excess newlines, double periods → collapsed
+- Punctuation spacing issues → fixed
 
 ### First-Name Personalization
 
-`extractFirstName(displayName)` takes the user's Google `name` field (stored at sign-in) and returns the first word (≥ 2 chars). When available, the phrasing prompt instructs the model to address the reader by first name once, naturally.
+`extractFirstName(displayName)` takes the user's Google `name` field (stored at sign-in) and returns the first word (≥ 2 chars).
 
-**Where phrasing + personalization runs:**
+**Where text polish + personalization runs:**
 
-| Job | What gets phrased |
-|-----|--------------------|
-| `generateWeeklyReports.js` | `insight.summary`, each `action.reason` |
-| `generateLlmInsights.js` | Each narrative section body (preserves headers) |
+| Path | What gets polished |
+|------|--------------------|
+| `weeklyReport.js` (live API) | `summary`, each `action.reason` |
+| `generateWeeklyReports.js` (batch) | `insight.summary`, each `action.reason` |
+| `generateLlmInsights.js` (batch) | Each narrative section body (preserves headers) |
+
+### LLM Summary Rewrite (`backend/jobs/rewriteSummaries.js`) — v84
+
+Optional ops-console job that rewrites stored rule-based summaries using a local Ollama model. Separate from the default text polish path.
+
+| Property | Value |
+|----------|-------|
+| Source | Local worker (Ollama) |
+| Models | `mistral`, `phi3`, `llama3`, `llama2`, `gemma`, `qwen2` |
+| Timeout | 15s per rewrite |
+| Fallback | Returns original text on any failure |
+| Skips | Users with no stored report, or already-rewritten (unless `--force`) |
+| Metadata | Stores `rewrittenBy` (model name) and `rewrittenAt` on the report |
+
+Accessible from the ops console as **"Rewrite Summaries (LLM)"** with model picker and user picker.
 
 ### Premium Branding
 
@@ -1011,40 +1027,23 @@ Per-user report rows now show:
 
 ---
 
-## 14. Text Quality Hardening (v82–v83)
+## 14. Text Quality Hardening (v82–v84)
 
 ### Em Dash Sanitization (v82)
 
 Source-level fixes across 15+ instances in `baselineEngine.js`, `generateInsight.js`, `actionEngine.js` removed em/en dashes at generation time. API boundary guard `sanitizeDeep()` in `sanitizeOutput.js` recursively walks any response object and replaces remaining dashes.
 
-### HF Phrasing Quality Gate (v83-a)
+### HF Phrasing Layer — Added then Removed (v83–v84)
 
-The HF phrasing layer (`phrasingLayer.js`) was introducing grammar mistakes, random characters, and typos because `gemma-2b-it` output was accepted without validation. A quality gate was added to reject bad output, but the root cause remained: a 2B-parameter model on a free API tier is fundamentally unreliable for text rewriting.
+The HF phrasing layer (`phrasingLayer.js`) was introduced in v80 as a post-processing step using `google/gemma-2b-it`. It was degrading text quality — introducing grammar mistakes, random characters, and typos. After adding quality gates (v83-a) and making it opt-in (v83-b), HF was **fully removed in v84**. The `HF_TOKEN` env var, `hfPolish()` function, quality gate, and all `useHf` flags have been deleted.
 
-### Local-First Text Polish Architecture (v83-b)
+### Local Deterministic Polish (v83-b → v84)
 
-**Root cause**: Rule-based summaries from `generateInsight.js` are already well-written English. Sending them through `gemma-2b-it` was *degrading* quality rather than improving it. The model intermittently introduces spelling errors, breaks grammar, and produces encoding artifacts even with a quality gate.
+`phrasingLayer.js` now contains only `localPolish()` — deterministic regex cleanup that runs on **all** text paths (live API + batch). See Section 12 for details.
 
-**Solution**: Complete redesign of `phrasingLayer.js` into a dual-mode architecture:
+### LLM Summary Rewrite (v84)
 
-| Mode | Function | When | What it does |
-|------|----------|------|-------------|
-| Local | `localPolish()` | **Always** (default) | Deterministic regex cleanup — em/en dashes, smart quotes, zero-width/control chars, markdown artifacts, double spaces, excess newlines, double periods, punctuation spacing |
-| HF | `hfPolish()` | Opt-in only | HuggingFace `gemma-2b-it` API call with 4s timeout, echo stripping, quality gate (length bounds, prompt leak, garbled ratio, consecutive specials, repeated chars, word overlap ≥30%), falls back to original on any failure |
-
-`phraseText()` always runs `localPolish()`. HF is only invoked when `opts.useHf === true`, controlled via the ops console toggle "Use HF phrasing (API rewrite)" (default: off).
-
-### Quality Gate Checks
-
-| Check | Rejects when |
-|-------|-------------|
-| Length floor | Output < 40% of original |
-| Length ceiling | Output > 200% of original |
-| Prompt leak | Output contains any of 10 instruction fragment patterns |
-| Garbled ratio | < 70% word-characters |
-| Consecutive specials | 4+ non-alphanumeric chars in a row |
-| Repeated chars | Same character repeated 5+ times |
-| Word overlap | < 30% words from original preserved |
+New ops-console job **"Rewrite Summaries (LLM)"** allows rewriting stored rule-based summaries using a local Ollama model (with model and user selection). This replaces HF as the optional AI rewrite path, but uses a reliable local model instead of a free API. See Section 12 for details.
 
 ### Expanded `sanitizeDeep` (v83)
 
@@ -1060,4 +1059,4 @@ Expanded to match backend sanitization: strips smart quotes, zero-width/control 
 
 ---
 
-*Generated from source code as of v83. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `control.js`, `execute.js`, `run-job.js`.*
+*Generated from source code as of v84. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `rewriteSummaries.js`, `control.js`, `execute.js`, `workerClient.js`, `server.js`.*
