@@ -13,7 +13,7 @@ const ACTION_META = {
 };
 
 export function generateActions(report) {
-  if (!report || !report.totalMoments) return [];
+  if (!report || report.totalMoments < 3) return [];
 
   const actions = [];
   const friction = report.frictionZones || [];
@@ -126,7 +126,7 @@ export function generateActions(report) {
   }
 
   // 8. Variety experiment: if few unique triggers, encourage exploration
-  if (actions.length < 3 && dq.uniqueTriggers && dq.uniqueTriggers <= 3 && dq.totalMoments >= 5) {
+  if (actions.length < 3 && dq.uniqueTriggers && dq.uniqueTriggers <= 3) {
     actions.push({
       id: "explore-triggers",
       type: "experiment",

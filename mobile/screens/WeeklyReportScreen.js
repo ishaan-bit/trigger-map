@@ -610,7 +610,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
           <Text style={s.insightStateIcon}>⚡</Text>
           <Text style={s.insightStateTitle}>Actions are on their way</Text>
           <Text style={s.insightStateBody}>
-            Log a few more moments with different triggers and emotions. Once your patterns are clearer, actions will appear here.
+            Log at least 3 moments to unlock actions. With 5+, you get personalised AI insights.
           </Text>
         </View>
       </View>

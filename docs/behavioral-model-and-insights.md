@@ -407,7 +407,14 @@ Used by the MirrorTab's `DeltaChip` arrows (↑/↓) to indicate week-over-week 
 
 **File:** `backend/services/actionEngine.js`
 
-`generateActions(report)` — Rule-based engine that produces 3–5 contextual behavioral actions from the full weekly report.
+`generateActions(report)` — Rule-based engine that produces 3–5 contextual behavioral actions from the full weekly report. **Requires ≥ 3 moments** (returns empty array below that).
+
+### Thresholds
+
+| Feature          | Moments Required |
+|------------------|:----------------:|
+| Actions          | **3**            |
+| LLM Insights     | **5**            |
 
 ### Action Meta
 
@@ -419,7 +426,9 @@ Maps action types to display metadata:
 | `awareness`  | 👁️   | "Notice"     |
 | `experiment` | 🧪   | "Experiment" |
 
-### Strategies (5 rules, evaluated in order)
+### Primary Strategies (1–5, evaluated in order)
+
+These fire when strong patterns (friction zones, regulators, drift, deltas) are present:
 
 | # | Strategy                       | Type         | Input Fields Used                                        |
 |---|--------------------------------|--------------|----------------------------------------------------------|
@@ -428,6 +437,17 @@ Maps action types to display metadata:
 | 3 | Drift-based check-in           | `awareness`  | `baselineMetrics.drift.direction === 'declining'`         |
 | 4 | Rising trigger alert           | `awareness`  | `weeklyDeltas.triggerDeltas` (triggers with `delta >= 2`) |
 | 5 | Stability reinforcement        | `regulate`   | `regulators` (≥2) and drift not declining                 |
+
+### Fallback Strategies (6–9)
+
+Fire when primary strategies produce nothing — ensures users with 3+ moments always see actions, even with sparse or neutral data:
+
+| # | Strategy                       | Type         | Fires When                          | Input Fields Used           |
+|---|--------------------------------|--------------|-------------------------------------|-----------------------------|
+| 6 | Top-pair awareness             | `awareness`  | 0 actions so far                    | `topPair`                   |
+| 7 | Dominant trigger check-in      | `awareness`  | < 2 actions                         | `topTrigger`                |
+| 8 | Variety experiment             | `experiment` | < 3 actions AND ≤ 3 unique triggers | `dataQuality.uniqueTriggers`|
+| 9 | Logging consistency            | `experiment` | < 3 actions AND < 4 days logged     | `dataQuality.daysLogged`    |
 
 ### Action Object Shape
 
