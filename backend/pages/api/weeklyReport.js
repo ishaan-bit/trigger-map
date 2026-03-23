@@ -2,6 +2,7 @@ import { getWeeklyAggregates } from "@/services/aggregationService.js";
 import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { generateInsight } from "@/ai/generateInsight.js";
 import { generateActions } from "@/services/actionEngine.js";
+import { sanitizeDeep } from "@/utils/sanitizeOutput.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
         // Anonymous → prompt sign-in for free rule-based insights
         report.aiPreview = {
           available: true,
-          teaser: "Sign in with Google to unlock your pattern insights — free for all accounts.",
+          teaser: "Sign in with Google to unlock your pattern insights, free for all accounts.",
           action: "sign-in",
         };
       } else if (!hasPremium) {
@@ -129,7 +130,7 @@ export default async function handler(req, res) {
     trackServerEvent("weekly_report_viewed", ownerId, { totalMoments: report.totalMoments }).catch(() => {});
 
     res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
-    return sendSuccess(res, { report });
+    return sendSuccess(res, { report: sanitizeDeep(report) });
   } catch (error) {
     captureServerError(error, { route: "weeklyReport" });
     return sendError(res, 500, "REPORT_FAILED", "Unable to build weekly report");

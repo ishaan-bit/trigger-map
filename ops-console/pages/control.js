@@ -455,6 +455,8 @@ export default function ControlPage() {
   const [pushTitle, setPushTitle] = useState('TriggerMap');
   const [pushBody, setPushBody] = useState('');
   const [pushSending, setPushSending] = useState(false);
+  const [backfillWeeks, setBackfillWeeks] = useState(3);
+  const [backfillRunning, setBackfillRunning] = useState(false);
 
   // Persist jobParams to localStorage
   useEffect(() => {
@@ -986,6 +988,130 @@ export default function ControlPage() {
             }}
           >
             {pushSending ? 'Sending...' : 'Send Notification'}
+          </button>
+        </div>
+      </div>
+
+      {/* Demo Data Backfill */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>Backfill Demo Data</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Seed curated moments for demos</span>
+        </div>
+        <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Generates curated demo moments (work stress, exercise recovery, social energy, travel resets) going back N weeks.
+            Each week uses a different narrative arc. Data is written directly to Redis aggregates.
+          </div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+              <span style={{ fontWeight: 600 }}>Weeks</span>
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={backfillWeeks}
+                onChange={(e) => setBackfillWeeks(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1)))}
+                style={{ width: 50, padding: '3px 6px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, fontFamily: 'var(--font-mono)' }}
+              />
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              ~{backfillWeeks * 13} moments across {backfillWeeks * 6}-{backfillWeeks * 7} days
+            </span>
+          </div>
+          {/* User picker */}
+          {!userPickerOpen['backfill'] ? (
+            <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => {
+              setUserPickerOpen(p => ({ ...p, backfill: true }));
+              if (!eligibleUsers['backfill']?.length) {
+                // Fetch all users (minMoments=0 to include even empty accounts)
+                (async () => {
+                  setEligibleLoading(p => ({ ...p, backfill: true }));
+                  try {
+                    const res = await fetch('/api/control/eligible-users?minMoments=0');
+                    const data = await res.json();
+                    const users = data.users || [];
+                    setEligibleUsers(p => ({ ...p, backfill: users }));
+                    setSelectedUsers(p => ({ ...p, backfill: new Set() }));
+                  } catch {
+                    setEligibleUsers(p => ({ ...p, backfill: [] }));
+                  } finally {
+                    setEligibleLoading(p => ({ ...p, backfill: false }));
+                  }
+                })();
+              }
+            }}>
+              Select accounts...
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>Accounts to backfill</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => {
+                    const all = (eligibleUsers['backfill'] || []).map(u => u.ownerId);
+                    setSelectedUsers(p => ({ ...p, backfill: new Set(all) }));
+                  }}>All</button>
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => setSelectedUsers(p => ({ ...p, backfill: new Set() }))}>None</button>
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => setUserPickerOpen(p => ({ ...p, backfill: false }))}>Close</button>
+                </div>
+              </div>
+              {eligibleLoading['backfill'] ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading accounts...</div> : (
+                (eligibleUsers['backfill'] || []).map(u => (
+                  <label key={u.ownerId} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, padding: '2px 0', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={selectedUsers['backfill']?.has(u.ownerId) || false} onChange={() => {
+                      setSelectedUsers(p => {
+                        const s = new Set(p['backfill'] || []);
+                        s.has(u.ownerId) ? s.delete(u.ownerId) : s.add(u.ownerId);
+                        return { ...p, backfill: s };
+                      });
+                    }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{u.ownerId.slice(0, 8)}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{u.name || u.email || '(anonymous)'} - {u.momentCount} moments</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+          <button
+            className="btn btn-primary btn-sm"
+            disabled={backfillRunning || !(selectedUsers['backfill']?.size > 0)}
+            style={{ alignSelf: 'flex-start' }}
+            onClick={async () => {
+              const sel = selectedUsers['backfill'];
+              if (!sel || sel.size === 0) { alert('Select at least one account'); return; }
+              setBackfillRunning(true);
+              const ts = new Date().toISOString();
+              try {
+                const res = await fetch('/api/control/backfill-demo', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ownerIds: [...sel], weeks: backfillWeeks }),
+                });
+                const data = await res.json();
+                setResults(prev => [{
+                  timestamp: ts,
+                  action: 'backfill-demo',
+                  target: `${sel.size} accounts x ${backfillWeeks}w`,
+                  ok: res.ok,
+                  data,
+                  status: res.status,
+                }, ...prev].slice(0, 50));
+              } catch (err) {
+                setResults(prev => [{
+                  timestamp: ts,
+                  action: 'backfill-demo',
+                  target: 'backfill',
+                  ok: false,
+                  data: { error: err.message },
+                  status: 0,
+                }, ...prev].slice(0, 50));
+              } finally {
+                setBackfillRunning(false);
+              }
+            }}
+          >
+            {backfillRunning ? 'Backfilling...' : `Backfill ${backfillWeeks} week${backfillWeeks > 1 ? 's' : ''}`}
           </button>
         </div>
       </div>

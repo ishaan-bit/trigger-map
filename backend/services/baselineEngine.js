@@ -214,10 +214,10 @@ function computeStateOfMind(drift, stability, volatility) {
   // Priority-ordered mapping
   if (drift > DRIFT_THRESHOLD && stability >= 0.6) return "grounded and improving";
   if (drift > DRIFT_THRESHOLD) return "improving with some ups and downs";
-  if (drift < -DRIFT_THRESHOLD && stability < 0.4) return "unsettled — worth paying attention";
-  if (drift < -DRIFT_THRESHOLD) return "below your usual — a temporary dip";
-  if (stability >= 0.7) return "steady — close to your normal";
-  if (volatility != null && volatility > 1.2) return "emotionally active — more range than usual";
+  if (drift < -DRIFT_THRESHOLD && stability < 0.4) return "unsettled, worth paying attention";
+  if (drift < -DRIFT_THRESHOLD) return "below your usual, a temporary dip";
+  if (stability >= 0.7) return "steady, close to your normal";
+  if (volatility != null && volatility > 1.2) return "emotionally active, more range than usual";
   return "holding steady with some variation";
 }
 

@@ -91,15 +91,15 @@ function streakNote(positiveStreak, negativeStreak) {
 }
 
 function buildTooEarlySummary() {
-  return "You're just getting started — every moment you log helps us learn how you tick. A few more and we'll start spotting patterns.";
+  return "You're just getting started. Every moment you log helps us learn how you tick. A few more and we'll start spotting patterns.";
 }
 
 function buildLowSummary(report) {
   const n = report.dataQuality.totalMoments;
   if (report.topTrigger) {
-    return `You've logged ${n} moments so far, and ${report.topTrigger} has come up the most. Keep going — a few more days and your patterns will really start to take shape.`;
+    return `You've logged ${n} moments so far, and ${report.topTrigger} has come up the most. Keep going, a few more days and your patterns will really start to take shape.`;
   }
-  return `${n} moments logged across a few areas. No single theme stands out yet, which is fine — patterns emerge with a bit more data.`;
+  return `${n} moments logged across a few areas. No single theme stands out yet, which is fine. Patterns emerge with a bit more data.`;
 }
 
 function buildEmergingSummary(report) {
@@ -118,7 +118,7 @@ function buildEmergingSummary(report) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`Good news: ${r.trigger} seems to bring you back to ${r.emotion} — that's worth protecting.`);
+    parts.push(`Good news: ${r.trigger} seems to bring you back to ${r.emotion}. That's worth protecting.`);
   }
 
   if (bm?.drift?.direction === "declining") {
@@ -137,12 +137,12 @@ function buildModerateSummary(report) {
   if (report.topTrigger) {
     parts.push(`${report.topTrigger} showed up the most this week.`);
   } else {
-    parts.push(`No single trigger dominated — your attention was spread across ${report.tiedTriggers?.join(", ") || "a few areas"}.`);
+    parts.push(`No single trigger dominated. Your attention was spread across ${report.tiedTriggers?.join(", ") || "a few areas"}.`);
   }
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `When ${f.trigger} came up, it often left you feeling ${f.emotion} — that happened ${f.count} times.`;
+    let fLine = `When ${f.trigger} came up, it often left you feeling ${f.emotion}. That happened ${f.count} times.`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -155,7 +155,7 @@ function buildModerateSummary(report) {
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
   if (bm?.stateOfMind) {
-    parts.push(`Overall, you're ${bm.stateOfMind}${bl ? " — " + bl : ""}.`);
+    parts.push(`Overall, you're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`);
   } else if (report.trajectoryNote) {
     parts.push(report.trajectoryNote);
   }
@@ -178,7 +178,7 @@ function buildStrongSummary(report) {
 
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `${f.trigger} and ${f.emotion} kept pairing up (${f.count}×) — that's a pattern worth noticing.`;
+    let fLine = `${f.trigger} and ${f.emotion} kept pairing up (${f.count}×). That's a pattern worth noticing.`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -191,7 +191,7 @@ function buildStrongSummary(report) {
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
   if (bm?.stateOfMind) {
-    parts.push(`Right now, you're ${bm.stateOfMind}${bl ? " — " + bl : ""}.`);
+    parts.push(`Right now, you're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`);
   } else {
     if (report.volatilityScore !== null) {
       parts.push(report.volatilityScore < 0.5 ? "Emotionally, things have been pretty steady." : "There's been some emotional range this week.");
@@ -294,7 +294,7 @@ function buildWhatWorking(report) {
   }
   const bm = report.baselineMetrics;
   if (bm?.stability?.score >= 0.7) {
-    items.push({ text: "You're consistently hovering near your emotional baseline — that's great stability" });
+    items.push({ text: "You're consistently hovering near your emotional baseline. That's great stability" });
   }
   return items.length > 0 ? items : null;
 }
@@ -303,7 +303,7 @@ function buildWhereToFocus(report) {
   const items = [];
   for (const f of (report.frictionZones || []).slice(0, 3)) {
     items.push({
-      text: `${f.trigger} often leads to ${f.emotion} — worth noticing`,
+      text: `${f.trigger} often leads to ${f.emotion}, worth noticing`,
       trigger: f.trigger,
       emotion: f.emotion,
       count: f.count,
@@ -314,7 +314,7 @@ function buildWhereToFocus(report) {
     items.push({ text: "Your emotional tone has dipped below your usual baseline this week" });
   }
   if (bm?.recoveryLatency?.days > 3) {
-    items.push({ text: `It's been taking a few days to bounce back after tough spots — ${bm.recoveryLatency.label}` });
+    items.push({ text: `It's been taking a few days to bounce back after tough spots. ${bm.recoveryLatency.label}` });
   }
   return items.length > 0 ? items : null;
 }

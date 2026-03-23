@@ -105,7 +105,7 @@ export function generateActions(report) {
       id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
       title: `Notice when ${topPair.trigger} brings ${topPair.emotion}`,
-      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week — your most common combo.`,
+      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week. Your most common combo.`,
       trigger: topPair.trigger,
       emotion: topPair.emotion,
     });
