@@ -38,7 +38,7 @@ jobs:
 
       - name: Build AAB (production)
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: "${{ secrets.EXPO_TOKEN }}"
         run: |
           cd mobile
           eas build --platform android --profile production --local --non-interactive --output ./build.aab

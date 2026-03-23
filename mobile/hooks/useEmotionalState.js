@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { useFocusEffect } from "expo-router";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette } from "@/utils/theme";
 
@@ -109,12 +108,11 @@ export function EmotionalStateProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  // Refresh on every tab focus (works because individual screens re-focus)
-  useFocusEffect(
-    useCallback(() => {
-      doRefresh();
-    }, [doRefresh])
-  );
+  // Refresh once on mount (provider is at root level — individual screens
+  // handle per-focus refresh via their own useFocusEffect)
+  useEffect(() => {
+    doRefresh();
+  }, [doRefresh]);
 
   // Also refresh when app comes back to foreground
   useEffect(() => {

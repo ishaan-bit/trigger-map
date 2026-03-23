@@ -1,3 +1,10 @@
 import { PremiumScreen } from "@/screens/PremiumScreen";
+import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
-export default PremiumScreen;
+export default function PremiumTab() {
+  return (
+    <TabErrorBoundary>
+      <PremiumScreen />
+    </TabErrorBoundary>
+  );
+}
