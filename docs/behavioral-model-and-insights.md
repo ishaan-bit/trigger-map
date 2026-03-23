@@ -1017,24 +1017,38 @@ Per-user report rows now show:
 
 Source-level fixes across 15+ instances in `baselineEngine.js`, `generateInsight.js`, `actionEngine.js` removed em/en dashes at generation time. API boundary guard `sanitizeDeep()` in `sanitizeOutput.js` recursively walks any response object and replaces remaining dashes.
 
-### HF Phrasing Quality Gate (v83)
+### HF Phrasing Quality Gate (v83-a)
 
-The HF phrasing layer (`phrasingLayer.js`) was introducing grammar mistakes, random characters, and typos because `gemma-2b-it` output was accepted without validation. Fixes:
+The HF phrasing layer (`phrasingLayer.js`) was introducing grammar mistakes, random characters, and typos because `gemma-2b-it` output was accepted without validation. A quality gate was added to reject bad output, but the root cause remained: a 2B-parameter model on a free API tier is fundamentally unreliable for text rewriting.
+
+### Local-First Text Polish Architecture (v83-b)
+
+**Root cause**: Rule-based summaries from `generateInsight.js` are already well-written English. Sending them through `gemma-2b-it` was *degrading* quality rather than improving it. The model intermittently introduces spelling errors, breaks grammar, and produces encoding artifacts even with a quality gate.
+
+**Solution**: Complete redesign of `phrasingLayer.js` into a dual-mode architecture:
+
+| Mode | Function | When | What it does |
+|------|----------|------|-------------|
+| Local | `localPolish()` | **Always** (default) | Deterministic regex cleanup — em/en dashes, smart quotes, zero-width/control chars, markdown artifacts, double spaces, excess newlines, double periods, punctuation spacing |
+| HF | `hfPolish()` | Opt-in only | HuggingFace `gemma-2b-it` API call with 4s timeout, echo stripping, quality gate (length bounds, prompt leak, garbled ratio, consecutive specials, repeated chars, word overlap ≥30%), falls back to original on any failure |
+
+`phraseText()` always runs `localPolish()`. HF is only invoked when `opts.useHf === true`, controlled via the ops console toggle "Use HF phrasing (API rewrite)" (default: off).
+
+### Quality Gate Checks
 
 | Check | Rejects when |
 |-------|-------------|
-| Length floor | Output < 35% of original (content lost) |
-| Length ceiling | Output > 220% of original (hallucinated) |
-| Prompt leak | Output contains prompt instruction fragments |
-| Garbled ratio | < 65% word-characters (garbled encoding) |
+| Length floor | Output < 40% of original |
+| Length ceiling | Output > 200% of original |
+| Prompt leak | Output contains any of 10 instruction fragment patterns |
+| Garbled ratio | < 70% word-characters |
 | Consecutive specials | 4+ non-alphanumeric chars in a row |
 | Repeated chars | Same character repeated 5+ times |
-
-Timeout increased from 1.5s to 3s. Echo stripping improved with multiple marker variants. All checks fall back to the original text on failure.
+| Word overlap | < 30% words from original preserved |
 
 ### Expanded `sanitizeDeep` (v83)
 
-Now also strips: smart quotes, zero-width characters, control characters, stray bold/header/bullet markers, collapses double spaces and excess newlines.
+Now also strips: smart quotes, zero-width characters, control characters, stray bold/header/bullet markers, collapses double spaces and excess newlines. Applied at API boundary on every response.
 
 ### Mobile `cleanText` (v83)
 
@@ -1046,4 +1060,4 @@ Expanded to match backend sanitization: strips smart quotes, zero-width/control 
 
 ---
 
-*Generated from source code as of v83. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`.*
+*Generated from source code as of v83. Files: `baselineEngine.js`, `patternEngine.js`, `actionEngine.js`, `generateInsight.js`, `generateLlmInsight.js`, `weeklyReport.js`, `aggregationService.js`, `WeeklyReportScreen.js`, `phrasingLayer.js`, `sanitizeOutput.js`, `control.js`, `execute.js`, `run-job.js`.*
