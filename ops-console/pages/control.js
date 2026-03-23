@@ -25,6 +25,7 @@ const JOBS = [
     params: [
       { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
       { key: 'minMoments', label: 'Min moments', type: 'number', default: 5 },
+      { key: 'maxWords', label: 'Max words (total)', type: 'number', default: 150 },
     ],
   },
   {
@@ -37,6 +38,7 @@ const JOBS = [
     params: [
       { key: 'force', label: 'Force (ignore cooldown)', type: 'checkbox', default: true },
       { key: 'minMoments', label: 'Min moments', type: 'number', default: 5 },
+      { key: 'maxWords', label: 'Max words (total)', type: 'number', default: 150 },
     ],
   },
 ];
@@ -404,10 +406,50 @@ export default function ControlPage() {
         defaults[job.id] = { ...(defaults[job.id] || {}), llmModel: 'phi3' };
       }
     }
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('ops_jobParams'));
+        if (saved && typeof saved === 'object') {
+          for (const jobId of Object.keys(defaults)) {
+            if (saved[jobId]) defaults[jobId] = { ...defaults[jobId], ...saved[jobId] };
+          }
+        }
+      } catch {}
+    }
     return defaults;
   });
   const [modelStatus, setModelStatus] = useState([]);
   const [pullingModel, setPullingModel] = useState(null);
+  const [eligibleUsers, setEligibleUsers] = useState({}); // { [jobId]: [] }
+  const [eligibleLoading, setEligibleLoading] = useState({});
+  const [selectedUsers, setSelectedUsers] = useState({}); // { [jobId]: Set<ownerId> }
+  const [userPickerOpen, setUserPickerOpen] = useState({}); // { [jobId]: bool }
+
+  // Persist jobParams to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('ops_jobParams', JSON.stringify(jobParams)); } catch {}
+  }, [jobParams]);
+
+  // Fetch eligible users for a job based on minMoments
+  const fetchEligibleUsers = useCallback(async (jobId) => {
+    const min = jobParams[jobId]?.minMoments || 1;
+    setEligibleLoading((p) => ({ ...p, [jobId]: true }));
+    try {
+      const res = await fetch(`/api/control/eligible-users?minMoments=${min}`);
+      const data = await res.json();
+      const users = data.users || [];
+      setEligibleUsers((p) => ({ ...p, [jobId]: users }));
+      // Default: all selected
+      setSelectedUsers((p) => ({
+        ...p,
+        [jobId]: new Set(users.map((u) => u.ownerId)),
+      }));
+    } catch {
+      setEligibleUsers((p) => ({ ...p, [jobId]: [] }));
+    } finally {
+      setEligibleLoading((p) => ({ ...p, [jobId]: false }));
+    }
+  }, [jobParams]);
 
   // Poll worker health
   const checkWorker = useCallback(async () => {
@@ -513,7 +555,14 @@ export default function ControlPage() {
   };
 
   const getJobParams = (job) => {
-    return { ...(jobParams[job.id] || {}) };
+    const p = { ...(jobParams[job.id] || {}) };
+    // If user picker was opened for this job, include selected ownerIds
+    const sel = selectedUsers[job.id];
+    const all = eligibleUsers[job.id];
+    if (sel && all && sel.size > 0 && sel.size < all.length) {
+      p.ownerIds = [...sel];
+    }
+    return p;
   };
 
   const hasActiveWorkerJob = (jobName) => {
@@ -599,7 +648,7 @@ export default function ControlPage() {
         </div>
       </div>
 
-      {/* Job Triggers */
+      {/* Job Triggers */}
       <div className="panel">
         <div className="panel-header">
           <h3>Jobs</h3>
@@ -676,6 +725,94 @@ export default function ControlPage() {
                         </label>
                       ))}
                     </div>
+                    {/* User picker for LLM jobs */}
+                    {job.usesLlm && (
+                      <div style={{ marginTop: 10 }}>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer',
+                            fontSize: 12, fontWeight: 600, padding: 0, textDecoration: 'underline',
+                          }}
+                          onClick={() => {
+                            const open = !userPickerOpen[job.id];
+                            setUserPickerOpen((p) => ({ ...p, [job.id]: open }));
+                            if (open && !eligibleUsers[job.id]) fetchEligibleUsers(job.id);
+                          }}
+                        >
+                          {userPickerOpen[job.id] ? '▾ Hide user selection' : '▸ Select users…'}
+                          {selectedUsers[job.id] && eligibleUsers[job.id] && (
+                            <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
+                              ({selectedUsers[job.id].size}/{eligibleUsers[job.id].length} selected)
+                            </span>
+                          )}
+                        </button>
+                        {userPickerOpen[job.id] && (
+                          <div style={{ marginTop: 8, border: '1px solid var(--border)', borderRadius: 6, padding: 10, background: 'var(--bg-primary)', maxHeight: 220, overflowY: 'auto' }}>
+                            {eligibleLoading[job.id] ? (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading eligible users…</div>
+                            ) : (eligibleUsers[job.id] && eligibleUsers[job.id].length > 0) ? (
+                              <>
+                                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                    onClick={() => setSelectedUsers((p) => ({
+                                      ...p,
+                                      [job.id]: new Set(eligibleUsers[job.id].map((u) => u.ownerId)),
+                                    }))}
+                                  >Select All</button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                    onClick={() => setSelectedUsers((p) => ({ ...p, [job.id]: new Set() }))}
+                                  >Deselect All</button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                    onClick={() => fetchEligibleUsers(job.id)}
+                                  >Refresh</button>
+                                </div>
+                                {eligibleUsers[job.id].map((u) => {
+                                  const sel = selectedUsers[job.id] || new Set();
+                                  return (
+                                    <label key={u.ownerId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={sel.has(u.ownerId)}
+                                        onChange={() => {
+                                          setSelectedUsers((prev) => {
+                                            const next = new Set(prev[job.id] || []);
+                                            if (next.has(u.ownerId)) next.delete(u.ownerId);
+                                            else next.add(u.ownerId);
+                                            return { ...prev, [job.id]: next };
+                                          });
+                                        }}
+                                        style={{ width: 14, height: 14 }}
+                                      />
+                                      <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', minWidth: 60 }}>
+                                        {u.ownerId.slice(0, 8)}
+                                      </span>
+                                      <span style={{ color: 'var(--text-secondary)' }}>
+                                        {u.name || u.email || '(anonymous)'}
+                                      </span>
+                                      <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                                        {u.momentCount} moments
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No eligible users found for this threshold.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {alreadyRunning && (

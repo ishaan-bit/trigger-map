@@ -12,12 +12,12 @@ export default async function handler(req, res) {
 
   try {
     const ownerIds = await sMembers(redisKey('owners'));
-    const sample = ownerIds.slice(0, 100);
 
-    // Get last 5 moments per user to check for recent activity
+    // Get last 5 moments + user hash per user
     const pipeCommands = [];
-    for (const oid of sample) {
+    for (const oid of ownerIds) {
       pipeCommands.push(['LRANGE', redisKey('moments', oid), '-5', '-1']);
+      pipeCommands.push(['HGETALL', redisKey('user', oid)]);
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
@@ -27,10 +27,11 @@ export default async function handler(req, res) {
     const emotionDistribution = {};
     const hourDistribution = {};
 
-    for (let i = 0; i < sample.length; i++) {
-      const moments = (results[i] || []).map((m) => {
+    for (let i = 0; i < ownerIds.length; i++) {
+      const moments = (results[i * 2] || []).map((m) => {
         try { return JSON.parse(m); } catch { return null; }
       }).filter(Boolean);
+      const userHash = flatArr(results[i * 2 + 1]);
 
       for (const m of moments) {
         // Track trigger/emotion distributions
@@ -44,7 +45,9 @@ export default async function handler(req, res) {
         }
 
         recentActivity.push({
-          ownerId: sample[i],
+          ownerId: ownerIds[i],
+          name: userHash.name || null,
+          email: userHash.email || null,
           trigger: m.trigger,
           emotion: m.emotion,
           hasNote: !!m.note,
@@ -67,4 +70,11 @@ export default async function handler(req, res) {
     console.error('Activity diagnostics error:', err);
     return res.status(500).json({ error: 'Failed to fetch activity data' });
   }
+}
+
+function flatArr(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return {};
+  const obj = {};
+  for (let i = 0; i < arr.length; i += 2) obj[arr[i]] = arr[i + 1];
+  return obj;
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TRIGGER_KEYWORDS, TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS } from "@triggermap/shared/constants/emotions";
-import { appendDailyAggregate } from "./aggregationService.js";
+import { appendDailyAggregate, getOwnerIndexKey } from "./aggregationService.js";
 import { lrangeJson, pipeline, redis, redisKey } from "./redisClient.js";
 import { sanitizeText } from "./security.js";
 
@@ -45,6 +45,7 @@ export async function appendMoment(moment) {
   await pipeline([
     ["RPUSH", getMomentsKey(moment.ownerId), JSON.stringify(moment)],
     ["INCR", redisKey("counter", "moments_logged")],
+    ["SADD", getOwnerIndexKey(), moment.ownerId],
   ]);
 
   await appendDailyAggregate(moment);

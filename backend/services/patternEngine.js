@@ -1,4 +1,5 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
+import { computeBaselineMetrics } from "./baselineEngine.js";
 
 // --- Confidence thresholds ---
 const MIN_LOGS_FOR_PATTERNS = 5;
@@ -110,7 +111,7 @@ function concentrationIndex(record) {
 
 // --- Main generator ---
 
-export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {}) {
+export function generateWeeklyReport({ aggregates = [], allAggregates = null, aiInsight = null } = {}) {
   const filledAggregates = aggregates.filter((s) => s && s.date);
 
   const triggerFrequency = {};
@@ -240,6 +241,10 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     hasEnoughForStability: totalMoments >= MIN_LOGS_FOR_STABILITY && validDays.length >= 2,
   };
 
+  // Baseline & drift — uses the extended window if available, else falls back to weekly
+  const baselineInput = allAggregates || filledAggregates;
+  const baselineMetrics = computeBaselineMetrics(baselineInput, rawVolatility);
+
   return {
     topTrigger,
     topEmotion,
@@ -269,6 +274,7 @@ export function generateWeeklyReport({ aggregates = [], aiInsight = null } = {})
     dataQuality,
     totalMoments,
     dailyAggregates: filledAggregates,
+    baselineMetrics,
     aiInsight,
   };
 }

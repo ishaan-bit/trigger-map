@@ -120,6 +120,16 @@ async function handleRequest(req, res) {
 
   // Health (no auth needed)
   if (path === '/health' && req.method === 'GET') {
+    // Clean up stale jobs (child process may have exited without triggering close event)
+    const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+    for (const [k, v] of activeJobs) {
+      if (Date.now() - v.startedAt > STALE_THRESHOLD_MS) {
+        if (v.child && !v.child.killed) v.child.kill('SIGTERM');
+        activeJobs.delete(k);
+        console.log(`[worker] Cleaned stale job: ${k} (elapsed ${Math.round((Date.now() - v.startedAt) / 1000)}s)`);
+      }
+    }
+
     return json(res, 200, {
       ok: true,
       service: 'triggermap-local-worker',
@@ -184,7 +194,7 @@ async function handleRunJob(req, res, scriptName, jobName) {
   }
 
   const body = await readBody(req);
-  const { model, force, minMoments } = body;
+  const { model, force, minMoments, maxWords, ownerIds } = body;
 
   // Validate model if provided
   if (model && !ALLOWED_MODELS.includes(model)) {
@@ -197,6 +207,10 @@ async function handleRunJob(req, res, scriptName, jobName) {
 
   const env = { ...process.env };
   if (model) env.LLM_MODEL = model;
+  if (maxWords != null) env.LLM_MAX_WORDS = String(maxWords);
+  if (Array.isArray(ownerIds) && ownerIds.length > 0) {
+    env.LLM_OWNER_IDS = ownerIds.join(',');
+  }
 
   const startTime = Date.now();
   let stdout = '';

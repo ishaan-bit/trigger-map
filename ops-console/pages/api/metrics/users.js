@@ -17,13 +17,14 @@ export default async function handler(req, res) {
     const ownerIds = await sMembers(redisKey('owners'));
     const today = todayKey();
 
-    // For each user: get today's aggregate, moment count, user hash, subscription
+    // For each user: get today's aggregate, moment count, user hash, subscription, push tokens
     const pipeCommands = [];
     for (const oid of ownerIds.slice(0, 200)) {
       pipeCommands.push(['HGETALL', redisKey('daily', oid, today)]);
       pipeCommands.push(['LLEN', redisKey('moments', oid)]);
       pipeCommands.push(['HGETALL', redisKey('user', oid)]);
-      pipeCommands.push(['GET', redisKey('subscription', oid)]);
+      pipeCommands.push(['HGETALL', redisKey('subscription', oid)]);
+      pipeCommands.push(['HGETALL', redisKey('push_tokens', oid)]);
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
@@ -31,14 +32,26 @@ export default async function handler(req, res) {
     const users = [];
 
     for (let i = 0; i < n; i++) {
-      const agg = flatArr(results[i * 4]);
-      const momentCount = results[i * 4 + 1] || 0;
-      const userHash = flatArr(results[i * 4 + 2]);
-      const sub = results[i * 4 + 3];
+      const agg = flatArr(results[i * 5]);
+      const momentCount = results[i * 5 + 1] || 0;
+      const userHash = flatArr(results[i * 5 + 2]);
+      const subRaw = results[i * 5 + 3];
+      const subscription = flatArr(subRaw);
+      const pushTokensRaw = flatArr(results[i * 5 + 4]);
 
-      let subscription = null;
-      if (sub) {
-        try { subscription = JSON.parse(sub); } catch {}
+      // Parse push token entries to extract device info
+      const devices = [];
+      for (const [deviceId, entryJson] of Object.entries(pushTokensRaw)) {
+        try {
+          const entry = JSON.parse(entryJson);
+          devices.push({
+            deviceId: deviceId.slice(0, 8),
+            platform: entry.platform || 'unknown',
+            updatedAt: entry.updatedAt || null,
+          });
+        } catch {
+          // skip malformed entries
+        }
       }
 
       users.push({
@@ -46,11 +59,14 @@ export default async function handler(req, res) {
         name: userHash.name || null,
         email: userHash.email || null,
         provider: userHash.provider || null,
+        hasPassword: !!userHash.passwordHash,
         isAnonymous: !userHash.email,
         momentCount,
         todayMoments: parseInt(agg.total || '0', 10),
         subscription: subscription?.status || 'none',
         createdAt: userHash.createdAt || null,
+        devices,
+        hasDevices: devices.length > 0,
       });
     }
 

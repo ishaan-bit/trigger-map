@@ -14,12 +14,13 @@ export default async function handler(req, res) {
     const ownerIds = await sMembers(redisKey('owners'));
     const sample = ownerIds.slice(0, 200);
 
-    // Fetch stored insights for each user
+    // Fetch stored insights + user hash for each user
     const pipeCommands = [];
     for (const oid of sample) {
       pipeCommands.push(['GET', redisKey('weekly_report', oid)]);
       pipeCommands.push(['GET', redisKey('llm_insight', oid)]);
       pipeCommands.push(['GET', redisKey('llm_free_pass', oid)]);
+      pipeCommands.push(['HGETALL', redisKey('user', oid)]);
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
@@ -32,9 +33,10 @@ export default async function handler(req, res) {
     const insightModels = {};
 
     for (let i = 0; i < n; i++) {
-      const ruleRaw = results[i * 3];
-      const llmRaw = results[i * 3 + 1];
-      const freePass = results[i * 3 + 2];
+      const ruleRaw = results[i * 4];
+      const llmRaw = results[i * 4 + 1];
+      const freePass = results[i * 4 + 2];
+      const userHash = flatArr(results[i * 4 + 3]);
 
       if (ruleRaw) {
         ruleBasedCount++;
@@ -43,6 +45,8 @@ export default async function handler(req, res) {
           if (parsed.generatedAt) {
             recentInsights.push({
               ownerId: sample[i],
+              name: userHash.name || null,
+              email: userHash.email || null,
               type: 'rule-based',
               model: parsed.model || 'rule-based',
               confidence: parsed.confidence || 'unknown',
@@ -61,6 +65,8 @@ export default async function handler(req, res) {
           if (parsed.generatedAt) {
             recentInsights.push({
               ownerId: sample[i],
+              name: userHash.name || null,
+              email: userHash.email || null,
               type: 'llm',
               model: parsed.model || 'unknown',
               sectionCount: parsed.sectionCount || 0,
@@ -94,4 +100,11 @@ export default async function handler(req, res) {
     console.error('Insight metrics error:', err);
     return res.status(500).json({ error: 'Failed to fetch insight metrics' });
   }
+}
+
+function flatArr(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return {};
+  const obj = {};
+  for (let i = 0; i < arr.length; i += 2) obj[arr[i]] = arr[i + 1];
+  return obj;
 }

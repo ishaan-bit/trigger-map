@@ -30,17 +30,17 @@ export async function workerRequest(path, options = {}) {
   }
 }
 
-export async function runLlmInsights({ model, force, minMoments } = {}) {
+export async function runLlmInsights({ model, force, minMoments, maxWords, ownerIds } = {}) {
   return workerRequest('/run-llm-insights', {
     method: 'POST',
-    body: JSON.stringify({ model, force, minMoments }),
+    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds }),
   });
 }
 
-export async function runFreePass({ model, force, minMoments } = {}) {
+export async function runFreePass({ model, force, minMoments, maxWords, ownerIds } = {}) {
   return workerRequest('/run-freepass', {
     method: 'POST',
-    body: JSON.stringify({ model, force, minMoments }),
+    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds }),
   });
 }
 

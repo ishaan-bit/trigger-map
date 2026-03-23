@@ -36,12 +36,15 @@ async function storeLlmInsight(ownerId, payload) {
 }
 
 export async function runGenerateLlmInsights({ force = false, minMoments = 1 } = {}) {
-  const owners = await listOwnerIds();
+  const envIds = process.env.LLM_OWNER_IDS;
+  const owners = envIds
+    ? envIds.split(',').filter(Boolean)
+    : await listOwnerIds();
   const results = [];
   let processed = 0;
   let skipped = 0;
 
-  console.log(`Found ${owners.length} total owners. Filtering for eligible users...`);
+  console.log(`Found ${owners.length} total owners${envIds ? ' (filtered by selection)' : ''}. Filtering for eligible users...`);
   if (force) console.log("--force: ignoring cooldown window");
   if (minMoments > 1) console.log(`--min-moments=${minMoments}: skipping users below threshold`);
 
@@ -63,7 +66,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1 } =
       }
 
       const aggregates = await getWeeklyAggregates(ownerId, 45);
-      const weeklyReport = generateWeeklyReport({ aggregates });
+      const weeklyReport = generateWeeklyReport({ aggregates, allAggregates: aggregates });
 
       if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
         results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });

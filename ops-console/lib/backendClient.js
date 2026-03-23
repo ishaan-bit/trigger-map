@@ -43,3 +43,17 @@ export async function clearCache(cacheKey) {
 export async function getBackendHealth() {
   return backendRequest('/api/health', { method: 'GET' });
 }
+
+export async function manageUser(action, params = {}) {
+  return backendRequest('/api/internal/control/manage-user', {
+    method: 'POST',
+    body: JSON.stringify({ action, ...params }),
+  });
+}
+
+export async function sendPush({ userIds, title, body }) {
+  return backendRequest('/api/internal/control/send-push', {
+    method: 'POST',
+    body: JSON.stringify({ userIds, title, body }),
+  });
+}

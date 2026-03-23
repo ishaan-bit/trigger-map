@@ -36,9 +36,10 @@ export default async function handler(req, res) {
 
     const isAuthenticated = Boolean(user);
 
-    // Parallel fetch: aggregates, subscription, LLM insight, first-free check, free pass
-    const [aggregates, subscription, llmInsight, firstFreeAvailable, freePass] = await Promise.all([
+    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, first-free check, free pass
+    const [aggregates, allAggregates, subscription, llmInsight, firstFreeAvailable, freePass] = await Promise.all([
       getWeeklyAggregates(ownerId),
+      getWeeklyAggregates(ownerId, 45),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
       getStoredLlmInsight(ownerId),
       isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
@@ -50,7 +51,8 @@ export default async function handler(req, res) {
 
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
-    const report = generateWeeklyReport({ aggregates });
+    // Pass allAggregates (45d) for baseline computation.
+    const report = generateWeeklyReport({ aggregates, allAggregates });
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report);
     }

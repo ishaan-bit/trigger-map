@@ -29,6 +29,8 @@ import {
   login,
   logMoment,
   register,
+  registerPushToken,
+  unregisterPushToken,
 } from "@/services/api";
 import {
   saveLocalMoment,
@@ -44,6 +46,7 @@ import { captureMobileError } from "@/services/crashService";
 import {
   disableWeeklyReminder,
   enableWeeklyReminder,
+  getExpoPushToken,
   schedulePatternAlert,
   scheduleReflectionReminder,
   disableReflectionReminder,
@@ -154,6 +157,13 @@ export function SessionProvider({ children }) {
           setUser(session.user);
           setSubscription(session.subscription || null);
           setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
+
+          // Re-register push token on every app start (tokens can rotate)
+          getExpoPushToken().then(pushInfo => {
+            if (pushInfo) {
+              registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, storedToken).catch(() => null);
+            }
+          });
         }
       } catch (error) {
         captureMobileError(error, { source: "bootstrap" });
@@ -226,6 +236,10 @@ export function SessionProvider({ children }) {
         setUser(response.user);
         await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
         trackEvent("login_completed", { provider: "email" });
+        // Register push token in background
+        getExpoPushToken().then(pushInfo => {
+          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
+        });
       },
       async registerWithEmail(name, email, password) {
         const activeDeviceId = await ensureDeviceIdentity();
@@ -235,6 +249,9 @@ export function SessionProvider({ children }) {
         setUser(response.user);
         await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
         trackEvent("register_completed", {});
+        getExpoPushToken().then(pushInfo => {
+          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
+        });
       },
       async signInWithGoogle(idToken) {
         const activeDeviceId = await ensureDeviceIdentity();
@@ -244,8 +261,16 @@ export function SessionProvider({ children }) {
         setUser(response.user);
         await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
         trackEvent("login_completed", { provider: "google" });
+        getExpoPushToken().then(pushInfo => {
+          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
+        });
       },
       async signOut() {
+        // Unregister push token before clearing session (needs auth token)
+        if (token && deviceId) {
+          unregisterPushToken({ deviceId }, token).catch(() => null);
+        }
+
         // Clear local session immediately for instant UX
         await clearSessionToken();
         setToken(null);

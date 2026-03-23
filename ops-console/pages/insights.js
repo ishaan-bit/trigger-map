@@ -64,6 +64,8 @@ export default function InsightsPage() {
                     <tr>
                       <th>Generated At</th>
                       <th>Owner</th>
+                      <th>Name</th>
+                      <th>Email</th>
                       <th>Type</th>
                       <th>Model</th>
                       <th>Confidence / Sections</th>
@@ -74,6 +76,8 @@ export default function InsightsPage() {
                       <tr key={i}>
                         <td className="mono">{formatDateTime(ins.generatedAt)}</td>
                         <td className="mono" style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ins.ownerId?.slice(0, 8)}...</td>
+                        <td>{ins.name || '—'}</td>
+                        <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ins.email || '—'}</td>
                         <td>
                           <span className={`status-badge ${ins.type === 'llm' ? 'healthy' : 'degraded'}`}>
                             <span className="dot" />

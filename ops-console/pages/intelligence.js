@@ -303,6 +303,66 @@ export default function IntelligencePage() {
             </div>
           )}
 
+          {/* Baseline & Emotional Drift (Fleet-level) */}
+          {data.baseline && data.baseline.usersWithBaseline > 0 && (
+            <div className="panel">
+              <div className="panel-header">
+                <h3>Baseline & Emotional Drift</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From cached weekly reports ({data.baseline.usersWithBaseline} users)</span>
+              </div>
+              <div className="panel-body">
+                <div className="metrics-grid" style={{ marginBottom: 16 }}>
+                  <MetricCard
+                    label="Avg Baseline"
+                    value={data.baseline.avgBaseline != null ? `${data.baseline.avgBaseline}/5` : '—'}
+                    sub="Fleet emotional center"
+                    color={data.baseline.avgBaseline >= 3.5 ? 'var(--green)' : data.baseline.avgBaseline >= 2.5 ? 'var(--yellow)' : 'var(--red)'}
+                  />
+                  <MetricCard
+                    label="Avg Drift"
+                    value={data.baseline.avgDrift != null ? `${data.baseline.avgDrift > 0 ? '+' : ''}${data.baseline.avgDrift}` : '—'}
+                    sub="Recent vs baseline"
+                    color={data.baseline.avgDrift >= 0 ? 'var(--green)' : 'var(--red)'}
+                  />
+                  <MetricCard
+                    label="Avg Stability"
+                    value={data.baseline.avgStability != null ? `${Math.round(data.baseline.avgStability * 100)}%` : '—'}
+                    sub="Days near baseline"
+                    color={data.baseline.avgStability >= 0.6 ? 'var(--green)' : data.baseline.avgStability >= 0.4 ? 'var(--yellow)' : 'var(--red)'}
+                  />
+                </div>
+                {data.baseline.driftDistribution && (
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                    <div style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 8, background: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.2)' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--green)' }}>{data.baseline.driftDistribution.improving}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Improving</div>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 8, background: 'rgba(155,176,201,0.08)', border: '1px solid rgba(155,176,201,0.2)' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-secondary)' }}>{data.baseline.driftDistribution.stable}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stable</div>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 8, background: 'rgba(255,107,122,0.08)', border: '1px solid rgba(255,107,122,0.2)' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{data.baseline.driftDistribution.declining}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Declining</div>
+                    </div>
+                  </div>
+                )}
+                {data.baseline.stateOfMind && Object.keys(data.baseline.stateOfMind).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>State of Mind Distribution</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {Object.entries(data.baseline.stateOfMind).sort(([, a], [, b]) => b - a).map(([state, count]) => (
+                        <span key={state} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 12, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                          {state} <strong>({count})</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Product Health Signals */}
           <div className="panel">
             <div className="panel-header"><h3>Product Health Assessment</h3></div>
@@ -359,6 +419,18 @@ export default function IntelligencePage() {
                           : 'High dormancy — critical churn risk'
                     }
                   />
+                  {data.baseline?.usersWithBaseline > 0 && (
+                    <SignalRow
+                      label="Emotional Health"
+                      value={`${data.baseline.avgBaseline}/5 avg baseline`}
+                      status={data.baseline.avgBaseline >= 3.2 ? 'healthy' : data.baseline.avgBaseline >= 2.5 ? 'degraded' : 'critical'}
+                      assessment={
+                        data.baseline.avgDrift >= 0
+                          ? `Fleet trending stable/positive (drift ${data.baseline.avgDrift > 0 ? '+' : ''}${data.baseline.avgDrift})`
+                          : `Fleet drifting negative (${data.baseline.avgDrift}) — monitor closely`
+                      }
+                    />
+                  )}
                 </tbody>
               </table>
             </div>

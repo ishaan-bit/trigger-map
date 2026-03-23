@@ -223,6 +223,8 @@ a:hover {
 .status-badge.degraded .dot { background: var(--yellow); }
 .status-badge.critical { background: rgba(239, 68, 68, 0.15); color: var(--red); }
 .status-badge.critical .dot { background: var(--red); }
+.status-badge.offline { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
+.status-badge.offline .dot { background: var(--text-muted); }
 
 /* Panels */
 .panel {

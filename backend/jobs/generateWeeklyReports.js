@@ -21,7 +21,8 @@ async function processOwner(ownerId, force) {
   }
 
   const aggregates = await getWeeklyAggregates(ownerId);
-  const report = generateWeeklyReport({ aggregates });
+  const allAggregates = await getWeeklyAggregates(ownerId, 45);
+  const report = generateWeeklyReport({ aggregates, allAggregates });
   if (!report.totalMoments) {
     return { ownerId, skipped: true, reason: "no-data" };
   }
@@ -33,6 +34,7 @@ async function processOwner(ownerId, force) {
     return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
   }
 
+  const bm = report.baselineMetrics;
   const payload = {
     windowEnd: new Date().toISOString().slice(0, 10),
     summary: insight.summary,
@@ -40,6 +42,13 @@ async function processOwner(ownerId, force) {
     confidence: insight.confidence,
     model: insight.model,
     generatedAt: insight.generatedAt,
+    stateOfMind: insight.stateOfMind || null,
+    baselineSummary: insight.baselineSummary || null,
+    baselineScore: bm?.baseline?.score ?? null,
+    driftValue: bm?.drift?.value ?? null,
+    driftLabel: bm?.drift?.label ?? null,
+    stabilityScore: bm?.stability?.score ?? null,
+    recoveryDays: bm?.recoveryLatency?.days ?? null,
   };
 
   await storeWeeklyInsight(ownerId, payload);

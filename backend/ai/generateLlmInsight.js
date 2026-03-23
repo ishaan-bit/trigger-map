@@ -104,6 +104,27 @@ function buildSignals(report, recentNotes) {
     lines.push(`Busiest time of day: ${report.busiestTime}.`);
   }
 
+  // Baseline & drift signals
+  const bm = report.baselineMetrics;
+  if (bm?.baseline?.reliable) {
+    lines.push(`Personal emotional baseline: ${bm.baseline.score.toFixed(1)}/5 (${bm.baseline.label}), based on ${bm.baseline.daysUsed} days of data.`);
+    if (bm.recentAverage !== null) {
+      lines.push(`Recent 7-day average: ${bm.recentAverage.toFixed(1)}/5.`);
+    }
+    if (bm.drift) {
+      lines.push(`Emotional drift: ${bm.drift.label} (${bm.drift.value > 0 ? "+" : ""}${bm.drift.value.toFixed(2)} from baseline).`);
+    }
+    if (bm.stability) {
+      lines.push(`Stability: ${bm.stability.label} (${Math.round(bm.stability.score * 100)}% of days within normal range).`);
+    }
+    if (bm.recoveryLatency) {
+      lines.push(`Recovery pattern: ${bm.recoveryLatency.label} (~${bm.recoveryLatency.days} days after dips).`);
+    }
+    if (bm.stateOfMind) {
+      lines.push(`Current state: ${bm.stateOfMind}.`);
+    }
+  }
+
   if (report.triggerConcentration !== undefined) {
     lines.push(`Trigger diversity: ${report.triggerConcentration < 0.3 ? "spread broadly" : report.triggerConcentration < 0.5 ? "moderately concentrated" : "dominated by few"}.`);
   }
@@ -143,6 +164,11 @@ function buildPrompt(report, recentNotes) {
   const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
   const hasNotes = recentNotes?.length > 0;
 
+  const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
+  const minWords = Math.round(maxWords * 0.6);
+  const hardCap = Math.round(maxWords * 1.1);
+  const sentencesPerSection = maxWords <= 100 ? '1-2' : maxWords <= 200 ? '2-3' : '3-4';
+
   return `Here are structured signals from a user's recent emotional data. Only reference what appears below.
 
 ---
@@ -154,35 +180,54 @@ Using ONLY the data above, write EXACTLY three short sections. Use the EXACT for
 EXAMPLE FORMAT (do not copy the content, only mimic the structure):
 
 What stood out
-Work-related triggers appeared most often this week, consistently paired with anxiety before deadlines.
+Work-related triggers appeared most often this week, consistently paired with anxiety before deadlines. This pattern was strongest on Monday and Wednesday mornings. Evening entries showed a noticeable shift toward calm once the workday ended.
 
 What may be contributing
-The combination of deadline pressure and back-to-back meetings may be amplifying anticipatory stress.
+The combination of deadline pressure and back-to-back meetings may be amplifying anticipatory stress. Having no buffer time between tasks could make each transition feel more intense.
 
 One thing to try
-Before your next presentation, spend five minutes writing down three things you know well about the topic.
+Before your next presentation, spend five minutes writing down three things you know well about the topic. This small ritual can shift your focus from what might go wrong to what you already have ready.
 
 END OF EXAMPLE. Now write your three sections using the data above.
 
 Rules:
 - Start with "What stood out" — no text before it.
 - Each header must be alone on its own line, with the body on the next line.
-- 60-90 words total. Do not exceed 100 words.
+- ${minWords}-${maxWords} words total. Do not exceed ${hardCap} words.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive.
+- IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
 - Use correct English spelling and grammar. No typos, no random numbers or characters.
-- Keep each section body to 1-2 sentences max. Be concise, not verbose.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+- Each section body must be ${sentencesPerSection} sentences.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+}
+
+/**
+ * Trim trailing incomplete sentence — finds the last sentence-ending
+ * punctuation (.!?) and drops everything after it.
+ */
+function trimIncomplete(text) {
+  // Find the last sentence terminator (.!?) that is followed by a space,
+  // newline, or end-of-string (avoids matching decimals like "0.5").
+  const match = text.match(/^([\s\S]*[.!?])(?:\s|$)/);
+  if (match) return match[1].trim();
+  // No sentence-ending punctuation at all — return as-is (don't destroy everything)
+  return text;
 }
 
 export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
+  const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
 
   // Auto-pull model if not available locally
   await ensureModelAvailable(apiUrl, model);
 
   const prompt = buildPrompt(weeklyReport, recentNotes);
+
+  // Scale max_tokens generously so the model never hits the ceiling mid-sentence.
+  // The prompt word-limit is the real constraint; tokens are just a safety net.
+  const maxTokens = Math.max(400, Math.round(maxWords * 3.5));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -194,11 +239,11 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided." },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so." },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 200,
+        max_tokens: maxTokens,
       }),
       signal: controller.signal,
     });
@@ -210,9 +255,16 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
 
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content?.trim();
+    const finishReason = data.choices?.[0]?.finish_reason;
 
     if (!content) {
       throw new Error("LLM returned empty response");
+    }
+
+    // If the model hit the token limit, the last sentence is likely incomplete.
+    // Trim back to the last sentence-ending punctuation.
+    if (finishReason === 'length') {
+      content = trimIncomplete(content);
     }
 
     // Clean up formatting artifacts the model may produce
@@ -297,6 +349,8 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [] }) {
       // Truncate at paragraph break to discard trailing hallucinations
       const paraBreak = body.indexOf("\n\n");
       let trimmedBody = paraBreak > 0 ? body.slice(0, paraBreak).trim() : body;
+      // Trim any incomplete sentence at the end of the section
+      trimmedBody = trimIncomplete(trimmedBody);
       // Clean stray LLM artifacts from section body
       trimmedBody = trimmedBody
         .replace(/^\d+[.)]\s*/gm, "")           // stray numbered prefixes

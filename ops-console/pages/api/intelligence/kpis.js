@@ -58,6 +58,12 @@ export default async function handler(req, res) {
     let insightLatencies = [];
     let ruleInsightCount = 0;
 
+    // Baseline fleet metrics
+    const baselineScores = [];
+    const driftValues = [];
+    const stabilityScores = [];
+    const stateOfMindCounts = {};
+
     // Behavioral signals
     const triggerCounts = {};
     const emotionCounts = {};
@@ -108,6 +114,18 @@ export default async function handler(req, res) {
       if (hasReport) { insightViewEligible++; ruleInsightCount++; }
       if (hasLlm) llmInsightCount++;
       if (hasReport || hasLlm) usersWithInsight++;
+
+      // Extract baseline metrics from cached weekly report
+      if (hasReport) {
+        try {
+          const reportRaw = results[base + 7];
+          const rp = typeof reportRaw === 'string' ? JSON.parse(reportRaw) : null;
+          if (rp?.baselineScore != null) baselineScores.push(rp.baselineScore);
+          if (rp?.driftValue != null) driftValues.push(rp.driftValue);
+          if (rp?.stabilityScore != null) stabilityScores.push(rp.stabilityScore);
+          if (rp?.stateOfMind) stateOfMindCounts[rp.stateOfMind] = (stateOfMindCounts[rp.stateOfMind] || 0) + 1;
+        } catch { /* ignore parse errors */ }
+      }
 
       // Retention
       const todayAgg = flatArr(results[base + 0]);
@@ -253,6 +271,24 @@ export default async function handler(req, res) {
         dormantUsers,
       },
       trends,
+      baseline: {
+        usersWithBaseline: baselineScores.length,
+        avgBaseline: baselineScores.length > 0
+          ? Number((baselineScores.reduce((a, b) => a + b, 0) / baselineScores.length).toFixed(2))
+          : null,
+        avgDrift: driftValues.length > 0
+          ? Number((driftValues.reduce((a, b) => a + b, 0) / driftValues.length).toFixed(2))
+          : null,
+        avgStability: stabilityScores.length > 0
+          ? Number((stabilityScores.reduce((a, b) => a + b, 0) / stabilityScores.length).toFixed(2))
+          : null,
+        driftDistribution: {
+          improving: driftValues.filter(d => d > 0.15).length,
+          stable: driftValues.filter(d => d >= -0.15 && d <= 0.15).length,
+          declining: driftValues.filter(d => d < -0.15).length,
+        },
+        stateOfMind: stateOfMindCounts,
+      },
     });
   } catch (err) {
     console.error('Intelligence error:', err);

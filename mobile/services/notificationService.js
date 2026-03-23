@@ -1,5 +1,7 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import { NOTIFICATION_TITLES, NOTIFICATION_TYPES, INACTIVITY_THRESHOLD_DAYS } from "@triggermap/shared/constants/notifications";
 import { getLastLoggedAt, getLastOpenedAt } from "./deviceService";
 
@@ -193,4 +195,24 @@ export async function scheduleInactivityNudge() {
       minute: 0,
     },
   });
+}
+
+/**
+ * Request notification permission and return the Expo push token.
+ * Returns null if permission denied or token unavailable.
+ */
+export async function getExpoPushToken() {
+  try {
+    const permissions = await Notifications.requestPermissionsAsync();
+    if (!permissions.granted) return null;
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
+    return { token: tokenData.data, platform: Platform.OS };
+  } catch (err) {
+    console.warn("[push-token] Failed to get Expo push token:", err.message);
+    return null;
+  }
 }

@@ -38,7 +38,10 @@ async function storeLlmInsight(ownerId, payload) {
 }
 
 export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}) {
-  const owners = await listOwnerIds();
+  const envIds = process.env.LLM_OWNER_IDS;
+  const owners = envIds
+    ? envIds.split(',').filter(Boolean)
+    : await listOwnerIds();
   let scanned = 0;
   let eligible = 0;
   let generated = 0;
@@ -46,7 +49,7 @@ export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}
   let skipped = 0;
   const results = [];
 
-  console.log(`Scanning ${owners.length} total owners...`);
+  console.log(`Scanning ${owners.length} total owners${envIds ? ' (filtered by selection)' : ''}...`);
   if (force) console.log("--force: regenerating even if recent insight exists");
   console.log(`--min-moments=${minMoments}`);
   console.log("");
@@ -64,7 +67,7 @@ export async function runGenerateFreePass({ force = false, minMoments = 5 } = {}
 
       // Check moment threshold
       const aggregates = await getWeeklyAggregates(ownerId, 45);
-      const weeklyReport = generateWeeklyReport({ aggregates });
+      const weeklyReport = generateWeeklyReport({ aggregates, allAggregates: aggregates });
 
       if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
         results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });
