@@ -3,6 +3,7 @@ import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { generateInsight } from "@/ai/generateInsight.js";
 import { generateActions } from "@/services/actionEngine.js";
 import { sanitizeDeep } from "@/utils/sanitizeOutput.js";
+import { extractFirstName } from "@/utils/phrasingLayer.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
@@ -60,7 +61,8 @@ export default async function handler(req, res) {
     // Pass allAggregates (45d) for baseline computation.
     const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
     if (canViewRuleBased && report.totalMoments) {
-      report.aiInsight = await generateInsight(report);
+      const firstName = extractFirstName(user?.name);
+      report.aiInsight = await generateInsight(report, { firstName });
     }
 
     // Attach LLM insight for premium users, first-free eligible, OR free-pass holders

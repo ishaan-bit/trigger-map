@@ -94,22 +94,23 @@ function buildTooEarlySummary() {
   return "You're just getting started. Every moment you log helps us learn how you tick. A few more and we'll start spotting patterns.";
 }
 
-function buildLowSummary(report) {
+function buildLowSummary(report, firstName) {
   const n = report.dataQuality.totalMoments;
+  const opener = firstName ? `${firstName}, you've` : "You've";
   if (report.topTrigger) {
-    return `You've logged ${n} moments so far, and ${report.topTrigger} has come up the most. Keep going, a few more days and your patterns will really start to take shape.`;
+    return `${opener} logged ${n} moments so far, and ${report.topTrigger} has come up the most. Keep going, a few more days and your patterns will really start to take shape.`;
   }
   return `${n} moments logged across a few areas. No single theme stands out yet, which is fine. Patterns emerge with a bit more data.`;
 }
 
-function buildEmergingSummary(report) {
+function buildEmergingSummary(report, firstName) {
   const parts = [];
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${report.topTrigger} has been on your mind the most this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} has been on your mind the most this week.`);
   } else if (report.tiedTriggers?.length) {
-    parts.push(`Your week was split between ${report.tiedTriggers.join(" and ")}.`);
+    parts.push(`${firstName ? firstName + ", your" : "Your"} week was split between ${report.tiedTriggers.join(" and ")}.`);
   }
 
   if (report.topEmotion) {
@@ -130,14 +131,14 @@ function buildEmergingSummary(report) {
   return parts.join(" ");
 }
 
-function buildModerateSummary(report) {
+function buildModerateSummary(report, firstName) {
   const parts = [];
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${report.topTrigger} showed up the most this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} showed up the most this week.`);
   } else {
-    parts.push(`No single trigger dominated. Your attention was spread across ${report.tiedTriggers?.join(", ") || "a few areas"}.`);
+    parts.push(`${firstName ? firstName + ", no" : "No"} single trigger dominated. Your attention was spread across ${report.tiedTriggers?.join(", ") || "a few areas"}.`);
   }
 
   if (report.frictionZones.length) {
@@ -166,14 +167,14 @@ function buildModerateSummary(report) {
   return parts.join(" ");
 }
 
-function buildStrongSummary(report) {
+function buildStrongSummary(report, firstName) {
   const parts = [];
   const bm = report.baselineMetrics;
 
   if (report.topTrigger) {
-    parts.push(`${report.topTrigger} was the main theme this week.`);
+    parts.push(`${firstName ? firstName + ", " : ""}${report.topTrigger} was the main theme this week.`);
   } else {
-    parts.push(`Your week touched on ${report.tiedTriggers?.join(", ") || "several areas"} without one standing out.`);
+    parts.push(`${firstName ? firstName + ", your" : "Your"} week touched on ${report.tiedTriggers?.join(", ") || "several areas"} without one standing out.`);
   }
 
   if (report.frictionZones.length) {
@@ -235,8 +236,9 @@ function appendPredictionContext(summary, report) {
   return summary;
 }
 
-export async function generateInsight(report) {
+export async function generateInsight(report, opts = {}) {
   const confidence = report.dataQuality?.confidence || "too_early";
+  const firstName = opts.firstName || null;
 
   let summary;
   switch (confidence) {
@@ -244,16 +246,16 @@ export async function generateInsight(report) {
       summary = buildTooEarlySummary();
       break;
     case "low":
-      summary = buildLowSummary(report);
+      summary = buildLowSummary(report, firstName);
       break;
     case "emerging":
-      summary = buildEmergingSummary(report);
+      summary = buildEmergingSummary(report, firstName);
       break;
     case "moderate":
-      summary = buildModerateSummary(report);
+      summary = buildModerateSummary(report, firstName);
       break;
     default:
-      summary = buildStrongSummary(report);
+      summary = buildStrongSummary(report, firstName);
   }
 
   const trigger = report.topTrigger || report.tiedTriggers?.[0] || "work";

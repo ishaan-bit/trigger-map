@@ -31,9 +31,13 @@ async function processOwner(ownerId, force) {
     return { ownerId, skipped: true, reason: "no-data" };
   }
 
+  // Fetch user for name personalization
+  const user = await getUserById(ownerId).catch(() => null);
+  const firstName = extractFirstName(user?.name);
+
   let insight;
   try {
-    insight = await generateInsight(report);
+    insight = await generateInsight(report, { firstName });
   } catch (aiError) {
     return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
   }
@@ -42,8 +46,6 @@ async function processOwner(ownerId, force) {
   const actions = generateActions(report);
 
   // HF phrasing pass (batch only, not in request path)
-  const user = await getUserById(ownerId).catch(() => null);
-  const firstName = extractFirstName(user?.name);
   insight.summary = await phraseText(insight.summary, { firstName });
   for (const a of actions) {
     a.reason = await phraseText(a.reason, { firstName });
