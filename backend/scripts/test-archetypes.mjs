@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
- * Test harness: backfill each personality archetype and generate rule-based insights.
+ * Test harness: backfill each personality archetype and generate insights.
  *
  * Usage:
- *   node scripts/test-archetypes.mjs                    # all archetypes
- *   node scripts/test-archetypes.mjs burnout-candidate   # single archetype
+ *   node scripts/test-archetypes.mjs                           # rule-based only
+ *   node scripts/test-archetypes.mjs --llm                     # rule-based + LLM (all)
+ *   node scripts/test-archetypes.mjs --llm burnout-candidate   # single archetype with LLM
+ *   node scripts/test-archetypes.mjs --llm-only                # LLM only (skip rule-based checks)
  *
  * Requires: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env vars
  *           (loaded via dotenv from backend/.env)
+ * LLM requires: Ollama running with specified model (default: phi3)
  */
 
 import "dotenv/config";
@@ -22,8 +25,23 @@ import { redis, redisKey, pipeline } from "../services/redisClient.js";
 import { getWeeklyAggregates } from "../services/aggregationService.js";
 import { generateWeeklyReport } from "../services/patternEngine.js";
 import { generateInsight } from "../ai/generateInsight.js";
+import { generateLlmInsight } from "../ai/generateLlmInsight.js";
 import { buildSignalProfile, rankSignals, detectRelationship } from "../ai/signalProfile.js";
+import { lrangeJson } from "../services/redisClient.js";
 import { randomUUID } from "node:crypto";
+
+// ── CLI flags ──
+const args = process.argv.slice(2);
+const RUN_LLM = args.includes("--llm") || args.includes("--llm-only");
+const LLM_ONLY = args.includes("--llm-only");
+const LLM_MODEL = process.env.LLM_MODEL || "phi3";
+const positionalArgs = args.filter(a => !a.startsWith("--"));
+
+// Override env for phi3
+if (RUN_LLM) {
+  process.env.LLM_MODEL = LLM_MODEL;
+  process.env.LLM_API_URL = process.env.LLM_API_URL || "http://localhost:11434/v1";
+}
 
 const TEST_OWNER = "test-archetype-runner-00000000";
 const AGGREGATE_TTL = 60 * 60 * 24 * 45;
@@ -265,6 +283,13 @@ const EXPECTED = {
     whatWorkingShouldNot: ["steady"],
     whereToFocusShouldMention: ["work"],
     description: "Work-dominated friction zones, high frustration+anxiety, exercise barely helps (neutral only). Should NOT say 'steady' or 'balanced'.",
+    llm: {
+      mustMention: ["work"],
+      shouldMentionAny: ["frustrated", "anxious", "stressed", "pressure", "deadline", "meetings", "friction", "heavy", "tense", "drained"],
+      mustNotMention: ["balanced", "positive", "great", "thriving"],
+      toneExpected: "negative-aware",
+      description: "LLM must acknowledge work-driven frustration/anxiety. Must NOT paint a positive picture. Should suggest reducing work friction.",
+    },
   },
   "steady-achiever": {
     mustMention: ["exercise", "energized"],
@@ -273,6 +298,13 @@ const EXPECTED = {
     toneKeywords: ["steady", "energized", "calm", "exercise"],
     whatWorkingShouldMention: ["exercise"],
     description: "Exercise is a clear regulator (energized). Mostly positive. Should highlight exercise as anchor. May mention the one frustrated moment but shouldn't overweight it.",
+    llm: {
+      mustMention: ["exercise"],
+      shouldMentionAny: ["energized", "calm", "steady", "routine", "anchor", "consistent", "positive", "morning"],
+      mustNotMention: ["burnout", "crash", "struggling", "overwhelm"],
+      toneExpected: "positive",
+      description: "LLM should recognize exercise as the anchor. Tone should be positive/encouraging. Should not overdramatize the single frustrated moment.",
+    },
   },
   "social-butterfly": {
     mustMention: ["social", "energized"],
@@ -281,6 +313,13 @@ const EXPECTED = {
     toneKeywords: ["social", "energized", "alone", "anxious"],
     whereToFocusShouldMention: ["alone"],
     description: "Social = energized (regulator). Alone = anxious/frustrated (friction). Clear inverse pattern. Should highlight social as anchor and alone as friction.",
+    llm: {
+      mustMention: ["social"],
+      shouldMentionAny: ["alone", "energized", "anxious", "people", "friends", "connection", "isolated", "restless"],
+      mustNotMention: ["stable", "balanced week"],
+      toneExpected: "contrast",
+      description: "LLM must capture social=energy, alone=drain inverse. Should suggest managing alone-time or building in social connection.",
+    },
   },
   "relationship-focused": {
     mustMention: ["partner"],
@@ -288,6 +327,13 @@ const EXPECTED = {
     regulatorExpected: true,
     toneKeywords: ["partner", "frustrated", "calm", "energized"],
     description: "Partner drives both highs (energized) and lows (frustrated). Family stabilizes. Should show partner as both friction and regulator, or describe the cycling.",
+    llm: {
+      mustMention: ["partner"],
+      shouldMentionAny: ["frustrated", "calm", "energized", "ups", "downs", "cycle", "argument", "close", "connected"],
+      mustNotMention: ["therapy", "counseling", "toxic"],
+      toneExpected: "nuanced",
+      description: "LLM must capture partner as both positive and negative. Should not give relationship advice or speculate. Should note the cycling pattern.",
+    },
   },
   "wellness-warrior": {
     mustMention: ["exercise", "energized"],
@@ -296,6 +342,13 @@ const EXPECTED = {
     toneKeywords: ["exercise", "energized", "calm", "health"],
     whatWorkingShouldMention: ["exercise"],
     description: "Exercise consistently energizes. Health brings calm. One work-anxiety moment shouldn't dominate. Should feel very positive.",
+    llm: {
+      mustMention: ["exercise"],
+      shouldMentionAny: ["energized", "health", "calm", "strong", "routine", "consistent", "positive"],
+      mustNotMention: ["burnout", "crash", "struggling", "overwhelm"],
+      toneExpected: "positive",
+      description: "LLM should reflect a very positive week. Exercise is the clear anchor. Work anxiety should be minor note at most.",
+    },
   },
   "delayed-crash": {
     mustMention: ["work", "neutral", "alone", "frustrated"],
@@ -303,6 +356,13 @@ const EXPECTED = {
     regulatorExpected: false,
     toneKeywords: ["neutral", "frustrated", "alone", "crash"],
     description: "Work appears neutral in-moment, but alone-time crashes follow with frustrated/anxious. Should capture the lagged pattern or at least the alone-frustrated friction.",
+    llm: {
+      mustMention: ["work"],
+      shouldMentionAny: ["neutral", "alone", "frustrated", "crash", "delayed", "lag", "surface", "underneath", "drained", "exhausted", "flat"],
+      mustNotMention: ["balanced", "positive week", "thriving"],
+      toneExpected: "subtle-warning",
+      description: "LLM should notice work looks neutral on surface but alone-time brings crashes. Should hint at delayed stress response.",
+    },
   },
   "false-recovery": {
     mustMention: ["alone", "frustrated"],
@@ -310,6 +370,13 @@ const EXPECTED = {
     regulatorExpected: true,
     toneKeywords: ["alone", "frustrated", "exercise", "social", "energized"],
     description: "Alone = frustrated/anxious (friction). Exercise + social = energized (regulators). The passive-rest trap. Should show alone as friction, exercise/social as what works.",
+    llm: {
+      mustMention: ["alone"],
+      shouldMentionAny: ["exercise", "social", "energized", "frustrated", "passive", "rest", "scrolling", "recovery", "trap", "cycle"],
+      mustNotMention: ["stable", "balanced week"],
+      toneExpected: "pattern-aware",
+      description: "LLM should capture the false recovery pattern — passive rest doesn't help, active recovery does. Should suggest active alternatives.",
+    },
   },
   "context-split": {
     mustMention: ["work"],
@@ -317,6 +384,13 @@ const EXPECTED = {
     regulatorExpected: false,
     toneKeywords: ["work", "calm", "anxious", "frustrated"],
     description: "Work produces both calm (deep work) and anxious/frustrated (meetings). Tags differentiate. Should capture the split or at least mention work appears with mixed feelings.",
+    llm: {
+      mustMention: ["work"],
+      shouldMentionAny: ["calm", "anxious", "frustrated", "morning", "afternoon", "meeting", "deep", "split", "mixed", "different"],
+      mustNotMention: ["balanced week", "thriving"],
+      toneExpected: "observational",
+      description: "LLM should notice work produces both calm and anxious. Tags (deep-work vs afternoon-meetings) should differentiate contexts. Should suggest protecting deep-work time.",
+    },
   },
   "silent-drift": {
     mustMention: ["neutral"],
@@ -326,6 +400,13 @@ const EXPECTED = {
     whatWorkingShouldNot: ["steady", "stability"],
     whereToFocusShouldExist: true,
     description: "Nearly everything is neutral. Should detect flattening pattern — emotional range narrowing. Should NOT describe as 'steady' positively.",
+    llm: {
+      mustMention: ["neutral"],
+      shouldMentionAny: ["flat", "narrow", "range", "variation", "numb", "mechanical", "same", "surface", "quiet", "drift"],
+      mustNotMention: ["great", "thriving", "strong"],
+      toneExpected: "gentle-concern",
+      description: "LLM must recognize the flattening. Should NOT praise stability. Should suggest reintroducing variety or noticing more nuance.",
+    },
   },
 };
 
@@ -471,9 +552,32 @@ async function testArchetype(personality) {
     console.log(`  frictionZones: ${report.frictionZones.map(f => `${f.trigger}+${f.emotion}(${f.count}x)`).join(", ")}`);
   }
   const emotionFreq = report.emotionFrequency || {};
+  const totalEmo = Object.values(emotionFreq).reduce((s, v) => s + v, 0);
+  const neutralPct = totalEmo > 0 ? Math.round((emotionFreq.neutral || 0) / totalEmo * 100) : 0;
   console.log(`  emotions: ${Object.entries(emotionFreq).sort(([,a],[,b]) => b - a).map(([e,c]) => `${e}=${c}`).join(", ")}`);
+  console.log(`  neutralRatio: ${neutralPct}%`);
   const triggerFreq = report.triggerFrequency || {};
   console.log(`  triggers: ${Object.entries(triggerFreq).sort(([,a],[,b]) => b - a).map(([t,c]) => `${t}=${c}`).join(", ")}`);
+
+  // Baseline metrics
+  const bm = report.baselineMetrics;
+  if (bm) {
+    console.log("\n── Baseline Metrics ──");
+    if (bm.baseline?.reliable) console.log(`  baseline: ${bm.baseline.score?.toFixed(1)}/5 (${bm.baseline.label})`);
+    if (bm.drift) console.log(`  drift: ${bm.drift.label} (${bm.drift.value > 0 ? "+" : ""}${bm.drift.value?.toFixed(2)})`);
+    if (bm.stability) console.log(`  stability: ${bm.stability.label} (${Math.round(bm.stability.score * 100)}%)`);
+    if (bm.recoveryLatency) console.log(`  recovery: ${bm.recoveryLatency.label} (~${bm.recoveryLatency.days}d)`);
+    if (bm.stateOfMind) console.log(`  stateOfMind: ${bm.stateOfMind}`);
+  }
+
+  // Trajectory
+  if (report.weeklyEmotionTrajectory?.length >= 2) {
+    const traj = report.weeklyEmotionTrajectory;
+    const scores = traj.map(t => t.score.toFixed(1)).join(" → ");
+    console.log(`\n── Trajectory ──`);
+    console.log(`  ${scores}`);
+    if (report.trajectoryNote) console.log(`  note: ${report.trajectoryNote}`);
+  }
 
   console.log("\n── SUMMARY ──");
   console.log(`  ${insight.summary}`);
@@ -568,12 +672,135 @@ async function testArchetype(personality) {
     }
   }
 
-  return { personality, label, issues, summary: insight.summary };
+  return { personality, label, issues, summary: insight.summary, report, sp };
+}
+
+// ── LLM test ───────────────────────────────────────────────────────────────
+
+async function testLlm(personality, report) {
+  const label = PERSONALITIES[personality].label;
+  const expected = EXPECTED[personality].llm;
+  if (!expected) {
+    console.log(`  (no LLM expectations defined — skipping)`);
+    return { personality, label, llmIssues: [], llmNarrative: null, skipped: true };
+  }
+
+  console.log(`\n  ── LLM INSIGHT (${LLM_MODEL}) ──`);
+  console.log(`  LLM Expected: ${expected.description}\n`);
+
+  // Get recent notes from backfilled moments
+  const momentsRaw = await lrangeJson(redisKey("moments", TEST_OWNER));
+  const recentNotes = momentsRaw
+    .filter(m => m.note)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 10)
+    .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note }));
+
+  let llmResult;
+  try {
+    llmResult = await generateLlmInsight({ weeklyReport: report, recentNotes });
+  } catch (err) {
+    console.log(`  ⚠ LLM FAILED: ${err.message}`);
+    return { personality, label, llmIssues: [`LLM_ERROR: ${err.message}`], llmNarrative: null };
+  }
+
+  const narrative = llmResult.narrative || "";
+  console.log(`  ${narrative.replace(/\n/g, "\n  ")}`);
+  console.log(`  [model: ${llmResult.model}, sections: ${llmResult.sectionCount}]`);
+
+  // ── LLM KPI validation ──
+  const llmIssues = [];
+  const narrativeLower = narrative.toLowerCase();
+
+  // KPI 1: Word count (60-165 words)
+  const wordCount = narrative.split(/\s+/).filter(w => w.length > 0).length;
+  if (wordCount < 50) llmIssues.push(`KPI: too short (${wordCount} words, min 50)`);
+  if (wordCount > 200) llmIssues.push(`KPI: too long (${wordCount} words, max 200)`);
+  console.log(`  Word count: ${wordCount}`);
+
+  // KPI 2: Section structure (must have at least 2 of 3 required sections)
+  const hasStoodOut = /what stood out/i.test(narrative);
+  const hasContributing = /what may be contributing/i.test(narrative);
+  const hasTrySection = /one thing to try/i.test(narrative);
+  const sectionCount = [hasStoodOut, hasContributing, hasTrySection].filter(Boolean).length;
+  if (sectionCount < 2) llmIssues.push(`KPI: only ${sectionCount}/3 sections present`);
+
+  // KPI 3: Must-mention terms
+  for (const word of (expected.mustMention || [])) {
+    if (!narrativeLower.includes(word)) {
+      llmIssues.push(`KPI: LLM must mention "${word}"`);
+    }
+  }
+
+  // KPI 4: Should mention any (at least 1 from the list)
+  if (expected.shouldMentionAny?.length) {
+    const foundAny = expected.shouldMentionAny.some(w => narrativeLower.includes(w));
+    if (!foundAny) {
+      llmIssues.push(`KPI: LLM should mention at least one of: ${expected.shouldMentionAny.join(", ")}`);
+    }
+  }
+
+  // KPI 5: Must NOT mention
+  for (const word of (expected.mustNotMention || [])) {
+    if (narrativeLower.includes(word)) {
+      llmIssues.push(`KPI: LLM must NOT mention "${word}"`);
+    }
+  }
+
+  // KPI 6: No name usage (should only use "you"/"your")
+  if (/\b[A-Z][a-z]{2,}'s\b/.test(narrative) || /\bthe user\b/i.test(narrative)) {
+    llmIssues.push("KPI: LLM used name or 'the user' instead of 'you/your'");
+  }
+
+  // KPI 7: No markdown artifacts
+  if (/[*#]/.test(narrative)) {
+    llmIssues.push("KPI: LLM output contains markdown artifacts (* or #)");
+  }
+
+  // KPI 8: No em dashes
+  if (/\u2014|\u2013/.test(narrative)) {
+    llmIssues.push("KPI: LLM output contains em/en dashes");
+  }
+
+  // KPI 9: No prompt echo (instruction leak)
+  const echoPatterns = /structured signals|only reference|critical rules|signal profile|section \d|end of example/i;
+  if (echoPatterns.test(narrative)) {
+    llmIssues.push("KPI: LLM output contains prompt echo");
+  }
+
+  // KPI 10: No hallucinated emotions (only valid: calm, neutral, anxious, frustrated, energized)
+  const hallucinated = narrative.match(/\b(sad|happy|angry|depressed|joyful|elated|miserable|furious|terrified|ecstatic|devastated)\b/gi);
+  if (hallucinated?.length) {
+    llmIssues.push(`KPI: LLM hallucinated emotions: ${[...new Set(hallucinated.map(h => h.toLowerCase()))].join(", ")}`);
+  }
+
+  // KPI 11: No fabricated context not in data
+  const fabricated = narrative.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi);
+  // Only flag if the specific day isn't in the data notes
+  const arcNotes = PERSONALITIES[personality].arcs[0].moments.map(m => (m.note || "").toLowerCase()).join(" ");
+  if (fabricated?.length) {
+    for (const day of [...new Set(fabricated.map(d => d.toLowerCase()))]) {
+      if (!arcNotes.includes(day)) {
+        llmIssues.push(`KPI: LLM may have fabricated day reference "${day}" not in source data`);
+      }
+    }
+  }
+
+  if (llmIssues.length === 0) {
+    console.log("\n  ✅ LLM PASS — all KPIs met");
+  } else {
+    console.log(`\n  ❌ LLM ISSUES (${llmIssues.length}):`);
+    for (const issue of llmIssues) {
+      console.log(`     ${issue}`);
+    }
+  }
+
+  return { personality, label, llmIssues, llmNarrative: narrative };
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
-const selected = process.argv[2];
+const selected = positionalArgs[0] || null;
 const personalities = selected
   ? [selected]
   : Object.keys(PERSONALITIES);
@@ -584,24 +811,53 @@ if (selected && !PERSONALITIES[selected]) {
   process.exit(1);
 }
 
-console.log(`Testing ${personalities.length} archetype(s)...\n`);
+const modeLabel = LLM_ONLY ? "LLM-only" : RUN_LLM ? "rule-based + LLM" : "rule-based";
+console.log(`Testing ${personalities.length} archetype(s) [${modeLabel}]${RUN_LLM ? ` (model: ${LLM_MODEL})` : ""}...\n`);
 
 const results = [];
+const llmResults = [];
 for (const p of personalities) {
   const result = await testArchetype(p);
   results.push(result);
+
+  if (RUN_LLM) {
+    const llmResult = await testLlm(p, result.report);
+    llmResults.push(llmResult);
+  }
 }
 
-// ── Summary ────────────────────────────────────────────────────────────────
-console.log(`\n\n${"═".repeat(70)}`);
-console.log("  FINAL SCORECARD");
-console.log(`${"═".repeat(70)}`);
-for (const r of results) {
-  const status = r.issues.length === 0 ? "✅ PASS" : `❌ FAIL (${r.issues.length})`;
-  console.log(`  ${status}  ${r.label}`);
-  if (r.issues.length > 0) {
-    for (const issue of r.issues) {
-      console.log(`           ${issue}`);
+// ── Rule-Based Scorecard ───────────────────────────────────────────────────
+if (!LLM_ONLY) {
+  console.log(`\n\n${"═".repeat(70)}`);
+  console.log("  RULE-BASED SCORECARD");
+  console.log(`${"═".repeat(70)}`);
+  for (const r of results) {
+    const status = r.issues.length === 0 ? "✅ PASS" : `❌ FAIL (${r.issues.length})`;
+    console.log(`  ${status}  ${r.label}`);
+    if (r.issues.length > 0) {
+      for (const issue of r.issues) {
+        console.log(`           ${issue}`);
+      }
+    }
+  }
+}
+
+// ── LLM Scorecard ──────────────────────────────────────────────────────────
+if (RUN_LLM && llmResults.length > 0) {
+  console.log(`\n${"═".repeat(70)}`);
+  console.log(`  LLM SCORECARD (${LLM_MODEL})`);
+  console.log(`${"═".repeat(70)}`);
+  for (const r of llmResults) {
+    if (r.skipped) {
+      console.log(`  ⏭ SKIP  ${r.label}`);
+      continue;
+    }
+    const status = r.llmIssues.length === 0 ? "✅ PASS" : `❌ FAIL (${r.llmIssues.length})`;
+    console.log(`  ${status}  ${r.label}`);
+    if (r.llmIssues.length > 0) {
+      for (const issue of r.llmIssues) {
+        console.log(`           ${issue}`);
+      }
     }
   }
 }
@@ -610,5 +866,7 @@ for (const r of results) {
 await clearUser(TEST_OWNER);
 console.log("\n(Test user data cleaned up)");
 
-const totalIssues = results.reduce((s, r) => s + r.issues.length, 0);
+const rbIssues = LLM_ONLY ? 0 : results.reduce((s, r) => s + r.issues.length, 0);
+const llmIssueCount = llmResults.reduce((s, r) => s + (r.llmIssues?.length || 0), 0);
+const totalIssues = rbIssues + llmIssueCount;
 process.exit(totalIssues > 0 ? 1 : 0);

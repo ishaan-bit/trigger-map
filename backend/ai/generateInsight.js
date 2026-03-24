@@ -173,6 +173,8 @@ function buildModerateSummary(report, firstName) {
       : `${name}this week carried a heavy emotional tone, with frustration or anxiety showing up often.`;
   } else if (sp.volatility === 'low') {
     s1 = `${name}things have been steady this week, with ${report.topEmotion || 'a consistent tone'} showing up most.`;
+  } else if (sp.dominantEmotion === 'neutral' && report.frictionZones?.length && report.topTrigger) {
+    s1 = `${name}${cap(triggerLabel(report.topTrigger))} came up the most this week, but most of it felt neutral.`;
   } else if (report.topTrigger) {
     s1 = `${name}${cap(triggerLabel(report.topTrigger))} came up the most this week.`;
   } else {
@@ -285,6 +287,8 @@ function buildStrongSummary(report, firstName) {
     s1 = `${name}things were steady this week, with ${report.topEmotion || 'a consistent emotional tone'} showing up most.`;
   } else if (sp.volatility === 'high') {
     s1 = `${name}there was a lot of emotional range this week, with shifts between different states.`;
+  } else if (sp.dominantEmotion === 'neutral' && report.frictionZones?.length && report.topTrigger) {
+    s1 = `${name}${cap(triggerLabel(report.topTrigger))} was the main theme this week, but most of it felt neutral.`;
   } else if (report.topTrigger) {
     s1 = `${name}${cap(triggerLabel(report.topTrigger))} was the main theme this week.`;
   } else {
@@ -309,9 +313,11 @@ function buildStrongSummary(report, firstName) {
       s2 = `On the surface things look consistent, but there's been ${driftAdj} compared to your usual baseline.`;
     } else if (ranked.anchor && sp.drift !== 'positive' && report.frictionZones?.length) {
       const f = report.frictionZones[0];
-      const a = ranked.anchor.data || report.regulators[0];
+      const a = ranked.anchor.data || report.regulators?.[0] || {};
       const fVerb = sp.triggerStrength === 'weak' ? 'showed up together' : 'kept showing up together';
-      s2 = `While ${triggerLabel(a.trigger)} tends to help, ${triggerLabel(f.trigger)} and feeling ${f.emotion} ${fVerb} (${f.count}×).`;
+      s2 = a.trigger
+        ? `While ${triggerLabel(a.trigger)} tends to help, ${triggerLabel(f.trigger)} and feeling ${f.emotion} ${fVerb} (${f.count}×).`
+        : `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} ${fVerb} (${f.count}×). That's worth noticing.`;
     } else if (report.topTrigger && sp.dominantEmotion === 'neutral') {
       s2 = `${cap(triggerLabel(report.topTrigger))} showed up often, but your responses stayed mostly neutral, suggesting reduced emotional variation.`;
     } else {

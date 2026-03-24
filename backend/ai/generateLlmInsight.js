@@ -249,15 +249,17 @@ END OF EXAMPLE. Now write your three sections using the data above.
 
 CRITICAL RULES (must follow):
 - ONLY describe emotions, triggers, and patterns that appear in the data above. Do not invent deadlines, meetings, mornings, evenings, or any context not present.
+- Do NOT reference specific days of the week (Monday, Tuesday, etc.) unless they appear literally in the user's notes above. Never fabricate day references.
 - If the SIGNAL PROFILE says FLATTENING DETECTED, the central story MUST be about emotional range narrowing toward neutral. Do not describe this as positive stability.
 - If the data shows a Within-week trajectory decline, acknowledge the drop. Do not call the week stable or even.
 - Never reference the user by name. Only use "you" and "your".
 - Never speculate about psychological states or coping ability. Only describe patterns visible in the data.
+- Do NOT use words from the SIGNAL PROFILE labels (like "signal profile", "confidence", "volatility score", "drift", "alignment", "contrast") in your output. Describe patterns in plain everyday language.
 
 Format rules:
 - Start with "What stood out" — no text before it.
 - Each header must be alone on its own line, with the body on the next line.
-- ${minWords}-${maxWords} words total. Do not exceed ${hardCap} words.
+- ${minWords}-${maxWords} words total. HARD LIMIT: stop at ${hardCap} words. Write SHORT, crisp sentences.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive. Use simple everyday words. Avoid uncommon or technical vocabulary.
@@ -293,9 +295,9 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
 
   const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback);
 
-  // Scale max_tokens generously so the model never hits the ceiling mid-sentence.
-  // The prompt word-limit is the real constraint; tokens are just a safety net.
-  const maxTokens = Math.max(400, Math.round(maxWords * 3.5));
+  // Scale max_tokens — tight enough to discourage verbosity but with headroom
+  // for the model to complete sentences. Roughly 1.5 tokens per word.
+  const maxTokens = Math.max(300, Math.round(maxWords * 2.5));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -375,7 +377,8 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       .replace(/a single concrete,? small experiment for next week[^.]*?[:\s.]*/gi, "")
       .replace(/be specific to the data\.?\s*/gi, "")
       // Strip leaked signal-profile / constraint labels
-      .replace(/\b(?:given|based on|considering|due to) (?:the )?(?:subtle |moderate |strong )?(?:signal profile|flattening detected|within-week trajectory)[,.]?\s*/gi, "")
+      .replace(/\b(?:given|based on|considering|due to|as (?:per|indicated|suggested|noted|seen|observed|evident|shown)(?: (?:by|in|from))?) (?:the )?(?:subtle |moderate |strong )?(?:signal profile|flattening detected|within-week trajectory)[,.]?\s*/gi, "")
+      .replace(/\b(?:signal profile|volatility score|confidence level|drift (?:direction|level)|within-week trajectory slope)\b/gi, "data")
       .trim();
 
     // Normalize variant section headers to canonical names.
@@ -454,6 +457,28 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
 
     // Recompose from extracted sections only — discards trailing hallucinations
     content = extracted.map(s => `${s.header}\n${s.body}`).join("\n\n");
+
+    // Hard word-count enforcement: trim each section at sentence boundary if over limit
+    const hardWordCap = Math.round(maxWords * 1.35);
+    const totalWords = content.split(/\s+/).filter(w => w.length > 0).length;
+    if (totalWords > hardWordCap) {
+      const maxPerSection = Math.floor(hardWordCap / extracted.length);
+      for (const sec of extracted) {
+        const words = sec.body.split(/\s+/).filter(w => w.length > 0);
+        if (words.length > maxPerSection) {
+          // Walk backward from maxPerSection to find sentence boundary
+          const partial = words.slice(0, maxPerSection).join(" ");
+          sec.body = trimIncomplete(partial);
+        }
+      }
+      content = extracted.map(s => `${s.header}\n${s.body}`).join("\n\n");
+    }
+
+    // Strip fabricated day-of-week references not present in source notes
+    const notesText = (recentNotes || []).map(n => (n.note || "").toLowerCase()).join(" ");
+    content = content.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi, (match) => {
+      return notesText.includes(match.toLowerCase()) ? match : "";
+    }).replace(/\s{2,}/g, " ").replace(/\s([.,;:])/g, "$1").trim();
 
     return {
       narrative: content,
