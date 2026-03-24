@@ -117,6 +117,7 @@ export default function InsightsPage() {
                       <th>Type</th>
                       <th>Model</th>
                       <th>Confidence / Sections</th>
+                      <th>Behavioral Flags</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,6 +135,32 @@ export default function InsightsPage() {
                         </td>
                         <td className="mono">{ins.model}</td>
                         <td className="mono">{ins.confidence || `${ins.sectionCount} sections`}</td>
+                        <td>
+                          {ins.hasInvoked ? (
+                            <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {ins.crashRisk && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(239,68,68,0.15)', color: '#f87171' }} title="Crash risk detected">CRASH</span>
+                              )}
+                              {ins.falseRecovery && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(234,179,8,0.15)', color: '#facc15' }} title="False recovery detected">FALSE-R</span>
+                              )}
+                              {ins.maskingLevel && ins.maskingLevel !== 'none' && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }} title={`Masking: ${ins.maskingLevel}`}>MASK:{ins.maskingLevel[0].toUpperCase()}</span>
+                              )}
+                              {ins.vacuumDrift != null && ins.vacuumDrift < -0.1 && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(255,107,122,0.12)', color: '#ff6b7a' }} title={`Vacuum drift: ${ins.vacuumDrift.toFixed(2)}`}>V↓</span>
+                              )}
+                              {ins.vacuumDrift != null && ins.vacuumDrift > 0.1 && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(52,199,89,0.12)', color: '#34c759' }} title={`Vacuum drift: +${ins.vacuumDrift.toFixed(2)}`}>V↑</span>
+                              )}
+                              {!ins.crashRisk && !ins.falseRecovery && (!ins.maskingLevel || ins.maskingLevel === 'none') && ins.vacuumDrift != null && Math.abs(ins.vacuumDrift) <= 0.1 && (
+                                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>stable</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -67,6 +67,27 @@ export default async function handler(req, res) {
           const model = parsed.model || 'rule-based';
           insightModels[model] = (insightModels[model] || 0) + 1;
 
+          // Invoked metrics presence
+          const hasInvoked = !!parsed.invokedMetrics;
+          const vacuumDrift = parsed.invokedMetrics?.vacuumDrift;
+          const maskingLevel = parsed.invokedMetrics?.masking?.level;
+          const falseRecovery = !!parsed.compoundPatterns?.falseRecovery;
+          const crashRisk = !!parsed.compoundPatterns?.crashRisk;
+
+          // Update recent insight entry with invoked info
+          if (parsed.generatedAt) {
+            const entry = recentInsights[recentInsights.length - 1];
+            if (entry && entry.ownerId === sample[i]) {
+              entry.hasInvoked = hasInvoked;
+              if (hasInvoked) {
+                entry.vacuumDrift = vacuumDrift;
+                entry.maskingLevel = maskingLevel;
+                entry.falseRecovery = falseRecovery;
+                entry.crashRisk = crashRisk;
+              }
+            }
+          }
+
           // Count actions from weekly report
           if (Array.isArray(parsed.actions) && parsed.actions.length > 0) {
             usersWithActions++;

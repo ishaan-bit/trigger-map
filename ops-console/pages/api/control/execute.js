@@ -15,6 +15,7 @@ const ALLOWED_CACHES = [
   'llm_free_pass',
   'action_feedback',
   'action_prefs',
+  'vacuum',
 ];
 
 export default async function handler(req, res) {

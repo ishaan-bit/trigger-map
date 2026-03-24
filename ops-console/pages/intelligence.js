@@ -363,6 +363,72 @@ export default function IntelligencePage() {
             </div>
           )}
 
+          {/* Invoked Behavioral Metrics (Fleet-level) */}
+          {data.invokedMetrics && data.invokedMetrics.usersWithData > 0 && (
+            <div className="panel">
+              <div className="panel-header">
+                <h3>Invoked Behavioral Metrics</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {data.invokedMetrics.usersWithData} users with computed metrics
+                </span>
+              </div>
+              <div className="panel-body">
+                <div className="metrics-grid" style={{ marginBottom: 16 }}>
+                  <MetricCard
+                    label="False Recovery"
+                    value={data.invokedMetrics.falseRecoveryCount}
+                    sub="Users with surface recovery, deeper decline"
+                    color={data.invokedMetrics.falseRecoveryCount > 0 ? 'var(--yellow)' : 'var(--green)'}
+                  />
+                  <MetricCard
+                    label="Crash Risk"
+                    value={data.invokedMetrics.crashRiskCount}
+                    sub="Users on declining vacuum trajectory"
+                    color={data.invokedMetrics.crashRiskCount > 0 ? 'var(--red)' : 'var(--green)'}
+                  />
+                </div>
+                {/* Vacuum drift distribution */}
+                {data.invokedMetrics.vacuumDrift && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Vacuum Drift Distribution</div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {[
+                        { label: 'Positive', value: data.invokedMetrics.vacuumDrift.positive, color: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.2)', text: 'var(--green)' },
+                        { label: 'Stable', value: data.invokedMetrics.vacuumDrift.none, color: 'rgba(155,176,201,0.08)', border: 'rgba(155,176,201,0.2)', text: 'var(--text-secondary)' },
+                        { label: 'Negative', value: data.invokedMetrics.vacuumDrift.negative, color: 'rgba(255,204,0,0.08)', border: 'rgba(255,204,0,0.2)', text: 'var(--yellow)' },
+                        { label: 'Strong ↓', value: data.invokedMetrics.vacuumDrift.strong_negative, color: 'rgba(255,107,122,0.08)', border: 'rgba(255,107,122,0.2)', text: 'var(--red)' },
+                      ].map((seg) => (
+                        <div key={seg.label} style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 8, background: seg.color, border: `1px solid ${seg.border}` }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: seg.text }}>{seg.value}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{seg.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Masking level distribution */}
+                {data.invokedMetrics.maskingLevel && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Behavioral Masking Levels</div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {[
+                        { label: 'None', value: data.invokedMetrics.maskingLevel.none, color: 'var(--green)' },
+                        { label: 'Low', value: data.invokedMetrics.maskingLevel.low, color: 'var(--cyan)' },
+                        { label: 'Moderate', value: data.invokedMetrics.maskingLevel.moderate, color: 'var(--yellow)' },
+                        { label: 'High', value: data.invokedMetrics.maskingLevel.high, color: 'var(--red)' },
+                      ].map((seg) => (
+                        <div key={seg.label} style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 8, background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: seg.color }}>{seg.value}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{seg.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Product Health Signals */}
           <div className="panel">
             <div className="panel-header"><h3>Product Health Assessment</h3></div>

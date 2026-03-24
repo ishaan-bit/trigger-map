@@ -119,6 +119,11 @@ const CACHE_ACTIONS = [
     label: 'Clear Action Feedback',
     description: 'Remove all stored HiTL action feedback (tried/skipped responses). Users will see fresh action cards.',
   },
+  {
+    id: 'vacuum',
+    label: 'Clear Vacuum State Cache',
+    description: 'Remove all cached vacuum state trajectories. Next weekly report generation will recompute invoked metrics.',
+  },
 ];
 
 const QUICK_ACTIONS = [

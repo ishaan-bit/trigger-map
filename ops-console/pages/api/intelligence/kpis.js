@@ -64,6 +64,13 @@ export default async function handler(req, res) {
     const stabilityScores = [];
     const stateOfMindCounts = {};
 
+    // Invoked metrics fleet aggregates
+    const vacuumDriftCounts = { positive: 0, none: 0, negative: 0, strong_negative: 0 };
+    const maskingLevelCounts = { none: 0, low: 0, moderate: 0, high: 0 };
+    let falseRecoveryCount = 0;
+    let crashRiskCount = 0;
+    let usersWithInvokedMetrics = 0;
+
     // Behavioral signals
     const triggerCounts = {};
     const emotionCounts = {};
@@ -124,6 +131,22 @@ export default async function handler(req, res) {
           if (rp?.driftValue != null) driftValues.push(rp.driftValue);
           if (rp?.stabilityScore != null) stabilityScores.push(rp.stabilityScore);
           if (rp?.stateOfMind) stateOfMindCounts[rp.stateOfMind] = (stateOfMindCounts[rp.stateOfMind] || 0) + 1;
+
+          // Invoked behavioral metrics
+          if (rp?.invokedMetrics) {
+            usersWithInvokedMetrics++;
+            const vd = rp.invokedMetrics.vacuumDrift;
+            if (vd != null) {
+              if (vd > 0.1) vacuumDriftCounts.positive++;
+              else if (vd > -0.1) vacuumDriftCounts.none++;
+              else if (vd > -0.25) vacuumDriftCounts.negative++;
+              else vacuumDriftCounts.strong_negative++;
+            }
+            const ml = rp.invokedMetrics.masking?.level;
+            if (ml && maskingLevelCounts[ml] !== undefined) maskingLevelCounts[ml]++;
+          }
+          if (rp?.compoundPatterns?.falseRecovery) falseRecoveryCount++;
+          if (rp?.compoundPatterns?.crashRisk) crashRiskCount++;
         } catch { /* ignore parse errors */ }
       }
 
@@ -288,6 +311,13 @@ export default async function handler(req, res) {
           declining: driftValues.filter(d => d < -0.15).length,
         },
         stateOfMind: stateOfMindCounts,
+      },
+      invokedMetrics: {
+        usersWithData: usersWithInvokedMetrics,
+        vacuumDrift: vacuumDriftCounts,
+        maskingLevel: maskingLevelCounts,
+        falseRecoveryCount,
+        crashRiskCount,
       },
     });
   } catch (err) {
