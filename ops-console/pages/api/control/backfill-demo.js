@@ -243,6 +243,188 @@ const PERSONALITIES = {
       },
     ],
   },
+
+  'delayed-crash': {
+    label: 'Delayed Crash',
+    description: 'Stress feels controlled in the moment, crashes arrive 24-48h later',
+    arcs: [
+      {
+        name: 'delayed-crash-a-lagged-collapse',
+        moments: [
+          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Handled a heavy workload, felt in control', tags: ['workload'] },
+          { dayOffset: 0, hour: 14, trigger: 'work',     emotion: 'neutral',    note: 'Meetings were dense but manageable' },
+          { dayOffset: 1, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Woke up exhausted, no energy to do anything' },
+          { dayOffset: 1, hour: 18, trigger: 'health',   emotion: 'anxious',    note: 'Headache won\'t go away, body is protesting' },
+          { dayOffset: 2, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Pushed through another packed day', tags: ['workload'] },
+          { dayOffset: 2, hour: 14, trigger: 'work',     emotion: 'neutral',    note: 'Stayed composed but felt something building' },
+          { dayOffset: 3, hour: 9,  trigger: 'alone',    emotion: 'frustrated', note: 'Everything hit at once, could barely get out of bed' },
+          { dayOffset: 3, hour: 19, trigger: 'exercise',  emotion: 'calm',       note: 'Forced a walk, it helped somewhat' },
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Back to autopilot mode', tags: ['workload'] },
+          { dayOffset: 4, hour: 20, trigger: 'alone',    emotion: 'anxious',    note: 'Weekend but too drained to enjoy it' },
+          { dayOffset: 5, hour: 10, trigger: 'exercise',  emotion: 'calm',       note: 'Long walk finally cleared my head' },
+          { dayOffset: 5, hour: 17, trigger: 'social',    emotion: 'neutral',    note: 'Met friends but could not fully engage' },
+          { dayOffset: 6, hour: 9,  trigger: 'alone',    emotion: 'frustrated', note: 'Dreading Monday already, the cycle repeats' },
+        ],
+      },
+      {
+        name: 'delayed-crash-b-accumulation',
+        moments: [
+          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Started the week fresh actually' },
+          { dayOffset: 0, hour: 15, trigger: 'work',     emotion: 'neutral',    note: 'Afternoon got intense, lots of context switching', tags: ['context-switching'] },
+          { dayOffset: 1, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Meetings all day, stayed composed', tags: ['meetings'] },
+          { dayOffset: 1, hour: 20, trigger: 'work',     emotion: 'neutral',    note: 'Worked late but still felt okay' },
+          { dayOffset: 2, hour: 8,  trigger: 'alone',    emotion: 'anxious',    note: 'Hit a wall this morning, brain fog', tags: ['crash'] },
+          { dayOffset: 2, hour: 14, trigger: 'health',   emotion: 'frustrated', note: 'Stomach issues, stress leaking into my body' },
+          { dayOffset: 3, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Recovered enough to push through' },
+          { dayOffset: 3, hour: 18, trigger: 'exercise',  emotion: 'calm',       note: 'Gym session, first good feeling in days' },
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Intense sprint to close the week', tags: ['deadline'] },
+          { dayOffset: 4, hour: 19, trigger: 'alone',    emotion: 'frustrated', note: 'Collapsed on the couch, zero motivation' },
+          { dayOffset: 5, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Expected to bounce back on Saturday, did not happen', tags: ['crash'] },
+          { dayOffset: 5, hour: 16, trigger: 'exercise',  emotion: 'neutral',    note: 'Tried to run but legs felt like lead' },
+          { dayOffset: 6, hour: 10, trigger: 'family',   emotion: 'calm',       note: 'Family visit helped more than I expected' },
+        ],
+      },
+    ],
+  },
+
+  'false-recovery': {
+    label: 'False Recovery',
+    description: 'Passive rest feels like recovery but next-day baseline drops; active recovery actually works',
+    arcs: [
+      {
+        name: 'false-recovery-a-scrolling-trap',
+        moments: [
+          // Cycle 1: work stress → passive rest → decline → real recovery
+          { dayOffset: 0, hour: 9,  trigger: 'work',     emotion: 'frustrated', note: 'Overwhelmed from minute one', tags: ['deadline'] },
+          { dayOffset: 0, hour: 20, trigger: 'alone',    emotion: 'neutral',    note: 'Scrolling through my phone to zone out', tags: ['passive-rest'] },
+          { dayOffset: 1, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Did not sleep well, woke up worse than yesterday' },
+          { dayOffset: 1, hour: 18, trigger: 'exercise',  emotion: 'energized',  note: 'Finally dragged myself to the gym, huge difference' },
+          // Cycle 2: recovered → passive rest again → decline → real recovery
+          { dayOffset: 2, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Clear-headed after yesterday\'s workout' },
+          { dayOffset: 2, hour: 20, trigger: 'alone',    emotion: 'neutral',    note: 'Netflix and couch, thought I earned it', tags: ['passive-rest'] },
+          { dayOffset: 3, hour: 8,  trigger: 'alone',    emotion: 'anxious',    note: 'Woke up restless, the Netflix did not help' },
+          { dayOffset: 3, hour: 18, trigger: 'social',    emotion: 'energized',  note: 'Drinks with friends, actually laughed for the first time all week' },
+          // Cycle 3: recovered → passive rest AGAIN → decline → real recovery
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Felt genuinely better after real connection' },
+          { dayOffset: 4, hour: 20, trigger: 'alone',    emotion: 'neutral',    note: 'Thought I would try relaxing at home again', tags: ['passive-rest'] },
+          { dayOffset: 5, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Same crash, passive rest just does not work for me' },
+          { dayOffset: 5, hour: 16, trigger: 'exercise',  emotion: 'energized',  note: 'Afternoon bike ride finally broke the cycle' },
+          { dayOffset: 6, hour: 8,  trigger: 'alone',    emotion: 'anxious',    note: 'Thought I recovered but feel off again today' },
+          { dayOffset: 6, hour: 15, trigger: 'social',    emotion: 'energized',  note: 'Sunday brunch with friends saved the day' },
+        ],
+      },
+      {
+        name: 'false-recovery-b-couch-cycle',
+        moments: [
+          // Cycle 1: stress → passive rest → decline → real recovery
+          { dayOffset: 0, hour: 9,  trigger: 'work',     emotion: 'anxious',    note: 'Week started with urgent emails', tags: ['urgent'] },
+          { dayOffset: 0, hour: 21, trigger: 'alone',    emotion: 'neutral',    note: 'Stayed up late watching videos to forget about it', tags: ['passive-rest'] },
+          { dayOffset: 1, hour: 8,  trigger: 'alone',    emotion: 'anxious',    note: 'Headache and low energy, the videos made it worse' },
+          { dayOffset: 1, hour: 19, trigger: 'alone',    emotion: 'neutral',    note: 'Tried reading but kept checking my phone', tags: ['passive-rest'] },
+          // Cycle 2: more passive rest → decline → real recovery
+          { dayOffset: 2, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Third day feeling progressively worse' },
+          { dayOffset: 2, hour: 18, trigger: 'social',    emotion: 'energized',  note: 'Colleague invited me for a walk, best part of the week' },
+          { dayOffset: 3, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Felt genuinely better, focused morning' },
+          { dayOffset: 3, hour: 20, trigger: 'alone',    emotion: 'neutral',    note: 'Just want to do nothing', tags: ['passive-rest'] },
+          // Cycle 3: passive rest → decline → real recovery
+          { dayOffset: 4, hour: 8,  trigger: 'alone',    emotion: 'anxious',    note: 'Can not settle, restless, nothing helped' },
+          { dayOffset: 4, hour: 18, trigger: 'exercise',  emotion: 'energized',  note: 'Partner convinced me to go for a run, grateful for the push' },
+          { dayOffset: 5, hour: 8,  trigger: 'alone',    emotion: 'frustrated', note: 'Expected rest to help but still feel flat' },
+          { dayOffset: 5, hour: 15, trigger: 'social',    emotion: 'energized',  note: 'Friends invited me out, saved the day' },
+          { dayOffset: 6, hour: 9,  trigger: 'exercise',  emotion: 'energized',  note: 'Sunday run, energy is actually back' },
+          { dayOffset: 6, hour: 17, trigger: 'health',   emotion: 'calm',       note: 'Cooked a real meal, early night' },
+        ],
+      },
+    ],
+  },
+
+  'context-split': {
+    label: 'Context Split',
+    description: 'Same trigger (work) produces opposite emotions depending on context (morning solo vs afternoon meetings)',
+    arcs: [
+      {
+        name: 'context-split-a-morning-vs-afternoon',
+        moments: [
+          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Deep work block, headphones on, productive', tags: ['deep-work'] },
+          { dayOffset: 0, hour: 14, trigger: 'work',     emotion: 'anxious',    note: 'Back-to-back afternoon meetings, energy tanked', tags: ['afternoon-meetings'] },
+          { dayOffset: 0, hour: 20, trigger: 'alone',    emotion: 'calm',       note: 'Quiet evening, decompressing' },
+          { dayOffset: 1, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Morning coding session, in the zone', tags: ['deep-work'] },
+          { dayOffset: 1, hour: 14, trigger: 'work',     emotion: 'frustrated', note: 'Project review meeting, lots of criticism', tags: ['afternoon-meetings'] },
+          { dayOffset: 2, hour: 9,  trigger: 'work',     emotion: 'energized',  note: 'Creative brainstorm, fun collaboration', tags: ['brainstorm'] },
+          { dayOffset: 2, hour: 14, trigger: 'work',     emotion: 'anxious',    note: 'Sprint planning, everything feels urgent', tags: ['afternoon-meetings'] },
+          { dayOffset: 2, hour: 19, trigger: 'exercise',  emotion: 'calm',       note: 'Evening run, needed the release' },
+          { dayOffset: 3, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Morning focus time, clear progress', tags: ['deep-work'] },
+          { dayOffset: 3, hour: 15, trigger: 'work',     emotion: 'frustrated', note: 'Another long afternoon meeting, no decisions made', tags: ['afternoon-meetings'] },
+          { dayOffset: 4, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Wrapping up deliverables solo', tags: ['deep-work'] },
+          { dayOffset: 4, hour: 13, trigger: 'social',    emotion: 'energized',  note: 'Lunch with the team, great energy', tags: ['lunch'] },
+          { dayOffset: 5, hour: 9,  trigger: 'exercise',  emotion: 'energized',  note: 'Saturday morning run' },
+          { dayOffset: 6, hour: 10, trigger: 'family',   emotion: 'calm',       note: 'Relaxed Sunday with family' },
+        ],
+      },
+      {
+        name: 'context-split-b-meetings-drain',
+        moments: [
+          { dayOffset: 0, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Started the week with planning, focused', tags: ['deep-work'] },
+          { dayOffset: 0, hour: 15, trigger: 'work',     emotion: 'frustrated', note: 'Midweek review pulled forward, stressful', tags: ['afternoon-meetings'] },
+          { dayOffset: 1, hour: 8,  trigger: 'work',     emotion: 'energized',  note: 'Pair programming, enjoying the flow', tags: ['deep-work'] },
+          { dayOffset: 1, hour: 14, trigger: 'work',     emotion: 'anxious',    note: 'Unexpected stakeholder meeting, no prep time', tags: ['afternoon-meetings'] },
+          { dayOffset: 1, hour: 19, trigger: 'partner',   emotion: 'calm',       note: 'Cooked together, good reset' },
+          { dayOffset: 2, hour: 8,  trigger: 'work',     emotion: 'calm',       note: 'Solo research, interesting problem', tags: ['deep-work'] },
+          { dayOffset: 2, hour: 15, trigger: 'work',     emotion: 'anxious',    note: 'Design review, felt put on the spot', tags: ['afternoon-meetings'] },
+          { dayOffset: 3, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Documentation day, quiet and steady', tags: ['deep-work'] },
+          { dayOffset: 3, hour: 14, trigger: 'work',     emotion: 'frustrated', note: 'Retrospective turned into blame session', tags: ['afternoon-meetings'] },
+          { dayOffset: 3, hour: 19, trigger: 'exercise',  emotion: 'energized',  note: 'Gym session, worked out the frustration' },
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'calm',       note: 'Light day, tying up loose ends', tags: ['deep-work'] },
+          { dayOffset: 4, hour: 14, trigger: 'work',     emotion: 'neutral',    note: 'Quick sync, painless for once' },
+          { dayOffset: 5, hour: 10, trigger: 'social',    emotion: 'energized',  note: 'Coffee with friends' },
+          { dayOffset: 6, hour: 9,  trigger: 'health',   emotion: 'calm',       note: 'Meal prep and recovery day' },
+        ],
+      },
+    ],
+  },
+
+  'silent-drift': {
+    label: 'Silent Drift',
+    description: 'No obvious negative trigger but baseline gradually declining, positive activities losing effectiveness',
+    arcs: [
+      {
+        name: 'silent-drift-a-flattening',
+        moments: [
+          { dayOffset: 0, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Standard day, nothing remarkable' },
+          { dayOffset: 0, hour: 18, trigger: 'exercise',  emotion: 'neutral',    note: 'Went to the gym, felt okay I guess' },
+          { dayOffset: 1, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Meetings but whatever' },
+          { dayOffset: 1, hour: 20, trigger: 'alone',    emotion: 'neutral',    note: 'Evening in, scrolling' },
+          { dayOffset: 2, hour: 8,  trigger: 'social',    emotion: 'neutral',    note: 'Coffee with a friend, it was fine' },
+          { dayOffset: 2, hour: 18, trigger: 'work',     emotion: 'neutral',    note: 'Wrapped up some tasks' },
+          { dayOffset: 3, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Another day, another meeting' },
+          { dayOffset: 3, hour: 19, trigger: 'partner',   emotion: 'neutral',    note: 'Dinner together, quiet night' },
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'anxious',    note: 'Felt a flash of anxiety out of nowhere' },
+          { dayOffset: 4, hour: 19, trigger: 'alone',    emotion: 'anxious',    note: 'Can not settle, restless but do not know why' },
+          { dayOffset: 5, hour: 10, trigger: 'exercise',  emotion: 'neutral',    note: 'Ran but it felt mechanical' },
+          { dayOffset: 5, hour: 17, trigger: 'social',    emotion: 'calm',       note: 'Met friends, managed to enjoy it a little' },
+          { dayOffset: 6, hour: 10, trigger: 'alone',    emotion: 'neutral',    note: 'Just existing today' },
+        ],
+      },
+      {
+        name: 'silent-drift-b-fading-highs',
+        moments: [
+          { dayOffset: 0, hour: 8,  trigger: 'exercise',  emotion: 'energized',  note: 'Great morning workout' },
+          { dayOffset: 0, hour: 14, trigger: 'work',     emotion: 'calm',       note: 'Good focus day' },
+          { dayOffset: 1, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Average day, getting by' },
+          { dayOffset: 1, hour: 18, trigger: 'social',    emotion: 'energized',  note: 'Spontaneous dinner invite, felt good' },
+          { dayOffset: 2, hour: 8,  trigger: 'work',     emotion: 'neutral',    note: 'Plodding along' },
+          { dayOffset: 2, hour: 19, trigger: 'exercise',  emotion: 'calm',       note: 'Evening yoga, slightly better' },
+          { dayOffset: 3, hour: 9,  trigger: 'work',     emotion: 'neutral',    note: 'Head down, doing the work' },
+          { dayOffset: 3, hour: 18, trigger: 'partner',   emotion: 'calm',       note: 'Nice chat over dinner' },
+          { dayOffset: 4, hour: 9,  trigger: 'work',     emotion: 'anxious',    note: 'End-of-week pressure kicked in' },
+          { dayOffset: 4, hour: 19, trigger: 'alone',    emotion: 'neutral',    note: 'Too tired to go out, stayed in' },
+          { dayOffset: 5, hour: 9,  trigger: 'exercise',  emotion: 'calm',       note: 'Morning walk, decent enough' },
+          { dayOffset: 5, hour: 16, trigger: 'family',   emotion: 'energized',  note: 'Family gathering, actually felt happy' },
+          { dayOffset: 6, hour: 10, trigger: 'health',   emotion: 'calm',       note: 'Restful day, cooking and reading' },
+        ],
+      },
+    ],
+  },
 };
 
 const VALID_PERSONALITIES = Object.keys(PERSONALITIES);

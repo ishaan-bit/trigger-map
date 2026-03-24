@@ -10,6 +10,10 @@ const BACKFILL_PERSONALITIES = [
   { id: 'social-butterfly',      label: '🦋 Social Butterfly',      desc: 'Energized by people, solo time is draining, social-dominant' },
   { id: 'relationship-focused',  label: '💞 Relationship-Focused',  desc: 'Partner interactions drive mood swings, family stabilizes' },
   { id: 'wellness-warrior',      label: '💪 Wellness Warrior',      desc: 'Exercise/health dominant, high baseline, only work causes dips' },
+  { id: 'delayed-crash',         label: '⏳ Delayed Crash',          desc: 'Stress feels controlled, crashes arrive 24-48h later' },
+  { id: 'false-recovery',        label: '🔁 False Recovery',        desc: 'Passive rest feels like recovery but next-day baseline drops' },
+  { id: 'context-split',         label: '🎭 Context Split',         desc: 'Same trigger, opposite emotions depending on context' },
+  { id: 'silent-drift',          label: '📉 Silent Drift',          desc: 'No obvious trigger but baseline gradually declining' },
 ];
 
 const JOBS = [
