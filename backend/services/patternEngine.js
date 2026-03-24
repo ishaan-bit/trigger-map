@@ -1,5 +1,8 @@
 import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
+import { FEATURE_FLAGS } from "@triggermap/shared/constants/flags";
 import { computeBaselineMetrics } from "./baselineEngine.js";
+import { computeDailyInvoked, computeResidue, detectContamination } from "./emotionDecomposer.js";
+import { computeVacuumTrajectory, computeWeeklyMasking, detectFalseRecovery, detectCrashRisk } from "./vacuumStateEngine.js";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 
 // --- Confidence thresholds ---
@@ -175,7 +178,7 @@ function buildChangeHighlights(deltas, report) {
 
 // --- Main generator ---
 
-export function generateWeeklyReport({ aggregates = [], allAggregates = null, previousAggregates = null, aiInsight = null } = {}) {
+export function generateWeeklyReport({ aggregates = [], allAggregates = null, previousAggregates = null, aiInsight = null, moments = null } = {}) {
   const filledAggregates = aggregates.filter((s) => s && s.date);
 
   const triggerFrequency = {};
@@ -315,6 +318,74 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     : null;
   const changeHighlights = buildChangeHighlights(weeklyDeltas, { topTrigger, topEmotion });
 
+  // --- Invoked Metrics (computational behavioral model) ---
+  let invokedMetrics = null;
+  let compoundPatterns = null;
+  if (FEATURE_FLAGS.computeInvokedMetrics && moments?.length && Object.keys(correlations).length) {
+    const dailyInvoked = computeDailyInvoked(moments, correlations);
+    const baselineScore = baselineMetrics?.baseline?.score ?? 3.0;
+
+    // Vacuum trajectory
+    const vacuumTrajectory = computeVacuumTrajectory(baselineScore, dailyInvoked);
+    const lastVacuum = vacuumTrajectory.length
+      ? vacuumTrajectory[vacuumTrajectory.length - 1].vacuum
+      : baselineScore;
+
+    // Masking
+    const masking = computeWeeklyMasking(filledAggregates, baselineScore);
+
+    // Residue (per-day)
+    const byDay = {};
+    for (const m of moments) {
+      const date = new Date(m.timestamp).toISOString().slice(0, 10);
+      if (!byDay[date]) byDay[date] = [];
+      byDay[date].push(m);
+    }
+    const residueHotspots = [];
+    for (const [, dayMoments] of Object.entries(byDay)) {
+      const res = computeResidue(dayMoments, correlations);
+      for (const r of res) {
+        if (Math.abs(r.residue) >= 0.5) {
+          residueHotspots.push(r);
+        }
+      }
+    }
+
+    // Cross-context contamination
+    const contamination = detectContamination(moments, correlations);
+
+    invokedMetrics = {
+      dailyInvoked,
+      vacuumTrajectory,
+      currentVacuum: lastVacuum,
+      vacuumDrift: Number((lastVacuum - baselineScore).toFixed(3)),
+      masking,
+      residueHotspots: residueHotspots.slice(0, 5),
+      contamination: contamination.slice(0, 3),
+    };
+
+    // Compound pattern detection
+    const avgScore = emotionAvgScore(emotionFrequency);
+    const stabilityScore = baselineMetrics?.stability?.score ?? null;
+
+    const dayScoresWithVacuum = vacuumTrajectory.map(v => {
+      const dayAgg = filledAggregates.find(a => a.date === v.date);
+      const score = dayAgg ? emotionAvgScore(dayAgg.emotions || {}) : 3.0;
+      return { date: v.date, score, vacuum: v.vacuum, masking: masking.dailyMasking.find(d => d.date === v.date)?.mu || 0 };
+    });
+
+    const falseRecovery = detectFalseRecovery(avgScore, baselineScore, lastVacuum, stabilityScore);
+    const crashRisk = detectCrashRisk(dayScoresWithVacuum, baselineScore);
+
+    compoundPatterns = {
+      falseRecovery,
+      crashRisk,
+      maskingAlert: masking.alert,
+      maskingLevel: masking.level,
+      hasContamination: contamination.length > 0,
+    };
+  }
+
   // --- Recurrence detection (v81) ---
   const recurrence = [];
   for (const [pairKey, count] of Object.entries(pairFrequency)) {
@@ -393,6 +464,8 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     positiveStreak,
     negativeStreak,
     baselineContext,
+    invokedMetrics,
+    compoundPatterns,
     aiInsight,
   };
 }

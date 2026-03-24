@@ -3,7 +3,7 @@ import enableCors from '../../../../lib/cors.js';
 import { redis, redisKey } from '../../../../services/redisClient.js';
 import { listOwnerIds } from '../../../../services/aggregationService.js';
 
-const ALLOWED_CACHES = ['weekly_report', 'llm_insight', 'llm_free_pass', 'action_feedback'];
+const ALLOWED_CACHES = ['weekly_report', 'llm_insight', 'llm_free_pass', 'action_feedback', 'vacuum'];
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) return;

@@ -4,4 +4,5 @@ export const FEATURE_FLAGS = {
   momentEditing: true,
   triggerAutoDetection: true,
   onboardingEnabled: true,
+  computeInvokedMetrics: true,
 };

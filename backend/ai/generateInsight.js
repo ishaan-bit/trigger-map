@@ -459,6 +459,11 @@ function buildWhatWorking(report) {
       items.push({ text: "You're consistently hovering near your emotional baseline. That's great stability" });
     }
   }
+  // Vacuum stability as a positive signal
+  const spVac = buildSignalProfile(report);
+  if (spVac.vacuumDrift === 'positive') {
+    items.push({ text: "Your underlying emotional state is trending above your baseline, even beyond what individual triggers explain" });
+  }
   return items.length > 0 ? items : null;
 }
 
@@ -486,6 +491,19 @@ function buildWhereToFocus(report) {
   }
   if (bm?.recoveryLatency?.days > 3) {
     items.push({ text: "It's been taking a few days to bounce back after tough spots" });
+  }
+  // Invoked metrics: masking, false recovery, crash risk, contamination
+  if (spWf.maskingLevel === 'high' || spWf.maskingLevel === 'moderate') {
+    items.push({ text: "Your behavioral patterns suggest more is going on than your reported emotions show" });
+  }
+  if (spWf.falseRecovery) {
+    items.push({ text: "Your scores look like they've returned to normal, but underlying signals suggest the recovery may not be complete" });
+  }
+  if (spWf.crashRisk) {
+    items.push({ text: "Things look steady on the surface, but some deeper signals are diverging - worth paying attention to" });
+  }
+  if (spWf.residueContamination) {
+    items.push({ text: "Emotions from one part of your day seem to be carrying over into unrelated contexts" });
   }
   return items.length > 0 ? items : null;
 }

@@ -196,6 +196,24 @@ function buildSignals(report, recentNotes, actionFeedback) {
     }
   }
 
+  // Invoked metrics (computational behavioral model)
+  const im = report.invokedMetrics;
+  const cp = report.compoundPatterns;
+  if (im) {
+    lines.push(`Vacuum state (emotional ground truth with trigger influence removed): ${im.currentVacuum.toFixed(2)}/5, drift from baseline: ${im.vacuumDrift > 0 ? "+" : ""}${im.vacuumDrift.toFixed(2)}.`);
+    lines.push(`Masking coefficient: ${im.masking.coefficient.toFixed(2)} (${im.masking.level}). ${im.masking.alert ? "ALERT: behavioral patterns diverge from reported stability." : ""}`);
+    if (im.contamination?.length) {
+      const hotspots = im.contamination.map(c => `${c.sourceTrigger} → ${c.affectedTriggers.join(", ")}`);
+      lines.push(`Context contamination: emotions from ${hotspots.join("; ")} bleed across contexts.`);
+    }
+    if (cp?.falseRecovery) {
+      lines.push("FALSE RECOVERY detected: surface scores near baseline but underlying emotional state remains depressed.");
+    }
+    if (cp?.crashRisk) {
+      lines.push("CRASH RISK detected: sustained positive surface with declining underlying state and elevated masking.");
+    }
+  }
+
   if (recentNotes?.length) {
     const noteLines = recentNotes.map(n => `[${n.trigger}/${n.emotion}] "${n.note}"`);
     lines.push(`Recent user notes:\n${noteLines.join("\n")}`);

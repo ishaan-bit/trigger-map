@@ -72,6 +72,22 @@ export function buildSignalProfile(report) {
         || driftLevel === 'slight_negative'
         || neutralRatio >= 0.65);
 
+  // Invoked metrics (computational behavioral model)
+  const im = report.invokedMetrics;
+  const cp = report.compoundPatterns;
+  let vacuumDrift = 'none';
+  let maskingLevel = 'none';
+  let residueContamination = false;
+
+  if (im) {
+    if (im.vacuumDrift < -0.4) vacuumDrift = 'strong_negative';
+    else if (im.vacuumDrift < -0.15) vacuumDrift = 'negative';
+    else if (im.vacuumDrift > 0.15) vacuumDrift = 'positive';
+
+    maskingLevel = im.masking?.level || 'none';
+    residueContamination = im.contamination?.length > 0;
+  }
+
   return {
     volatility,
     drift: driftLevel,
@@ -80,6 +96,11 @@ export function buildSignalProfile(report) {
     intensity,
     weeklySlope,
     isFlattening,
+    vacuumDrift,
+    maskingLevel,
+    residueContamination,
+    falseRecovery: cp?.falseRecovery || false,
+    crashRisk: cp?.crashRisk || false,
   };
 }
 
@@ -125,6 +146,29 @@ export function buildSignalConstraints(profile) {
 
   if (profile.weeklySlope === 'slight_decline' || profile.weeklySlope === 'declining') {
     lines.push(`Within-week trajectory: ${profile.weeklySlope === 'declining' ? 'declining' : 'slight decline'}. Emotional tone dropped from start of week to end. Acknowledge this within-week shift.`);
+  }
+
+  // Invoked metrics constraints
+  if (profile.vacuumDrift === 'strong_negative') {
+    lines.push('VACUUM STATE: Strong negative drift detected. The user\'s emotional ground-truth (with trigger influence removed) has fallen well below baseline. This is a deeper signal than surface emotions suggest.');
+  } else if (profile.vacuumDrift === 'negative') {
+    lines.push('VACUUM STATE: Negative drift detected. Underlying emotional state is trending below baseline even when trigger effects are accounted for.');
+  }
+
+  if (profile.maskingLevel === 'high' || profile.maskingLevel === 'moderate') {
+    lines.push(`MASKING DETECTED (${profile.maskingLevel}): Behavioral patterns (logging frequency, timing shifts, intra-day variance) diverge from reported emotional stability. The user may be reporting steadier emotions than their behavior suggests.`);
+  }
+
+  if (profile.falseRecovery) {
+    lines.push('FALSE RECOVERY: Surface scores appear near baseline but underlying state remains depressed with low stability. Apparent recovery may not be genuine.');
+  }
+
+  if (profile.crashRisk) {
+    lines.push('CRASH RISK: Sustained positive surface scores with declining underlying state and elevated masking. This pattern historically precedes emotional drops.');
+  }
+
+  if (profile.residueContamination) {
+    lines.push('CONTEXT CONTAMINATION: Emotional residue from one trigger context is bleeding into subsequent, unrelated contexts within the same day.');
   }
 
   return lines.join('\n');
@@ -234,6 +278,36 @@ export function rankSignals(report, sp) {
       type: 'weeklyDecline',
       label: sp.weeklySlope,
       weight: sp.weeklySlope === 'declining' ? 4 : 3,
+      valence: 'negative',
+    });
+  }
+
+  // Vacuum drift (invoked metrics)
+  if (sp.vacuumDrift === 'strong_negative' || sp.vacuumDrift === 'negative') {
+    signals.push({
+      type: 'vacuumDrift',
+      label: sp.vacuumDrift,
+      weight: sp.vacuumDrift === 'strong_negative' ? 5 : 4,
+      valence: 'negative',
+    });
+  }
+
+  // False recovery
+  if (sp.falseRecovery) {
+    signals.push({
+      type: 'falseRecovery',
+      label: 'active',
+      weight: 5,
+      valence: 'negative',
+    });
+  }
+
+  // Crash risk
+  if (sp.crashRisk) {
+    signals.push({
+      type: 'crashRisk',
+      label: 'active',
+      weight: 5,
       valence: 'negative',
     });
   }

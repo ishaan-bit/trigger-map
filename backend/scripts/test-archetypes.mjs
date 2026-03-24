@@ -520,9 +520,10 @@ async function testArchetype(personality) {
   // Backfill
   await backfillArchetype(TEST_OWNER, personality);
 
-  // Generate report
+  // Generate report — include raw moments for invoked metrics
   const aggregates = await getWeeklyAggregates(TEST_OWNER, 45);
-  const report = generateWeeklyReport({ aggregates, allAggregates: aggregates });
+  const momentsRaw = await lrangeJson(redisKey("moments", TEST_OWNER));
+  const report = generateWeeklyReport({ aggregates, allAggregates: aggregates, moments: momentsRaw });
 
   // Generate insight
   const insight = await generateInsight(report);
@@ -540,6 +541,11 @@ async function testArchetype(personality) {
   console.log(`  primary: ${ranked.primary?.type || "none"} (${ranked.primary?.label || "-"})`);
   console.log(`  secondary: ${ranked.secondary?.type || "none"} (${ranked.secondary?.label || "-"})`);
   console.log(`  relationship: ${rel}`);
+  if (sp.vacuumDrift !== 'none') console.log(`  vacuumDrift: ${sp.vacuumDrift}`);
+  if (sp.maskingLevel !== 'none') console.log(`  maskingLevel: ${sp.maskingLevel}`);
+  if (sp.residueContamination) console.log(`  residueContamination: true`);
+  if (sp.falseRecovery) console.log(`  falseRecovery: detected`);
+  if (sp.crashRisk) console.log(`  crashRisk: detected`);
 
   console.log("\n── Key Report Data ──");
   console.log(`  topTrigger: ${report.topTrigger || "tied"} | topEmotion: ${report.topEmotion || "tied"}`);
@@ -568,6 +574,33 @@ async function testArchetype(personality) {
     if (bm.stability) console.log(`  stability: ${bm.stability.label} (${Math.round(bm.stability.score * 100)}%)`);
     if (bm.recoveryLatency) console.log(`  recovery: ${bm.recoveryLatency.label} (~${bm.recoveryLatency.days}d)`);
     if (bm.stateOfMind) console.log(`  stateOfMind: ${bm.stateOfMind}`);
+  }
+
+  // Invoked metrics
+  const im = report.invokedMetrics;
+  const cp = report.compoundPatterns;
+  if (im) {
+    console.log("\n── Invoked Metrics ──");
+    console.log(`  currentVacuum: ${im.currentVacuum.toFixed(2)} | vacuumDrift: ${im.vacuumDrift > 0 ? "+" : ""}${im.vacuumDrift.toFixed(2)}`);
+    console.log(`  masking: ${im.masking.coefficient.toFixed(2)} (${im.masking.level})${im.masking.alert ? " ⚠ ALERT" : ""}`);
+    if (im.contamination?.length) {
+      console.log(`  contamination: ${im.contamination.map(c => `${c.sourceTrigger}→${c.affectedTriggers.join(",")}`).join("; ")}`);
+    }
+    if (im.residueHotspots?.length) {
+      console.log(`  residueHotspots: ${im.residueHotspots.length} moments with significant carry-over`);
+    }
+    if (cp) {
+      const flags = [];
+      if (cp.falseRecovery) flags.push("falseRecovery");
+      if (cp.crashRisk) flags.push("crashRisk");
+      if (cp.maskingAlert) flags.push("maskingAlert");
+      if (cp.hasContamination) flags.push("contamination");
+      if (flags.length) console.log(`  compoundPatterns: ${flags.join(", ")}`);
+      else console.log(`  compoundPatterns: (none detected)`);
+    }
+  } else {
+    console.log("\n── Invoked Metrics ──");
+    console.log("  (not computed — no moments or correlations)");
   }
 
   // Trajectory
