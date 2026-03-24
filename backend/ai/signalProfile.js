@@ -50,12 +50,35 @@ export function buildSignalProfile(report) {
     || triggerStrength === 'strong';
   const intensity = isStrong ? 'strong' : isSubtle ? 'subtle' : 'moderate';
 
+  // Within-week trajectory slope: use last 7 entries (this week's window)
+  const traj = report.weeklyEmotionTrajectory || [];
+  let weeklySlope = 'flat';
+  if (traj.length >= 3) {
+    const recent = traj.slice(-7);
+    const diff = recent[recent.length - 1].score - recent[0].score;
+    if (diff <= -0.8) weeklySlope = 'declining';
+    else if (diff <= -0.3) weeklySlope = 'slight_decline';
+    else if (diff >= 0.8) weeklySlope = 'rising';
+    else if (diff >= 0.3) weeklySlope = 'slight_rise';
+  }
+
+  // Flattening: neutral-dominant + low volatility + within-week decline
+  const emotionFreq = report.emotionFrequency || {};
+  const totalEmotions = Object.values(emotionFreq).reduce((s, v) => s + v, 0);
+  const neutralRatio = (emotionFreq.neutral || 0) / (totalEmotions || 1);
+  const isFlattening = volatility === 'low'
+    && neutralRatio >= 0.4
+    && (weeklySlope === 'declining' || weeklySlope === 'slight_decline'
+        || driftLevel === 'slight_negative');
+
   return {
     volatility,
     drift: driftLevel,
     dominantEmotion: report.topEmotion || null,
     triggerStrength,
     intensity,
+    weeklySlope,
+    isFlattening,
   };
 }
 
@@ -93,6 +116,14 @@ export function buildSignalConstraints(profile) {
 
   if (profile.intensity === 'subtle') {
     lines.push('CONSTRAINT: Subtle signal profile. Be observational, not diagnostic. Describe what is present without exaggeration. Reflect uncertainty. Avoid strong causal claims.');
+  }
+
+  if (profile.isFlattening) {
+    lines.push('FLATTENING DETECTED: Emotional range is narrowing toward neutral. Describe reduced emotional responsiveness, not positive stability. Frame neutral-dominance as a subtle shift worth watching, not as steadiness.');
+  }
+
+  if (profile.weeklySlope === 'slight_decline' || profile.weeklySlope === 'declining') {
+    lines.push(`Within-week trajectory: ${profile.weeklySlope === 'declining' ? 'declining' : 'slight decline'}. Emotional tone dropped from start of week to end. Acknowledge this within-week shift.`);
   }
 
   return lines.join('\n');
@@ -193,6 +224,16 @@ export function rankSignals(report, sp) {
       label: bm.recoveryLatency.label,
       weight: 1,
       valence: bm.recoveryLatency.days <= 2 ? 'positive' : 'negative',
+    });
+  }
+
+  // Within-week trajectory decline
+  if (sp.weeklySlope === 'declining' || sp.weeklySlope === 'slight_decline') {
+    signals.push({
+      type: 'weeklyDecline',
+      label: sp.weeklySlope,
+      weight: sp.weeklySlope === 'declining' ? 4 : 3,
+      valence: 'negative',
     });
   }
 

@@ -86,7 +86,7 @@ function recurrenceNote(trigger, emotion, recurrence) {
 function baselineLanguage(direction) {
   if (direction === "improving") return "slightly better than your usual pattern";
   if (direction === "declining") return "a bit below your usual pattern";
-  if (direction === "stable") return "fairly consistent with your usual pattern";
+  if (direction === "stable") return "in line with your usual pattern";
   return null;
 }
 
@@ -152,7 +152,9 @@ function buildModerateSummary(report, firstName) {
   // ── Sentence 1: Surface state ──
   let s1;
   if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
-    s1 = `${name}your week was fairly even, with neutral being the most common feeling.`;
+    s1 = sp.isFlattening
+      ? `${name}your week looked stable on the surface, with neutral showing up more than any other feeling.`
+      : `${name}your week was steady, with neutral being the most common feeling.`;
   } else if (sp.volatility === 'low') {
     s1 = `${name}things have been steady this week, with ${report.topEmotion || 'a consistent tone'} showing up most.`;
   } else if (report.topTrigger) {
@@ -164,8 +166,18 @@ function buildModerateSummary(report, firstName) {
   // ── Sentence 2: Underlying shift or contrast ──
   let s2;
   if (rel === 'contrast') {
+    // Flattening: neutral-dominant + within-week decline
+    if (sp.isFlattening) {
+      const topT = report.topTrigger;
+      const neutralPair = report.recurrence?.find(r => r.trigger === topT && r.emotion === 'neutral');
+      if (neutralPair) {
+        s2 = `Underneath, ${triggerLabel(topT)} came up the most but didn't produce strong reactions, and your responses have been narrowing toward neutral as the week went on.`;
+      } else {
+        s2 = "Underneath, your emotional responses have been narrowing toward neutral, with less variation as the week went on.";
+      }
+    }
     // Stable surface + negative drift
-    if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
+    else if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
       const driftAdj = sp.drift === 'slight_negative' ? 'a subtle shift' : 'a noticeable shift';
       s2 = `While the surface looks stable, there's been ${driftAdj} below your usual baseline.`;
     }
@@ -204,8 +216,12 @@ function buildModerateSummary(report, firstName) {
   let s3;
   if (report.regulators?.length) {
     const r = report.regulators[0];
-    const rVerb = r.count >= 3 ? 'kept leaving' : 'left';
-    s3 = `${cap(triggerLabel(r.trigger))} ${rVerb} you feeling ${r.emotion}, which is a good anchor.`;
+    if (sp.isFlattening) {
+      s3 = `${cap(triggerLabel(r.trigger))} still brought you ${r.emotion}, but it hasn't been enough to shift the overall tone.`;
+    } else {
+      const rVerb = r.count >= 3 ? 'kept leaving' : 'left';
+      s3 = `${cap(triggerLabel(r.trigger))} ${rVerb} you feeling ${r.emotion}, which is a good anchor.`;
+    }
   } else if (bm?.stateOfMind && !s2.includes(bm.stateOfMind)) {
     s3 = `Overall, you're ${bm.stateOfMind}.`;
   } else {
@@ -240,7 +256,9 @@ function buildStrongSummary(report, firstName) {
   // ── Sentence 1: Surface state ──
   let s1;
   if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
-    s1 = `${name}your week was quiet and largely neutral, without much emotional movement.`;
+    s1 = sp.isFlattening
+      ? `${name}your week looked calm on the surface, but neutral was the dominant feeling, with less emotional range than usual.`
+      : `${name}your week was quiet and largely neutral, without much emotional movement.`;
   } else if (sp.volatility === 'low') {
     s1 = `${name}things were steady this week, with ${report.topEmotion || 'a consistent emotional tone'} showing up most.`;
   } else if (sp.volatility === 'high') {
@@ -254,7 +272,17 @@ function buildStrongSummary(report, firstName) {
   // ── Sentence 2: Underlying shift or contrast ──
   let s2;
   if (rel === 'contrast') {
-    if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
+    // Flattening: neutral-dominant + within-week decline
+    if (sp.isFlattening) {
+      const topT = report.topTrigger;
+      const neutralPair = report.recurrence?.find(r => r.trigger === topT && r.emotion === 'neutral');
+      if (neutralPair) {
+        s2 = `${cap(triggerLabel(topT))} appeared often but didn't produce strong reactions, and your emotional responses narrowed toward neutral as the week went on.`;
+      } else {
+        s2 = "Your emotional responses narrowed toward neutral as the week went on, suggesting a subtle flattening in how you're responding to experiences.";
+      }
+    }
+    else if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
       const driftAdj = sp.drift === 'slight_negative' ? 'a subtle decline' : 'a clear dip';
       s2 = `On the surface things look consistent, but there's been ${driftAdj} compared to your usual baseline.`;
     } else if (ranked.anchor && sp.drift !== 'positive' && report.frictionZones?.length) {
@@ -290,8 +318,12 @@ function buildStrongSummary(report, firstName) {
   let s3;
   if (report.regulators?.length && !s2.includes(triggerLabel(report.regulators[0].trigger))) {
     const r = report.regulators[0];
-    const rAdv = r.count >= 4 ? 'consistently' : 'generally';
-    s3 = `${cap(triggerLabel(r.trigger))} has ${rAdv} left you feeling ${r.emotion}.`;
+    if (sp.isFlattening) {
+      s3 = `${cap(triggerLabel(r.trigger))} still brought you ${r.emotion}, but it hasn't been enough to shift the overall tone.`;
+    } else {
+      const rAdv = r.count >= 4 ? 'consistently' : 'generally';
+      s3 = `${cap(triggerLabel(r.trigger))} has ${rAdv} left you feeling ${r.emotion}.`;
+    }
   } else if (bm?.recoveryLatency) {
     s3 = `When things dip, you tend to ${bm.recoveryLatency.label}.`;
   } else if (bm?.stateOfMind && !s2.includes(bm.stateOfMind)) {
@@ -385,7 +417,10 @@ function buildWhatWorking(report) {
     });
   }
   if (report.volatilityScore !== null && report.volatilityScore < 0.5) {
-    items.push({ text: "Your emotions have been pretty steady this week" });
+    const spWw = buildSignalProfile(report);
+    if (!spWw.isFlattening) {
+      items.push({ text: "Your emotions have been pretty steady this week" });
+    }
   }
   const bm = report.baselineMetrics;
   if (bm?.stability?.score >= 0.7) {
@@ -396,6 +431,7 @@ function buildWhatWorking(report) {
 
 function buildWhereToFocus(report) {
   const items = [];
+  const spWf = buildSignalProfile(report);
   for (const f of (report.frictionZones || []).slice(0, 3)) {
     const freq = f.count <= 2 ? 'sometimes' : 'often';
     items.push({
@@ -407,11 +443,13 @@ function buildWhereToFocus(report) {
   }
   const bm = report.baselineMetrics;
   if (bm?.drift?.direction === "declining") {
-    const sp = buildSignalProfile(report);
-    const driftText = sp.drift === 'slight_negative'
+    const driftText = spWf.drift === 'slight_negative'
       ? "There's been a subtle dip below your usual emotional baseline"
       : "Your emotional tone has dipped below your usual baseline this week";
     items.push({ text: driftText });
+  }
+  if (spWf.isFlattening) {
+    items.push({ text: "Your emotional range has been narrowing toward neutral, with less variation day to day" });
   }
   if (bm?.recoveryLatency?.days > 3) {
     items.push({ text: "It's been taking a few days to bounce back after tough spots" });

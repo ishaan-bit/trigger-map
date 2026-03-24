@@ -111,7 +111,9 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       }
 
       // Polish LLM output — local deterministic cleanup (no HF API by default)
-      const firstName = extractFirstName(user?.name);
+      // Skip firstName personalization for LLM output — the LLM writes in 2nd
+      // person ("you"/"your") and replacing "Your" → "Name's" creates a jarring
+      // 3rd-person switch that reads like a clinical report.
       if (insight.narrative) {
         const sections = insight.narrative.split(/\n\n/);
         const phrased = [];
@@ -120,7 +122,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
           if (headerMatch) {
             const header = headerMatch[1];
             const body = section.slice(header.length).trim();
-            const polished = await phraseText(body, { firstName });
+            const polished = await phraseText(body);
             phrased.push(`${header}\n${polished}`);
           } else {
             phrased.push(section);

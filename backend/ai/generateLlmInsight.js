@@ -103,6 +103,26 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Trajectory: ${report.trajectoryNote}`);
   }
 
+  // Within-week trajectory slope (last 7 entries = this week's window)
+  const traj = report.weeklyEmotionTrajectory || [];
+  if (traj.length >= 3) {
+    const recent = traj.slice(-7);
+    const firstScore = recent[0].score;
+    const lastScore = recent[recent.length - 1].score;
+    const diff = lastScore - firstScore;
+    if (Math.abs(diff) >= 0.3) {
+      lines.push(`Within-week trajectory slope: ${diff > 0 ? '+' : ''}${diff.toFixed(1)} (from ${firstScore.toFixed(1)} on ${recent[0].date} to ${lastScore.toFixed(1)} on ${recent[recent.length - 1].date}).`);
+    }
+  }
+
+  // Neutral dominance
+  const emoFreq = report.emotionFrequency || {};
+  const totalEmo = Object.values(emoFreq).reduce((s, v) => s + v, 0);
+  const neutralPct = totalEmo > 0 ? Math.round((emoFreq.neutral || 0) / totalEmo * 100) : 0;
+  if (neutralPct >= 40) {
+    lines.push(`Neutral dominance: ${neutralPct}% of emotions logged were neutral.`);
+  }
+
   // Recurrence & streak signals (v81)
   if (report.recurrence?.length) {
     const top = report.recurrence.slice(0, 2).map(r => `${r.trigger} + ${r.emotion} (${r.count}x, ${r.label})`);
@@ -214,20 +234,27 @@ ${signals}
 
 Using ONLY the data above, write EXACTLY three short sections. Use the EXACT format shown in the example below.
 
-EXAMPLE FORMAT (do not copy the content, only mimic the structure):
+EXAMPLE FORMAT (do not copy the content or themes, only mimic the structure):
 
 What stood out
-Work-related triggers appeared most often this week, consistently paired with anxiety before deadlines. This pattern was strongest on Monday and Wednesday mornings. Evening entries showed a noticeable shift toward calm once the workday ended.
+Friends showed up as your most common trigger this week, and happy was the feeling that came with it most often. On the weekend though, your energy dipped and you logged a couple of tired entries back to back.
 
 What may be contributing
-The combination of deadline pressure and back-to-back meetings may be amplifying anticipatory stress. Having no buffer time between tasks could make each transition feel more intense.
+The social time seems to lift your mood reliably, but by Saturday the pace may have caught up with you. The drop at the end of the week lined up with fewer social entries.
 
 One thing to try
-Before your next presentation, spend five minutes writing down three things you know well about the topic. This small ritual can shift your focus from what might go wrong to what you already have ready.
+Next weekend, try leaving one evening unplanned. Giving yourself a gap between social time and the start of the new week could help you hold on to more of that energy.
 
 END OF EXAMPLE. Now write your three sections using the data above.
 
-Rules:
+CRITICAL RULES (must follow):
+- ONLY describe emotions, triggers, and patterns that appear in the data above. Do not invent deadlines, meetings, mornings, evenings, or any context not present.
+- If the SIGNAL PROFILE says FLATTENING DETECTED, the central story MUST be about emotional range narrowing toward neutral. Do not describe this as positive stability.
+- If the data shows a Within-week trajectory decline, acknowledge the drop. Do not call the week stable or even.
+- Never reference the user by name. Only use "you" and "your".
+- Never speculate about psychological states or coping ability. Only describe patterns visible in the data.
+
+Format rules:
 - Start with "What stood out" — no text before it.
 - Each header must be alone on its own line, with the body on the next line.
 - ${minWords}-${maxWords} words total. Do not exceed ${hardCap} words.
@@ -237,11 +264,10 @@ Rules:
 - Do NOT describe signals independently. Look for contrast (stable surface + subtle drift, active trigger + flat emotion) or alignment between signals. If contrasting, use structures like "While X appears..., Y suggests..." or "On the surface..., but underneath...".
 - Prioritize the most important 1-2 signals rather than listing everything.
 - If action feedback data is provided, use it: acknowledge actions the user tried and tailor "One thing to try" to avoid suggesting things they already skipped. Build on what they engaged with.
-- IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
-- Use correct English spelling and grammar. No typos, no random numbers or characters mixed into words.
 - Always use "Your" as the possessive form. Never write "You's" which is not valid English.
 - Each section body must be ${sentencesPerSection} sentences.
-- CRITICAL: Match language intensity to the SIGNAL PROFILE section in the data above. If it says subtle or weak, use restrained observational language. Do not dramatize weak patterns or invent causes not present in the data.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+- Match language intensity to the SIGNAL PROFILE section. If it says subtle or weak, use restrained observational language.
+- "One thing to try" must be specific to the dominant pattern. If neutral-dominance and flattening are present, the suggestion should be about reintroducing variety or noticing more nuance, not about generic reflection or journaling.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
 /**
@@ -281,10 +307,10 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague." + getStylePrompt(process.env.LLM_STYLE) },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague. NEVER reference the user by name. Always say 'you' or 'your', never a person's name. NEVER speculate about the user's psychological state, coping ability, or personality. Only describe observable patterns in the data. If the SIGNAL PROFILE section contains a FLATTENING DETECTED or Within-week trajectory constraint, those MUST be the central theme of your response. Do not ignore them." + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
-        temperature: 0.3,
+        temperature: 0.15,
         max_tokens: maxTokens,
       }),
       signal: controller.signal,
@@ -348,6 +374,8 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       .replace(/one sentence connecting a trigger[- ]emotion pairing to a possible cause[:\s.]*/gi, "")
       .replace(/a single concrete,? small experiment for next week[^.]*?[:\s.]*/gi, "")
       .replace(/be specific to the data\.?\s*/gi, "")
+      // Strip leaked signal-profile / constraint labels
+      .replace(/\b(?:given|based on|considering|due to) (?:the )?(?:subtle |moderate |strong )?(?:signal profile|flattening detected|within-week trajectory)[,.]?\s*/gi, "")
       .trim();
 
     // Normalize variant section headers to canonical names.
