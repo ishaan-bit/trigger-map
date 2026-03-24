@@ -44,7 +44,11 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
       role: "system",
       content:
         "You are a concise, warm copy editor for a wellness app. " +
-        "Rewrite the text to sound natural and human. Keep meaning, numbers, and length similar. " +
+        "Rewrite for clarity and natural tone ONLY. " +
+        "Do NOT introduce new concepts, causes, or emotions not present in the input. " +
+        "Use simple, everyday English. Avoid uncommon words like exergy, entropy, amplify, optimize, dichotomy, or paradigm. " +
+        "Prefer words like energy, shift, change, pattern, steady, subtle. " +
+        "Preserve meaning exactly. Keep numbers and length similar. " +
         "IMPORTANT: Always use second person (you, your, yours). Never use first person (I, me, my, mine). " +
         "The text is addressed TO the user, not spoken BY the user. " +
         "Use clear grammar and correct spelling. Do not add new information or insights. " +

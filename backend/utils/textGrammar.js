@@ -146,5 +146,59 @@ export function lintText(text) {
   t = t.replace(/\b[a-zA-Z]{2,}\d{3,}\b/g, "");        // "exer0376"
   t = t.replace(/\s{2,}/g, " ").trim();                 // clean up gaps
 
+  // 12. Banned vocabulary: replace technical/uncommon words with everyday alternatives
+  t = t.replace(/\bexergy\b/gi, "energy");
+  t = t.replace(/\bentropy\b/gi, "variation");
+  t = t.replace(/\bamplif(?:y|ies|ied|ying)\b/gi, (m) => {
+    if (/ies$/i.test(m)) return "increases";
+    if (/ied$/i.test(m)) return "increased";
+    if (/ying$/i.test(m)) return "increasing";
+    return "increase";
+  });
+  t = t.replace(/\boptimiz(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "improves";
+    if (/ed$/i.test(m)) return "improved";
+    if (/ing$/i.test(m)) return "improving";
+    return "improve";
+  });
+  t = t.replace(/\bdichotomy\b/gi, "contrast");
+  t = t.replace(/\bjuxtaposition\b/gi, "contrast");
+  t = t.replace(/\bmodulat(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "shapes";
+    if (/ed$/i.test(m)) return "shaped";
+    if (/ing$/i.test(m)) return "shaping";
+    return "shape";
+  });
+  t = t.replace(/\bameliorat(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "eases";
+    if (/ed$/i.test(m)) return "eased";
+    if (/ing$/i.test(m)) return "easing";
+    return "ease";
+  });
+  t = t.replace(/\bparadigm\b/gi, "pattern");
+  t = t.replace(/\btrajectory\b/gi, "direction");
+  t = t.replace(/\bpropensity\b/gi, "tendency");
+  t = t.replace(/\bmitigat(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "reduces";
+    if (/ed$/i.test(m)) return "reduced";
+    if (/ing$/i.test(m)) return "reducing";
+    return "reduce";
+  });
+  t = t.replace(/\bcontemplat(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "considers";
+    if (/ed$/i.test(m)) return "considered";
+    if (/ing$/i.test(m)) return "considering";
+    return "consider";
+  });
+  t = t.replace(/\bfluctuations?\b/gi, (m) => /s$/i.test(m) ? "shifts" : "shift");
+  t = t.replace(/\bequilibrium\b/gi, "balance");
+  t = t.replace(/\bcatalyst\b/gi, "trigger");
+  t = t.replace(/\bexacerbat(?:e|es|ed|ing)\b/gi, (m) => {
+    if (/es$/i.test(m)) return "worsens";
+    if (/ed$/i.test(m)) return "worsened";
+    if (/ing$/i.test(m)) return "worsening";
+    return "worsen";
+  });
+
   return t;
 }

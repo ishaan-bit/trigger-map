@@ -97,3 +97,137 @@ export function buildSignalConstraints(profile) {
 
   return lines.join('\n');
 }
+
+// ── Signal Ranking ───────────────────────────────────────────────────────────
+//
+// Ranks available signals by importance, selects PRIMARY + SECONDARY,
+// and detects whether they form a CONTRAST or ALIGNMENT relationship.
+// Consumed by summary builders to structure the 3-sentence output.
+
+/**
+ * Rank signals by importance and select the top two.
+ * Returns { primary, secondary, anchor } where each is
+ * { type, label, weight } or null.
+ */
+export function rankSignals(report, sp) {
+  const bm = report.baselineMetrics;
+  const signals = [];
+
+  // Dominant emotion — always high weight
+  if (report.topEmotion) {
+    const isNeutral = report.topEmotion === 'neutral';
+    signals.push({
+      type: 'dominantEmotion',
+      label: report.topEmotion,
+      weight: isNeutral ? 3 : 4,
+      valence: isNeutral ? 'flat' : (['calm', 'energized'].includes(report.topEmotion) ? 'positive' : 'negative'),
+    });
+  }
+
+  // Drift — high weight when present and non-neutral
+  if (sp.drift !== 'neutral') {
+    const w = sp.drift === 'strong_negative' ? 5 : sp.drift === 'slight_negative' ? 4 : 3;
+    signals.push({
+      type: 'drift',
+      label: sp.drift,
+      weight: w,
+      valence: sp.drift === 'positive' ? 'positive' : 'negative',
+    });
+  }
+
+  // Volatility — medium weight
+  if (sp.volatility !== 'low') {
+    signals.push({
+      type: 'volatility',
+      label: sp.volatility,
+      weight: sp.volatility === 'high' ? 3 : 2,
+      valence: sp.volatility === 'high' ? 'negative' : 'mixed',
+    });
+  } else {
+    signals.push({
+      type: 'volatility',
+      label: 'low',
+      weight: 2,
+      valence: 'stable',
+    });
+  }
+
+  // Top trigger — medium weight
+  if (report.topTrigger) {
+    signals.push({
+      type: 'trigger',
+      label: report.topTrigger,
+      weight: 2,
+      valence: 'mixed',
+    });
+  }
+
+  // Top friction zone — medium-high weight
+  if (report.frictionZones?.length) {
+    const f = report.frictionZones[0];
+    signals.push({
+      type: 'friction',
+      label: `${f.trigger}+${f.emotion}`,
+      weight: f.count >= 3 ? 3 : 2,
+      valence: 'negative',
+      data: f,
+    });
+  }
+
+  // Top regulator / anchor — medium weight
+  if (report.regulators?.length) {
+    const r = report.regulators[0];
+    signals.push({
+      type: 'anchor',
+      label: `${r.trigger}+${r.emotion}`,
+      weight: r.count >= 3 ? 3 : 2,
+      valence: 'positive',
+      data: r,
+    });
+  }
+
+  // Recovery latency — low weight
+  if (bm?.recoveryLatency) {
+    signals.push({
+      type: 'recovery',
+      label: bm.recoveryLatency.label,
+      weight: 1,
+      valence: bm.recoveryLatency.days <= 2 ? 'positive' : 'negative',
+    });
+  }
+
+  // Sort by weight descending
+  signals.sort((a, b) => b.weight - a.weight);
+
+  const primary = signals[0] || null;
+  // Secondary must be different type than primary
+  const secondary = signals.find(s => s !== primary && s.type !== primary?.type) || null;
+  // Anchor: prefer a regulator if not already primary/secondary
+  const anchor = signals.find(s => s.type === 'anchor' && s !== primary && s !== secondary)
+    || signals.find(s => s.valence === 'positive' && s !== primary && s !== secondary)
+    || null;
+
+  return { primary, secondary, anchor, all: signals };
+}
+
+/**
+ * Detect whether primary and secondary signals form a CONTRAST
+ * or an ALIGNMENT. Returns 'contrast' | 'alignment'.
+ */
+export function detectRelationship(ranked) {
+  const { primary, secondary } = ranked;
+  if (!primary || !secondary) return 'alignment';
+
+  // Contrast: signals point in different directions
+  const valences = [primary.valence, secondary.valence];
+  const hasPositive = valences.some(v => v === 'positive' || v === 'stable');
+  const hasNegative = valences.some(v => v === 'negative');
+  const hasFlat = valences.some(v => v === 'flat');
+
+  // stable/positive + negative = contrast
+  if (hasPositive && hasNegative) return 'contrast';
+  // flat + negative = contrast (neutral but drifting)
+  if (hasFlat && hasNegative) return 'contrast';
+  // stable + flat is alignment (both point to evenness)
+  return 'alignment';
+}

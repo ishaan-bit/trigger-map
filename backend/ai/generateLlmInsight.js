@@ -9,7 +9,7 @@
  */
 
 import { getStylePrompt } from "./styleProfiles.js";
-import { buildSignalProfile, buildSignalConstraints } from "./signalProfile.js";
+import { buildSignalProfile, buildSignalConstraints, rankSignals, detectRelationship } from "./signalProfile.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
@@ -183,8 +183,13 @@ function buildSignals(report, recentNotes, actionFeedback) {
 
   // Signal profile constraints
   const sp = buildSignalProfile(report);
+  const ranked = rankSignals(report, sp);
+  const rel = detectRelationship(ranked);
   lines.push('');
   lines.push(buildSignalConstraints(sp));
+  lines.push('');
+  lines.push(`SIGNAL PRIORITY: Primary signal = ${ranked.primary?.type || 'none'} (${ranked.primary?.label || '-'}). Secondary signal = ${ranked.secondary?.type || 'none'} (${ranked.secondary?.label || '-'}).`);
+  lines.push(`SIGNAL RELATIONSHIP: ${rel}. ${rel === 'contrast' ? 'These signals point in different directions. Describe the surface state, then reveal the underlying tension or shift.' : 'These signals reinforce each other. Describe what they consistently show.'}`);
 
   return lines.join("\n");
 }
@@ -228,7 +233,9 @@ Rules:
 - ${minWords}-${maxWords} words total. Do not exceed ${hardCap} words.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
-- Tone: calm, direct, perceptive.
+- Tone: calm, direct, perceptive. Use simple everyday words. Avoid uncommon or technical vocabulary.
+- Do NOT describe signals independently. Look for contrast (stable surface + subtle drift, active trigger + flat emotion) or alignment between signals. If contrasting, use structures like "While X appears..., Y suggests..." or "On the surface..., but underneath...".
+- Prioritize the most important 1-2 signals rather than listing everything.
 - If action feedback data is provided, use it: acknowledge actions the user tried and tailor "One thing to try" to avoid suggesting things they already skipped. Build on what they engaged with.
 - IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
 - Use correct English spelling and grammar. No typos, no random numbers or characters mixed into words.
@@ -274,7 +281,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns." + getStylePrompt(process.env.LLM_STYLE) },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague." + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,

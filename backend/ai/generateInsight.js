@@ -1,6 +1,6 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
-import { buildSignalProfile } from "./signalProfile.js";
+import { buildSignalProfile, rankSignals, detectRelationship } from "./signalProfile.js";
 
 /**
  * Confidence-aware rule-based insight generator.
@@ -143,93 +143,166 @@ function buildEmergingSummary(report, firstName) {
 }
 
 function buildModerateSummary(report, firstName) {
-  const parts = [];
-  const bm = report.baselineMetrics;
-
-  if (report.topTrigger) {
-    parts.push(`${firstName ? firstName + ", " : ""}${cap(triggerLabel(report.topTrigger))} showed up the most this week.`);
-  } else {
-    parts.push(`${firstName ? firstName + ", no" : "No"} single trigger dominated. Your attention was spread across ${triggerList(report.tiedTriggers)}.`);
-  }
-
   const sp = buildSignalProfile(report);
+  const ranked = rankSignals(report, sp);
+  const rel = detectRelationship(ranked);
+  const bm = report.baselineMetrics;
+  const name = firstName ? firstName + ", " : "";
 
-  if (report.frictionZones.length) {
-    const f = report.frictionZones[0];
-    const freq = f.count <= 2 ? 'sometimes' : 'often';
-    let fLine = `When ${triggerLabel(f.trigger)} came up, it ${freq} left you feeling ${f.emotion} (${f.count}×).`;
-    const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
-    if (rn) fLine += " " + rn;
-    parts.push(fLine);
+  // ── Sentence 1: Surface state ──
+  let s1;
+  if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
+    s1 = `${name}your week was fairly even, with neutral being the most common feeling.`;
+  } else if (sp.volatility === 'low') {
+    s1 = `${name}things have been steady this week, with ${report.topEmotion || 'a consistent tone'} showing up most.`;
+  } else if (report.topTrigger) {
+    s1 = `${name}${cap(triggerLabel(report.topTrigger))} came up the most this week.`;
+  } else {
+    s1 = `${name}your attention was spread across ${triggerList(report.tiedTriggers)} without one standing out.`;
   }
 
-  if (report.regulators.length) {
+  // ── Sentence 2: Underlying shift or contrast ──
+  let s2;
+  if (rel === 'contrast') {
+    // Stable surface + negative drift
+    if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
+      const driftAdj = sp.drift === 'slight_negative' ? 'a subtle shift' : 'a noticeable shift';
+      s2 = `While the surface looks stable, there's been ${driftAdj} below your usual baseline.`;
+    }
+    // Anchor present but tone not improving
+    else if (ranked.anchor && sp.drift !== 'positive') {
+      const a = ranked.anchor.data || {};
+      s2 = `Although ${triggerLabel(a.trigger || report.regulators?.[0]?.trigger)} tends to help, your overall tone hasn't lifted this week.`;
+    }
+    // Frequent trigger + neutral emotion
+    else if (report.topTrigger && sp.dominantEmotion === 'neutral') {
+      s2 = `${cap(triggerLabel(report.topTrigger))} appeared often, but your emotional response stayed mostly flat.`;
+    }
+    // Generic contrast fallback
+    else {
+      s2 = buildContrastFallback(report, sp);
+    }
+  } else {
+    // Alignment — signals reinforce each other
+    if (report.frictionZones?.length) {
+      const f = report.frictionZones[0];
+      const freq = f.count <= 2 ? 'sometimes' : 'often';
+      s2 = `${cap(triggerLabel(f.trigger))} ${freq} left you feeling ${f.emotion} (${f.count}×).`;
+    } else if (bm?.stateOfMind) {
+      const bl = baselineLanguage(report.baselineContext?.driftDirection);
+      s2 = `You're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`;
+    } else if (report.trajectoryNote) {
+      s2 = report.trajectoryNote;
+    } else {
+      s2 = sp.volatility === 'low'
+        ? "Your emotional range was narrow, with little variation day to day."
+        : "There was some emotional range this week, though nothing stood out sharply.";
+    }
+  }
+
+  // ── Sentence 3: Context or anchor ──
+  let s3;
+  if (report.regulators?.length) {
     const r = report.regulators[0];
     const rVerb = r.count >= 3 ? 'kept leaving' : 'left';
-    parts.push(`On the flip side, ${triggerLabel(r.trigger)} ${rVerb} you feeling ${r.emotion}, which is a good anchor.`);
+    s3 = `${cap(triggerLabel(r.trigger))} ${rVerb} you feeling ${r.emotion}, which is a good anchor.`;
+  } else if (bm?.stateOfMind && !s2.includes(bm.stateOfMind)) {
+    s3 = `Overall, you're ${bm.stateOfMind}.`;
+  } else {
+    s3 = report.trajectoryNote && !s2.includes(report.trajectoryNote)
+      ? report.trajectoryNote
+      : "No single pattern dominated, so there's room to explore what shapes your week.";
   }
 
-  const bl = baselineLanguage(report.baselineContext?.driftDirection);
-  if (bm?.stateOfMind) {
-    parts.push(`Overall, you're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`);
-  } else if (report.trajectoryNote) {
-    parts.push(report.trajectoryNote);
+  return `${cap(s1)} ${s2} ${s3}`;
+}
+
+// Fallback for contrast when primary patterns are ambiguous
+function buildContrastFallback(report, sp) {
+  if (report.frictionZones?.length) {
+    const f = report.frictionZones[0];
+    const freq = f.count <= 2 ? 'sometimes' : 'often';
+    return `${cap(triggerLabel(f.trigger))} ${freq} left you feeling ${f.emotion}, even though things looked steady on the surface.`;
   }
-
-  const sn = streakNote(report.positiveStreak, report.negativeStreak);
-  if (sn) parts.push(sn);
-
-  return parts.join(" ");
+  if (sp.drift === 'slight_negative') {
+    return "There's been a subtle downward shift in your emotional tone, even as day-to-day moments stayed consistent.";
+  }
+  return "Underneath the surface, some signals suggest a quiet shift worth watching.";
 }
 
 function buildStrongSummary(report, firstName) {
-  const parts = [];
-  const bm = report.baselineMetrics;
-
-  if (report.topTrigger) {
-    parts.push(`${firstName ? firstName + ", " : ""}${cap(triggerLabel(report.topTrigger))} was the main theme this week.`);
-  } else {
-    parts.push(`${firstName ? firstName + ", your" : "Your"} week touched on ${triggerList(report.tiedTriggers)} without one standing out.`);
-  }
-
   const sp = buildSignalProfile(report);
+  const ranked = rankSignals(report, sp);
+  const rel = detectRelationship(ranked);
+  const bm = report.baselineMetrics;
+  const name = firstName ? firstName + ", " : "";
 
-  if (report.frictionZones.length) {
-    const f = report.frictionZones[0];
-    const fVerb = sp.triggerStrength === 'weak' ? 'showed up together' : 'kept showing up together';
-    const fNote = sp.triggerStrength === 'weak' ? 'That may be worth watching.' : "That's a pattern worth noticing.";
-    let fLine = `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} ${fVerb} (${f.count}×). ${fNote}`;
-    const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
-    if (rn) fLine += " " + rn;
-    parts.push(fLine);
+  // ── Sentence 1: Surface state ──
+  let s1;
+  if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
+    s1 = `${name}your week was quiet and largely neutral, without much emotional movement.`;
+  } else if (sp.volatility === 'low') {
+    s1 = `${name}things were steady this week, with ${report.topEmotion || 'a consistent emotional tone'} showing up most.`;
+  } else if (sp.volatility === 'high') {
+    s1 = `${name}there was a lot of emotional range this week, with shifts between different states.`;
+  } else if (report.topTrigger) {
+    s1 = `${name}${cap(triggerLabel(report.topTrigger))} was the main theme this week.`;
+  } else {
+    s1 = `${name}your week touched on ${triggerList(report.tiedTriggers)} without one standing out.`;
   }
 
-  if (report.regulators.length) {
+  // ── Sentence 2: Underlying shift or contrast ──
+  let s2;
+  if (rel === 'contrast') {
+    if (sp.volatility === 'low' && (sp.drift === 'slight_negative' || sp.drift === 'strong_negative')) {
+      const driftAdj = sp.drift === 'slight_negative' ? 'a subtle decline' : 'a clear dip';
+      s2 = `On the surface things look consistent, but there's been ${driftAdj} compared to your usual baseline.`;
+    } else if (ranked.anchor && sp.drift !== 'positive' && report.frictionZones?.length) {
+      const f = report.frictionZones[0];
+      const a = ranked.anchor.data || report.regulators[0];
+      const fVerb = sp.triggerStrength === 'weak' ? 'showed up together' : 'kept showing up together';
+      s2 = `While ${triggerLabel(a.trigger)} tends to help, ${triggerLabel(f.trigger)} and feeling ${f.emotion} ${fVerb} (${f.count}×).`;
+    } else if (report.topTrigger && sp.dominantEmotion === 'neutral') {
+      s2 = `${cap(triggerLabel(report.topTrigger))} showed up often, but your responses stayed mostly neutral, suggesting reduced emotional variation.`;
+    } else {
+      s2 = buildContrastFallback(report, sp);
+    }
+  } else {
+    // Alignment
+    if (report.frictionZones?.length) {
+      const f = report.frictionZones[0];
+      const fVerb = sp.triggerStrength === 'weak' ? 'showed up together' : 'kept showing up together';
+      const fNote = sp.triggerStrength === 'weak' ? 'That may be worth watching.' : "That's a pattern worth noticing.";
+      s2 = `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} ${fVerb} (${f.count}×). ${fNote}`;
+    } else if (bm?.stateOfMind) {
+      const bl = baselineLanguage(report.baselineContext?.driftDirection);
+      s2 = `Right now, you're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`;
+    } else if (report.volatilityScore !== null) {
+      s2 = report.volatilityScore < 0.5
+        ? "Emotionally, things have been pretty steady."
+        : "There's been some emotional range this week.";
+    } else {
+      s2 = "No clear shift stood out, which can be a sign of stability.";
+    }
+  }
+
+  // ── Sentence 3: Context or anchor ──
+  let s3;
+  if (report.regulators?.length && !s2.includes(triggerLabel(report.regulators[0].trigger))) {
     const r = report.regulators[0];
     const rAdv = r.count >= 4 ? 'consistently' : 'generally';
-    parts.push(`${cap(triggerLabel(r.trigger))} has ${rAdv} left you feeling ${r.emotion}.`);
-  }
-
-  const bl = baselineLanguage(report.baselineContext?.driftDirection);
-  if (bm?.stateOfMind) {
-    parts.push(`Right now, you're ${bm.stateOfMind}${bl ? ", " + bl : ""}.`);
+    s3 = `${cap(triggerLabel(r.trigger))} has ${rAdv} left you feeling ${r.emotion}.`;
+  } else if (bm?.recoveryLatency) {
+    s3 = `When things dip, you tend to ${bm.recoveryLatency.label}.`;
+  } else if (bm?.stateOfMind && !s2.includes(bm.stateOfMind)) {
+    s3 = `Overall, you're ${bm.stateOfMind}.`;
   } else {
-    if (report.volatilityScore !== null) {
-      parts.push(report.volatilityScore < 0.5 ? "Emotionally, things have been pretty steady." : "There's been some emotional range this week.");
-    }
-    if (report.trajectoryNote) {
-      parts.push(report.trajectoryNote);
-    }
+    s3 = report.trajectoryNote && !s2.includes(report.trajectoryNote)
+      ? report.trajectoryNote
+      : "There's enough data now to start seeing what shapes your week.";
   }
 
-  if (bm?.recoveryLatency) {
-    parts.push(`When things dip, you tend to ${bm.recoveryLatency.label}. That's a good sign.`);
-  }
-
-  const sn = streakNote(report.positiveStreak, report.negativeStreak);
-  if (sn) parts.push(sn);
-
-  return parts.join(" ");
+  return `${cap(s1)} ${s2} ${s3}`;
 }
 
 function appendTagContext(summary, report) {
