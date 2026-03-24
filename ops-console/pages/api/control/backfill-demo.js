@@ -299,6 +299,20 @@ export default async function handler(req, res) {
 
   for (const ownerId of ownerIds) {
     try {
+      // ── Clear existing moment + aggregate data for this user ──
+      // Delete the moments list (timeline)
+      await redis(['DEL', redisKey('moments', ownerId)]);
+      // Delete daily aggregate keys
+      const dailyKeys = await keys(redisKey('daily', ownerId, '*')) || [];
+      if (dailyKeys.length) {
+        const delBatch = 20;
+        for (let i = 0; i < dailyKeys.length; i += delBatch) {
+          await pipeline(dailyKeys.slice(i, i + delBatch).map(k => ['DEL', k]));
+        }
+      }
+      // Clear any cached report so it regenerates cleanly
+      await redis(['DEL', redisKey('weekly_report', ownerId)]);
+
       const cmds = [];
       let totalMoments = 0;
       const daysSet = new Set();

@@ -7,7 +7,7 @@ import { phraseText, extractFirstName } from "@/utils/phrasingLayer.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredWeeklyInsight, getStoredLlmInsight, hasFreePass, getActionFeedback } from "@/services/reportStore.js";
+import { getStoredWeeklyInsight, getStoredLlmInsight, hasFreePass, getActionFeedback, getActionPrefs } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const isAuthenticated = Boolean(user);
 
     // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, stored report, first-free check, free pass, action feedback
-    const [aggregates, allAggregates, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback] = await Promise.all([
+    const [aggregates, allAggregates, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
@@ -49,6 +49,7 @@ export default async function handler(req, res) {
       isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
       isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
       getActionFeedback(ownerId),
+      getActionPrefs(ownerId),
     ]);
 
     const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -126,8 +127,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Generate contextual actions from the report
-    report.actions = generateActions(report);
+    // Generate contextual actions from the report (feedback-aware)
+    report.actions = generateActions(report, actionFeedback || [], actionPrefs);
     report.actionFeedback = actionFeedback || [];
 
     // Local text polish on summary + action reasons (fast, no external API)

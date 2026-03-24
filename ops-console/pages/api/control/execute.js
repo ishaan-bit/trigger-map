@@ -1,10 +1,10 @@
 import { requireAuth } from '../../../lib/auth.js';
 import { triggerJob, clearCache, getBackendHealth } from '../../../lib/backendClient.js';
-import { runLlmInsights, runFreePass, runRewriteSummaries, cancelWorkerJob, getWorkerHealth, listModels, pullModel } from '../../../lib/workerClient.js';
+import { runLlmInsights, runFreePass, runRewriteSummaries, runLlmActions, cancelWorkerJob, getWorkerHealth, listModels, pullModel } from '../../../lib/workerClient.js';
 import { pingRedis, sMembers, redisKey } from '../../../lib/redis.js';
 
 // Jobs that run on the local worker (LLM inference)
-const LOCAL_JOBS = new Set(['generateLlmInsights', 'generateFreePass', 'rewriteSummaries']);
+const LOCAL_JOBS = new Set(['generateLlmInsights', 'generateFreePass', 'rewriteSummaries', 'generateLlmActions']);
 
 // Jobs that run on the Vercel backend (rule-based)
 const BACKEND_JOBS = new Set(['generateWeeklyReports']);
@@ -14,6 +14,7 @@ const ALLOWED_CACHES = [
   'llm_insight',
   'llm_free_pass',
   'action_feedback',
+  'action_prefs',
 ];
 
 export default async function handler(req, res) {
@@ -45,6 +46,8 @@ export default async function handler(req, res) {
           result = await runLlmInsights(workerParams);
         } else if (target === 'rewriteSummaries') {
           result = await runRewriteSummaries(workerParams);
+        } else if (target === 'generateLlmActions') {
+          result = await runLlmActions(workerParams);
         } else {
           result = await runFreePass(workerParams);
         }

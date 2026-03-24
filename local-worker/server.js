@@ -171,6 +171,11 @@ async function handleRequest(req, res) {
     return handleRunJob(req, res, 'rewriteSummaries.js', 'rewriteSummaries');
   }
 
+  // POST /generate-llm-actions
+  if (path === '/generate-llm-actions' && req.method === 'POST') {
+    return handleRunJob(req, res, 'generateLlmActions.js', 'generateLlmActions');
+  }
+
   // POST /cancel-job
   if (path === '/cancel-job' && req.method === 'POST') {
     const body = await readBody(req);

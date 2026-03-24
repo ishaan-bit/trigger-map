@@ -75,3 +75,33 @@ export async function getActionFeedback(ownerId) {
     .map((r) => { try { return JSON.parse(r); } catch { return null; } })
     .filter(Boolean);
 }
+
+// --- Action preferences (feedback-driven parameters) ---
+
+export function getActionPrefsKey(ownerId) {
+  return redisKey("action_prefs", ownerId);
+}
+
+/**
+ * Action prefs shape:
+ * {
+ *   likedTriggers: string[],       // triggers from "tried" actions
+ *   dislikedApproaches: string[],  // action IDs the user skipped
+ *   llmActions: Action[],          // LLM-generated replacement actions
+ *   llmGeneratedAt: ISO string,
+ *   llmModel: string,
+ *   updatedAt: ISO string,
+ * }
+ */
+export async function getActionPrefs(ownerId) {
+  const raw = await redis(["GET", getActionPrefsKey(ownerId)]);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export async function storeActionPrefs(ownerId, prefs) {
+  const payload = { ...prefs, updatedAt: new Date().toISOString() };
+  await redis(["SET", getActionPrefsKey(ownerId), JSON.stringify(payload)]);
+  await redis(["EXPIRE", getActionPrefsKey(ownerId), String(60 * 60 * 24 * 90)]);
+  return payload;
+}

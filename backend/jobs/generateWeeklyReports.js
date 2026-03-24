@@ -3,7 +3,7 @@ import { generateInsight } from "../ai/generateInsight.js";
 import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationService.js";
 import { generateWeeklyReport } from "../services/patternEngine.js";
 import { generateActions } from "../services/actionEngine.js";
-import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportStore.js";
+import { getStoredWeeklyInsight, storeWeeklyInsight, getActionFeedback, getActionPrefs } from "../services/reportStore.js";
 import { getUserById } from "../services/authService.js";
 import { phraseText, extractFirstName } from "../utils/phrasingLayer.js";
 
@@ -42,8 +42,12 @@ async function processOwner(ownerId, force, { personalize = true } = {}) {
     return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
   }
 
-  // Generate action cards from the full report
-  const actions = generateActions(report);
+  // Generate action cards from the full report (feedback-aware)
+  const [actionFeedback, actionPrefs] = await Promise.all([
+    getActionFeedback(ownerId),
+    getActionPrefs(ownerId),
+  ]);
+  const actions = generateActions(report, actionFeedback || [], actionPrefs);
 
   // Polish text: local deterministic cleanup
   insight.summary = await phraseText(insight.summary, { firstName });

@@ -51,6 +51,13 @@ export async function runRewriteSummaries({ model, force, ownerIds } = {}) {
   });
 }
 
+export async function runLlmActions({ model, force, ownerIds } = {}) {
+  return workerRequest('/generate-llm-actions', {
+    method: 'POST',
+    body: JSON.stringify({ model, force, ownerIds }),
+  });
+}
+
 export async function cancelWorkerJob(jobName) {
   return workerRequest('/cancel-job', {
     method: 'POST',

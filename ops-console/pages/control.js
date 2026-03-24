@@ -65,6 +65,18 @@ const JOBS = [
       { key: 'force', label: 'Force (re-rewrite already rewritten)', type: 'checkbox', default: false },
     ],
   },
+  {
+    id: 'generateLlmActions',
+    label: 'Generate LLM Actions (HiTL)',
+    description: 'Generate personalized action items using LLM based on HiTL feedback. Enhances liked actions, replaces skipped ones. Stores as action prefs that feed into weekly report generation.',
+    danger: false,
+    usesLlm: true,
+    hasUserPicker: true,
+    source: 'local',
+    params: [
+      { key: 'force', label: 'Force (generate even without feedback)', type: 'checkbox', default: true },
+    ],
+  },
 ];
 
 const CACHE_ACTIONS = [
