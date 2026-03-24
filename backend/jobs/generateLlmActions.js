@@ -18,6 +18,7 @@ import { getUserById } from "../services/authService.js";
 import { getActionFeedback, getActionPrefs, storeActionPrefs } from "../services/reportStore.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
 import { lintText } from "../utils/textGrammar.js";
+import { getStylePrompt } from "../ai/styleProfiles.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -223,7 +224,7 @@ async function generateForOwner(ownerId, { model, apiUrl, force }) {
         body: JSON.stringify({
           model,
           messages: [
-            { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
+            { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." + getStylePrompt(process.env.LLM_STYLE) },
             { role: "user", content: prompt },
           ],
           temperature: 0.65,

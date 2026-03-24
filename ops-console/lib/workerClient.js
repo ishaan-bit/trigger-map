@@ -30,31 +30,31 @@ export async function workerRequest(path, options = {}) {
   }
 }
 
-export async function runLlmInsights({ model, force, minMoments, maxWords, ownerIds } = {}) {
+export async function runLlmInsights({ model, force, minMoments, maxWords, ownerIds, style } = {}) {
   return workerRequest('/run-llm-insights', {
     method: 'POST',
-    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds }),
+    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds, style }),
   });
 }
 
-export async function runFreePass({ model, force, minMoments, maxWords, ownerIds } = {}) {
+export async function runFreePass({ model, force, minMoments, maxWords, ownerIds, style } = {}) {
   return workerRequest('/run-freepass', {
     method: 'POST',
-    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds }),
+    body: JSON.stringify({ model, force, minMoments, maxWords, ownerIds, style }),
   });
 }
 
-export async function runRewriteSummaries({ model, force, ownerIds } = {}) {
+export async function runRewriteSummaries({ model, force, ownerIds, style } = {}) {
   return workerRequest('/rewrite-summaries', {
     method: 'POST',
-    body: JSON.stringify({ model, force, ownerIds }),
+    body: JSON.stringify({ model, force, ownerIds, style }),
   });
 }
 
-export async function runLlmActions({ model, force, ownerIds } = {}) {
+export async function runLlmActions({ model, force, ownerIds, style } = {}) {
   return workerRequest('/generate-llm-actions', {
     method: 'POST',
-    body: JSON.stringify({ model, force, ownerIds }),
+    body: JSON.stringify({ model, force, ownerIds, style }),
   });
 }
 

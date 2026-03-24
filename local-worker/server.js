@@ -205,7 +205,7 @@ async function handleRunJob(req, res, scriptName, jobName) {
   }
 
   const body = await readBody(req);
-  const { model, force, minMoments, maxWords, ownerIds } = body;
+  const { model, force, minMoments, maxWords, ownerIds, style } = body;
 
   // Validate model if provided
   if (model && !ALLOWED_MODELS.includes(model)) {
@@ -221,6 +221,9 @@ async function handleRunJob(req, res, scriptName, jobName) {
   if (maxWords != null) env.LLM_MAX_WORDS = String(maxWords);
   if (Array.isArray(ownerIds) && ownerIds.length > 0) {
     env.LLM_OWNER_IDS = ownerIds.join(',');
+  }
+  if (style && style !== 'default') {
+    env.LLM_STYLE = style;
   }
 
   const startTime = Date.now();

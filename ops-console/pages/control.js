@@ -4,6 +4,21 @@ import ConfirmAction from '../components/ConfirmAction';
 
 const LLM_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
+const LLM_STYLES = [
+  { id: 'default',      label: 'Default (System Voice)' },
+  { id: 'dostoevsky',   label: '🔥 Dostoevsky' },
+  { id: 'camus',        label: '🪨 Camus' },
+  { id: 'pessoa',       label: '🌫 Pessoa' },
+  { id: 'krishnamurti', label: '🧘 Krishnamurti' },
+  { id: 'vivekananda',  label: '🔱 Vivekananda' },
+  { id: 'fleabag',      label: '🎭 Fleabag' },
+  { id: 'seinfeld',     label: '😂 Seinfeld / Curb' },
+  { id: 'carlin',       label: '🔥 George Carlin' },
+  { id: 'sloss',        label: '🎤 Daniel Sloss' },
+  { id: 'kenny',        label: '🇮🇳 Kenny Sebastian' },
+  { id: 'virdas',       label: '🇮🇳 Vir Das' },
+];
+
 const BACKFILL_PERSONALITIES = [
   { id: 'burnout-candidate',     label: '🔥 Burnout Candidate',     desc: 'Work-dominated stress, declining energy, exercise barely helps' },
   { id: 'steady-achiever',       label: '⚖️ Steady Achiever',       desc: 'Balanced routines, exercise is a strong regulator, mostly positive' },
@@ -468,7 +483,7 @@ export default function ControlPage() {
         }
       }
       if (job.usesLlm) {
-        defaults[job.id] = { ...(defaults[job.id] || {}), llmModel: 'phi3' };
+        defaults[job.id] = { ...(defaults[job.id] || {}), llmModel: 'phi3', llmStyle: 'default' };
       }
     }
     if (typeof window !== 'undefined') {
@@ -762,28 +777,49 @@ export default function ControlPage() {
                     )}
                     <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                       {job.usesLlm && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>LLM Model</span>
-                          <select
-                            value={jobParams[job.id]?.llmModel || 'phi3'}
-                            onChange={(e) => updateParam(job.id, 'llmModel', e.target.value)}
-                            style={{
-                              padding: '3px 8px',
-                              background: 'var(--bg-primary)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 4,
-                              color: 'var(--text-primary)',
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)',
-                            }}
-                          >
-                            {LLM_MODELS.map((m) => {
-                              const ms = modelStatus.find(s => s.name === m);
-                              const prefix = modelStatus.length > 0 ? (ms?.ready ? '✓ ' : '↓ ') : '';
-                              return <option key={m} value={m}>{prefix}{m}</option>;
-                            })}
-                          </select>
-                        </label>
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>LLM Model</span>
+                            <select
+                              value={jobParams[job.id]?.llmModel || 'phi3'}
+                              onChange={(e) => updateParam(job.id, 'llmModel', e.target.value)}
+                              style={{
+                                padding: '3px 8px',
+                                background: 'var(--bg-primary)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 4,
+                                color: 'var(--text-primary)',
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                              }}
+                            >
+                              {LLM_MODELS.map((m) => {
+                                const ms = modelStatus.find(s => s.name === m);
+                                const prefix = modelStatus.length > 0 ? (ms?.ready ? '✓ ' : '↓ ') : '';
+                                return <option key={m} value={m}>{prefix}{m}</option>;
+                              })}
+                            </select>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>Style</span>
+                            <select
+                              value={jobParams[job.id]?.llmStyle || 'default'}
+                              onChange={(e) => updateParam(job.id, 'llmStyle', e.target.value)}
+                              style={{
+                                padding: '3px 8px',
+                                background: 'var(--bg-primary)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 4,
+                                color: 'var(--text-primary)',
+                                fontSize: 12,
+                              }}
+                            >
+                              {LLM_STYLES.map((s) => (
+                                <option key={s.id} value={s.id}>{s.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
                       )}
                       {job.params && job.params.map((p) => (
                         <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>

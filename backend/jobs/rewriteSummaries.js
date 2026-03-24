@@ -20,6 +20,7 @@ import { listOwnerIds } from "../services/aggregationService.js";
 import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportStore.js";
 import { getUserById } from "../services/authService.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
+import { getStylePrompt } from "../ai/styleProfiles.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -48,7 +49,8 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
         "The text is addressed TO the user, not spoken BY the user. " +
         "Use clear grammar and correct spelling. Do not add new information or insights. " +
         "Do not use markdown, bullet points, numbered lists, em dashes, or bold formatting. " +
-        "Output only the rewritten text, nothing else.",
+        "Output only the rewritten text, nothing else." +
+        getStylePrompt(process.env.LLM_STYLE),
     },
     {
       role: "user",

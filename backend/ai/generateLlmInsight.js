@@ -8,6 +8,8 @@
  * Tone: calm, observant, grounded. No essays, no fake-therapeutic language.
  */
 
+import { getStylePrompt } from "./styleProfiles.js";
+
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
 const REQUEST_TIMEOUT_MS = 300_000;
@@ -265,7 +267,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'Your' as the possessive form — never 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'Your' as the possessive form — never 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,

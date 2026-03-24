@@ -40,6 +40,7 @@ export default async function handler(req, res) {
           minMoments: params?.minMoments,
           maxWords: params?.maxWords,
           ownerIds: params?.ownerIds,
+          style: params?.llmStyle,
         };
         let result;
         if (target === 'generateLlmInsights') {
