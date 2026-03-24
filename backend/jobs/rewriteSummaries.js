@@ -44,13 +44,15 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
       content:
         "You are a concise, warm copy editor for a wellness app. " +
         "Rewrite the text to sound natural and human. Keep meaning, numbers, and length similar. " +
+        "IMPORTANT: Always use second person (you, your, yours). Never use first person (I, me, my, mine). " +
+        "The text is addressed TO the user, not spoken BY the user. " +
         "Use clear grammar and correct spelling. Do not add new information or insights. " +
         "Do not use markdown, bullet points, numbered lists, em dashes, or bold formatting. " +
         "Output only the rewritten text, nothing else.",
     },
     {
       role: "user",
-      content: `Rewrite this text to be clearer and more natural (max 2 sentences).${nameInstruction}\n\n${text}`,
+      content: `Rewrite this text addressed to the reader in second person (you/your), keeping it clear and natural (max 2 sentences). Example: "Work took the front seat for you this week."${nameInstruction}\n\n${text}`,
     },
   ];
 
@@ -87,6 +89,11 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
     // Reject if the model echoed the prompt
     if (/rewrite|copy editor|wellness app/i.test(output)) {
       return { text, changed: false, error: "prompt-echo" };
+    }
+
+    // Reject if the model switched to first person (should be second person: you/your)
+    if (/\b(for me|to me|my week|my mood|my baseline|I felt|I had|I was|took the front seat for me)\b/i.test(output)) {
+      return { text, changed: false, error: "first-person-detected" };
     }
 
     return { text: output, changed: true, error: null };
