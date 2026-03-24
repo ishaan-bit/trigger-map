@@ -10,6 +10,7 @@
  */
 
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
+import { buildSignalProfile } from "../ai/signalProfile.js";
 
 const ACTION_META = {
   regulate:   { icon: "🌿", category: "Try this" },
@@ -63,16 +64,18 @@ export function generateActions(report, feedback = [], prefs = null) {
   const drift = report.baselineMetrics?.drift;
   const deltas = report.weeklyDeltas;
   const likedTriggers = new Set(prefs?.likedTriggers || []);
+  const sp = buildSignalProfile(report);
 
   // 1. Friction + Regulator pairing
   if (friction.length && regulators.length) {
     const f = friction[0];
     const r = regulators[0];
+    const freq1 = f.count <= 2 ? 'sometimes' : 'often';
     candidates.push({
       id: `reg-${f.trigger}-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
       title: `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`,
-      reason: `${cap(triggerLabel(f.trigger))} often leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,
+      reason: `${cap(triggerLabel(f.trigger))} ${freq1} leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,
       trigger: f.trigger,
       emotion: f.emotion,
     });
@@ -93,11 +96,14 @@ export function generateActions(report, feedback = [], prefs = null) {
 
   // 3. Drift-based action
   if (drift?.direction === "declining") {
+    const subtleDrift = sp.drift === 'slight_negative';
     candidates.push({
       id: "drift-check-in",
       type: "awareness",
-      title: "Check in with how you're feeling",
-      reason: "Your emotional tone dipped below your baseline this week. A brief pause can help.",
+      title: subtleDrift ? "Notice how your baseline is shifting" : "Check in with how you're feeling",
+      reason: subtleDrift
+        ? "There's been a subtle shift below your usual baseline. A brief check-in can help."
+        : "Your emotional tone dipped below your baseline this week. A brief pause can help.",
     });
   }
 

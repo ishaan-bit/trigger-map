@@ -1,5 +1,6 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
+import { buildSignalProfile } from "./signalProfile.js";
 
 /**
  * Confidence-aware rule-based insight generator.
@@ -151,9 +152,12 @@ function buildModerateSummary(report, firstName) {
     parts.push(`${firstName ? firstName + ", no" : "No"} single trigger dominated. Your attention was spread across ${triggerList(report.tiedTriggers)}.`);
   }
 
+  const sp = buildSignalProfile(report);
+
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `When ${triggerLabel(f.trigger)} came up, it often left you feeling ${f.emotion}. That happened ${f.count} times.`;
+    const freq = f.count <= 2 ? 'sometimes' : 'often';
+    let fLine = `When ${triggerLabel(f.trigger)} came up, it ${freq} left you feeling ${f.emotion} (${f.count}×).`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -161,7 +165,8 @@ function buildModerateSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`On the flip side, ${triggerLabel(r.trigger)} kept leaving you feeling ${r.emotion}, which is a good anchor.`);
+    const rVerb = r.count >= 3 ? 'kept leaving' : 'left';
+    parts.push(`On the flip side, ${triggerLabel(r.trigger)} ${rVerb} you feeling ${r.emotion}, which is a good anchor.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -187,9 +192,13 @@ function buildStrongSummary(report, firstName) {
     parts.push(`${firstName ? firstName + ", your" : "Your"} week touched on ${triggerList(report.tiedTriggers)} without one standing out.`);
   }
 
+  const sp = buildSignalProfile(report);
+
   if (report.frictionZones.length) {
     const f = report.frictionZones[0];
-    let fLine = `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} kept showing up together (${f.count}×). That's a pattern worth noticing.`;
+    const fVerb = sp.triggerStrength === 'weak' ? 'showed up together' : 'kept showing up together';
+    const fNote = sp.triggerStrength === 'weak' ? 'That may be worth watching.' : "That's a pattern worth noticing.";
+    let fLine = `${cap(triggerLabel(f.trigger))} and feeling ${f.emotion} ${fVerb} (${f.count}×). ${fNote}`;
     const rn = recurrenceNote(f.trigger, f.emotion, report.recurrence);
     if (rn) fLine += " " + rn;
     parts.push(fLine);
@@ -197,7 +206,8 @@ function buildStrongSummary(report, firstName) {
 
   if (report.regulators.length) {
     const r = report.regulators[0];
-    parts.push(`${cap(triggerLabel(r.trigger))} has consistently left you feeling ${r.emotion}.`);
+    const rAdv = r.count >= 4 ? 'consistently' : 'generally';
+    parts.push(`${cap(triggerLabel(r.trigger))} has ${rAdv} left you feeling ${r.emotion}.`);
   }
 
   const bl = baselineLanguage(report.baselineContext?.driftDirection);
@@ -314,8 +324,9 @@ function buildWhatWorking(report) {
 function buildWhereToFocus(report) {
   const items = [];
   for (const f of (report.frictionZones || []).slice(0, 3)) {
+    const freq = f.count <= 2 ? 'sometimes' : 'often';
     items.push({
-      text: `${cap(triggerLabel(f.trigger))} often leaves you feeling ${f.emotion} - worth noticing`,
+      text: `${cap(triggerLabel(f.trigger))} ${freq} leaves you feeling ${f.emotion} - worth noticing`,
       trigger: f.trigger,
       emotion: f.emotion,
       count: f.count,

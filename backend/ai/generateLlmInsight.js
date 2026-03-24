@@ -9,6 +9,7 @@
  */
 
 import { getStylePrompt } from "./styleProfiles.js";
+import { buildSignalProfile, buildSignalConstraints } from "./signalProfile.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
@@ -180,6 +181,11 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Recent user notes:\n${noteLines.join("\n")}`);
   }
 
+  // Signal profile constraints
+  const sp = buildSignalProfile(report);
+  lines.push('');
+  lines.push(buildSignalConstraints(sp));
+
   return lines.join("\n");
 }
 
@@ -227,7 +233,8 @@ Rules:
 - IMPORTANT: Only describe emotions and patterns that appear in the data. If the user logged mostly calm or neutral moments, reflect that positively. Never invent problems. If baseline/drift data is provided, reference it naturally.
 - Use correct English spelling and grammar. No typos, no random numbers or characters mixed into words.
 - Always use "Your" as the possessive form. Never write "You's" which is not valid English.
-- Each section body must be ${sentencesPerSection} sentences.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+- Each section body must be ${sentencesPerSection} sentences.
+- CRITICAL: Match language intensity to the SIGNAL PROFILE section in the data above. If it says subtle or weak, use restrained observational language. Do not dramatize weak patterns or invent causes not present in the data.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
 }
 
 /**
@@ -267,7 +274,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." + getStylePrompt(process.env.LLM_STYLE) },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns." + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
