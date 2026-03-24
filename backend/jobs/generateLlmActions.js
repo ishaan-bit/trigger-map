@@ -74,6 +74,14 @@ function buildActionSignals(report, feedback, prefs, firstName) {
     lines.push(`\nTriggers the user has positively engaged with: ${prefs.likedTriggers.join(", ")}.`);
   }
 
+  // Include previous LLM actions so the model avoids repeating them
+  if (prefs?.llmActions?.length) {
+    lines.push(`\nPreviously generated actions (DO NOT repeat these - generate completely different ones):`);
+    for (const a of prefs.llmActions) {
+      lines.push(`  - ${a.title}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -85,6 +93,7 @@ RULES:
 - For triggers/patterns the user TRIED (liked): create enhanced versions — deepen, build on what worked, add specificity.
 - For triggers/patterns the user SKIPPED (disliked): take a completely different approach — change the angle, context, or strategy. Do not repeat the same idea.
 - Never repeat an action the user already tried or skipped. Be fresh and specific.
+- If previously generated actions are listed below, you MUST NOT repeat or rephrase any of them. Generate completely different actions with new angles.
 - Types: "regulate" (suggest a positive behavior), "awareness" (notice a pattern), "experiment" (try something new).
 - Tone: warm, direct, grounded. No therapy-speak. No em dashes. No markdown.
 - Use plain English. No bullet points or special formatting in the output.
@@ -114,7 +123,33 @@ function parseActions(raw) {
   let text = raw.trim();
   text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
 
-  const parsed = JSON.parse(text);
+  // Try to extract JSON array from surrounding prose
+  const arrayMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+  if (arrayMatch) text = arrayMatch[0];
+
+  // Fix common phi3 quirks
+  // 1. Trailing commas before ] or }
+  text = text.replace(/,\s*([\]\}])/g, "$1");
+  // 2. Trailing semicolons
+  text = text.replace(/\];?\s*$/, "]");
+  // 3. Corrupted id fields: "id02"] → "id": "llm-auto-2"  (phi3 merges id with digits)
+  text = text.replace(/"id(\d+)"\s*\]?\s*,?/g, '"id": "llm-auto-$1",');
+  // 4. Corrupted id with parenthesis: "id0123456789") → "id": "llm-auto"
+  text = text.replace(/"id[\d]+"\)\s*:?/g, '"id": "llm-auto",');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // Last resort: extract individual complete objects via regex
+    const objMatches = [...text.matchAll(/\{[^{}]*"type"\s*:\s*"[^"]+?"[^{}]*"title"\s*:\s*"[^"]+?"[^{}]*\}/g)];
+    if (objMatches.length === 0) throw new Error("Could not extract any action objects from LLM output");
+    parsed = objMatches.map(m => {
+      try { return JSON.parse(m[0]); } catch { return null; }
+    }).filter(Boolean);
+    if (parsed.length === 0) throw new Error("No parseable action objects in LLM output");
+  }
+
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error("LLM returned empty or non-array response");
   }
@@ -174,51 +209,69 @@ async function generateForOwner(ownerId, { model, apiUrl, force }) {
   const signals = buildActionSignals(report, feedback, prefs, firstName);
   const prompt = buildPrompt(signals);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const MAX_ATTEMPTS = 3;
+  let lastError;
 
-  try {
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 600,
-      }),
-      signal: controller.signal,
-    });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LLM API returned ${response.status}: ${text}`);
+    try {
+      const response = await fetch(`${apiUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.65,
+          max_tokens: 600,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`LLM API returned ${response.status}: ${text}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) throw new Error("LLM returned empty response");
+
+      try {
+        var actions = parseActions(content);
+      } catch (parseErr) {
+        console.log(`    Raw LLM output (attempt ${attempt}): ${content.slice(0, 500)}`);
+        throw parseErr;
+      }
+      const likedTriggers = computeLikedTriggers(feedback);
+
+      const newPrefs = {
+        likedTriggers,
+        dislikedApproaches: feedback.filter(f => f.response === "skipped").map(f => f.actionId),
+        llmActions: actions,
+        llmGeneratedAt: new Date().toISOString(),
+        llmModel: model,
+      };
+
+      await storeActionPrefs(ownerId, newPrefs);
+
+      if (attempt > 1) console.log(`    Succeeded on attempt ${attempt}`);
+      return { ok: true, actionCount: actions.length, model, likedTriggers };
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) {
+        console.log(`    Attempt ${attempt} failed (${err.message}), retrying...`);
+      }
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error("LLM returned empty response");
-
-    const actions = parseActions(content);
-    const likedTriggers = computeLikedTriggers(feedback);
-
-    const newPrefs = {
-      likedTriggers,
-      dislikedApproaches: feedback.filter(f => f.response === "skipped").map(f => f.actionId),
-      llmActions: actions,
-      llmGeneratedAt: new Date().toISOString(),
-      llmModel: model,
-    };
-
-    await storeActionPrefs(ownerId, newPrefs);
-
-    return { ok: true, actionCount: actions.length, model, likedTriggers };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastError;
 }
 
 export async function runGenerateLlmActions({ force = false, ownerIds, model } = {}) {
