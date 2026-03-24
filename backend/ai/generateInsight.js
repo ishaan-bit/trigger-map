@@ -2,6 +2,16 @@ import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 import { buildSignalProfile, rankSignals, detectRelationship } from "./signalProfile.js";
 
+function emotionAvgScore(emotions) {
+  let total = 0, weighted = 0;
+  for (const [emotion, count] of Object.entries(emotions || {})) {
+    const n = Number(count || 0);
+    total += n;
+    weighted += (EMOTION_SCORE[emotion] || 3) * n;
+  }
+  return total ? weighted / total : 3;
+}
+
 /**
  * Confidence-aware rule-based insight generator.
  *
@@ -151,10 +161,16 @@ function buildModerateSummary(report, firstName) {
 
   // ── Sentence 1: Surface state ──
   let s1;
+  const avgScoreM = emotionAvgScore(report.emotionFrequency || {});
   if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
     s1 = sp.isFlattening
       ? `${name}your week looked stable on the surface, with neutral showing up more than any other feeling.`
       : `${name}your week was steady, with neutral being the most common feeling.`;
+  } else if (sp.volatility === 'low' && avgScoreM < 2.5) {
+    const topFriction = report.frictionZones?.[0];
+    s1 = topFriction
+      ? `${name}${triggerLabel(topFriction.trigger)} brought consistent friction this week, with ${topFriction.emotion} running through most days.`
+      : `${name}this week carried a heavy emotional tone, with frustration or anxiety showing up often.`;
   } else if (sp.volatility === 'low') {
     s1 = `${name}things have been steady this week, with ${report.topEmotion || 'a consistent tone'} showing up most.`;
   } else if (report.topTrigger) {
@@ -255,10 +271,16 @@ function buildStrongSummary(report, firstName) {
 
   // ── Sentence 1: Surface state ──
   let s1;
+  const avgScoreS = emotionAvgScore(report.emotionFrequency || {});
   if (sp.volatility === 'low' && sp.dominantEmotion === 'neutral') {
     s1 = sp.isFlattening
       ? `${name}your week looked calm on the surface, but neutral was the dominant feeling, with less emotional range than usual.`
       : `${name}your week was quiet and largely neutral, without much emotional movement.`;
+  } else if (sp.volatility === 'low' && avgScoreS < 2.5) {
+    const topFriction = report.frictionZones?.[0];
+    s1 = topFriction
+      ? `${name}${triggerLabel(topFriction.trigger)} brought persistent friction this week, with ${topFriction.emotion} running through most days.`
+      : `${name}this week carried a heavy emotional tone, with frustration or anxiety present throughout.`;
   } else if (sp.volatility === 'low') {
     s1 = `${name}things were steady this week, with ${report.topEmotion || 'a consistent emotional tone'} showing up most.`;
   } else if (sp.volatility === 'high') {
@@ -418,13 +440,18 @@ function buildWhatWorking(report) {
   }
   if (report.volatilityScore !== null && report.volatilityScore < 0.5) {
     const spWw = buildSignalProfile(report);
-    if (!spWw.isFlattening) {
+    // Only celebrate steadiness when emotional tone is at least neutral-positive
+    const avgScore = emotionAvgScore(report.emotionFrequency || {});
+    if (!spWw.isFlattening && avgScore >= 3.0) {
       items.push({ text: "Your emotions have been pretty steady this week" });
     }
   }
   const bm = report.baselineMetrics;
   if (bm?.stability?.score >= 0.7) {
-    items.push({ text: "You're consistently hovering near your emotional baseline. That's great stability" });
+    const spStab = buildSignalProfile(report);
+    if (!spStab.isFlattening) {
+      items.push({ text: "You're consistently hovering near your emotional baseline. That's great stability" });
+    }
   }
   return items.length > 0 ? items : null;
 }

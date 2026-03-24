@@ -62,14 +62,15 @@ export function buildSignalProfile(report) {
     else if (diff >= 0.3) weeklySlope = 'slight_rise';
   }
 
-  // Flattening: neutral-dominant + low volatility + within-week decline
+  // Flattening: neutral-dominant + low volatility + (within-week decline OR perpetual flatness)
   const emotionFreq = report.emotionFrequency || {};
   const totalEmotions = Object.values(emotionFreq).reduce((s, v) => s + v, 0);
   const neutralRatio = (emotionFreq.neutral || 0) / (totalEmotions || 1);
   const isFlattening = volatility === 'low'
     && neutralRatio >= 0.4
     && (weeklySlope === 'declining' || weeklySlope === 'slight_decline'
-        || driftLevel === 'slight_negative');
+        || driftLevel === 'slight_negative'
+        || neutralRatio >= 0.65);
 
   return {
     volatility,
