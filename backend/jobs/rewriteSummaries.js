@@ -24,7 +24,7 @@ import { getStylePrompt } from "../ai/styleProfiles.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
-const REWRITE_TIMEOUT_MS = 30000;
+const REWRITE_TIMEOUT_MS = 60000;
 
 /**
  * Call local Ollama to rewrite a text block.

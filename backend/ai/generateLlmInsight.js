@@ -267,7 +267,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'Your' as the possessive form — never 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." + getStylePrompt(process.env.LLM_STYLE) },
+          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority." + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
@@ -315,6 +315,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       .replace(/\btheir (?=emotion|trigger|pattern|mood|feeling|week|day|log)/gi, "your ")
       .replace(/\bYou's\b/g, "Your")   // fix broken LLM possessive
       .replace(/\byou's\b/g, "your")
+      .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2") // lowercase mid-sentence You/Your
       .trim();
 
     // Strip prompt echo lines the model may repeat back
@@ -393,6 +394,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
         .replace(/\b[a-zA-Z]{2,}\d{3,}\b/g, "")      // garbled tokens: letters then 3+ random digits
         .replace(/\bYou's\b/g, "Your")          // broken possessive (final pass)
         .replace(/\byou's\b/g, "your")
+        .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2") // lowercase mid-sentence You/Your
         .replace(/\s{2,}/g, " ")                 // collapse double spaces
         .replace(/([a-z])\s*\n\s*([a-z])/g, "$1 $2") // join broken sentences
         .replace(/[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip non-printable/non-latin junk
