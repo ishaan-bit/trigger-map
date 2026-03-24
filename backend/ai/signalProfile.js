@@ -83,6 +83,8 @@ export function buildSignalConstraints(profile) {
 
   if (profile.drift === 'slight_negative') {
     lines.push('Drift: slight negative. Use "subtle decline", "slight dip". Avoid "drop", "worsening", "significantly declining".');
+  } else if (profile.drift === 'strong_negative') {
+    lines.push('Drift: strong negative. Emotional tone has fallen meaningfully below baseline. Acknowledge the shift directly but without catastrophizing.');
   } else if (profile.drift === 'neutral') {
     lines.push('Drift: stable. Do not suggest things are getting worse.');
   } else if (profile.drift === 'positive') {

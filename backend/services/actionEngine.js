@@ -131,7 +131,7 @@ export function generateActions(report, feedback = [], prefs = null) {
       id: `reinforce-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
       title: `Keep ${triggerLabel(r.trigger)} in your week`,
-      reason: `It consistently leaves you feeling ${r.emotion}. Protecting what works matters.`,
+      reason: `It ${r.count >= 4 ? 'consistently' : 'generally'} leaves you feeling ${r.emotion}. Protecting what works matters.`,
       trigger: r.trigger,
       emotion: r.emotion,
     });
@@ -167,7 +167,7 @@ export function generateActions(report, feedback = [], prefs = null) {
       id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
       title: `Notice when ${triggerLabel(topPair.trigger)} leaves you feeling ${topPair.emotion}`,
-      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week. Your most common combo.`,
+      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week.${topPair.count >= 3 ? ' Your most common combo.' : ''}`,
       trigger: topPair.trigger,
       emotion: topPair.emotion,
     });

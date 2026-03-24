@@ -334,7 +334,11 @@ function buildWhereToFocus(report) {
   }
   const bm = report.baselineMetrics;
   if (bm?.drift?.direction === "declining") {
-    items.push({ text: "Your emotional tone has dipped below your usual baseline this week" });
+    const sp = buildSignalProfile(report);
+    const driftText = sp.drift === 'slight_negative'
+      ? "There's been a subtle dip below your usual emotional baseline"
+      : "Your emotional tone has dipped below your usual baseline this week";
+    items.push({ text: driftText });
   }
   if (bm?.recoveryLatency?.days > 3) {
     items.push({ text: "It's been taking a few days to bounce back after tough spots" });
