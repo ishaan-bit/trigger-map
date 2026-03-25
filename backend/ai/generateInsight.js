@@ -419,6 +419,11 @@ export async function generateInsight(report, opts = {}) {
   const whereToFocus = buildWhereToFocus(report);
   const bm = report.baselineMetrics;
 
+  // Structured Mirror output: drivers, behavioral loop, actionable direction
+  const drivers = buildDrivers(report);
+  const behavioralLoop = buildBehavioralLoop(report);
+  const actionableDirection = buildActionableDirection(report);
+
   return {
     summary: lintText(appendPredictionContext(appendTagContext(summary, report), report)),
     microExperiment,
@@ -428,6 +433,9 @@ export async function generateInsight(report, opts = {}) {
     baselineSummary: bm?.baseline?.reliable
       ? `Your emotional baseline sits around ${bm.baseline.label}. ${bm.drift ? `This week you're ${bm.drift.label} compared to your norm.` : ""}`
       : null,
+    drivers,
+    behavioralLoop,
+    actionableDirection: actionableDirection ? lintText(actionableDirection) : null,
     confidence,
     model: "rule-based-v3",
     generatedAt: new Date().toISOString(),
@@ -506,4 +514,62 @@ function buildWhereToFocus(report) {
     items.push({ text: "Emotions from one part of your day seem to be carrying over into unrelated contexts" });
   }
   return items.length > 0 ? items : null;
+}
+
+function buildDrivers(report) {
+  const triggers = Object.entries(report.triggerFrequency || {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3);
+  if (!triggers.length) return null;
+  return triggers.map(([trigger, count]) => {
+    const friction = (report.frictionZones || []).find(f => f.trigger === trigger);
+    const regulator = (report.regulators || []).find(r => r.trigger === trigger);
+    return {
+      trigger,
+      count,
+      effect: regulator ? "regulator" : friction ? "friction" : "neutral",
+      emotion: regulator?.emotion || friction?.emotion || null,
+    };
+  });
+}
+
+function buildBehavioralLoop(report) {
+  const friction = report.frictionZones?.[0];
+  const regulator = report.regulators?.[0];
+  if (!friction && !regulator) return null;
+
+  const loops = [];
+  if (friction) {
+    const bm = report.baselineMetrics;
+    loops.push({
+      type: "friction",
+      trigger: friction.trigger,
+      emotion: friction.emotion,
+      recovery: bm?.recoveryLatency?.label || null,
+      count: friction.count,
+    });
+  }
+  if (regulator) {
+    loops.push({
+      type: "regulator",
+      trigger: regulator.trigger,
+      emotion: regulator.emotion,
+      recovery: null,
+      count: regulator.count,
+    });
+  }
+  return loops;
+}
+
+function buildActionableDirection(report) {
+  const sp = buildSignalProfile(report);
+  const bm = report.baselineMetrics;
+
+  if (sp.crashRisk) return "Your surface metrics look stable but deeper signals are diverging. Prioritize rest and check in with yourself.";
+  if (sp.falseRecovery) return "Your scores bounced back but the underlying pattern hasn't resolved. Ease back into demanding situations gradually.";
+  if (sp.maskingLevel === "high") return "There's more going on than your logged emotions suggest. Try logging more freely without filtering.";
+  if (bm?.drift?.direction === "declining") return `Your baseline has been dipping. Lean into what helps: ${report.regulators?.[0] ? triggerLabel(report.regulators[0].trigger) : "your regulators"}.`;
+  if (sp.isFlattening) return "Your emotional range is narrowing. Try something outside your routine to see what shifts.";
+  if (report.regulators?.length && bm?.stability?.score >= 0.6) return `Things are steady. Keep ${triggerLabel(report.regulators[0].trigger)} in your week.`;
+  return null;
 }

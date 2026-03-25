@@ -23,13 +23,22 @@ const ACTION_META = {
  * These should not appear again in the generated list.
  */
 function buildFeedbackIndex(feedback) {
-  const tried = new Set();
-  const skipped = new Set();
+  const helped = new Set();
+  const notHelpful = new Set();
+  const counters = {}; // actionId -> { helped: n, notHelpful: n }
   for (const entry of feedback || []) {
-    if (entry.response === "tried") tried.add(entry.actionId);
-    if (entry.response === "skipped") skipped.add(entry.actionId);
+    const r = entry.response;
+    if (!counters[entry.actionId]) counters[entry.actionId] = { helped: 0, notHelpful: 0 };
+    if (r === "helped" || r === "tried") {
+      helped.add(entry.actionId);
+      counters[entry.actionId].helped++;
+    }
+    if (r === "not_helpful" || r === "skipped") {
+      notHelpful.add(entry.actionId);
+      counters[entry.actionId].notHelpful++;
+    }
   }
-  return { tried, skipped, all: new Set([...tried, ...skipped]) };
+  return { helped, notHelpful, all: new Set([...helped, ...notHelpful]), counters };
 }
 
 /**
@@ -258,21 +267,36 @@ export function generateActions(report, feedback = [], prefs = null) {
     }
   }
 
-  // Filter out actions the user has already responded to (tried or skipped)
-  let filtered = candidates.filter(a => !fb.all.has(a.id));
+  // Remove actions the user said "not helpful" 2+ times
+  const blacklisted = new Set();
+  for (const [id, c] of Object.entries(fb.counters)) {
+    if (c.notHelpful >= 2) blacklisted.add(id);
+  }
 
-  // If filtering removed too many, add back from candidates that aren't exact duplicates
-  // (user may have skipped an old version but the data context changed)
+  // Filter out already-responded and permanently-blacklisted actions
+  let filtered = candidates.filter(a => !fb.all.has(a.id) && !blacklisted.has(a.id));
+
   if (filtered.length < 3) {
-    const remaining = candidates.filter(a => !filtered.some(f => f.id === a.id));
+    const remaining = candidates.filter(a => !filtered.some(f => f.id === a.id) && !blacklisted.has(a.id));
     for (const c of remaining) {
       if (filtered.length >= 3) break;
-      // Don't re-add exact skipped IDs — but allow tried ones to come back as enhanced
-      if (!fb.skipped.has(c.id)) {
-        filtered.push(c);
-      }
+      if (!fb.notHelpful.has(c.id)) filtered.push(c);
     }
   }
+
+  // Rank: boost actions related to triggers the user found helpful
+  const helpedTriggers = new Set();
+  for (const [id, c] of Object.entries(fb.counters)) {
+    if (c.helped > 0) {
+      const matched = candidates.find(a => a.id === id);
+      if (matched?.trigger) helpedTriggers.add(matched.trigger);
+    }
+  }
+  filtered.sort((a, b) => {
+    const aBoost = a.trigger && helpedTriggers.has(a.trigger) ? 1 : 0;
+    const bBoost = b.trigger && helpedTriggers.has(b.trigger) ? 1 : 0;
+    return bBoost - aBoost;
+  });
 
   // If LLM prefs have leftover actions that weren't filtered, merge them in
   if (prefs?.llmActions?.length && filtered.length < 4) {

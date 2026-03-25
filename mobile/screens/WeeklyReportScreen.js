@@ -284,15 +284,21 @@ function DeltaChip({ value, label, inverted = false }) {
 
 function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
   const bm = report?.baselineMetrics;
-  const deltas = report?.weeklyDeltas;
-  const highlights = report?.changeHighlights || [];
+  const insight = report?.aiInsight;
+  const drivers = insight?.drivers;
+  const loops = insight?.behavioralLoop;
+  const direction = insight?.actionableDirection;
+  const whereToFocus = insight?.whereToFocus;
+  const whatWorking = insight?.whatWorking;
+  const invoked = report?.invokedMetrics;
+  const compound = report?.compoundPatterns;
 
   return (
     <View style={s.tabContent}>
-      {/* State of Mind */}
+      {/* Current State */}
       {bm?.stateOfMind ? (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="State of mind" badge="weekly" />
+          <SectionHeader label="Current state" badge="weekly" />
           <View style={s.stateOfMindCard}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={s.stateOfMindText}>{capitalize(bm.stateOfMind)}</Text>
@@ -312,81 +318,142 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
         </AnimatedSection>
       ) : (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="State of mind" badge="weekly" />
+          <SectionHeader label="Current state" badge="weekly" />
           <View style={s.card}>
             <Text style={s.aiSummary}>Log a few more moments to see your state of mind emerge.</Text>
           </View>
         </AnimatedSection>
       )}
 
-      {/* Core Patterns — persistent view */}
-      {(report.regulators?.length > 0 || report.frictionZones?.length > 0) ? (
+      {/* Drivers — top triggers with effect tags */}
+      {drivers?.length ? (
         <AnimatedSection index={1} style={s.section}>
-          <SectionHeader label="Core patterns" badge="weekly" />
-          {report.regulators?.length ? (
-            <NarrativeCard
-              icon="🌿"
-              title="What helps"
-              items={report.regulators.slice(0, 3).map((r) => ({ trigger: r.trigger, emotion: r.emotion, count: r.count }))}
-              positive
-            />
-          ) : null}
-          {report.frictionZones?.length ? (
-            <NarrativeCard
-              icon="🔥"
-              title="Friction zones"
-              items={report.frictionZones.slice(0, 3).map((f) => ({ trigger: f.trigger, emotion: f.emotion, count: f.count }))}
-              positive={false}
-            />
-          ) : null}
+          <SectionHeader label="Drivers" badge="weekly" />
+          <View style={s.card}>
+            {drivers.map((d, i) => {
+              const tColor = TRIGGER_COLORS[d.trigger] || palette.accent;
+              const effectColor = d.effect === "regulator" ? palette.success : d.effect === "friction" ? palette.danger : palette.muted;
+              const effectLabel = d.effect === "regulator" ? "helps" : d.effect === "friction" ? "friction" : "neutral";
+              return (
+                <View key={i} style={[s.driverRow, i < drivers.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.glassBorder }]}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger)}</Text>
+                    {d.emotion ? <Text style={s.driverEmotion}>{d.emotion} · {d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
+                  </View>
+                  <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
+                    <Text style={[s.effectBadgeText, { color: effectColor }]}>{effectLabel}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </AnimatedSection>
       ) : null}
 
-      {/* Stability & Recovery */}
-      {bm?.stability ? (
+      {/* Behavioral Loop — trigger → emotion → recovery */}
+      {loops?.length ? (
         <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label="Stability" badge="weekly" />
-          <View style={s.card}>
-            <View style={s.baselineRow}>
-              <View style={s.baselineStat}>
-                <Text style={s.baselineLabel}>Stability</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[s.baselineValue, { color: bm.stability.score >= 0.6 ? palette.success : palette.warning }]}>
-                    {bm.stability.label}
-                  </Text>
-                  {bm.baselineDeltas?.deltaStability != null ? (
-                    <DeltaChip value={bm.baselineDeltas.deltaStability} />
+          <SectionHeader label="Behavioral loop" badge="weekly" />
+          {loops.map((loop, i) => {
+            const isFriction = loop.type === "friction";
+            const loopColor = isFriction ? palette.danger : palette.success;
+            const emoColor = EMOTION_COLORS[loop.emotion] || palette.textSecondary;
+            return (
+              <View key={i} style={[s.loopCard, { borderLeftColor: loopColor }]}>
+                <View style={s.loopFlow}>
+                  <View style={[s.loopNode, { backgroundColor: (TRIGGER_COLORS[loop.trigger] || palette.accent) + "20" }]}>
+                    <Text style={[s.loopNodeText, { color: TRIGGER_COLORS[loop.trigger] || palette.accent }]}>{triggerDisplay(loop.trigger)}</Text>
+                  </View>
+                  <Text style={s.loopArrow}>→</Text>
+                  <View style={[s.loopNode, { backgroundColor: emoColor + "20" }]}>
+                    <Text style={[s.loopNodeText, { color: emoColor }]}>{EMOTION_EMOJIS[loop.emotion] || "•"} {loop.emotion}</Text>
+                  </View>
+                  {loop.recovery ? (
+                    <>
+                      <Text style={s.loopArrow}>→</Text>
+                      <View style={[s.loopNode, { backgroundColor: palette.accentSoft }]}>
+                        <Text style={[s.loopNodeText, { color: palette.accent }]}>⏱ {loop.recovery}</Text>
+                      </View>
+                    </>
                   ) : null}
                 </View>
+                <Text style={s.loopMeta}>{loop.count}× this week</Text>
               </View>
-              {bm.recoveryLatency ? (
-                <View style={s.baselineStat}>
-                  <Text style={s.baselineLabel}>Recovery</Text>
-                  <Text style={s.baselineValue}>{bm.recoveryLatency.label}</Text>
+            );
+          })}
+        </AnimatedSection>
+      ) : null}
+
+      {/* Invoked Signals — masking, crash risk, false recovery */}
+      {(compound?.falseRecovery || compound?.crashRisk || invoked?.weeklyMasking) ? (
+        <AnimatedSection index={3} style={s.section}>
+          <SectionHeader label="Deeper signals" badge="weekly" />
+          <View style={s.card}>
+            {compound?.crashRisk ? (
+              <View style={s.signalRow}>
+                <Text style={[s.signalIcon, { color: palette.danger }]}>⚠️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.signalLabel, { color: palette.danger }]}>Crash risk detected</Text>
+                  <Text style={s.signalBody}>Surface metrics look stable but deeper signals are diverging.</Text>
                 </View>
-              ) : null}
-            </View>
+              </View>
+            ) : null}
+            {compound?.falseRecovery ? (
+              <View style={s.signalRow}>
+                <Text style={[s.signalIcon, { color: palette.warning }]}>🔄</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.signalLabel, { color: palette.warning }]}>False recovery</Text>
+                  <Text style={s.signalBody}>Scores look normal but the underlying pattern hasn't resolved.</Text>
+                </View>
+              </View>
+            ) : null}
+            {invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none" ? (
+              <View style={s.signalRow}>
+                <Text style={[s.signalIcon, { color: palette.purple }]}>🎭</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.signalLabel, { color: palette.purple }]}>Masking: {invoked.weeklyMasking.level}</Text>
+                  <Text style={s.signalBody}>Your reported emotions may not be telling the full story.</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         </AnimatedSection>
       ) : null}
 
-      {/* Change Highlights */}
-      {highlights.length > 0 ? (
-        <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label="What changed" badge="live" />
-          <View style={s.card}>
-            {highlights.map((h, i) => (
-              <View key={i} style={s.highlightRow}>
-                <Text style={s.highlightBullet}>•</Text>
-                <Text style={s.highlightText}>{h}</Text>
-              </View>
-            ))}
+      {/* Actionable Direction */}
+      {direction ? (
+        <AnimatedSection index={4} style={s.section}>
+          <SectionHeader label="Direction" badge="weekly" />
+          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
+            <Text style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}>{direction}</Text>
           </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* What's Working / Where to Focus */}
+      {(whatWorking?.length || whereToFocus?.length) ? (
+        <AnimatedSection index={5} style={s.section}>
+          {whatWorking?.length ? (
+            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
+              <Text style={s.cardLabel}>What's working</Text>
+              {whatWorking.slice(0, 3).map((item, i) => (
+                <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
+              ))}
+            </View>
+          ) : null}
+          {whereToFocus?.length ? (
+            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
+              <Text style={s.cardLabel}>Where to focus</Text>
+              {whereToFocus.slice(0, 3).map((item, i) => (
+                <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
+              ))}
+            </View>
+          ) : null}
         </AnimatedSection>
       ) : null}
 
       {/* Confidence */}
-      <AnimatedSection index={4} style={s.section}>
+      <AnimatedSection index={6} style={s.section}>
         <View style={s.card}>
           <Text style={s.cardLabel}>Confidence</Text>
           <Text style={s.aiSummary}>{CONFIDENCE_LABELS[confidence] || confidence}</Text>
@@ -605,6 +672,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
     return map;
   });
   const [submitting, setSubmitting] = useState(null);
+  const [feedbackAck, setFeedbackAck] = useState({});
 
   async function handleResponse(actionId, response) {
     if (responded[actionId] || submitting) return;
@@ -613,6 +681,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
     try {
       await submitActionFeedback(actionId, response, deviceId, token);
       setResponded((prev) => ({ ...prev, [actionId]: response }));
+      setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? "Marked helpful" : "We'll adjust this" }));
       trackEvent("action_feedback", { actionId, response });
       if (onFeedback) onFeedback(actionId, response);
     } catch {
@@ -647,6 +716,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
 
       {actions.map((action, i) => {
         const done = responded[action.id];
+        const ack = feedbackAck[action.id];
         return (
           <AnimatedSection key={action.id} index={i + 1} style={s.section}>
             <View style={[s.actionCard, done && s.actionCardDone]}>
@@ -659,28 +729,30 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
               </View>
               <Text style={s.actionReason}>{action.reason}</Text>
               {done ? (
-                <View style={s.actionFeedbackDone}>
-                  <Text style={s.actionFeedbackDoneText}>
-                    {done === "tried" ? "👍 You tried this" : "👎 Skipped"}
+                <View style={[s.actionFeedbackDone, { backgroundColor: done === "helped" ? palette.successSoft : palette.warningSoft }]}>
+                  <Text style={[s.actionFeedbackDoneText, { color: done === "helped" ? palette.success : palette.warning }]}>
+                    {done === "helped" ? "✓ " : "✕ "}{ack || (done === "helped" ? "Marked helpful" : "We'll adjust this")}
                   </Text>
                 </View>
               ) : (
                 <View style={s.actionButtons}>
                   <Pressable
-                    style={[s.actionBtn, s.actionBtnTry]}
-                    onPress={() => handleResponse(action.id, "tried")}
+                    style={[s.actionBtn, s.actionBtnHelped]}
+                    onPress={() => handleResponse(action.id, "helped")}
                     disabled={!!submitting}
                     accessibilityRole="button"
+                    accessibilityLabel="Mark as helpful"
                   >
-                    <Text style={s.actionBtnTryText}>👍 Tried it</Text>
+                    <Text style={s.actionBtnHelpedText}>✓ Helped</Text>
                   </Pressable>
                   <Pressable
-                    style={[s.actionBtn, s.actionBtnSkip]}
-                    onPress={() => handleResponse(action.id, "skipped")}
+                    style={[s.actionBtn, s.actionBtnNotHelpful]}
+                    onPress={() => handleResponse(action.id, "not_helpful")}
                     disabled={!!submitting}
                     accessibilityRole="button"
+                    accessibilityLabel="Mark as not helpful"
                   >
-                    <Text style={s.actionBtnSkipText}>👎 Skip</Text>
+                    <Text style={s.actionBtnNotHelpfulText}>✕ Not helpful</Text>
                   </Pressable>
                 </View>
               )}
@@ -698,8 +770,8 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
-  const triedCount = feedback.filter((f) => f.response === "tried").length;
-  const skippedCount = feedback.filter((f) => f.response === "skipped").length;
+  const triedCount = feedback.filter((f) => f.response === "tried" || f.response === "helped").length;
+  const skippedCount = feedback.filter((f) => f.response === "skipped" || f.response === "not_helpful").length;
 
   function renderLlmInsight() {
     if (!isSignedIn) {
@@ -848,11 +920,11 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
           <View style={s.card}>
             <View style={s.metricsRow}>
               <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Tried</Text>
+                <Text style={s.metricLabel}>Helped</Text>
                 <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
               </View>
               <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Skipped</Text>
+                <Text style={s.metricLabel}>Not helpful</Text>
                 <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
               </View>
             </View>
@@ -1401,15 +1473,23 @@ const s = StyleSheet.create({
   actionReason: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
   actionButtons: { flexDirection: "row", gap: 8, marginTop: 4 },
   actionBtn: {
-    flex: 1, alignItems: "center", paddingVertical: 10,
-    borderRadius: radius.sm, borderWidth: 1, borderColor: palette.glassBorder,
+    flex: 1, alignItems: "center", paddingVertical: 11,
+    borderRadius: radius.sm, borderWidth: 1.5,
   },
-  actionBtnTry: { backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)", borderColor: (palette.success || "#34C759") + "40" },
-  actionBtnSkip: { backgroundColor: "rgba(148, 180, 224, 0.10)", borderColor: "rgba(148, 180, 224, 0.25)" },
-  actionBtnTryText: { fontSize: 13, fontWeight: "600", color: palette.text },
-  actionBtnSkipText: { fontSize: 13, fontWeight: "600", color: palette.muted },
-  actionFeedbackDone: { alignItems: "center", paddingVertical: 8 },
-  actionFeedbackDoneText: { color: palette.muted, fontSize: 12, fontStyle: "italic" },
+  actionBtnHelped: {
+    backgroundColor: "rgba(94, 230, 160, 0.15)",
+    borderColor: "rgba(94, 230, 160, 0.45)",
+  },
+  actionBtnNotHelpful: {
+    backgroundColor: "rgba(255, 179, 71, 0.12)",
+    borderColor: "rgba(255, 179, 71, 0.35)",
+  },
+  actionBtnHelpedText: { fontSize: 13, fontWeight: "700", color: "#5ee6a0" },
+  actionBtnNotHelpfulText: { fontSize: 13, fontWeight: "700", color: "#ffb347" },
+  actionFeedbackDone: {
+    alignItems: "center", paddingVertical: 10, borderRadius: radius.sm, marginTop: 4,
+  },
+  actionFeedbackDoneText: { fontSize: 13, fontWeight: "600" },
 
   /* Effect rows (premium) */
   effectRow: {
@@ -1441,4 +1521,29 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   ctaCardText: { color: palette.text, fontSize: 14, fontWeight: "600", textAlign: "center" },
+
+  /* Drivers */
+  driverRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  driverTrigger: { fontSize: 14, fontWeight: "700", textTransform: "capitalize" },
+  driverEmotion: { color: palette.textSecondary, fontSize: 12, textTransform: "capitalize" },
+  effectBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
+  effectBadgeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase" },
+
+  /* Behavioral loop */
+  loopCard: {
+    borderRadius: radius.md, padding: 14, gap: 8,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+    borderLeftWidth: 3,
+  },
+  loopFlow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
+  loopNode: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
+  loopNodeText: { fontSize: 12, fontWeight: "700" },
+  loopArrow: { color: palette.muted, fontSize: 16, fontWeight: "700" },
+  loopMeta: { color: palette.muted, fontSize: 11 },
+
+  /* Deeper signals */
+  signalRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 6 },
+  signalIcon: { fontSize: 18, marginTop: 1 },
+  signalLabel: { fontSize: 13, fontWeight: "700" },
+  signalBody: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
 });

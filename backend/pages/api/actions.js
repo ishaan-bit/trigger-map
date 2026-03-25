@@ -22,10 +22,14 @@ export default async function handler(req, res) {
       if (!actionId || typeof actionId !== "string") {
         return sendError(res, 400, "INVALID_FEEDBACK", "actionId is required");
       }
-      if (!["tried", "skipped"].includes(response)) {
-        return sendError(res, 400, "INVALID_FEEDBACK", "response must be 'tried' or 'skipped'");
+      // Accept new labels ('helped'/'not_helpful') + legacy ('tried'/'skipped')
+      const VALID = ["helped", "not_helpful", "tried", "skipped"];
+      if (!VALID.includes(response)) {
+        return sendError(res, 400, "INVALID_FEEDBACK", "response must be 'helped', 'not_helpful', 'tried', or 'skipped'");
       }
-      await storeActionFeedback(ownerId, actionId, response);
+      // Normalize legacy labels
+      const normalized = response === "tried" ? "helped" : response === "skipped" ? "not_helpful" : response;
+      await storeActionFeedback(ownerId, actionId, normalized);
       return sendSuccess(res, { stored: true });
     }
 
