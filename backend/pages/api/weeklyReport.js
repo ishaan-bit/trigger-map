@@ -69,6 +69,7 @@ export default async function handler(req, res) {
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
     const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates, moments: recentMoments });
+    console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: moments=${recentMoments.length}, correlations=${Object.keys(report.correlations || {}).length}, invokedMetrics=${report.invokedMetrics != null}, compound=${report.compoundPatterns != null}`);
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report, { firstName, lang });

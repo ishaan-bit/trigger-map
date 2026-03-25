@@ -43,6 +43,10 @@ export default async function handler(req, res) {
     for (const mode of VALID_MODES) {
       results[mode] = await getStoredModeOutput(ownerId, mode);
     }
+    const populated = VALID_MODES.filter((m) => results[m] != null);
+    if (!populated.length) {
+      console.log(`[modes] All modes empty for ${ownerId.slice(0, 8)}. Run generateAdaptiveModes job.`);
+    }
     return sendSuccess(res, results);
   } catch (error) {
     captureServerError(error, { path: "/api/modes" });

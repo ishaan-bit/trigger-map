@@ -321,7 +321,9 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
   // --- Invoked Metrics (computational behavioral model) ---
   let invokedMetrics = null;
   let compoundPatterns = null;
-  if (FEATURE_FLAGS.computeInvokedMetrics && moments?.length && Object.keys(correlations).length) {
+  const hasCorrelations = Object.keys(correlations).length > 0;
+  if (FEATURE_FLAGS.computeInvokedMetrics && moments?.length && hasCorrelations) {
+    try {
     const dailyInvoked = computeDailyInvoked(moments, correlations);
     const baselineScore = baselineMetrics?.baseline?.score ?? 3.0;
 
@@ -389,6 +391,9 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
       maskingLevel: masking.level,
       hasContamination: contamination.length > 0,
     };
+    } catch (err) {
+      console.error("[patternEngine] invokedMetrics computation failed:", err?.message);
+    }
   }
 
   // --- Recurrence detection (v81) ---

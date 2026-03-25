@@ -817,11 +817,13 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   const [submitting, setSubmitting] = useState(null);
   const [feedbackAck, setFeedbackAck] = useState({});
   const [errorId, setErrorId] = useState(null);
+  const lastAttempt = useRef({});
 
   async function handleResponse(actionId, response) {
     if (responded[actionId] || submitting) return;
     setSubmitting(actionId);
     setErrorId(null);
+    lastAttempt.current[actionId] = response;
     tap();
     try {
       await submitActionFeedback(actionId, response, deviceId, token);
@@ -907,9 +909,11 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
                 </View>
               )}
               {hasError ? (
-                <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>
-                  {t("common.retryError") || "Something went wrong — tap to retry"}
-                </Text>
+                <Pressable onPress={() => handleResponse(action.id, lastAttempt.current[action.id] || "helped")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>
+                    {t("common.retryError") || "Something went wrong — tap to retry"}
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           </AnimatedSection>
@@ -1661,6 +1665,9 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
             )}
           </AnimatedSection>
 
+          {/* ── Remaining premium sections visible only in Core mode ── */}
+          {activeMode === "core" ? (
+            <>
           {/* ── 2. YOUR DIRECTION (hero) ── */}
           <AnimatedSection index={1} style={s.section}>
             <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
@@ -1825,6 +1832,8 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
               </View>
             </AnimatedSection>
           ) : null}
+            </>
+          ) : null}
         </View>
       )}
     </View>
@@ -1876,7 +1885,11 @@ export function WeeklyReportScreen() {
   useEffect(() => {
     if (isPremium && token) {
       fetchModes(token)
-        .then(setModes)
+        .then((data) => {
+          const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
+          console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
+          setModes(data);
+        })
         .catch((err) => console.error("Modes fetch failed:", err?.message || err));
     }
   }, [isPremium, token]);

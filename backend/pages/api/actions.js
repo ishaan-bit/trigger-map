@@ -40,6 +40,7 @@ export default async function handler(req, res) {
 
     return sendError(res, 405, "METHOD_NOT_ALLOWED", "GET or POST only");
   } catch (error) {
+    console.error("[actions] Error:", error?.message, { method: req.method, ownerId: req.query.deviceId });
     captureServerError(error, { path: "/api/actions" });
     return sendError(res, 500, "INTERNAL_ERROR", "Something went wrong");
   }

@@ -1,4 +1,4 @@
-import { redis, redisKey } from "./redisClient.js";
+import { redis, redisKey, pipeline } from "./redisClient.js";
 
 export function getWeeklyReportKey(ownerId) {
   return redisKey("weekly_report", ownerId);
@@ -63,8 +63,10 @@ export function getActionFeedbackKey(ownerId) {
 export async function storeActionFeedback(ownerId, actionId, response) {
   const key = getActionFeedbackKey(ownerId);
   const entry = JSON.stringify({ actionId, response, timestamp: Date.now() });
-  await redis(["RPUSH", key, entry]);
-  await redis(["EXPIRE", key, String(60 * 60 * 24 * 90)]); // 90-day TTL
+  await pipeline([
+    ["RPUSH", key, entry],
+    ["EXPIRE", key, String(60 * 60 * 24 * 90)],
+  ]);
 }
 
 export async function getActionFeedback(ownerId) {
