@@ -108,9 +108,9 @@ async function _fetchJson(path, options = {}) {
   return json.data !== undefined ? json.data : json;
 }
 
-export function logMoment(payload, token) {
+export function logMoment(payload, token, lang) {
   console.log("QuietDen request:", "/logMoment", payload);
-  return fetchJson("/logMoment", { method: "POST", body: payload, token });
+  return fetchJson("/logMoment", { method: "POST", body: { ...payload, lang }, token });
 }
 
 export function editMoment(momentId, payload, token) {
@@ -126,8 +126,11 @@ export function fetchTimeline(deviceId, token) {
   return fetchJson(`/timeline${query}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 
-export function fetchWeeklyReport(deviceId, token) {
-  const query = token ? "" : `?deviceId=${encodeURIComponent(deviceId)}`;
+export function fetchWeeklyReport(deviceId, token, lang) {
+  const params = [];
+  if (!token) params.push(`deviceId=${encodeURIComponent(deviceId)}`);
+  if (lang) params.push(`lang=${encodeURIComponent(lang)}`);
+  const query = params.length ? `?${params.join("&")}` : "";
   return fetchJson(`/weeklyReport${query}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 

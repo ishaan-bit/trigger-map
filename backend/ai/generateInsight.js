@@ -1,6 +1,15 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 import { buildSignalProfile, rankSignals, detectRelationship } from "./signalProfile.js";
+import {
+  triggerHi, emotionHi,
+  MICRO_EXPERIMENTS_HI,
+  buildTooEarlySummaryHi, buildLowSummaryHi, buildEmergingSummaryHi,
+  buildModerateSummaryHi, buildStrongSummaryHi,
+  buildWhatWorkingHi, buildWhereToFocusHi,
+  buildActionableDirectionHi, baselineSummaryHi,
+  appendTagContextHi, appendPredictionContextHi,
+} from "./insightLang.js";
 
 function emotionAvgScore(emotions) {
   let total = 0, weighted = 0;
@@ -392,50 +401,88 @@ function appendPredictionContext(summary, report) {
 export async function generateInsight(report, opts = {}) {
   const confidence = report.dataQuality?.confidence || "too_early";
   const firstName = opts.firstName || null;
+  const lang = opts.lang || "en";
+  const hi = lang === "hi";
 
   let summary;
   switch (confidence) {
     case "too_early":
-      summary = buildTooEarlySummary();
+      summary = hi ? buildTooEarlySummaryHi() : buildTooEarlySummary();
       break;
     case "low":
-      summary = buildLowSummary(report, firstName);
+      summary = hi ? buildLowSummaryHi(report, firstName) : buildLowSummary(report, firstName);
       break;
     case "emerging":
-      summary = buildEmergingSummary(report, firstName);
+      summary = hi ? buildEmergingSummaryHi(report, firstName) : buildEmergingSummary(report, firstName);
       break;
-    case "moderate":
-      summary = buildModerateSummary(report, firstName);
+    case "moderate": {
+      if (hi) {
+        const sp = buildSignalProfile(report);
+        const ranked = rankSignals(report, sp);
+        const rel = detectRelationship(ranked);
+        summary = buildModerateSummaryHi(report, firstName, sp, ranked, rel, report.baselineMetrics);
+      } else {
+        summary = buildModerateSummary(report, firstName);
+      }
       break;
-    default:
-      summary = buildStrongSummary(report, firstName);
+    }
+    default: {
+      if (hi) {
+        const sp = buildSignalProfile(report);
+        const ranked = rankSignals(report, sp);
+        const rel = detectRelationship(ranked);
+        summary = buildStrongSummaryHi(report, firstName, sp, ranked, rel, report.baselineMetrics);
+      } else {
+        summary = buildStrongSummary(report, firstName);
+      }
+    }
   }
 
   const trigger = report.topTrigger || report.tiedTriggers?.[0] || "work";
-  const microExperiment = confidence !== "too_early" ? pickExperiment(trigger) : null;
+  const expPool = hi ? MICRO_EXPERIMENTS_HI : MICRO_EXPERIMENTS;
+  const pool = expPool[trigger] || expPool.work;
+  const microExperiment = confidence !== "too_early" ? pool[Math.floor(Math.random() * pool.length)] : null;
 
   // Build structured fields for the new tab-based UI
-  const whatWorking = buildWhatWorking(report);
-  const whereToFocus = buildWhereToFocus(report);
+  let whatWorking = buildWhatWorking(report);
+  let whereToFocus = buildWhereToFocus(report);
+  if (hi) {
+    whatWorking = buildWhatWorkingHi(whatWorking);
+    whereToFocus = buildWhereToFocusHi(whereToFocus);
+  }
   const bm = report.baselineMetrics;
 
   // Structured Mirror output: drivers, behavioral loop, actionable direction
   const drivers = buildDrivers(report);
   const behavioralLoop = buildBehavioralLoop(report);
-  const actionableDirection = buildActionableDirection(report);
+  let actionableDirection;
+  if (hi) {
+    const sp = buildSignalProfile(report);
+    actionableDirection = buildActionableDirectionHi(report, sp, bm);
+  } else {
+    actionableDirection = buildActionableDirection(report);
+  }
+
+  if (hi) {
+    summary = appendPredictionContextHi(appendTagContextHi(summary, report), report);
+  } else {
+    summary = lintText(appendPredictionContext(appendTagContext(summary, report), report));
+  }
 
   return {
-    summary: lintText(appendPredictionContext(appendTagContext(summary, report), report)),
+    summary: hi ? summary : lintText(summary),
     microExperiment,
-    whatWorking: whatWorking?.map(item => ({ ...item, text: lintText(item.text) })) || null,
-    whereToFocus: whereToFocus?.map(item => ({ ...item, text: lintText(item.text) })) || null,
+    whatWorking: whatWorking?.map(item => ({ ...item, text: hi ? item.text : lintText(item.text) })) || null,
+    whereToFocus: whereToFocus?.map(item => ({ ...item, text: hi ? item.text : lintText(item.text) })) || null,
     stateOfMind: bm?.stateOfMind || null,
-    baselineSummary: bm?.baseline?.reliable
-      ? `Your emotional baseline sits around ${bm.baseline.label}. ${bm.drift ? `This week you're ${bm.drift.label} compared to your norm.` : ""}`
-      : null,
+    baselineSummary: hi
+      ? baselineSummaryHi(bm)
+      : (bm?.baseline?.reliable
+        ? `Your emotional baseline sits around ${bm.baseline.label}. ${bm.drift ? `This week you're ${bm.drift.label} compared to your norm.` : ""}`
+        : null),
     drivers,
     behavioralLoop,
-    actionableDirection: actionableDirection ? lintText(actionableDirection) : null,
+    actionableDirection: actionableDirection ? (hi ? actionableDirection : lintText(actionableDirection)) : null,
     confidence,
     model: "rule-based-v3",
     generatedAt: new Date().toISOString(),

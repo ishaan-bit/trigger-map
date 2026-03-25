@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 
 /**
@@ -9,6 +10,7 @@ import { palette, radius } from "@/utils/theme";
  */
 export function StreakOrb({ moments }) {
   const streak = computeStreak(moments);
+  const { t } = useLanguage();
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -39,8 +41,8 @@ export function StreakOrb({ moments }) {
       <View style={styles.content}>
         <Text style={styles.fire}>{tierMeta.icon}</Text>
         <View>
-          <Text style={[styles.count, { color: tierMeta.color }]}>{streak}-day streak</Text>
-          <Text style={styles.sub}>{tierMeta.message}</Text>
+          <Text style={[styles.count, { color: tierMeta.color }]}>{t("streak.dayStreak", { count: streak })}</Text>
+          <Text style={styles.sub}>{t("streak." + tier)}</Text>
         </View>
       </View>
     </View>

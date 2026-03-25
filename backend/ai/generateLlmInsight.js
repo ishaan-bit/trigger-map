@@ -232,17 +232,26 @@ function buildSignals(report, recentNotes, actionFeedback) {
   return lines.join("\n");
 }
 
-function buildPrompt(report, recentNotes, actionFeedback) {
+function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
   const signals = buildSignals(report, recentNotes, actionFeedback);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
   const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
   const hasNotes = recentNotes?.length > 0;
+  const hi = lang === "hi";
 
   const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
   const minWords = Math.round(maxWords * 0.6);
   const hardCap = Math.round(maxWords * 1.1);
   const sentencesPerSection = maxWords <= 100 ? '1-2' : maxWords <= 200 ? '2-3' : '3-4';
+
+  const headerStoodOut = hi ? "क्या ख़ास रहा" : "What stood out";
+  const headerContributing = hi ? "क्या कारण हो सकता है" : "What may be contributing";
+  const headerTry = hi ? "एक बात आज़माएँ" : "One thing to try";
+
+  const langRule = hi
+    ? `\n- LANGUAGE: Write ENTIRELY in Hindi (Devanagari script). No English words, no Hinglish. Use natural conversational Hindi. Use 'आप' and 'आपका/आपकी' to address the user.`
+    : "";
 
   return `Here are structured signals from a user's recent emotional data. Only reference what appears below.
 
@@ -254,14 +263,14 @@ Using ONLY the data above, write EXACTLY three short sections. Use the EXACT for
 
 EXAMPLE FORMAT (do not copy the content or themes, only mimic the structure):
 
-What stood out
-Friends showed up as your most common trigger this week, and happy was the feeling that came with it most often. On the weekend though, your energy dipped and you logged a couple of tired entries back to back.
+${headerStoodOut}
+${hi ? "इस हफ़्ते दोस्त आपका सबसे आम ट्रिगर रहा, और ख़ुशी सबसे ज़्यादा आने वाली भावना रही। हालाँकि वीकेंड पर ऊर्जा गिरी और लगातार दो बार थकान लॉग हुई।" : "Friends showed up as your most common trigger this week, and happy was the feeling that came with it most often. On the weekend though, your energy dipped and you logged a couple of tired entries back to back."}
 
-What may be contributing
-The social time seems to lift your mood reliably, but by Saturday the pace may have caught up with you. The drop at the end of the week lined up with fewer social entries.
+${headerContributing}
+${hi ? "सामाजिक समय मूड को ऊपर उठाता लगता है, लेकिन शनिवार तक शायद थकान हावी हो गई। हफ़्ते के अंत में गिरावट कम सामाजिक एंट्रीज़ के साथ दिखी।" : "The social time seems to lift your mood reliably, but by Saturday the pace may have caught up with you. The drop at the end of the week lined up with fewer social entries."}
 
-One thing to try
-Next weekend, try leaving one evening unplanned. Giving yourself a gap between social time and the start of the new week could help you hold on to more of that energy.
+${headerTry}
+${hi ? "अगले वीकेंड एक शाम खाली रखें। सामाजिक समय और नए हफ़्ते के बीच अंतर रखने से ऊर्जा बनी रह सकती है।" : "Next weekend, try leaving one evening unplanned. Giving yourself a gap between social time and the start of the new week could help you hold on to more of that energy."}
 
 END OF EXAMPLE. Now write your three sections using the data above.
 
@@ -270,24 +279,23 @@ CRITICAL RULES (must follow):
 - Do NOT reference specific days of the week (Monday, Tuesday, etc.) unless they appear literally in the user's notes above. Never fabricate day references.
 - If the SIGNAL PROFILE says FLATTENING DETECTED, the central story MUST be about emotional range narrowing toward neutral. Do not describe this as positive stability.
 - If the data shows a Within-week trajectory decline, acknowledge the drop. Do not call the week stable or even.
-- Never reference the user by name. Only use "you" and "your".
+- Never reference the user by name. Only use "${hi ? "आप" : "you"}" and "${hi ? "आपका" : "your"}".
 - Never speculate about psychological states or coping ability. Only describe patterns visible in the data.
-- Do NOT use words from the SIGNAL PROFILE labels (like "signal profile", "confidence", "volatility score", "drift", "alignment", "contrast") in your output. Describe patterns in plain everyday language.
+- Do NOT use words from the SIGNAL PROFILE labels (like "signal profile", "confidence", "volatility score", "drift", "alignment", "contrast") in your output. Describe patterns in plain everyday language.${langRule}
 
 Format rules:
-- Start with "What stood out" — no text before it.
+- Start with "${headerStoodOut}" — no text before it.
 - Each header must be alone on its own line, with the body on the next line.
 - ${minWords}-${maxWords} words total. HARD LIMIT: stop at ${hardCap} words. Write SHORT, crisp sentences.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
 - No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
 - Tone: calm, direct, perceptive. Use simple everyday words. Avoid uncommon or technical vocabulary.
-- Do NOT describe signals independently. Look for contrast (stable surface + subtle drift, active trigger + flat emotion) or alignment between signals. If contrasting, use structures like "While X appears..., Y suggests..." or "On the surface..., but underneath...".
+- Do NOT describe signals independently. Look for contrast (stable surface + subtle drift, active trigger + flat emotion) or alignment between signals. If contrasting, use structures like "${hi ? "जबकि X दिखता है..., Y बताता है..." : "While X appears..., Y suggests..."}" or "${hi ? "ऊपर से..., लेकिन अंदर..." : "On the surface..., but underneath..."}".
 - Prioritize the most important 1-2 signals rather than listing everything.
-- If action feedback data is provided, use it: acknowledge actions the user tried and tailor "One thing to try" to avoid suggesting things they already skipped. Build on what they engaged with.
-- Always use "Your" as the possessive form. Never write "You's" which is not valid English.
+- If action feedback data is provided, use it: acknowledge actions the user tried and tailor "${headerTry}" to avoid suggesting things they already skipped. Build on what they engaged with.${hi ? "" : "\n- Always use \"Your\" as the possessive form. Never write \"You's\" which is not valid English."}
 - Each section body must be ${sentencesPerSection} sentences.
 - Match language intensity to the SIGNAL PROFILE section. If it says subtle or weak, use restrained observational language.
-- "One thing to try" must be specific to the dominant pattern. If neutral-dominance and flattening are present, the suggestion should be about reintroducing variety or noticing more nuance, not about generic reflection or journaling.${sparse ? "\n- Limited data. Be honest about what you can and cannot see." : ""}`;
+- "${headerTry}" must be specific to the dominant pattern. If neutral-dominance and flattening are present, the suggestion should be about reintroducing variety or noticing more nuance, not about generic reflection or journaling.${sparse ? (hi ? "\n- सीमित डेटा। जो दिख रहा है और जो नहीं दिख रहा, उसके बारे में ईमानदार रहें।" : "\n- Limited data. Be honest about what you can and cannot see.") : ""}`;
 }
 
 /**
@@ -303,7 +311,7 @@ function trimIncomplete(text) {
   return text;
 }
 
-export async function generateLlmInsight({ weeklyReport, recentNotes = [], actionFeedback = [] }) {
+export async function generateLlmInsight({ weeklyReport, recentNotes = [], actionFeedback = [], lang = "en" }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
   const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
@@ -311,11 +319,17 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
   // Auto-pull model if not available locally
   await ensureModelAvailable(apiUrl, model);
 
-  const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback);
+const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
 
-  // Scale max_tokens — tight enough to discourage verbosity but with headroom
-  // for the model to complete sentences. Roughly 1.5 tokens per word.
-  const maxTokens = Math.max(300, Math.round(maxWords * 2.5));
+    // Scale max_tokens — tight enough to discourage verbosity but with headroom
+    // for the model to complete sentences. Roughly 1.5 tokens per word.
+    // Hindi Devanagari tokens are larger — allow more headroom.
+    const tokenMultiplier = lang === "hi" ? 3.5 : 2.5;
+    const maxTokens = Math.max(300, Math.round(maxWords * tokenMultiplier));
+
+    const systemBase = lang === "hi"
+      ? "You are a concise emotional pattern analyst. Write in natural conversational Hindi (Devanagari script). No Hinglish or transliteration — use pure Hindi. Write plain, grammatically correct Hindi sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'आप' and 'आपका/आपकी' for addressing the user. Do not mix English words into Hindi text. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Be balanced and grounded. Match language intensity to signal strength. Use simple everyday Hindi."
+      : "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague. NEVER reference the user by name. Always say 'you' or 'your', never a person's name. NEVER speculate about the user's psychological state, coping ability, or personality. Only describe observable patterns in the data. If the SIGNAL PROFILE section contains a FLATTENING DETECTED or Within-week trajectory constraint, those MUST be the central theme of your response. Do not ignore them.";
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -327,7 +341,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague. NEVER reference the user by name. Always say 'you' or 'your', never a person's name. NEVER speculate about the user's psychological state, coping ability, or personality. Only describe observable patterns in the data. If the SIGNAL PROFILE section contains a FLATTENING DETECTED or Within-week trajectory constraint, those MUST be the central theme of your response. Do not ignore them." + getStylePrompt(process.env.LLM_STYLE) },
+          { role: "system", content: systemBase + getStylePrompt(process.env.LLM_STYLE) },
           { role: "user", content: prompt },
         ],
         temperature: 0.15,
@@ -370,53 +384,81 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
       .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "") // strip control chars
       .replace(/\s{2,}(?!\n)/g, " ")         // collapse double spaces (preserve newlines)
       .replace(/\b(?:END OF (?:ANSWER|RESPONSE|OUTPUT)|<\/?(?:answer|response|output)>)\s*/gi, "") // strip end markers
-      .replace(/\bthis user\b/gi, "you")  // convert 3rd person to 2nd person
-      .replace(/\bthe user\b/gi, "you")
-      .replace(/\btheir (?=emotion|trigger|pattern|mood|feeling|week|day|log)/gi, "your ")
-      .replace(/\bYou's\b/g, "Your")   // fix broken LLM possessive
-      .replace(/\byou's\b/g, "your")
-      .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2") // lowercase mid-sentence You/Your
       .trim();
 
-    // Strip prompt echo lines the model may repeat back
-    content = content
-      .replace(/^.*(?:you are (?:a|the)\s+(?:\w+\s+)*(?:pattern|behavioral)|write concise|plain sentences only|never repeat|emotional pattern observations).*$/gmi, "")
-      .replace(/^.*(?:structured signals|only reference what|using only the data|do not echo|do not repeat).*$/gmi, "")
-      .replace(/^.*(?:section \d (?:header|content)|IMPORTANT|EXAMPLE FORMAT|END OF EXAMPLE|now write your).*$/gmi, "")
-      .replace(/^.*(?:em dashes|bullet (?:markers|points)|numbered lists|bold markers|no markdown).*$/gmi, "")
-      .replace(/^.*(?:total length|do not exceed \d+ words|60.*90 words|each header must be alone).*$/gmi, "")
-      .replace(/^.*(?:do not copy the content|only mimic the structure|Rules:).*$/gmi, "")
-      .trim();
+    // English-specific pronoun and grammar fixes (skip for Hindi)
+    if (lang !== "hi") {
+      content = content
+        .replace(/\bthis user\b/gi, "you")
+        .replace(/\bthe user\b/gi, "you")
+        .replace(/\btheir (?=emotion|trigger|pattern|mood|feeling|week|day|log)/gi, "your ")
+        .replace(/\bYou's\b/g, "Your")
+        .replace(/\byou's\b/g, "your")
+        .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2")
+        .trim();
+    }
 
-    // Strip format-description echoes the model may copy as content prefixes
-    content = content
-      .replace(/one or two sentences about the most notable (?:pattern|shift)[:\s.]*/gi, "")
-      .replace(/one sentence connecting a trigger[- ]emotion pairing to a possible cause[:\s.]*/gi, "")
-      .replace(/a single concrete,? small experiment for next week[^.]*?[:\s.]*/gi, "")
-      .replace(/be specific to the data\.?\s*/gi, "")
-      // Strip leaked signal-profile / constraint labels
-      .replace(/\b(?:given|based on|considering|due to|as (?:per|indicated|suggested|noted|seen|observed|evident|shown)(?: (?:by|in|from))?) (?:the )?(?:subtle |moderate |strong )?(?:signal profile|flattening detected|within-week trajectory)[,.]?\s*/gi, "")
-      .replace(/\b(?:signal profile|volatility score|confidence level|drift (?:direction|level)|within-week trajectory slope)\b/gi, "data")
-      .trim();
+    // Strip prompt echo lines the model may repeat back (English patterns only)
+    if (lang !== "hi") {
+      content = content
+        .replace(/^.*(?:you are (?:a|the)\s+(?:\w+\s+)*(?:pattern|behavioral)|write concise|plain sentences only|never repeat|emotional pattern observations).*$/gmi, "")
+        .replace(/^.*(?:structured signals|only reference what|using only the data|do not echo|do not repeat).*$/gmi, "")
+        .replace(/^.*(?:section \d (?:header|content)|IMPORTANT|EXAMPLE FORMAT|END OF EXAMPLE|now write your).*$/gmi, "")
+        .replace(/^.*(?:em dashes|bullet (?:markers|points)|numbered lists|bold markers|no markdown).*$/gmi, "")
+        .replace(/^.*(?:total length|do not exceed \d+ words|60.*90 words|each header must be alone).*$/gmi, "")
+        .replace(/^.*(?:do not copy the content|only mimic the structure|Rules:).*$/gmi, "")
+        .trim();
+
+      // Strip format-description echoes the model may copy as content prefixes
+      content = content
+        .replace(/one or two sentences about the most notable (?:pattern|shift)[:\s.]*/gi, "")
+        .replace(/one sentence connecting a trigger[- ]emotion pairing to a possible cause[:\s.]*/gi, "")
+        .replace(/a single concrete,? small experiment for next week[^.]*?[:\s.]*/gi, "")
+        .replace(/be specific to the data\.?\s*/gi, "")
+        // Strip leaked signal-profile / constraint labels
+        .replace(/\b(?:given|based on|considering|due to|as (?:per|indicated|suggested|noted|seen|observed|evident|shown)(?: (?:by|in|from))?) (?:the )?(?:subtle |moderate |strong )?(?:signal profile|flattening detected|within-week trajectory)[,.]?\s*/gi, "")
+        .replace(/\b(?:signal profile|volatility score|confidence level|drift (?:direction|level)|within-week trajectory slope)\b/gi, "data")
+        .trim();
+    }
 
     // Normalize variant section headers to canonical names.
     // Handle numbered variants (e.g., "1. What stood out:", "Section 1: What stood out")
-    content = content
-      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
-      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
-      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:possible|potential|likely)\s+(?:cause|contributing(?:\s+factor)?)[s]?[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
-      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+may\s+be\s+contributing[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
-      .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:one\s+thing\s+to\s+try|something\s+to\s+try|try\s+this|suggestion|action\s*(?:item|step))[ \t]*:?[ \t]*/gmi, "One thing to try\n")
-      .replace(/\n{3,}/g, "\n\n");
+    // Support Hindi headers when lang=hi
+    const isHi = lang === "hi";
+    const H_STOOD = isHi ? "क्या ख़ास रहा" : "What stood out";
+    const H_CONTRIBUTING = isHi ? "क्या कारण हो सकता है" : "What may be contributing";
+    const H_TRY = isHi ? "एक बात आज़माएँ" : "One thing to try";
+
+    if (!isHi) {
+      content = content
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:most\s+)?notable\s+pattern[s]?[ \t]*:?[ \t]*/gmi, "What stood out\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+(?:stood|stands)\s+out[ \t]*:?[ \t]*/gmi, "What stood out\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:possible|potential|likely)\s+(?:cause|contributing(?:\s+factor)?)[s]?[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?what\s+may\s+be\s+contributing[ \t]*:?[ \t]*/gmi, "What may be contributing\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?(?:section\s*\d+[:\s]*)?(?:one\s+thing\s+to\s+try|something\s+to\s+try|try\s+this|suggestion|action\s*(?:item|step))[ \t]*:?[ \t]*/gmi, "One thing to try\n")
+        .replace(/\n{3,}/g, "\n\n");
+    } else {
+      // Normalize Hindi headers
+      content = content
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?क्या ख़ास रहा[ \t]*:?[ \t]*/gm, "क्या ख़ास रहा\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?क्या कारण हो सकता है[ \t]*:?[ \t]*/gm, "क्या कारण हो सकता है\n")
+        .replace(/^[ \t]*(?:\d+[.)]\s*)?एक बात आज़माएँ[ \t]*:?[ \t]*/gm, "एक बात आज़माएँ\n")
+        .replace(/\n{3,}/g, "\n\n");
+    }
 
     // Strip any preamble text before the first recognized section header
-    const firstHeaderMatch = content.match(/^What stood out|^What may be contributing|^One thing to try/mi);
+    const firstHeaderRe = isHi
+      ? /^(?:क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)/mi
+      : /^What stood out|^What may be contributing|^One thing to try/mi;
+    const firstHeaderMatch = content.match(firstHeaderRe);
     if (firstHeaderMatch) {
       content = content.slice(firstHeaderMatch.index).trim();
     }
 
     // Truncate after the first complete 3-section set (some models repeat sections)
-    const sectionHeaders = /(?:what stood out|what may be contributing|one thing to try)/gi;
+    const sectionHeaders = isHi
+      ? /(?:क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)/gi
+      : /(?:what stood out|what may be contributing|one thing to try)/gi;
     const headerPositions = [];
     let hm;
     while ((hm = sectionHeaders.exec(content)) !== null) {
@@ -432,7 +474,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
     }
 
     // Validate sections exist with actual content, then recompose cleanly
-    const REQUIRED = ["What stood out", "What may be contributing", "One thing to try"];
+    const REQUIRED = [H_STOOD, H_CONTRIBUTING, H_TRY];
     const extracted = [];
     for (const header of REQUIRED) {
       const hIdx = content.toLowerCase().indexOf(header.toLowerCase());
@@ -460,7 +502,7 @@ export async function generateLlmInsight({ weeklyReport, recentNotes = [], actio
         .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2") // lowercase mid-sentence You/Your
         .replace(/\s{2,}/g, " ")                 // collapse double spaces
         .replace(/([a-z])\s*\n\s*([a-z])/g, "$1 $2") // join broken sentences
-        .replace(/[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip non-printable/non-latin junk
+        .replace(isHi ? /[\x00-\x08\x0b\x0c\x0e-\x1f]/g : /[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip junk (preserve Devanagari for Hindi)
         .trim();
       if (trimmedBody.length >= 8) {
         extracted.push({ header, body: trimmedBody });

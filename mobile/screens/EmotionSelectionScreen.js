@@ -8,6 +8,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { EmotionChip } from "@/components/EmotionChip";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
 import { palette, radius } from "@/utils/theme";
 import { emotionTap, selection, success as hapticSuccess, tap } from "@/utils/haptics";
@@ -34,6 +35,7 @@ export function EmotionSelectionScreen() {
   const { trigger } = useLocalSearchParams();
   const router = useRouter();
   const { saveMoment } = useAppSession();
+  const { t, lang } = useLanguage();
   const [selectedEmotion, setSelectedEmotion] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const [adaptiveTags, setAdaptiveTags] = useState([]);
@@ -89,7 +91,7 @@ export function EmotionSelectionScreen() {
         Animated.timing(saveButtonScale, { toValue: 1, duration: 80, useNativeDriver: true }),
       ]).start();
 
-      const payload = { trigger, emotion: selectedEmotion, note };
+      const payload = { trigger, emotion: selectedEmotion, note, lang };
       if (selectedTags.length > 0) payload.tags = selectedTags;
       const response = await saveMoment(payload);
 
@@ -112,7 +114,7 @@ export function EmotionSelectionScreen() {
       // Auto-navigate to timeline after feedback display
       setTimeout(() => router.replace("/(tabs)/timeline"), 3000);
     } catch {
-      showError("Save failed", "Could not log this moment. Please try again.");
+      showError(t("emotion.saveFailed"), t("emotion.saveFailedMessage"));
     } finally {
       setSaving(false);
     }
@@ -200,7 +202,7 @@ export function EmotionSelectionScreen() {
               {selectedEmotion === "calm" ? "😌" : selectedEmotion === "anxious" ? "😰" : selectedEmotion === "frustrated" ? "😤" : selectedEmotion === "energized" ? "⚡" : "😐"}
             </Text>
           </Animated.View>
-          <Text style={[styles.feedbackTitle, { color: emotionColor }]}>Heard you.</Text>
+          <Text style={[styles.feedbackTitle, { color: emotionColor }]}>{t("emotion.heardYou")}</Text>
           <FeedbackCard
             feedback={feedback}
             trigger={trigger}
@@ -211,7 +213,7 @@ export function EmotionSelectionScreen() {
             onPress={() => { tap(); router.replace("/(tabs)/timeline"); }}
             accessibilityRole="button"
           >
-            <Text style={styles.goTimelineText}>View on timeline →</Text>
+            <Text style={styles.goTimelineText}>{t("emotion.goTimeline")}</Text>
           </Pressable>
         </View>
       </ScreenShell>
@@ -224,13 +226,13 @@ export function EmotionSelectionScreen() {
       {/* Back button */}
       <Pressable style={styles.backButton} onPress={() => { tap(); router.back(); }} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={12}>
         <Ionicons name="arrow-back" size={22} color={palette.text} />
-        <Text style={styles.backLabel}>Back</Text>
+        <Text style={styles.backLabel}>{t("common.back")}</Text>
       </Pressable>
 
       <View style={styles.header}>
-        <Text style={styles.kicker}>{trigger}</Text>
-        <Text style={styles.prompt}>How did it{"\n"}affect you?</Text>
-        <Text style={styles.hint}>Choose an emotion, then refine with tags</Text>
+        <Text style={styles.kicker}>{t(`triggers.${trigger}`) !== `triggers.${trigger}` ? t(`triggers.${trigger}`) : trigger}</Text>
+        <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
+        <Text style={styles.hint}>{t("emotion.hint")}</Text>
       </View>
 
       <View style={styles.emotionWrap}>
@@ -250,7 +252,7 @@ export function EmotionSelectionScreen() {
           transform: [{ translateY: tagSectionAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
         }]}>
           <Text style={styles.tagLabel}>
-            What about this felt {selectedEmotion}?
+            {t("emotion.tagLabel", { emotion: t(`emotions.${selectedEmotion}`) })}
           </Text>
           <View style={styles.tagWrap}>
             {adaptiveTags.map((tag) => {
@@ -282,12 +284,12 @@ export function EmotionSelectionScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "android" ? "padding" : "height"}>
       <View style={styles.noteCard}>
-        <Text style={styles.noteLabel}>Note (optional)</Text>
+        <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
         <TextInput
           multiline
           numberOfLines={3}
           onChangeText={setNote}
-          placeholder="What happened right before this?"
+          placeholder={t("emotion.notePlaceholder")}
           placeholderTextColor={palette.muted}
           style={styles.input}
           value={note}
@@ -309,7 +311,7 @@ export function EmotionSelectionScreen() {
           ]}
         >
           <Text style={[styles.saveButtonText, !selectedEmotion && styles.saveButtonTextDisabled]}>
-            {saving ? "Saving..." : "Log moment"}
+            {saving ? t("emotion.saving") : t("emotion.saveMoment")}
           </Text>
         </Pressable>
       </Animated.View>

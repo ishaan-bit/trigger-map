@@ -4,29 +4,13 @@ import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
-
-const slides = [
-  {
-    icon: "🎯",
-    title: "Track what triggers\nyour emotions",
-    body: "Tap a trigger, pick how it made you feel, done.\nOne moment takes under 5 seconds.",
-  },
-  {
-    icon: "📊",
-    title: "Discover your\npatterns",
-    body: "TriggerMap connects your triggers and emotions over time, surfacing patterns you might not notice on your own.",
-  },
-  {
-    icon: "🔒",
-    title: "Private by default",
-    body: "Everything stays on your device unless you sign in.\nNo account required to start logging.",
-  },
-];
 
 export function OnboardingScreen() {
   const router = useRouter();
   const { completeOnboarding } = useAppSession();
+  const { t } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -55,15 +39,21 @@ export function OnboardingScreen() {
     finish();
   }
 
+  const slides = [
+    { icon: "🎯", title: t("onboarding.slide1Title"), body: t("onboarding.slide1Body") },
+    { icon: "📊", title: t("onboarding.slide2Title"), body: t("onboarding.slide2Body") },
+    { icon: "🔒", title: t("onboarding.slide3Title"), body: t("onboarding.slide3Body") },
+  ];
+
   const isLast = currentIndex === slides.length - 1;
 
   return (
     <ScreenShell scroll={false}>
       <View style={styles.top}>
-        <Text style={styles.brand}>TriggerMap</Text>
+        <Text style={styles.brand}>{t("onboarding.brand")}</Text>
         {!isLast && (
           <Pressable onPress={handleSkip} hitSlop={12} accessibilityRole="button">
-            <Text style={styles.skip}>Skip</Text>
+            <Text style={styles.skip}>{t("onboarding.skip")}</Text>
           </Pressable>
         )}
       </View>
@@ -98,7 +88,7 @@ export function OnboardingScreen() {
       </View>
 
       <PrimaryButton
-        label={isLast ? (loading ? "Starting\u2026" : "Start logging") : "Continue"}
+        label={isLast ? (loading ? t("onboarding.starting") : t("onboarding.startLogging")) : t("onboarding.continue")}
         onPress={handleNext}
         disabled={loading}
       />

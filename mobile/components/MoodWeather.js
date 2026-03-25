@@ -1,16 +1,17 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 
 const WEATHER_MAP = {
-  clear:      { icon: "☀️", label: "Clear skies",  color: palette.success, desc: "Mostly calm, your recent moments feel settled." },
-  clearing:   { icon: "🌤️", label: "Clearing up",  color: palette.success, desc: "Leaning positive, more calm than tension today." },
-  neutral:    { icon: "🌤️", label: "Partly clear",  color: palette.muted,   desc: "A steady mix, nothing pulling too hard in any direction." },
-  overcast:   { icon: "🌧️", label: "Overcast",      color: palette.warning, desc: "Some tension showing up. Be gentle with yourself." },
-  turbulent:  { icon: "⛈️", label: "Turbulent",     color: palette.danger,  desc: "Frustration running high, something is grinding." },
-  electric:   { icon: "⚡", label: "Electric",      color: palette.accent,  desc: "High energy, you're riding a wave right now." },
-  mixed:      { icon: "🌦️", label: "Changeable",    color: palette.purple,  desc: "Emotions shifting, your inner weather is restless today." },
-  quiet:      { icon: "🌙", label: "Still night",   color: palette.muted,   desc: "Not much data yet today, log a moment to see your forecast." },
+  clear:      { icon: "☀️", key: "clear",    color: palette.success },
+  clearing:   { icon: "🌤️", key: "clearing", color: palette.success },
+  neutral:    { icon: "🌤️", key: "neutral",  color: palette.muted },
+  overcast:   { icon: "🌧️", key: "overcast", color: palette.warning },
+  turbulent:  { icon: "⛈️", key: "turbulent",color: palette.danger },
+  electric:   { icon: "⚡", key: "electric", color: palette.accent },
+  mixed:      { icon: "🌦️", key: "mixed",    color: palette.purple },
+  quiet:      { icon: "🌙", key: "quiet",    color: palette.muted },
 };
 
 // Higher = calmer/more positive. Matches shared/constants/emotions.js EMOTION_SCORE.
@@ -76,6 +77,7 @@ function computeWeather(moments) {
  */
 export function MoodWeather({ moments }) {
   const weather = computeWeather(moments);
+  const { t } = useLanguage();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const breatheAnim = useRef(new Animated.Value(0)).current;
   const showBreathe = weather === WEATHER_MAP.overcast || weather === WEATHER_MAP.turbulent;
@@ -120,8 +122,8 @@ export function MoodWeather({ moments }) {
       <View style={styles.row}>
         <Text style={styles.icon}>{weather.icon}</Text>
         <View style={styles.textCol}>
-          <Text style={[styles.label, { color: weather.color }]}>{weather.label}</Text>
-          <Text style={styles.desc}>{weather.desc}</Text>
+          <Text style={[styles.label, { color: weather.color }]}>{t("weather." + weather.key)}</Text>
+          <Text style={styles.desc}>{t("weather.desc" + weather.key.charAt(0).toUpperCase() + weather.key.slice(1))}</Text>
         </View>
       </View>
       {showBreathe && (
@@ -131,7 +133,7 @@ export function MoodWeather({ moments }) {
             transform: [{ scale: breatheScale }],
             opacity: breatheOpacity,
           }]} />
-          <Text style={styles.breatheText}>Breathe with the dot</Text>
+          <Text style={styles.breatheText}>{t("weather.breathe")}</Text>
         </View>
       )}
     </View>

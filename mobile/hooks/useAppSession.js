@@ -340,7 +340,8 @@ export function SessionProvider({ children }) {
             ...(prediction ? { prediction } : {}),
             ...(payload.tags?.length ? { tags: payload.tags } : {}),
           },
-          token
+          token,
+          payload.lang
         );
         console.info("QuietDen: moment logged", {
           id: response.moment?.id,
@@ -395,7 +396,7 @@ export function SessionProvider({ children }) {
         await deleteMomentApi(momentId, token);
         trackEvent("moment_deleted", { momentId });
       },
-      async loadWeeklyReport() {
+      async loadWeeklyReport(lang) {
         const activeDeviceId = await ensureDeviceIdentity();
 
         if (!token) {
@@ -408,7 +409,7 @@ export function SessionProvider({ children }) {
         const cached = getCached("weeklyReport");
         if (cached) return cached;
 
-        const response = await fetchWeeklyReport(activeDeviceId, token);
+        const response = await fetchWeeklyReport(activeDeviceId, token, lang);
         const report = response.report || createEmptyReport();
         console.info("QuietDen: report generated", { totalMoments: report.totalMoments ?? 0 });
         trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments });

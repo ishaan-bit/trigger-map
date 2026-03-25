@@ -21,6 +21,7 @@ import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 /* ── Helpers ── */
 
@@ -91,18 +92,20 @@ function parseLlmSections(narrative) {
   ];
 }
 
-const INSIGHT_SECTION_META = [
-  { icon: "🔍", label: "What stood out", color: palette.accent },
-  { icon: "🧩", label: "What may be contributing", color: palette.purple },
-  { icon: "💡", label: "One thing to try", color: palette.success },
-];
+function getInsightSectionMeta(t) {
+  return [
+    { icon: "🔍", label: t("report.insightStoodOut"), color: palette.accent },
+    { icon: "🧩", label: t("report.insightContributing"), color: palette.purple },
+    { icon: "💡", label: t("report.insightTryThis"), color: palette.success },
+  ];
+}
 
 const EMOTION_EMOJIS = { frustrated: "😤", anxious: "😰", neutral: "😐", calm: "😌", energized: "⚡" };
 const EMOTION_COLORS = { calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa" };
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
 const TIME_COLORS = { morning: "#ffb347", afternoon: "#a78bfa", evening: "#56d0e0", night: "#9eb0c9" };
 const ENERGY_COLORS = { steady: palette.success, balanced: palette.accent, tense: palette.warning, drained: palette.danger, uplifted: palette.purple };
-const CONFIDENCE_LABELS = { too_early: "Just getting started", low: "Early patterns", emerging: "Taking shape", moderate: "Solid picture", strong: "High confidence" };
+function getConfidenceLabel(key, t) { return t("report.confidence." + key) || key; }
 
 function topEntries(record, limit = 5) {
   return Object.entries(record || {}).sort(([, a], [, b]) => b - a).slice(0, limit);
@@ -110,15 +113,17 @@ function topEntries(record, limit = 5) {
 
 function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : str; }
 
-const TRIGGER_DISPLAY = { alone: "Time alone", social: "Social life" };
-function triggerDisplay(t) { return TRIGGER_DISPLAY[t] || capitalize(t); }
+function triggerDisplay(key, t) {
+  const mapped = t ? t("triggers." + key) : null;
+  return mapped && mapped !== "triggers." + key ? mapped : capitalize(key);
+}
 
-function scoreTone(score) {
-  if (score >= 4.2) return { emoji: "🌟", label: "Great", color: "#a78bfa" };
-  if (score >= 3.5) return { emoji: "😌", label: "Good", color: "#5ee6a0" };
-  if (score >= 2.8) return { emoji: "😐", label: "Mixed", color: "#9eb0c9" };
-  if (score >= 2)   return { emoji: "😟", label: "Uneasy", color: "#ffb347" };
-  return { emoji: "😤", label: "Tough", color: "#ff6b7a" };
+function scoreTone(score, t) {
+  if (score >= 4.2) return { emoji: "🌟", label: t ? t("report.toneGreat") : "Great", color: "#a78bfa" };
+  if (score >= 3.5) return { emoji: "😌", label: t ? t("report.toneGood") : "Good", color: "#5ee6a0" };
+  if (score >= 2.8) return { emoji: "😐", label: t ? t("report.toneMixed") : "Mixed", color: "#9eb0c9" };
+  if (score >= 2)   return { emoji: "😟", label: t ? t("report.toneUneasy") : "Uneasy", color: "#ffb347" };
+  return { emoji: "😤", label: t ? t("report.toneTough") : "Tough", color: "#ff6b7a" };
 }
 
 /* ── Shared sub-components ── */
@@ -155,7 +160,7 @@ function HBar({ label, value, max, color = palette.accent, icon, highlight }) {
   );
 }
 
-function SectionHeader({ label, extra, badge }) {
+function SectionHeader({ label, extra, badge, t }) {
   return (
     <View style={s.sectionHeader}>
       <View style={s.sectionHeaderLeft}>
@@ -163,7 +168,7 @@ function SectionHeader({ label, extra, badge }) {
         {badge ? (
           <View style={[s.freqBadge, badge === "weekly" && s.freqBadgeWeekly]}>
             <Text style={[s.freqBadgeText, badge === "weekly" && s.freqBadgeTextWeekly]}>
-              {badge === "weekly" ? "WEEKLY" : "LIVE"}
+              {badge === "weekly" ? (t ? t("report.badgeWeekly") : "WEEKLY") : (t ? t("report.badgeLive") : "LIVE")}
             </Text>
           </View>
         ) : null}
@@ -210,7 +215,7 @@ function InsightCard({ icon, label, body, color, index }) {
   );
 }
 
-function NarrativeCard({ icon, title, items, positive }) {
+function NarrativeCard({ icon, title, items, positive, t }) {
   return (
     <AnimatedSection index={positive ? 1 : 0} style={[s.narrativeCard, { borderLeftWidth: 3, borderLeftColor: positive ? palette.success : palette.danger }]}>
       <Text style={s.narrativeIcon}>{icon}</Text>
@@ -220,8 +225,8 @@ function NarrativeCard({ icon, title, items, positive }) {
           <Text key={i} style={s.narrativeText}>
             {item.trigger ? (
               <>
-                <Text style={{ color: TRIGGER_COLORS[item.trigger] || palette.accent, fontWeight: "600" }}>{triggerDisplay(item.trigger)}</Text>
-                {positive ? " helps you feel " : " tends to leave you feeling "}
+                <Text style={{ color: TRIGGER_COLORS[item.trigger] || palette.accent, fontWeight: "600" }}>{triggerDisplay(item.trigger, t)}</Text>
+                {positive ? (t ? t("report.helpsFeel") : " helps you feel ") : (t ? t("report.leavesFeeling") : " tends to leave you feeling ")}
                 <Text style={{ color: EMOTION_COLORS[item.emotion] || palette.textSecondary, fontWeight: "600" }}>{item.emotion}</Text>
                 {item.count ? ` (${item.count}×)` : ""}
               </>
@@ -235,17 +240,17 @@ function NarrativeCard({ icon, title, items, positive }) {
 
 /* ── Tab pill selector ── */
 
-const TABS = [
-  { key: "mirror", label: "Mirror", icon: "🪞" },
-  { key: "week", label: "This Week", icon: "📅" },
-  { key: "actions", label: "Actions", icon: "⚡" },
-  { key: "premium", label: "Premium", icon: "💎" },
+const TAB_KEYS = [
+  { key: "mirror", labelKey: "report.tabMirror", icon: "🪞" },
+  { key: "week", labelKey: "report.tabThisWeek", icon: "📅" },
+  { key: "actions", labelKey: "report.tabActions", icon: "⚡" },
+  { key: "premium", labelKey: "report.tabPremium", icon: "💎" },
 ];
 
-function TabBar({ activeTab, onTabChange }) {
+function TabBar({ activeTab, onTabChange, t }) {
   return (
     <View style={s.tabBar}>
-      {TABS.map((tab) => {
+      {TAB_KEYS.map((tab) => {
         const active = activeTab === tab.key;
         return (
           <Pressable
@@ -256,7 +261,7 @@ function TabBar({ activeTab, onTabChange }) {
             accessibilityState={{ selected: active }}
           >
             <Text style={[s.tabText, active && s.tabTextActive]}>
-              {tab.icon} {tab.label}
+              {tab.icon} {t(tab.labelKey)}
             </Text>
           </Pressable>
         );
@@ -282,7 +287,7 @@ function DeltaChip({ value, label, inverted = false }) {
 
 /* ── Tab 1: Mirror (persistent identity) ── */
 
-function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
+function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
   const bm = report?.baselineMetrics;
   const insight = report?.aiInsight;
   const drivers = insight?.drivers;
@@ -298,7 +303,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Current State */}
       {bm?.stateOfMind ? (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="Current state" badge="weekly" />
+          <SectionHeader label={t("report.currentState")} badge="weekly" t={t} />
           <View style={s.stateOfMindCard}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={s.stateOfMindText}>{capitalize(bm.stateOfMind)}</Text>
@@ -308,19 +313,19 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
             </View>
             {bm.baseline?.reliable ? (
               <Text style={s.stateOfMindSub}>
-                Baseline {bm.baseline.score.toFixed(1)}/5 · This week {bm.recentAverage?.toFixed(1) || "—"}/5
+                {t("report.baselineText", { baselineScore: bm.baseline.score.toFixed(1), weekScore: bm.recentAverage?.toFixed(1) || "—" })}
                 {bm.drift ? ` · ${capitalize(bm.drift.label)}` : ""}
               </Text>
             ) : (
-              <Text style={s.stateOfMindSub}>Keep logging — your baseline is still forming.</Text>
+              <Text style={s.stateOfMindSub}>{t("report.baselineForming")}</Text>
             )}
           </View>
         </AnimatedSection>
       ) : (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="Current state" badge="weekly" />
+          <SectionHeader label={t("report.currentState")} badge="weekly" t={t} />
           <View style={s.card}>
-            <Text style={s.aiSummary}>Log a few more moments to see your state of mind emerge.</Text>
+            <Text style={s.aiSummary}>{t("report.logMoreForState")}</Text>
           </View>
         </AnimatedSection>
       )}
@@ -328,16 +333,16 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Drivers — top triggers with effect tags */}
       {drivers?.length ? (
         <AnimatedSection index={1} style={s.section}>
-          <SectionHeader label="Drivers" badge="weekly" />
+          <SectionHeader label={t("report.drivers")} badge="weekly" t={t} />
           <View style={s.card}>
             {drivers.map((d, i) => {
               const tColor = TRIGGER_COLORS[d.trigger] || palette.accent;
               const effectColor = d.effect === "regulator" ? palette.success : d.effect === "friction" ? palette.danger : palette.muted;
-              const effectLabel = d.effect === "regulator" ? "helps" : d.effect === "friction" ? "friction" : "neutral";
+              const effectLabel = d.effect === "regulator" ? t("report.helps") : d.effect === "friction" ? t("report.friction") : t("report.neutral");
               return (
                 <View key={i} style={[s.driverRow, i < drivers.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.glassBorder }]}>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger)}</Text>
+                    <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger, t)}</Text>
                     {d.emotion ? <Text style={s.driverEmotion}>{d.emotion} · {d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
                   </View>
                   <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
@@ -353,7 +358,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Behavioral Loop — trigger → emotion → recovery */}
       {loops?.length ? (
         <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label="Behavioral loop" badge="weekly" />
+          <SectionHeader label={t("report.behavioralLoop")} badge="weekly" t={t} />
           {loops.map((loop, i) => {
             const isFriction = loop.type === "friction";
             const loopColor = isFriction ? palette.danger : palette.success;
@@ -362,7 +367,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
               <View key={i} style={[s.loopCard, { borderLeftColor: loopColor }]}>
                 <View style={s.loopFlow}>
                   <View style={[s.loopNode, { backgroundColor: (TRIGGER_COLORS[loop.trigger] || palette.accent) + "20" }]}>
-                    <Text style={[s.loopNodeText, { color: TRIGGER_COLORS[loop.trigger] || palette.accent }]}>{triggerDisplay(loop.trigger)}</Text>
+                    <Text style={[s.loopNodeText, { color: TRIGGER_COLORS[loop.trigger] || palette.accent }]}>{triggerDisplay(loop.trigger, t)}</Text>
                   </View>
                   <Text style={s.loopArrow}>→</Text>
                   <View style={[s.loopNode, { backgroundColor: emoColor + "20" }]}>
@@ -377,7 +382,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
                     </>
                   ) : null}
                 </View>
-                <Text style={s.loopMeta}>{loop.count}× this week</Text>
+                <Text style={s.loopMeta}>{t("report.xThisWeek", { count: loop.count })}</Text>
               </View>
             );
           })}
@@ -387,14 +392,14 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Invoked Signals — masking, crash risk, false recovery */}
       {(compound?.falseRecovery || compound?.crashRisk || invoked?.weeklyMasking) ? (
         <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label="Deeper signals" badge="weekly" />
+          <SectionHeader label={t("report.deeperSignals")} badge="weekly" t={t} />
           <View style={s.card}>
             {compound?.crashRisk ? (
               <View style={s.signalRow}>
                 <Text style={[s.signalIcon, { color: palette.danger }]}>⚠️</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.danger }]}>Crash risk detected</Text>
-                  <Text style={s.signalBody}>Surface metrics look stable but deeper signals are diverging.</Text>
+                  <Text style={[s.signalLabel, { color: palette.danger }]}>{t("report.crashRiskLabel")}</Text>
+                  <Text style={s.signalBody}>{t("report.crashRiskBody")}</Text>
                 </View>
               </View>
             ) : null}
@@ -402,8 +407,8 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
               <View style={s.signalRow}>
                 <Text style={[s.signalIcon, { color: palette.warning }]}>🔄</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.warning }]}>False recovery</Text>
-                  <Text style={s.signalBody}>Scores look normal but the underlying pattern hasn't resolved.</Text>
+                  <Text style={[s.signalLabel, { color: palette.warning }]}>{t("report.falseRecoveryLabel")}</Text>
+                  <Text style={s.signalBody}>{t("report.falseRecoveryBody")}</Text>
                 </View>
               </View>
             ) : null}
@@ -411,8 +416,8 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
               <View style={s.signalRow}>
                 <Text style={[s.signalIcon, { color: palette.purple }]}>🎭</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.purple }]}>Masking: {invoked.weeklyMasking.level}</Text>
-                  <Text style={s.signalBody}>Your reported emotions may not be telling the full story.</Text>
+                  <Text style={[s.signalLabel, { color: palette.purple }]}>{t("report.maskingLevel", { level: invoked.weeklyMasking.level })}</Text>
+                  <Text style={s.signalBody}>{t("report.maskingBody")}
                 </View>
               </View>
             ) : null}
@@ -423,7 +428,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Actionable Direction */}
       {direction ? (
         <AnimatedSection index={4} style={s.section}>
-          <SectionHeader label="Direction" badge="weekly" />
+          <SectionHeader label={t("report.direction")} badge="weekly" t={t} />
           <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
             <Text style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}>{direction}</Text>
           </View>
@@ -435,7 +440,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
         <AnimatedSection index={5} style={s.section}>
           {whatWorking?.length ? (
             <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
-              <Text style={s.cardLabel}>What's working</Text>
+              <Text style={s.cardLabel}>{t("report.whatWorking")}</Text>
               {whatWorking.slice(0, 3).map((item, i) => (
                 <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
               ))}
@@ -443,7 +448,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
           ) : null}
           {whereToFocus?.length ? (
             <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
-              <Text style={s.cardLabel}>Where to focus</Text>
+              <Text style={s.cardLabel}>{t("report.whereToFocus")}</Text>
               {whereToFocus.slice(0, 3).map((item, i) => (
                 <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
               ))}
@@ -455,17 +460,17 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
       {/* Confidence */}
       <AnimatedSection index={6} style={s.section}>
         <View style={s.card}>
-          <Text style={s.cardLabel}>Confidence</Text>
-          <Text style={s.aiSummary}>{CONFIDENCE_LABELS[confidence] || confidence}</Text>
+          <Text style={s.cardLabel}>{t("report.confidenceLabel")}</Text>
+          <Text style={s.aiSummary}>{getConfidenceLabel(confidence, t)}</Text>
           <Text style={{ color: palette.muted, fontSize: 11 }}>
-            Based on {dq.totalMoments || 0} moments across {dq.daysLogged || 0} days
+            {t("report.basedOnMoments", { moments: dq.totalMoments || 0, days: dq.daysLogged || 0 })}
           </Text>
         </View>
       </AnimatedSection>
 
       {!isSignedIn ? (
         <View style={{ marginTop: 8 }}>
-          <PrimaryButton label="Sign in to deepen your patterns" onPress={handleSignIn} />
+          <PrimaryButton label={t("report.signInDeepen")} onPress={handleSignIn} />
         </View>
       ) : null}
     </View>
@@ -474,7 +479,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn }) {
 
 /* ── Tab 2: This Week (temporal) ── */
 
-function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
+function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
   const bm = report?.baselineMetrics;
   const deltas = report?.weeklyDeltas;
   const triggerEntries = topEntries(report?.triggerFrequency, 9);
@@ -489,7 +494,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Weekly summary */}
       {report?.aiInsight?.summary ? (
         <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="Weekly summary" badge="weekly" />
+          <SectionHeader label={t("report.weeklySummary")} badge="weekly" t={t} />
           <View style={s.summaryCard}>
             <Text style={s.summaryText}>{cleanText(report.aiInsight.summary)}</Text>
           </View>
@@ -497,10 +502,10 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
             <View style={[s.card, { marginTop: 6 }]}>
               <Text style={{ color: palette.textSecondary, fontSize: 12 }}>
                 {deltas.totalMomentsDelta > 0
-                  ? `${deltas.totalMomentsDelta} more moment${deltas.totalMomentsDelta !== 1 ? "s" : ""} than last week`
+                  ? (deltas.totalMomentsDelta !== 1 ? t("report.moreMomentsPlural", { count: deltas.totalMomentsDelta }) : t("report.moreMoments", { count: deltas.totalMomentsDelta }))
                   : deltas.totalMomentsDelta < 0
-                    ? `${Math.abs(deltas.totalMomentsDelta)} fewer moment${Math.abs(deltas.totalMomentsDelta) !== 1 ? "s" : ""} than last week`
-                    : "Same number of moments as last week"}
+                    ? (Math.abs(deltas.totalMomentsDelta) !== 1 ? t("report.fewerMomentsPlural", { count: Math.abs(deltas.totalMomentsDelta) }) : t("report.fewerMoments", { count: Math.abs(deltas.totalMomentsDelta) }))
+                    : t("report.sameMoments")}
               </Text>
             </View>
           ) : null}
@@ -510,15 +515,15 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Emotional trajectory */}
       {report.weeklyEmotionTrajectory?.length >= 1 ? (
         <AnimatedSection index={1} style={s.section}>
-          <SectionHeader label="Emotional tone" badge="live" />
+          <SectionHeader label={t("report.emotionalTone")} badge="live" t={t} />
           <View style={s.card}>
             <Text style={s.trajectoryHint}>
-              {report.weeklyEmotionTrajectory.length === 1 ? "Your tone from logged days." : "How your average tone shifted day by day."}
+              {report.weeklyEmotionTrajectory.length === 1 ? t("report.toneFromDays") : t("report.toneShifted")}
             </Text>
             {report.trajectoryNote ? <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
               {report.weeklyEmotionTrajectory.map((day) => {
-                const tone = scoreTone(day.score);
+                const tone = scoreTone(day.score, t);
                 return (
                   <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
                     <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
@@ -531,8 +536,8 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
             {(report.positiveStreak?.days >= 2 || report.negativeStreak?.days >= 2) ? (
               <Text style={[s.trajectoryNote, { marginTop: 6 }]}>
                 {report.negativeStreak?.days >= 2
-                  ? `${report.negativeStreak.days}-day low stretch mid-week`
-                  : `${report.positiveStreak.days}-day high-energy stretch`}
+                  ? t("report.lowStretch", { days: report.negativeStreak.days })
+                  : t("report.highStretch", { days: report.positiveStreak.days })}
               </Text>
             ) : null}
           </View>
@@ -542,9 +547,9 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Drift timeline */}
       {bm?.dailyDrift?.length >= 2 ? (
         <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label="Drift from baseline" badge="live" />
+          <SectionHeader label={t("report.driftFromBaseline")} badge="live" t={t} />
           <View style={s.card}>
-            <Text style={s.trajectoryHint}>Above zero = better than usual, below = tougher.</Text>
+            <Text style={s.trajectoryHint}>{t("report.driftHint")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
               {bm.dailyDrift.map((day) => {
                 const color = day.deviation >= 0.2 ? palette.success : day.deviation <= -0.2 ? palette.danger : palette.muted;
@@ -563,7 +568,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Emotions breakdown */}
       {emotionEntries.length ? (
         <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label="Emotions" badge="live" extra={`${dq.uniqueEmotions || 0} recorded`} />
+          <SectionHeader label={t("report.emotionsTitle")} badge="live" t={t} extra={t("report.recorded", { count: dq.uniqueEmotions || 0 })} />
           <View style={s.card}>
             {emotionEntries.map(([key, value]) => (
               <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
@@ -575,7 +580,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Triggers breakdown */}
       {triggerEntries.length ? (
         <AnimatedSection index={4} style={s.section}>
-          <SectionHeader label="Triggers" badge="live" extra={`${dq.uniqueTriggers || 0} areas`} />
+          <SectionHeader label={t("report.triggersTitle")} badge="live" t={t} extra={t("report.areasCount", { count: dq.uniqueTriggers || 0 })} />
           <View style={s.card}>
             {triggerEntries.map(([key, value]) => (
               <HBar key={key} label={key} value={value} max={triggerMax} color={TRIGGER_COLORS[key] || palette.accent} highlight />
@@ -587,7 +592,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Time of day */}
       {dq.hasEnoughForRhythm && timeEntries.length ? (
         <AnimatedSection index={5} style={s.section}>
-          <SectionHeader label="When you logged" badge="live" />
+          <SectionHeader label={t("report.whenLogged")} badge="live" t={t} />
           <View style={s.card}>
             {timeEntries.map(([key, value]) => (
               <HBar key={key} label={key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
@@ -599,7 +604,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Correlations */}
       {isSignedIn && dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
         <AnimatedSection index={6} style={s.section}>
-          <SectionHeader label="Trigger → Emotion" badge="live" />
+          <SectionHeader label={t("report.triggerEmotion")} badge="live" t={t} />
           <View style={s.card}>
             {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => {
               const tColor = TRIGGER_COLORS[trigger] || palette.accent;
@@ -626,18 +631,18 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Gut check */}
       {report.predictionAccuracy ? (
         <AnimatedSection index={7} style={s.section}>
-          <SectionHeader label="Gut check" badge="live" />
+          <SectionHeader label={t("report.gutCheck")} badge="live" t={t} />
           <View style={s.card}>
             <View style={s.gutCheckRow}>
               <Text style={s.gutCheckEmoji}>{report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}</Text>
               <View style={s.gutCheckContent}>
-                <Text style={s.gutCheckTitle}>{report.predictionAccuracy.correct} of {report.predictionAccuracy.daysCompared} days</Text>
+                <Text style={s.gutCheckTitle}>{t("report.gutCheckDays", { correct: report.predictionAccuracy.correct, total: report.predictionAccuracy.daysCompared })}</Text>
                 <Text style={s.gutCheckBody}>
-                  {report.predictionAccuracy.rate >= 0.8 ? "You read yourself almost perfectly."
-                    : report.predictionAccuracy.rate >= 0.6 ? "Strong self-awareness. Your morning read mostly matched the day."
-                    : report.predictionAccuracy.rate >= 0.4 ? "Hit-and-miss — your days had more turns than expected."
-                    : report.predictionAccuracy.correct === 0 ? "None of your predictions landed."
-                    : "Mostly off the mark, but surprises teach you something."}
+                  {report.predictionAccuracy.rate >= 0.8 ? t("report.gutCheckPerfect")
+                    : report.predictionAccuracy.rate >= 0.6 ? t("report.gutCheckStrong")
+                    : report.predictionAccuracy.rate >= 0.4 ? t("report.gutCheckMixed")
+                    : report.predictionAccuracy.correct === 0 ? t("report.gutCheckNone")
+                    : t("report.gutCheckOff")}
                 </Text>
               </View>
             </View>
@@ -648,13 +653,13 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
       {/* Timeline CTA */}
       <AnimatedSection index={8} style={s.section}>
         <Pressable style={s.ctaCard} onPress={() => { tap(); router.push("/(tabs)/timeline"); }} accessibilityRole="button">
-          <Text style={s.ctaCardText}>📖 View full timeline</Text>
+          <Text style={s.ctaCardText}>📖 {t("report.viewTimeline")}</Text>
         </Pressable>
       </AnimatedSection>
 
       {!isSignedIn ? (
         <View style={{ marginTop: 8 }}>
-          <PrimaryButton label="Sign in for deeper analytics" onPress={handleSignIn} />
+          <PrimaryButton label={t("report.signInAnalytics")} onPress={handleSignIn} />
         </View>
       ) : null}
     </View>
@@ -663,7 +668,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router }) {
 
 /* ── Tab 3: Actions (behavioural) ── */
 
-function ActionsTab({ report, deviceId, token, onFeedback }) {
+function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   const actions = report?.actions || [];
   const feedback = report?.actionFeedback || [];
   const [responded, setResponded] = useState(() => {
@@ -681,7 +686,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
     try {
       await submitActionFeedback(actionId, response, deviceId, token);
       setResponded((prev) => ({ ...prev, [actionId]: response }));
-      setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? "Marked helpful" : "We'll adjust this" }));
+      setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? t("report.markedHelpful") : t("report.adjustThis") }));
       trackEvent("action_feedback", { actionId, response });
       if (onFeedback) onFeedback(actionId, response);
     } catch {
@@ -696,9 +701,9 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
       <View style={s.tabContent}>
         <View style={s.insightStateCard}>
           <Text style={s.insightStateIcon}>⚡</Text>
-          <Text style={s.insightStateTitle}>Actions are on their way</Text>
+          <Text style={s.insightStateTitle}>{t("report.actionsOnWay")}</Text>
           <Text style={s.insightStateBody}>
-            Log at least 3 moments to unlock actions. With 5+, you get personalised AI insights.
+            {t("report.actionsOnWayBody")}
           </Text>
         </View>
       </View>
@@ -708,9 +713,9 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
   return (
     <View style={s.tabContent}>
       <AnimatedSection index={0} style={s.section}>
-        <SectionHeader label="This week's actions" badge="live" extra={`${actions.length} suggestion${actions.length !== 1 ? "s" : ""}`} />
+        <SectionHeader label={t("report.thisWeeksActions")} badge="live" t={t} extra={actions.length !== 1 ? t("report.suggestionsCountPlural", { count: actions.length }) : t("report.suggestionsCount", { count: actions.length })} />
         <Text style={{ color: palette.textSecondary, fontSize: 12, marginBottom: 4 }}>
-          Based on your patterns. Try one and let us know.
+          {t("report.basedOnPatterns")}
         </Text>
       </AnimatedSection>
 
@@ -723,7 +728,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
               <View style={s.actionHeader}>
                 <Text style={s.actionIcon}>{action.icon || "⚡"}</Text>
                 <View style={s.actionHeaderText}>
-                  <Text style={s.actionCategory}>{action.category || "Action"}</Text>
+                  <Text style={s.actionCategory}>{action.category || t("report.defaultCategory")}</Text>
                   <Text style={s.actionTitle}>{action.title}</Text>
                 </View>
               </View>
@@ -731,7 +736,7 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
               {done ? (
                 <View style={[s.actionFeedbackDone, { backgroundColor: done === "helped" ? palette.successSoft : palette.warningSoft }]}>
                   <Text style={[s.actionFeedbackDoneText, { color: done === "helped" ? palette.success : palette.warning }]}>
-                    {done === "helped" ? "✓ " : "✕ "}{ack || (done === "helped" ? "Marked helpful" : "We'll adjust this")}
+                    {done === "helped" ? "✓ " : "✕ "}{ack || (done === "helped" ? t("report.markedHelpful") : t("report.adjustThis"))}
                   </Text>
                 </View>
               ) : (
@@ -741,18 +746,18 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
                     onPress={() => handleResponse(action.id, "helped")}
                     disabled={!!submitting}
                     accessibilityRole="button"
-                    accessibilityLabel="Mark as helpful"
+                    accessibilityLabel={t("report.helped")}
                   >
-                    <Text style={s.actionBtnHelpedText}>✓ Helped</Text>
+                    <Text style={s.actionBtnHelpedText}>✓ {t("report.helped")}</Text>
                   </Pressable>
                   <Pressable
                     style={[s.actionBtn, s.actionBtnNotHelpful]}
                     onPress={() => handleResponse(action.id, "not_helpful")}
                     disabled={!!submitting}
                     accessibilityRole="button"
-                    accessibilityLabel="Mark as not helpful"
+                    accessibilityLabel={t("report.notHelpful")}
                   >
-                    <Text style={s.actionBtnNotHelpfulText}>✕ Not helpful</Text>
+                    <Text style={s.actionBtnNotHelpfulText}>✕ {t("report.notHelpful")}</Text>
                   </Pressable>
                 </View>
               )}
@@ -764,89 +769,134 @@ function ActionsTab({ report, deviceId, token, onFeedback }) {
   );
 }
 
-/* ── Tab 4: Premium (deep learning) ── */
+/* ── Tab 4: Premium (decision-oriented) ── */
 
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing }) {
+function getDirectionText(report) {
+  if (report?.llmInsight?.narrative) {
+    const sec = parseLlmSections(report.llmInsight.narrative);
+    if (sec?.[2]) return sec[2];
+  }
+  if (report?.aiInsight?.actionableDirection) return report.aiInsight.actionableDirection;
+  if (report?.aiInsight?.microExperiment) return report.aiInsight.microExperiment;
+  return null;
+}
+
+function buildSignals(report, t) {
+  const out = [];
+  const bm = report?.baselineMetrics;
+  const compound = report?.compoundPatterns;
+  const invoked = report?.invokedMetrics;
+  if (bm?.drift) {
+    const v = bm.drift.value;
+    out.push({
+      key: "drift", icon: v >= 0.2 ? "📈" : v <= -0.2 ? "📉" : "➡️",
+      label: t("report.prem.signalDrift"),
+      body: v >= 0.2 ? t("report.prem.driftUp") : v <= -0.2 ? t("report.prem.driftDown") : t("report.prem.driftStable"),
+      color: v >= 0.2 ? palette.success : v <= -0.2 ? palette.danger : palette.muted,
+    });
+  }
+  if (bm?.stability) {
+    out.push({
+      key: "stability", icon: bm.stability.score >= 0.6 ? "🟢" : "🟡",
+      label: t("report.prem.signalStability"),
+      body: bm.stability.score >= 0.6 ? t("report.prem.stabilityHigh") : t("report.prem.stabilityLow"),
+      color: bm.stability.score >= 0.6 ? palette.success : palette.warning,
+    });
+  }
+  if (compound?.crashRisk) {
+    out.push({ key: "crash", icon: "⚠️", label: t("report.prem.signalCrashRisk"), body: t("report.crashRiskBody"), color: palette.danger });
+  }
+  if (compound?.falseRecovery) {
+    out.push({ key: "recovery", icon: "🔄", label: t("report.prem.signalFalseRecovery"), body: t("report.falseRecoveryBody"), color: palette.warning });
+  }
+  if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") {
+    out.push({ key: "masking", icon: "🎭", label: t("report.prem.signalMasking"), body: t("report.maskingBody"), color: palette.purple });
+  }
+  if (report?.volatilityLabel) {
+    const high = report.volatilityLabel.toLowerCase().includes("high") || report.volatilityLabel.toLowerCase().includes("volatile");
+    out.push({
+      key: "volatility", icon: high ? "⚡" : "🌊",
+      label: t("report.prem.signalVolatility"),
+      body: high ? t("report.prem.volatilityHigh") : t("report.prem.volatilityLow"),
+      color: high ? palette.warning : palette.success,
+    });
+  }
+  return out;
+}
+
+function sortRegulatorsByFeedback(regulators, feedback) {
+  const helpedTriggers = new Set();
+  const skippedTriggers = new Set();
+  for (const f of feedback) {
+    const trig = f.trigger || f.category;
+    if (!trig) continue;
+    if (f.response === "tried" || f.response === "helped") helpedTriggers.add(trig.toLowerCase());
+    if (f.response === "skipped" || f.response === "not_helpful") skippedTriggers.add(trig.toLowerCase());
+  }
+  return [...regulators].sort((a, b) => {
+    const aHelped = helpedTriggers.has((a.trigger || "").toLowerCase()) ? -2 : 0;
+    const bHelped = helpedTriggers.has((b.trigger || "").toLowerCase()) ? -2 : 0;
+    const aSkipped = skippedTriggers.has((a.trigger || "").toLowerCase()) ? 1 : 0;
+    const bSkipped = skippedTriggers.has((b.trigger || "").toLowerCase()) ? 1 : 0;
+    return (aHelped + aSkipped) - (bHelped + bSkipped);
+  });
+}
+
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t }) {
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
   const triedCount = feedback.filter((f) => f.response === "tried" || f.response === "helped").length;
   const skippedCount = feedback.filter((f) => f.response === "skipped" || f.response === "not_helpful").length;
+  const directionText = getDirectionText(report);
+  const signals = buildSignals(report, t);
+  const llmSections = hasLlmInsight ? parseLlmSections(report.llmInsight.narrative) : null;
+  const sortedRegulators = sortRegulatorsByFeedback(regulators, feedback);
+  const helpedTriggerSet = new Set(feedback.filter((f) => f.response === "tried" || f.response === "helped").map((f) => (f.trigger || f.category || "").toLowerCase()));
 
-  function renderLlmInsight() {
+  const expiryDate = subscription?.expiresAt
+    ? new Date(subscription.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+
+  const lockedCta = !isSignedIn
+    ? { label: t("report.signInToUnlock"), onPress: handleSignIn }
+    : { label: purchasing ? t("common.pleaseWait") : t("report.upgradePremium"), onPress: handleUpgrade, disabled: purchasing };
+
+  /* ── Render helpers ── */
+
+  function renderDirectionCard() {
     if (!isSignedIn) {
       return (
-        <LockedSection
-          title="Personal insight"
-          teaser="Sign in to unlock personalised AI-powered pattern analysis."
-          ctaLabel="Sign in to unlock"
-          onPress={handleSignIn}
-        >
-          <View style={s.card}><Text style={[s.aiSummary, { color: palette.muted }]}>Deeper pattern analysis appears here.</Text></View>
+        <LockedSection title={t("report.prem.unlockDirection")} teaser={t("report.prem.directionLocked")} ctaLabel={t("report.signInToUnlock")} onPress={handleSignIn}>
+          <View style={s.premDirectionCard}><Text style={[s.premDirectionText, { color: palette.muted }]}>{t("report.prem.directionHint")}</Text></View>
         </LockedSection>
       );
     }
 
-    if (isPremium && hasLlmInsight) {
-      const sections = parseLlmSections(report.llmInsight.narrative);
-      if (sections) {
-        return (
-          <View style={s.section}>
-            <SectionHeader label="Personal insight" badge="weekly" />
-            <View style={s.insightCardsRow}>
-              {sections.map((body, idx) => {
-                if (!body) return null;
-                const meta = INSIGHT_SECTION_META[idx] || {};
-                return (
-                  <View key={idx} style={s.insightSectionCard}>
-                    <View style={s.insightSectionHeader}>
-                      <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
-                      <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
-                        {meta.label || `Section ${idx + 1}`}
-                      </Text>
-                    </View>
-                    <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
-                  </View>
-                );
-              })}
-              <Text style={s.insightFooter}>
-                Generated by QuietDen · {report.llmInsight.generatedAt
-                  ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                  : ""}
-              </Text>
-            </View>
-          </View>
-        );
-      }
+    if (isPremium && directionText) {
       return (
-        <View style={s.section}>
-          <SectionHeader label="Personal insight" badge="weekly" />
-          <View style={s.card}>
-            <Text style={s.aiSummary}>{cleanText(report.llmInsight.narrative)}</Text>
-          </View>
-          <Text style={s.insightFooter}>
-            Generated by QuietDen · {report.llmInsight.generatedAt
-              ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-              : ""}
-          </Text>
+        <View style={s.premDirectionCard}>
+          <Text style={s.premDirectionKicker}>{t("report.prem.tryThis")}</Text>
+          <Text style={s.premDirectionText}>{cleanText(directionText)}</Text>
+          <Text style={s.premDirectionHint}>{t("report.prem.directionHint")}</Text>
         </View>
       );
     }
 
     if (hasLlmTeaser) {
-      const narrativeSource = report.llmTeaser?.narrative;
-      const teaserSections = parseLlmSections(narrativeSource);
-      const teaserText = teaserSections?.[0] || cleanText(narrativeSource).split(/\n\s*\n/)[0] || "";
+      const src = report.llmTeaser?.narrative;
+      const teaser = parseLlmSections(src);
+      const preview = teaser?.[2] || teaser?.[0] || cleanText(src).split(/\n\s*\n/)[0] || "";
       return (
         <View style={s.section}>
-          <SectionHeader label="Personal insight" badge="weekly" />
           <View style={s.teaserCard}>
-            <Text style={s.teaserTitle}>{teaserText ? "Your pattern insight is ready" : "A deeper pattern is emerging…"}</Text>
-            {teaserText ? <Text style={s.teaserBody} numberOfLines={3}>{teaserText}</Text> : null}
+            <Text style={s.premDirectionKicker}>{t("report.prem.tryThis")}</Text>
+            {preview ? <Text style={s.teaserBody} numberOfLines={2}>{preview}</Text> : null}
             <LinearGradient colors={["transparent", palette.glass]} locations={[0, 1]} style={s.teaserFade} />
           </View>
+          <Text style={s.premTeaserNote}>{t("report.prem.teaserHint")}</Text>
           <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-            <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "See the full picture"}</Text>
+            <Text style={s.teaserCtaButtonText}>{purchasing ? t("common.pleaseWait") : t("report.seeFullPicture")}</Text>
           </Pressable>
         </View>
       );
@@ -854,131 +904,279 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
 
     if (!isPremium) {
       return (
-        <View style={s.section}>
-          <SectionHeader label="Personal insight" badge="weekly" />
-          <View style={s.insightStateCard}>
-            <Text style={s.insightStateIcon}>💎</Text>
-            <Text style={s.insightStateTitle}>Unlock Premium insights</Text>
-            <Text style={s.insightStateBody}>
-              Get a personalised AI deep-dive into your patterns, effect sizes, and behavioural profile.
-            </Text>
-            <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-              <Text style={s.teaserCtaButtonText}>{purchasing ? "Please wait…" : "Upgrade to Premium"}</Text>
-            </Pressable>
-          </View>
+        <View style={s.insightStateCard}>
+          <Text style={s.insightStateIcon}>💎</Text>
+          <Text style={s.insightStateTitle}>{t("report.unlockInsightsTitle")}</Text>
+          <Text style={s.insightStateBody}>{t("report.unlockInsightsBody")}</Text>
+          <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+            <Text style={s.teaserCtaButtonText}>{purchasing ? t("common.pleaseWait") : t("report.upgradePremium")}</Text>
+          </Pressable>
         </View>
       );
     }
 
-    return null;
+    return (
+      <View style={s.premDirectionCard}>
+        <Text style={s.premDirectionKicker}>{t("report.prem.tryThis")}</Text>
+        <Text style={s.premDirectionText}>{t("report.prem.directionEmpty")}</Text>
+      </View>
+    );
   }
 
   return (
     <View style={s.tabContent}>
-      {/* What Works For You — effect sizes from regulators */}
-      {regulators.length ? (
-        <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label="What works for you" badge="weekly" />
-          <View style={s.card}>
-            {regulators.slice(0, 5).map((r, i) => (
-              <View key={i} style={s.effectRow}>
-                <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
-                  <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
-                </View>
-                <View style={s.effectContent}>
-                  <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
-                  <Text style={s.effectCount}>{r.count} time{r.count !== 1 ? "s" : ""} this period</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </AnimatedSection>
+
+      {/* ── Premium status badge ── */}
+      {isPremium ? (
+        <View style={s.premBadge}>
+          <Text style={s.premBadgeText}>
+            {expiryDate ? t("report.prem.statusUntil", { date: expiryDate }) : t("report.prem.statusActive")}
+          </Text>
+        </View>
       ) : null}
 
-      {/* Behaviour Profile — chips */}
-      {bm?.baseline?.reliable ? (
-        <AnimatedSection index={1} style={s.section}>
-          <SectionHeader label="Behaviour profile" badge="weekly" />
-          <View style={s.card}>
-            <View style={s.profileChips}>
-              <View style={s.profileChip}><Text style={s.profileChipText}>Baseline: {bm.baseline.label}</Text></View>
-              {bm.stability ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(bm.stability.label)}</Text></View> : null}
-              {bm.recoveryLatency ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(bm.recoveryLatency.label)}</Text></View> : null}
-              {report.volatilityLabel ? <View style={s.profileChip}><Text style={s.profileChipText}>{capitalize(report.volatilityLabel)}</Text></View> : null}
+      {/* ── 1. YOUR DIRECTION (hero) ── */}
+      <AnimatedSection index={0} style={s.section}>
+        <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
+        {renderDirectionCard()}
+      </AnimatedSection>
+
+      {/* ── 2. WHAT'S SHIFTING (signal cards) ── */}
+      {signals.length > 0 ? (
+        isPremium ? (
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.prem.shifting")} badge="live" t={t}
+              extra={signals.length !== 1 ? t("report.prem.signalCountPlural", { count: signals.length }) : t("report.prem.signalCount", { count: signals.length })} />
+            <View style={s.premSignalGrid}>
+              {signals.map((sig) => (
+                <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
+                  <Text style={s.premSignalIcon}>{sig.icon}</Text>
+                  <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
+                  <Text style={s.premSignalBody}>{sig.body}</Text>
+                </View>
+              ))}
             </View>
-            <Text style={s.baselineExplainer}>
-              Built from {bm.baseline.daysUsed} days of data. The more you log, the richer this profile becomes.
+          </AnimatedSection>
+        ) : (
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.prem.shifting")} badge="live" t={t} />
+            {/* Show first signal as preview, lock the rest */}
+            <View style={s.premSignalGrid}>
+              <View style={[s.premSignalCard, { borderLeftColor: signals[0].color }]}>
+                <Text style={s.premSignalIcon}>{signals[0].icon}</Text>
+                <Text style={[s.premSignalLabel, { color: signals[0].color }]}>{signals[0].label}</Text>
+                <Text style={s.premSignalBody}>{signals[0].body}</Text>
+              </View>
+            </View>
+            {signals.length > 1 ? (
+              <LockedSection
+                title={t("report.prem.unlockSignals")}
+                teaser={t("report.prem.shiftingHint")}
+                ctaLabel={lockedCta.label}
+                onPress={lockedCta.onPress}
+              >
+                <View style={s.premSignalGrid}>
+                  {signals.slice(1, 3).map((sig) => (
+                    <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
+                      <Text style={s.premSignalIcon}>{sig.icon}</Text>
+                      <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </LockedSection>
+            ) : null}
+          </AnimatedSection>
+        )
+      ) : null}
+
+      {/* ── 3. PATTERN INTELLIGENCE (LLM insight cards) ── */}
+      {isPremium && hasLlmInsight && llmSections ? (
+        <AnimatedSection index={2} style={s.section}>
+          <SectionHeader label={t("report.prem.patternIntel")} badge="weekly" t={t} />
+          <View style={s.insightCardsRow}>
+            {llmSections.map((body, idx) => {
+              if (!body) return null;
+              const insightMeta = getInsightSectionMeta(t);
+              const meta = insightMeta[idx] || {};
+              return (
+                <View key={idx} style={s.insightSectionCard}>
+                  <View style={s.insightSectionHeader}>
+                    <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
+                    <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
+                      {meta.label || t("report.sectionLabel", { num: idx + 1 })}
+                    </Text>
+                  </View>
+                  <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
+                </View>
+              );
+            })}
+            <Text style={s.insightFooter}>
+              {t("report.generatedBy", { date: report.llmInsight.generatedAt
+                ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                : "" })}
             </Text>
           </View>
         </AnimatedSection>
-      ) : null}
-
-      {/* Action Effectiveness */}
-      {(triedCount > 0 || skippedCount > 0) ? (
+      ) : !isPremium && isSignedIn ? (
         <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label="Action effectiveness" badge="live" />
-          <View style={s.card}>
-            <View style={s.metricsRow}>
-              <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Helped</Text>
-                <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
-              </View>
-              <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Not helpful</Text>
-                <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
+          <LockedSection
+            title={t("report.prem.unlockIntel")}
+            teaser={t("report.prem.patternIntelHint")}
+            ctaLabel={lockedCta.label}
+            onPress={lockedCta.onPress}
+          >
+            <View style={s.insightCardsRow}>
+              <View style={s.insightSectionCard}>
+                <View style={s.insightSectionHeader}>
+                  <Text style={s.insightSectionIcon}>🔍</Text>
+                  <Text style={s.insightSectionLabel}>{t("report.insightStoodOut")}</Text>
+                </View>
+                <Text style={[s.insightSectionBody, { color: palette.muted }]}>{t("report.prem.patternIntelHint")}</Text>
               </View>
             </View>
-          </View>
+          </LockedSection>
         </AnimatedSection>
       ) : null}
 
-      {/* Baseline advanced details */}
+      {/* ── 4. YOUR LEVERS (adaptive regulators) ── */}
+      {sortedRegulators.length > 0 ? (
+        isPremium ? (
+          <AnimatedSection index={3} style={s.section}>
+            <SectionHeader label={t("report.prem.leversTitle")} badge="weekly" t={t}
+              extra={helpedTriggerSet.size > 0 ? t("report.prem.leversAdaptive") : null} />
+            <View style={s.card}>
+              {sortedRegulators.slice(0, 6).map((r, i) => {
+                const isHelped = helpedTriggerSet.has((r.trigger || "").toLowerCase());
+                return (
+                  <View key={i} style={s.effectRow}>
+                    <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
+                      <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
+                    </View>
+                    <View style={s.effectContent}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
+                        {isHelped ? (
+                          <View style={s.premHelpedBadge}>
+                            <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={s.effectCount}>{r.count !== 1 ? t("report.timesThisPeriodPlural", { count: r.count }) : t("report.timesThisPeriod", { count: r.count })}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </AnimatedSection>
+        ) : isSignedIn ? (
+          <AnimatedSection index={3} style={s.section}>
+            <LockedSection
+              title={t("report.prem.unlockLevers")}
+              teaser={t("report.prem.leversHint")}
+              ctaLabel={lockedCta.label}
+              onPress={lockedCta.onPress}
+            >
+              <View style={s.card}>
+                {sortedRegulators.slice(0, 2).map((r, i) => (
+                  <View key={i} style={s.effectRow}>
+                    <View style={[s.effectDot, { backgroundColor: palette.muted + "40" }]}>
+                      <Text style={{ fontSize: 14 }}>🌿</Text>
+                    </View>
+                    <View style={s.effectContent}>
+                      <Text style={s.effectTitle}>{r.trigger} → ...</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </LockedSection>
+          </AnimatedSection>
+        ) : null
+      ) : null}
+
+      {/* ── 5. BEHAVIOUR SNAPSHOT (compact metrics) ── */}
       {bm?.baseline?.reliable ? (
-        <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label="Baseline details" badge="weekly" />
-          <View style={s.card}>
-            <View style={s.analyticsGrid}>
-              <View style={s.analyticsStat}>
-                <Text style={s.analyticsStatLabel}>Baseline</Text>
-                <Text style={s.analyticsStatValue}>{bm.baseline.score.toFixed(2)}/5</Text>
+        isPremium ? (
+          <AnimatedSection index={4} style={s.section}>
+            <SectionHeader label={t("report.prem.snapshot")} badge="weekly" t={t} />
+            <View style={s.premMetricGrid}>
+              <View style={s.premMetricItem}>
+                <Text style={s.premMetricLabel}>{t("report.prem.baseline")}</Text>
+                <Text style={s.premMetricValue}>{bm.baseline.score.toFixed(1)}/5</Text>
               </View>
               {bm.recentAverage != null ? (
-                <View style={s.analyticsStat}>
-                  <Text style={s.analyticsStatLabel}>7-day avg</Text>
-                  <Text style={s.analyticsStatValue}>{bm.recentAverage.toFixed(2)}/5</Text>
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.recentAvg")}</Text>
+                  <Text style={s.premMetricValue}>{bm.recentAverage.toFixed(1)}/5</Text>
                 </View>
               ) : null}
               {bm.drift ? (
-                <View style={s.analyticsStat}>
-                  <Text style={s.analyticsStatLabel}>Drift</Text>
-                  <Text style={[s.analyticsStatValue, { color: bm.drift.value >= 0 ? palette.success : palette.danger }]}>
-                    {bm.drift.value > 0 ? "+" : ""}{bm.drift.value.toFixed(2)}
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.drift")}</Text>
+                  <Text style={[s.premMetricValue, { color: bm.drift.value >= 0 ? palette.success : palette.danger }]}>
+                    {bm.drift.value > 0 ? "+" : ""}{bm.drift.value.toFixed(1)}
                   </Text>
                 </View>
               ) : null}
               {bm.stability ? (
-                <View style={s.analyticsStat}>
-                  <Text style={s.analyticsStatLabel}>Stability</Text>
-                  <Text style={s.analyticsStatValue}>{Math.round(bm.stability.score * 100)}%</Text>
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.stability")}</Text>
+                  <Text style={s.premMetricValue}>{Math.round(bm.stability.score * 100)}%</Text>
                 </View>
               ) : null}
               {bm.recoveryLatency ? (
-                <View style={s.analyticsStat}>
-                  <Text style={s.analyticsStatLabel}>Recovery</Text>
-                  <Text style={s.analyticsStatValue}>~{bm.recoveryLatency.days}d</Text>
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.recovery")}</Text>
+                  <Text style={s.premMetricValue}>~{bm.recoveryLatency.days}d</Text>
                 </View>
               ) : null}
-              <View style={s.analyticsStat}>
-                <Text style={s.analyticsStatLabel}>Days used</Text>
-                <Text style={s.analyticsStatValue}>{bm.baseline.daysUsed}</Text>
+              <View style={s.premMetricItem}>
+                <Text style={s.premMetricLabel}>{t("report.prem.daysTracked")}</Text>
+                <Text style={s.premMetricValue}>{bm.baseline.daysUsed}</Text>
               </View>
             </View>
+          </AnimatedSection>
+        ) : isSignedIn ? (
+          <AnimatedSection index={4} style={s.section}>
+            <LockedSection
+              title={t("report.prem.unlockSnapshot")}
+              teaser={t("report.prem.snapshotHint")}
+              ctaLabel={lockedCta.label}
+              onPress={lockedCta.onPress}
+            >
+              <View style={s.premMetricGrid}>
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.baseline")}</Text>
+                  <Text style={s.premMetricValue}>—</Text>
+                </View>
+                <View style={s.premMetricItem}>
+                  <Text style={s.premMetricLabel}>{t("report.prem.stability")}</Text>
+                  <Text style={s.premMetricValue}>—</Text>
+                </View>
+              </View>
+            </LockedSection>
+          </AnimatedSection>
+        ) : null
+      ) : null}
+
+      {/* ── 6. ACTION EFFECTIVENESS (compact) ── */}
+      {(triedCount > 0 || skippedCount > 0) ? (
+        <AnimatedSection index={5} style={s.section}>
+          <SectionHeader label={t("report.prem.effectiveness")} badge="live" t={t} />
+          <View style={s.card}>
+            <View style={s.metricsRow}>
+              <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.success }]}>
+                <Text style={s.metricLabel}>{t("report.helped")}</Text>
+                <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
+              </View>
+              <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.muted }]}>
+                <Text style={s.metricLabel}>{t("report.notHelpful")}</Text>
+                <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
+              </View>
+            </View>
+            <Text style={s.premAdjustingNote}>{t("report.prem.adjusting")}</Text>
           </View>
         </AnimatedSection>
       ) : null}
-
-      {/* LLM Insight */}
-      {renderLlmInsight()}
     </View>
   );
 }
@@ -989,6 +1187,7 @@ export function WeeklyReportScreen() {
   const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId } = useAppSession();
   const router = useRouter();
   const { dominantEmotion } = useEmotionalState();
+  const { t, lang } = useLanguage();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1006,11 +1205,11 @@ export function WeeklyReportScreen() {
   const load = useCallback(async (isRetry = false) => {
     if (isRetry && reportRef.current) { setError(""); } else { setLoading(true); setError(""); }
     try {
-      const nextReport = await callbacksRef.current.loadWeeklyReport();
+      const nextReport = await callbacksRef.current.loadWeeklyReport(lang);
       setReport(nextReport);
     } catch {
       if (!reportRef.current) setReport(null);
-      setError("Unable to load report. Check connection.");
+      setError(t("report.unableToLoad"));
     } finally { setLoading(false); }
   }, []);
 
@@ -1038,9 +1237,9 @@ export function WeeklyReportScreen() {
       const msg = err?.message || "";
       if (err?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) return;
       if (msg.includes("not found") || msg.includes("No subscription")) {
-        Alert.alert("Subscription unavailable", "Could not find the subscription product. Make sure the app is up to date.");
+        Alert.alert(t("premium.subscriptionUnavailable"), t("report.subscriptionUnavailableMsg"));
       } else {
-        Alert.alert("Upgrade error", msg || "Something went wrong.");
+        Alert.alert(t("report.upgradeError"), msg || t("report.somethingWrong"));
       }
     } finally { setPurchasing(false); }
   }
@@ -1048,9 +1247,9 @@ export function WeeklyReportScreen() {
   return (
     <ScreenShell
       loading={loading}
-      loadingTitle="Building your report"
-      loadingMessage="Summarizing patterns from the past week."
-      timeoutMessage="Unable to load report. Check connection."
+      loadingTitle={t("report.buildingReport")}
+      loadingMessage={t("report.buildingReportMsg")}
+      timeoutMessage={t("report.unableToLoad")}
       onRetry={() => load(true)}
       scroll
       edges={["top", "left", "right", "bottom"]}
@@ -1062,11 +1261,13 @@ export function WeeklyReportScreen() {
 
           {/* Hero header */}
           <View style={s.header}>
-            <Text style={s.kicker}>Weekly patterns</Text>
-            <Text style={s.title}>Your Week</Text>
+            <Text style={s.kicker}>{t("report.weeklyPatterns")}</Text>
+            <Text style={s.title}>{t("report.yourWeek")}</Text>
             {report?.totalMoments ? (
               <Text style={s.subtitle}>
-                {report.totalMoments} moment{report.totalMoments !== 1 ? "s" : ""} across {dq.daysLogged || "-"} day{(dq.daysLogged || 0) !== 1 ? "s" : ""}
+                {report.totalMoments !== 1
+                  ? t("report.momentsSummaryPlural", { moments: report.totalMoments, days: dq.daysLogged || "-" })
+                  : t("report.momentsSummary", { moments: report.totalMoments, days: dq.daysLogged || "-" })}
               </Text>
             ) : null}
             {report?.totalMoments ? (
@@ -1074,17 +1275,17 @@ export function WeeklyReportScreen() {
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</Text>
                   <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
-                    {report.topEmotion || "Mixed"}
+                    {report.topEmotion || t("report.mixedEmotion")}
                   </Text>
                 </View>
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>🎯</Text>
                   <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
-                    {report.topTrigger || (report.tiedTriggers?.length > 1 ? `${report.tiedTriggers.length} areas` : "-")}
+                    {report.topTrigger || (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
                   </Text>
                 </View>
                 <View style={[s.heroPill, s.confidencePill]}>
-                  <Text style={s.heroPillLabel}>{CONFIDENCE_LABELS[confidence] || confidence}</Text>
+                  <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
                 </View>
               </View>
             ) : null}
@@ -1092,30 +1293,28 @@ export function WeeklyReportScreen() {
 
           {error ? (
             <View style={s.stateCard}>
-              <Text style={s.stateTitle}>Report unavailable</Text>
+              <Text style={s.stateTitle}>{t("report.reportUnavailable")}</Text>
               <Text style={s.stateBody}>{error}</Text>
-              <PrimaryButton label="Retry" onPress={() => load(true)} />
+              <PrimaryButton label={t("report.retry")} onPress={() => load(true)} />
             </View>
           ) : null}
 
           {report && !error && confidence === "too_early" ? (
             <View style={s.starterCard}>
               <Text style={s.starterEmoji}>🌱</Text>
-              <Text style={s.starterTitle}>{isSignedIn ? "A few more moments to go" : "Start tracking to see patterns"}</Text>
+              <Text style={s.starterTitle}>{isSignedIn ? t("report.starterSignedIn") : t("report.starterAnon")}</Text>
               <Text style={s.starterBody}>
-                {isSignedIn
-                  ? "Log at least 3 moments this week for your patterns to take shape. With 5+, you unlock personalised insights that get sharper the more you log."
-                  : "Log at least 3 moments to see your first patterns. Sign in and log 5+ to unlock personalised insights."}
+                {isSignedIn ? t("report.starterBodySignedIn") : t("report.starterBodyAnon")}
               </Text>
               {!isSignedIn ? (
                 <>
-                  <PrimaryButton label="Sign in to unlock deeper insights" onPress={handleSignIn} />
+                  <PrimaryButton label={t("report.signInDeeper")} onPress={handleSignIn} />
                   <Pressable style={s.nudgeSecondary} onPress={() => router.push("/(tabs)/log")} accessibilityRole="button">
-                    <Text style={s.nudgeSecondaryText}>Log a moment</Text>
+                    <Text style={s.nudgeSecondaryText}>{t("report.logMoment")}</Text>
                   </Pressable>
                 </>
               ) : (
-                <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+                <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
               )}
             </View>
           ) : null}
@@ -1123,22 +1322,22 @@ export function WeeklyReportScreen() {
           {report && !error && confidence !== "too_early" ? (
             <>
               {/* Tab bar */}
-              <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+              <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
 
               {/* Tab content */}
               {activeTab === "mirror" ? (
-                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} />
+                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} />
               ) : activeTab === "week" ? (
-                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} />
+                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} />
               ) : activeTab === "actions" ? (
-                <ActionsTab report={report} deviceId={deviceId} token={token} />
+                <ActionsTab report={report} deviceId={deviceId} token={token} t={t} />
               ) : (
                 <PremiumTab
                   report={report} dq={dq} confidence={confidence}
                   isSignedIn={isSignedIn} isPremium={isPremium}
                   hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                  purchasing={purchasing}
+                  purchasing={purchasing} subscription={subscription} t={t}
                 />
               )}
             </>
@@ -1147,9 +1346,9 @@ export function WeeklyReportScreen() {
           {!report && !loading && !error ? (
             <View style={[s.stateCard, s.emptyStateCard]}>
               <Image source={require("@/assets/report-empty.png")} style={s.emptyIllustration} resizeMode="contain" accessible={false} />
-              <Text style={s.stateTitle}>Your first insight is on its way</Text>
-              <Text style={s.stateBody}>Log at least 3 moments this week to see your patterns. With 5+, you get personalised insights.</Text>
-              <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+              <Text style={s.stateTitle}>{t("report.firstInsight")}</Text>
+              <Text style={s.stateBody}>{t("report.firstInsightBody")}</Text>
+              <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
             </View>
           ) : null}
         </View>
@@ -1546,4 +1745,48 @@ const s = StyleSheet.create({
   signalIcon: { fontSize: 18, marginTop: 1 },
   signalLabel: { fontSize: 13, fontWeight: "700" },
   signalBody: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
+
+  /* Premium tab — decision cards */
+  premBadge: {
+    alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: radius.pill, backgroundColor: palette.accentSoft,
+    borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  premBadgeText: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 0.6 },
+  premDirectionCard: {
+    borderRadius: radius.md, padding: 18, gap: 8,
+    backgroundColor: palette.card,
+    borderWidth: 1, borderColor: palette.accentMedium,
+    borderLeftWidth: 4, borderLeftColor: palette.accent,
+  },
+  premDirectionKicker: {
+    color: palette.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1.4, textTransform: "uppercase",
+  },
+  premDirectionText: { color: palette.text, fontSize: 15, fontWeight: "600", lineHeight: 22 },
+  premDirectionHint: { color: palette.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  premTeaserNote: { color: palette.textSecondary, fontSize: 12, fontStyle: "italic", textAlign: "center", marginTop: 4 },
+  premSignalGrid: { gap: 8 },
+  premSignalCard: {
+    borderRadius: radius.md, padding: 14, gap: 4,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+    borderLeftWidth: 3,
+  },
+  premSignalIcon: { fontSize: 16 },
+  premSignalLabel: { fontSize: 12, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  premSignalBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
+  premHelpedBadge: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill,
+    backgroundColor: "rgba(94, 230, 160, 0.15)", borderWidth: 1, borderColor: "rgba(94, 230, 160, 0.35)",
+  },
+  premHelpedBadgeText: { color: "#5ee6a0", fontSize: 10, fontWeight: "700" },
+  premMetricGrid: {
+    flexDirection: "row", flexWrap: "wrap", gap: 8,
+    backgroundColor: palette.glass, borderRadius: radius.md,
+    borderWidth: 1, borderColor: palette.glassBorder, padding: 12,
+  },
+  premMetricItem: { width: "30%", gap: 2, alignItems: "center", paddingVertical: 8 },
+  premMetricLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", textAlign: "center" },
+  premMetricValue: { color: palette.text, fontSize: 18, fontWeight: "700" },
+  premAdjustingNote: { color: palette.muted, fontSize: 11, fontStyle: "italic", marginTop: 4 },
 });

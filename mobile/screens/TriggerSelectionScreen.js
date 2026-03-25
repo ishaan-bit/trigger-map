@@ -10,6 +10,7 @@ import { MoodWeather } from "@/components/MoodWeather";
 import { StreakOrb } from "@/components/StreakOrb";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 import { STAGGER_DELAY } from "@/utils/designSystem";
 
@@ -30,13 +31,13 @@ function StaggerIn({ index, children, style }) {
   return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
 }
 
-const PROMPTS = [
+const PROMPTS_EN = [
   "What just happened?",
   "What pulled you here?",
   "What's on your mind?",
 ];
 
-const EMOTION_PROMPTS = {
+const EMOTION_PROMPTS_EN = {
   calm: "Steady waters. What's on your mind?",
   neutral: "What just happened?",
   anxious: "Something pulling at you?",
@@ -44,18 +45,19 @@ const EMOTION_PROMPTS = {
   energized: "Riding some energy.",
 };
 
-function getPrompt(count, dominantEmotion) {
-  if (count >= 3) return "Back again, good habit.";
-  if (dominantEmotion && EMOTION_PROMPTS[dominantEmotion]) {
-    return EMOTION_PROMPTS[dominantEmotion];
+function getPrompt(count, dominantEmotion, t) {
+  if (count >= 3) return t("log.prompts.returning");
+  if (dominantEmotion && t(`log.prompts.${dominantEmotion}`) !== `log.prompts.${dominantEmotion}`) {
+    return t(`log.prompts.${dominantEmotion}`);
   }
-  return PROMPTS[count % PROMPTS.length];
+  return t(`log.prompts.default${count % 3}`);
 }
 
 export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
   const { dominantEmotion, dominantTrigger, emotionalTrend, emotionColor, momentCount } = useEmotionalState();
+  const { t } = useLanguage();
   const [todayCount, setTodayCount] = useState(0);
   const [moments, setMoments] = useState([]);
   const [predictionDone, setPredictionDone] = useState(true);
@@ -93,12 +95,12 @@ export function TriggerSelectionScreen() {
       <Animated.View style={[styles.top, { opacity: fadeAnim }]}>
         <StaggerIn index={0}>
           <View style={styles.header}>
-            <Text style={styles.kicker}>Quick log</Text>
-            <Text style={styles.prompt}>{getPrompt(todayCount, dominantEmotion)}</Text>
+            <Text style={styles.kicker}>{t("log.kicker")}</Text>
+            <Text style={styles.prompt}>{getPrompt(todayCount, dominantEmotion, t)}</Text>
             <Text style={styles.hint}>
               {todayCount > 0
-                ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
-                : "Tap a trigger to start logging"}
+                ? (todayCount !== 1 ? t("log.momentCountPlural", { count: todayCount }) : t("log.momentCount", { count: todayCount }))
+                : t("log.tapToStart")}
             </Text>
           </View>
         </StaggerIn>
@@ -120,16 +122,16 @@ export function TriggerSelectionScreen() {
               <View style={[styles.nudgeDot, { backgroundColor: emotionColor }]} />
               <View style={styles.nudgeContent}>
                 <Text style={styles.nudgeLabel}>
-                  Trending {dominantEmotion}{emotionalTrend === "improving" ? " ↑" : emotionalTrend === "declining" ? " ↓" : ""}
+                  {t("log.trending", { emotion: t(`emotions.${dominantEmotion}`) })}{emotionalTrend === "improving" ? " ↑" : emotionalTrend === "declining" ? " ↓" : ""}
                 </Text>
                 <Text style={styles.nudgeBody}>
                   {dominantTrigger
-                    ? `${dominantTrigger} has been your most logged trigger this week.`
+                    ? t("log.nudgeTrigger", { trigger: t(`triggers.${dominantTrigger}`) })
                     : emotionalTrend === "improving"
-                      ? "Your emotional tone has been shifting positively."
+                      ? t("log.nudgeImproving")
                       : emotionalTrend === "declining"
-                        ? "Things have felt heavier lately. Name what's contributing."
-                        : "Your patterns are building. Keep logging for sharper insights."}
+                        ? t("log.nudgeDeclining")
+                        : t("log.nudgeBuildPatterns")}
                 </Text>
               </View>
             </View>
@@ -138,7 +140,7 @@ export function TriggerSelectionScreen() {
 
         <Tooltip
           id="log_tooltip"
-          text="Logging a few moments each day reveals your emotional patterns."
+          text={t("log.tooltip")}
           hidden={!predictionDone}
         />
 
@@ -165,16 +167,16 @@ export function TriggerSelectionScreen() {
           </Text>
           <Text style={styles.bottomText}>
             {moments.length >= 10 && dominantTrigger
-              ? `Strong data this week. ${dominantTrigger} and ${dominantEmotion || "your patterns"} are becoming clear.`
+              ? t("log.bottomStrong", { trigger: t(`triggers.${dominantTrigger}`), emotion: dominantEmotion ? t(`emotions.${dominantEmotion}`) : t("log.nudgeBuildPatterns") })
               : moments.length >= 10
-                ? "Strong week so far. Your patterns are getting sharper."
+                ? t("log.bottomStrongGeneral")
                 : todayCount >= 3
-                  ? "Nice pattern data building up. Check your report later."
+                  ? t("log.bottom3Today")
                   : moments.length >= 5
-                    ? "Good momentum this week. Keep going for richer insights."
+                    ? t("log.bottomGoodWeek")
                     : todayCount > 0
-                      ? `${3 - todayCount} more today to strengthen this week's observations.`
-                      : "Each moment you log sharpens your weekly pattern report."}
+                      ? t("log.bottomMoreToday", { count: 3 - todayCount })
+                      : t("log.bottomDefault")}
           </Text>
         </View>
       </StaggerIn>

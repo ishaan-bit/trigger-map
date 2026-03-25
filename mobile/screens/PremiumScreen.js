@@ -5,38 +5,28 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 import { success as hapticSuccess } from "@/utils/haptics";
 
-const transformations = [
-  {
-    before: "I keep feeling anxious but don't know why",
-    after: "Social situations are your #1 anxiety trigger — especially in groups",
-    icon: "🔍",
-  },
-  {
-    before: "All my days feel the same",
-    after: "Exercise on Tue/Thu consistently brings your calmest moments",
-    icon: "🌿",
-  },
-  {
-    before: "I log moments but nothing happens",
-    after: "Weekly personalized insights show exactly what's driving your patterns",
-    icon: "✦",
-  },
+const transformationKeys = [
+  { beforeKey: "premium.transform1Before", afterKey: "premium.transform1After", icon: "🔍" },
+  { beforeKey: "premium.transform2Before", afterKey: "premium.transform2After", icon: "🌿" },
+  { beforeKey: "premium.transform3Before", afterKey: "premium.transform3After", icon: "✦" },
 ];
 
-const premiumFeatures = [
-  { icon: "🧠", text: "Weekly personalized reflections" },
-  { icon: "📈", text: "Multi-week trend tracking" },
-  { icon: "🔥", text: "Friction zone analysis" },
-  { icon: "💬", text: "Priority support" },
+const premiumFeatureKeys = [
+  { icon: "🧠", key: "premium.feature1" },
+  { icon: "📈", key: "premium.feature2" },
+  { icon: "🔥", key: "premium.feature3" },
+  { icon: "💬", key: "premium.feature4" },
 ];
 
 export function PremiumScreen() {
   const router = useRouter();
   const { subscribe, restoreSubscription, subscription, user } = useAppSession();
+  const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const isActive = subscription?.status === "active" || subscription?.status === "grace_period";
 
@@ -50,30 +40,30 @@ export function PremiumScreen() {
           accessible={false}
         />
         <View style={styles.heroOverlay}>
-          <Text style={styles.kicker}>Premium</Text>
-          <Text style={styles.title}>Unlock your{"\n"}patterns</Text>
+          <Text style={styles.kicker}>{t("premium.kicker")}</Text>
+          <Text style={styles.title}>{t("premium.title")}</Text>
           <Text style={styles.subtitle}>
-            Turn raw moments into understanding — see what's really going on.
+            {t("premium.subtitle")}
           </Text>
         </View>
       </View>
 
       {/* BEFORE → AFTER transformations */}
       <View style={styles.transformSection}>
-        <Text style={styles.transformHeader}>What changes with Premium</Text>
-        {transformations.map((t) => (
-          <View key={t.before} style={styles.transformCard}>
+        <Text style={styles.transformHeader}>{t("premium.transformHeader")}</Text>
+        {transformationKeys.map((tk) => (
+          <View key={tk.beforeKey} style={styles.transformCard}>
             <View style={styles.transformRow}>
-              <Text style={styles.transformLabel}>BEFORE</Text>
-              <Text style={styles.transformBefore}>"{t.before}"</Text>
+              <Text style={styles.transformLabel}>{t("premium.before")}</Text>
+              <Text style={styles.transformBefore}>"{t(tk.beforeKey)}"</Text>
             </View>
             <View style={styles.transformArrow}>
-              <Text style={styles.transformArrowIcon}>{t.icon}</Text>
+              <Text style={styles.transformArrowIcon}>{tk.icon}</Text>
               <View style={styles.transformArrowLine} />
             </View>
             <View style={styles.transformRow}>
-              <Text style={[styles.transformLabel, styles.transformLabelAfter]}>AFTER</Text>
-              <Text style={styles.transformAfter}>"{t.after}"</Text>
+              <Text style={[styles.transformLabel, styles.transformLabelAfter]}>{t("premium.after")}</Text>
+              <Text style={styles.transformAfter}>"{t(tk.afterKey)}"</Text>
             </View>
           </View>
         ))}
@@ -81,10 +71,10 @@ export function PremiumScreen() {
 
       {/* Blurred insight preview */}
       <View style={styles.previewCard}>
-        <Text style={styles.previewTitle}>Your insight preview</Text>
+        <Text style={styles.previewTitle}>{t("premium.previewTitle")}</Text>
         <View style={styles.previewBlur}>
           <Text style={styles.previewBlurText}>
-            {"When work comes up, you tend to feel anxious — particularly around meetings and deadlines. This pattern appeared 4 times this week..."}
+            {t("premium.previewText")}
           </Text>
           <LinearGradient
             colors={["transparent", "transparent", "transparent", "rgba(13, 20, 36, 0.85)"]}
@@ -92,50 +82,50 @@ export function PremiumScreen() {
             style={styles.previewGradient}
           />
         </View>
-        <Text style={styles.previewHint}>Upgrade to read your full personalized insight</Text>
+        <Text style={styles.previewHint}>{t("premium.previewHint")}</Text>
       </View>
 
       {/* Feature list */}
       <View style={styles.featureCard}>
-        <Text style={styles.featureCardTitle}>Everything in Premium</Text>
+        <Text style={styles.featureCardTitle}>{t("premium.featureCardTitle")}</Text>
         <Text style={styles.featureCardPrice}>{PREMIUM_PRICE_LABEL}</Text>
-        {premiumFeatures.map((f) => (
-          <View key={f.text} style={styles.featureRow}>
+        {premiumFeatureKeys.map((f) => (
+          <View key={f.key} style={styles.featureRow}>
             <Text style={styles.featureIcon}>{f.icon}</Text>
-            <Text style={styles.featureText}>{f.text}</Text>
+            <Text style={styles.featureText}>{t(f.key)}</Text>
           </View>
         ))}
       </View>
 
       {!user ? (
         <PrimaryButton
-          label="Create free account"
+          label={t("premium.createFreeAccount")}
           onPress={() => router.push("/login")}
         />
       ) : !isActive ? (
         <>
           <PrimaryButton
-            label={busy ? "Please wait..." : "Unlock your patterns"}
+            label={busy ? t("common.pleaseWait") : t("premium.unlockPatterns")}
             disabled={busy}
             onPress={async () => {
               try {
                 setBusy(true);
                 await subscribe();
                 hapticSuccess();
-                Alert.alert("Premium enabled", "Your weekly insights are ready to view.");
+                Alert.alert(t("premium.premiumEnabled"), t("premium.insightsReady"));
               } catch (error) {
                 const msg = error?.message || "Something went wrong";
                 if (error?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) {
                   // User dismissed the purchase sheet — no alert needed
                 } else if (msg.includes("not found") || msg.includes("No subscription")) {
                   Alert.alert(
-                    "Subscription unavailable",
-                    "We couldn't find the subscription product on Google Play. Make sure your app is up to date and try again in a few minutes."
+                    t("premium.subscriptionUnavailable"),
+                    t("premium.subscriptionUnavailableMessage")
                   );
                 } else if (msg.includes("not completed")) {
-                  Alert.alert("Purchase incomplete", "The purchase was not completed. No charge was made.");
+                  Alert.alert(t("premium.purchaseIncomplete"), t("premium.purchaseIncompleteMessage"));
                 } else {
-                  Alert.alert("Subscription error", msg);
+                  Alert.alert(t("premium.subscriptionError"), msg);
                 }
               } finally {
                 setBusy(false);
@@ -143,7 +133,7 @@ export function PremiumScreen() {
             }}
           />
           <PrimaryButton
-            label="Restore purchase"
+            label={t("premium.restorePurchase")}
             secondary
             disabled={busy}
             onPress={async () => {
@@ -151,12 +141,12 @@ export function PremiumScreen() {
                 setBusy(true);
                 const result = await restoreSubscription();
                 if (result) {
-                  Alert.alert("Restored", "Your premium subscription has been restored.");
+                  Alert.alert(t("premium.restored"), t("premium.restoredMessage"));
                 } else {
-                  Alert.alert("No subscription found", "We couldn't find an active subscription for this account.");
+                  Alert.alert(t("premium.noSubscription"), t("premium.noSubscriptionMessage"));
                 }
               } catch {
-                Alert.alert("Restore failed", "Something went wrong. Please try again.");
+                Alert.alert(t("premium.restoreFailed"), t("premium.restoreFailedMessage"));
               } finally {
                 setBusy(false);
               }
@@ -168,7 +158,7 @@ export function PremiumScreen() {
       {isActive && (
         <View style={styles.activeCard}>
           <Text style={styles.activeIcon}>✓</Text>
-          <Text style={styles.activeText}>Premium is active. Thank you for supporting TriggerMap.</Text>
+          <Text style={styles.activeText}>{t("premium.activeText")}</Text>
         </View>
       )}
     </ScreenShell>

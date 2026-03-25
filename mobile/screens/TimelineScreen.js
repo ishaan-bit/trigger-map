@@ -10,6 +10,7 @@ import { MoodWeather } from "@/components/MoodWeather";
 import { EmotionGarden } from "@/components/EmotionGarden";
 import { Tooltip } from "@/components/Tooltip";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
 import { palette, radius } from "@/utils/theme";
@@ -72,6 +73,7 @@ function groupByDay(moments) {
 export function TimelineScreen() {
   const router = useRouter();
   const { loadTimeline, updateMoment, removeMoment, user, token } = useAppSession();
+  const { t } = useLanguage();
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -158,20 +160,20 @@ export function TimelineScreen() {
   return (
     <ScreenShell
       loading={loading}
-      loadingTitle="Loading your timeline"
-      loadingMessage="Fetching your latest logged moments."
-      timeoutMessage="Unable to load timeline. Check connection."
+      loadingTitle={t("timeline.loadingTitle")}
+      loadingMessage={t("timeline.loadingMessage")}
+      timeoutMessage={t("timeline.timeoutMessage")}
       onRetry={load}
       scroll
       edges={["top", "left", "right", "bottom"]}
     >
       <View style={styles.header}>
-        <Text style={styles.kicker}>Past 7 days</Text>
-        <Text style={styles.title}>Timeline</Text>
+        <Text style={styles.kicker}>{t("timeline.kicker")}</Text>
+        <Text style={styles.title}>{t("timeline.title")}</Text>
         <Text style={styles.subtitle}>
           {moments.length
-            ? `${moments.length} moment${moments.length !== 1 ? "s" : ""} this week`
-            : "Your moments, grouped by day."}
+            ? (moments.length !== 1 ? t("timeline.subtitleWithCountPlural", { count: moments.length }) : t("timeline.subtitleWithCount", { count: moments.length }))
+            : t("timeline.subtitleEmpty")}
         </Text>
       </View>
 
@@ -183,7 +185,7 @@ export function TimelineScreen() {
 
       <Tooltip
         id="timeline_tooltip"
-        text="Your timeline shows how triggers connect to emotions over time."
+        text={t("timeline.tooltip")}
         hidden={microInsights.length > 0}
       />
 
@@ -197,7 +199,7 @@ export function TimelineScreen() {
 
       {error ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>Timeline unavailable</Text>
+          <Text style={styles.stateTitle}>{t("timeline.unavailable")}</Text>
           <Text style={styles.stateBody}>{error}</Text>
           <PrimaryButton label="Retry" onPress={load} />
         </View>

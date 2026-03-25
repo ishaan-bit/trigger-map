@@ -12,6 +12,7 @@ const NUDGES_KEY = "triggermap.nudges-enabled";
 const LAST_OPENED_AT_KEY = "triggermap.last-opened-at";
 const LAST_LOGGED_AT_KEY = "triggermap.last-logged-at";
 const DAILY_PREDICTION_KEY = "triggermap.daily-prediction";
+const LANGUAGE_KEY = "triggermap.language";
 
 export async function getOrCreateDeviceId() {
   const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
@@ -109,4 +110,14 @@ export async function getDailyPrediction() {
     if (date === new Date().toISOString().slice(0, 10)) return prediction;
   } catch { /* corrupted */ }
   return null;
+}
+
+/** Get the stored language preference ('en' or 'hi'). */
+export async function getLanguage() {
+  return AsyncStorage.getItem(LANGUAGE_KEY);
+}
+
+/** Set the language preference. */
+export async function setLanguage(lang) {
+  return AsyncStorage.setItem(LANGUAGE_KEY, lang);
 }

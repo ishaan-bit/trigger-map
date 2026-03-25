@@ -1,4 +1,4 @@
-import { Alert, Animated, Easing, Linking, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Animated, Easing, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
 import { selection, warning, tap } from "@/utils/haptics";
@@ -55,6 +56,7 @@ export function SettingsScreen() {
     exportLogs, deleteAllUserData, reminderEnabled, reflectionEnabled, nudgesEnabled,
     signOut, subscription, toggleReminder, toggleReflection, toggleNudges, user,
   } = useAppSession();
+  const { t, lang, setLang } = useLanguage();
   const baseUrl = getWebBaseUrl();
   const [permissionStatus, setPermissionStatus] = useState("undetermined");
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -72,7 +74,7 @@ export function SettingsScreen() {
   const notificationsBlocked = permissionStatus === "denied";
 
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
-  const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
+  const planLabel = isPremium ? t("settings.premium") : user ? t("settings.free") : t("settings.anonymous");
 
   const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.05] });
 
@@ -82,27 +84,27 @@ export function SettingsScreen() {
 
       <StaggerIn index={0}>
         <View style={styles.header}>
-          <Text style={styles.kicker}>Preferences</Text>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Manage your account, notifications, and data.</Text>
+          <Text style={styles.kicker}>{t("settings.kicker")}</Text>
+          <Text style={styles.title}>{t("settings.title")}</Text>
+          <Text style={styles.subtitle}>{t("settings.subtitle")}</Text>
         </View>
       </StaggerIn>
 
       {/* ── Account ── */}
-      <Section icon="👤" title="Account" index={1}>
-        <Row label="Status" value={user ? user.email : "Anonymous"} />
+      <Section icon="👤" title={t("settings.account")} index={1}>
+        <Row label={t("settings.status")} value={user ? user.email : t("settings.anonymous")} />
         {!user && (
-          <Text style={styles.hintText}>Sign in to keep your emotional data safe and synced across devices.</Text>
+          <Text style={styles.hintText}>{t("settings.signInHint")}</Text>
         )}
         <PrimaryButton
-          label={user ? "Sign out" : "Sign in"}
+          label={user ? t("settings.signOut") : t("settings.signIn")}
           onPress={user ? async () => {
             tap();
             try {
               await signOut();
               router.replace("/login");
             } catch {
-              Alert.alert("Sign out failed", "Please try again.");
+              Alert.alert(t("login.signOutFailed"), t("common.retry"));
             }
           } : () => { tap(); router.push("/login"); }}
           secondary
@@ -110,42 +112,64 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Subscription ── */}
-      <Section icon="✦" title="Subscription" index={2}>
+      <Section icon="✦" title={t("settings.subscription")} index={2}>
         <View style={styles.planRow}>
           <View style={[styles.planBadge, isPremium && styles.planBadgePremium]}>
             <Text style={[styles.planBadgeText, isPremium && styles.planBadgeTextPremium]}>{planLabel}</Text>
           </View>
         </View>
         {isPremium ? (
-          <Text style={styles.hintText}>Personalized AI insights and detailed charts unlocked.</Text>
+          <Text style={styles.hintText}>{t("settings.premiumHint")}</Text>
         ) : user ? (
-          <Text style={styles.hintText}>Upgrade to Premium for AI narrative insights and advanced analytics.</Text>
+          <Text style={styles.hintText}>{t("settings.upgradeHint")}</Text>
         ) : (
-          <Text style={styles.hintText}>Create a free account to sync, or go Premium for AI insights.</Text>
+          <Text style={styles.hintText}>{t("settings.anonPremiumHint")}</Text>
         )}
-        <PrimaryButton label="View plans" onPress={() => router.push("/(tabs)/premium")} secondary />
+        <PrimaryButton label={t("settings.viewPlans")} onPress={() => router.push("/(tabs)/premium")} secondary />
       </Section>
 
       {/* ── Notifications ── */}
-      <Section icon="🔔" title="Notifications" index={3}>
+      {/* ── Language ── */}
+      <Section icon="🌐" title={t("settings.language")} index={3}>
+        <Text style={styles.hintText}>{t("settings.languageHint")}</Text>
+        <View style={styles.langRow}>
+          <Pressable
+            style={[styles.langOption, lang === "en" && styles.langOptionActive]}
+            onPress={() => { selection(); setLang("en"); }}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.langLabel, lang === "en" && styles.langLabelActive]}>English</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.langOption, lang === "hi" && styles.langOptionActive]}
+            onPress={() => { selection(); setLang("hi"); }}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.langLabel, lang === "hi" && styles.langLabelActive]}>हिन्दी</Text>
+          </Pressable>
+        </View>
+      </Section>
+
+      {/* ── Notifications ── */}
+      <Section icon="🔔" title={t("settings.notifications")} index={4}>
         {notificationsBlocked ? (
           <View style={styles.permissionNotice}>
             <Text style={styles.permissionNoticeText}>
-              Notifications are turned off. Enable them in your device settings to receive reminders.
+              {t("settings.notificationsBlocked")}
             </Text>
-            <PrimaryButton label="Open settings" onPress={() => Linking.openSettings()} secondary />
+            <PrimaryButton label={t("settings.openSettings")} onPress={() => Linking.openSettings()} secondary />
           </View>
         ) : (
           <>
             <View style={styles.switchRow}>
               <View style={styles.switchLabel}>
-                <Text style={styles.rowLabel}>Daily check-in</Text>
-                <Text style={styles.switchHint}>A gentle evening reminder to log how your day went.</Text>
+                <Text style={styles.rowLabel}>{t("settings.dailyCheckIn")}</Text>
+                <Text style={styles.switchHint}>{t("settings.dailyCheckInHint")}</Text>
               </View>
               <Switch
                 onValueChange={async (value) => {
                   selection();
-                  try { await toggleReflection(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                  try { await toggleReflection(value); } catch (error) { Alert.alert(t("settings.reminderError"), error.message); }
                 }}
                 value={reflectionEnabled}
                 trackColor={{ false: palette.glass, true: palette.accentGlow }}
@@ -154,13 +178,13 @@ export function SettingsScreen() {
             </View>
             <View style={styles.switchRow}>
               <View style={styles.switchLabel}>
-                <Text style={styles.rowLabel}>Weekly insights</Text>
-                <Text style={styles.switchHint}>Get notified when your weekly pattern report is ready.</Text>
+                <Text style={styles.rowLabel}>{t("settings.weeklyInsights")}</Text>
+                <Text style={styles.switchHint}>{t("settings.weeklyInsightsHint")}</Text>
               </View>
               <Switch
                 onValueChange={async (value) => {
                   selection();
-                  try { await toggleReminder(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                  try { await toggleReminder(value); } catch (error) { Alert.alert(t("settings.reminderError"), error.message); }
                 }}
                 value={reminderEnabled}
                 trackColor={{ false: palette.glass, true: palette.accentGlow }}
@@ -169,13 +193,13 @@ export function SettingsScreen() {
             </View>
             <View style={styles.switchRow}>
               <View style={styles.switchLabel}>
-                <Text style={styles.rowLabel}>Gentle nudges</Text>
-                <Text style={styles.switchHint}>A quiet prompt if you haven't logged in a few days.</Text>
+                <Text style={styles.rowLabel}>{t("settings.gentleNudges")}</Text>
+                <Text style={styles.switchHint}>{t("settings.gentleNudgesHint")}</Text>
               </View>
               <Switch
                 onValueChange={async (value) => {
                   selection();
-                  try { await toggleNudges(value); } catch (error) { Alert.alert("Reminder error", error.message); }
+                  try { await toggleNudges(value); } catch (error) { Alert.alert(t("settings.reminderError"), error.message); }
                 }}
                 value={nudgesEnabled}
                 trackColor={{ false: palette.glass, true: palette.accentGlow }}
@@ -187,39 +211,39 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Data ── */}
-      <Section icon="📂" title="Data" index={4}>
+      <Section icon="📂" title={t("settings.data")} index={5}>
         <PrimaryButton
-          label="Export logs"
+          label={t("settings.exportLogs")}
           onPress={async () => {
             try {
               await exportLogs();
             } catch (error) {
-              Alert.alert("Export failed", error.message);
+              Alert.alert(t("settings.exportFailed"), error.message);
             }
           }}
           secondary
         />
         {user && (
-          <Text style={styles.hintText}>Exports include all synced and local moments.</Text>
+          <Text style={styles.hintText}>{t("settings.exportHint")}</Text>
         )}
         <PrimaryButton
-          label="Delete all data"
+          label={t("settings.deleteAll")}
           onPress={() => {
             warning();
             Alert.alert(
-              "Delete all data?",
-              "This will permanently remove all your moments, reports, and insights. This cannot be undone.",
+              t("settings.deleteConfirmTitle"),
+              t("settings.deleteConfirmMessage"),
               [
-                { text: "Cancel", style: "cancel" },
+                { text: t("common.cancel"), style: "cancel" },
                 {
-                  text: "Delete everything",
+                  text: t("settings.deleteEverything"),
                   style: "destructive",
                   onPress: async () => {
                     try {
                       await deleteAllUserData();
-                      Alert.alert("Done", "All your data has been deleted.");
+                      Alert.alert(t("common.done"), t("settings.deleteDone"));
                     } catch (error) {
-                      Alert.alert("Delete failed", error.message);
+                      Alert.alert(t("settings.deleteFailed"), error.message);
                     }
                   },
                 },
@@ -231,25 +255,25 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Privacy ── */}
-      <Section icon="🔒" title="Privacy" index={5}>
-        <Text style={styles.hintText}>Privacy first — your emotional data stays on your terms, always.</Text>
-        <PrimaryButton label="Privacy policy" onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
-        <PrimaryButton label="Terms and conditions" onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
-        <Row label="Support" value="qdenxp@gmail.com" />
+      <Section icon="🔒" title={t("settings.privacy")} index={6}>
+        <Text style={styles.hintText}>{t("settings.privacyHint")}</Text>
+        <PrimaryButton label={t("settings.privacyPolicy")} onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
+        <PrimaryButton label={t("settings.terms")} onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
+        <Row label={t("settings.support")} value="qdenxp@gmail.com" />
       </Section>
 
       {/* ── About ── */}
-      <Section icon="ℹ️" title="About" index={6}>
-        <Text style={styles.aboutName}>TriggerMap</Text>
+      <Section icon="ℹ️" title={t("settings.about")} index={7}>
+        <Text style={styles.aboutName}>{t("settings.aboutName")}</Text>
         <Text style={styles.aboutBody}>
-          Log moments, reflect on emotional triggers, and understand weekly patterns over time.
+          {t("settings.aboutBody")}
         </Text>
         <View style={styles.aboutMeta}>
-          <Row label="Version" value={`v${Constants.expoConfig?.version || "1.0.0"}`} />
-          <Row label="Developer" value="QuietDen (OPC) Pvt. Ltd." />
-          <Row label="Website" value="qdenxp.com" />
+          <Row label={t("settings.version")} value={`v${Constants.expoConfig?.version || "1.0.0"}`} />
+          <Row label={t("settings.developer")} value="QuietDen (OPC) Pvt. Ltd." />
+          <Row label={t("settings.website")} value="qdenxp.com" />
         </View>
-        <Text style={styles.aboutFooter}>Registered December 2025, India</Text>
+        <Text style={styles.aboutFooter}>{t("settings.aboutFooter")}</Text>
       </Section>
 
     </ScreenShell>
@@ -405,5 +429,29 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 12,
     marginTop: 4,
+  },
+  langRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  langOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: palette.glassBorder,
+    alignItems: "center",
+  },
+  langOptionActive: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  langLabel: {
+    color: palette.textSecondary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  langLabelActive: {
+    color: palette.accent,
   },
 });

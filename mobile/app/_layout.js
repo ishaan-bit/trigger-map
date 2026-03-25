@@ -11,6 +11,7 @@ import * as Notifications from "expo-notifications";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
 import { EmotionalStateProvider } from "@/hooks/useEmotionalState";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 import { setLastOpenedAt } from "@/services/deviceService";
 import { initAnalytics } from "@/services/analyticsService";
 import { initCrashMonitoring } from "@/services/crashService";
@@ -90,6 +91,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AppErrorBoundary>
+          <LanguageProvider>
           <SessionProvider>
             <EmotionalStateProvider>
             <StatusBar style="light" translucent={Platform.OS === "android"} backgroundColor="transparent" />
@@ -102,6 +104,7 @@ export default function RootLayout() {
             </Stack>
             </EmotionalStateProvider>
           </SessionProvider>
+          </LanguageProvider>
         </AppErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>

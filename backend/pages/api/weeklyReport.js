@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     const token = getBearerToken(req);
     const user = token ? await validateSession(token) : null;
     const ownerId = user?.id || req.query.deviceId;
+    const lang = req.query.lang || "en";
 
     if (!ownerId) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
     const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
-      report.aiInsight = await generateInsight(report, { firstName });
+      report.aiInsight = await generateInsight(report, { firstName, lang });
 
       // Use LLM-rewritten summary if available (from rewriteSummaries job)
       if (report.aiInsight && storedReport?.rewrittenBy && storedReport.summary) {
@@ -114,25 +115,30 @@ export default async function handler(req, res) {
         // Anonymous → prompt sign-in for free rule-based insights
         report.aiPreview = {
           available: true,
-          teaser: "Sign in with Google to unlock your pattern insights, free for all accounts.",
+          teaser: lang === "hi"
+            ? "Google से साइन इन करें और अपने पैटर्न इनसाइट्स अनलॉक करें — सभी अकाउंट्स के लिए मुफ़्त।"
+            : "Sign in with Google to unlock your pattern insights, free for all accounts.",
           action: "sign-in",
         };
       } else if (!hasPremium) {
         // Signed-in free → tease upcoming LLM personalized insight
         report.llmPreview = {
           available: false,
-          teaser: "Personalized AI insights are coming soon. Upgrade to Premium to be first in line.",
+          teaser: lang === "hi"
+            ? "व्यक्तिगत AI इनसाइट्स जल्द आ रहे हैं। Premium में अपग्रेड करें।"
+            : "Personalized AI insights are coming soon. Upgrade to Premium to be first in line.",
           action: "upgrade",
         };
       }
     }
 
     // Generate contextual actions from the report (feedback-aware)
-    report.actions = generateActions(report, actionFeedback || [], actionPrefs);
+    report.actions = generateActions(report, actionFeedback || [], actionPrefs, lang);
     report.actionFeedback = actionFeedback || [];
 
     // Local text polish on summary + action reasons (fast, no external API)
-    if (report.aiInsight?.summary) {
+    // Skip English lint for Hindi — Hindi text is pre-composed
+    if (lang !== "hi" && report.aiInsight?.summary) {
       report.aiInsight.summary = await phraseText(report.aiInsight.summary, { firstName });
       for (const a of report.actions) {
         a.reason = await phraseText(a.reason, { firstName });

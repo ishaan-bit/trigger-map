@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 import { tap, success as hapticSuccess } from "@/utils/haptics";
 import { STAGGER_DELAY } from "@/utils/designSystem";
@@ -37,6 +38,7 @@ export function LoginScreen() {
   const navigation = useNavigation();
   const canGoBack = navigation.canGoBack();
   const { signInWithEmail, registerWithEmail, signInWithGoogle } = useAppSession();
+  const { t } = useLanguage();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -75,7 +77,7 @@ export function LoginScreen() {
       hapticSuccess();
       router.replace("/(tabs)/timeline");
     } catch (error) {
-      Alert.alert("Authentication error", error.message);
+      Alert.alert(t("login.authError"), error.message);
     } finally {
       setLoading(false);
     }
@@ -110,7 +112,7 @@ export function LoginScreen() {
         if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
         if (error.code === statusCodes.IN_PROGRESS) return;
       }
-      Alert.alert("Google sign-in error", error.message);
+      Alert.alert(t("login.googleError"), error.message);
     }
   }
 
@@ -128,13 +130,13 @@ export function LoginScreen() {
 
       <StaggerIn index={0}>
         <View style={styles.header}>
-          <Text style={styles.brand}>TriggerMap</Text>
-          <Text style={styles.kicker}>{mode === "login" ? "Welcome back" : "Get started"}</Text>
-          <Text style={styles.title}>{mode === "login" ? "Good to see you" : "Let's begin"}</Text>
+          <Text style={styles.brand}>{t("onboarding.brand")}</Text>
+          <Text style={styles.kicker}>{mode === "login" ? t("login.welcomeBack") : t("login.getStarted")}</Text>
+          <Text style={styles.title}>{mode === "login" ? t("login.goodToSee") : t("login.letsBegin")}</Text>
           <Text style={styles.subtitle}>
             {mode === "login"
-              ? "Your emotional journey picks up right where you left off."
-              : "A safe, private space to understand your emotions."}
+              ? t("login.subtitleLogin")
+              : t("login.subtitleRegister")}
           </Text>
         </View>
       </StaggerIn>
@@ -143,7 +145,7 @@ export function LoginScreen() {
       <StaggerIn index={1}>
         <View style={styles.trustRow}>
           <Text style={styles.trustIcon}>🔒</Text>
-          <Text style={styles.trustText}>Your data is encrypted and never shared with anyone.</Text>
+          <Text style={styles.trustText}>{t("login.trustText")}</Text>
         </View>
       </StaggerIn>
 
@@ -152,7 +154,7 @@ export function LoginScreen() {
           <TextInput
             accessibilityLabel="Name"
             onChangeText={setName}
-            placeholder="Name"
+            placeholder={t("login.namePlaceholder")}
             placeholderTextColor={palette.muted}
             style={styles.input}
             value={name}
@@ -182,14 +184,14 @@ export function LoginScreen() {
       </StaggerIn>
 
       <StaggerIn index={3}>
-        <PrimaryButton label={loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={loading} />
+        <PrimaryButton label={loading ? t("common.pleaseWait") : mode === "login" ? t("login.signIn") : t("login.createAccount")} onPress={submit} disabled={loading} />
       </StaggerIn>
       <StaggerIn index={4}>
-        <PrimaryButton label="Continue with Google" onPress={handleGoogle} outline disabled={loading} />
+        <PrimaryButton label={t("login.continueGoogle")} onPress={handleGoogle} outline disabled={loading} />
       </StaggerIn>
       <StaggerIn index={5}>
         <PrimaryButton
-          label={mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+          label={mode === "login" ? t("login.newHere") : t("login.alreadyHaveAccount")}
           onPress={() => { tap(); setMode(mode === "login" ? "register" : "login"); }}
           outline
           disabled={loading}
@@ -202,18 +204,18 @@ export function LoginScreen() {
 
       <StaggerIn index={7}>
         <PrimaryButton
-          label="Continue anonymously"
+          label={t("login.continueAnonymously")}
           onPress={() => router.replace("/(tabs)/log")}
           outline
         />
         <View style={{ height: 10 }} />
         <Text style={styles.anonHint}>
-          Anonymous mode keeps everything on your device only. Sign in to sync across devices and get personalised weekly insights.
+          {t("login.anonHint")}
         </Text>
       </StaggerIn>
       <StaggerIn index={8}>
         <Text style={styles.privacyHint}>
-          Private by design. No tracking pixels. No data brokers. Your patterns belong to you.
+          {t("login.privacyHint")}
         </Text>
       </StaggerIn>
     </ScreenShell>

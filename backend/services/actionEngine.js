@@ -11,6 +11,10 @@
 
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 import { buildSignalProfile } from "../ai/signalProfile.js";
+import { triggerHi, emotionHi } from "../ai/insightLang.js";
+
+function tl(trigger, lang) { return lang === "hi" ? triggerHi(trigger) : triggerLabel(trigger); }
+function el(emotion, lang) { return lang === "hi" ? emotionHi(emotion) : emotion; }
 
 const ACTION_META = {
   regulate:   { icon: "🌿", category: "Try this" },
@@ -46,10 +50,11 @@ function buildFeedbackIndex(feedback) {
  * @param {Array}   feedback - HiTL feedback entries [{actionId, response, timestamp}]
  * @param {object?} prefs    - Stored action prefs (likedTriggers, dislikedApproaches, llmActions)
  */
-export function generateActions(report, feedback = [], prefs = null) {
+export function generateActions(report, feedback = [], prefs = null, lang = "en") {
   if (!report || report.totalMoments < 3) return [];
 
   const fb = buildFeedbackIndex(feedback);
+  const hi = lang === "hi";
 
   // If LLM actions exist in prefs, use them as the primary source.
   // Filter out any that the user already tried/skipped.
@@ -79,12 +84,16 @@ export function generateActions(report, feedback = [], prefs = null) {
   if (friction.length && regulators.length) {
     const f = friction[0];
     const r = regulators[0];
-    const freq1 = f.count <= 2 ? 'sometimes' : 'often';
+    const freq1 = f.count <= 2 ? (hi ? 'कभी-कभी' : 'sometimes') : (hi ? 'अक्सर' : 'often');
     candidates.push({
       id: `reg-${f.trigger}-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
-      title: `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`,
-      reason: `${cap(triggerLabel(f.trigger))} ${freq1} leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,
+      title: hi
+        ? `जब ${tl(f.trigger, lang)} मुश्किल हो, तो ${tl(r.trigger, lang)} आज़माएँ`
+        : `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`,
+      reason: hi
+        ? `${tl(f.trigger, lang)} ${freq1} आपको ${el(f.emotion, lang)} छोड़ता है। ${tl(r.trigger, lang)} आपको ${el(r.emotion, lang)} महसूस कराने में मदद करता है।`
+        : `${cap(triggerLabel(f.trigger))} ${freq1} leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,
       trigger: f.trigger,
       emotion: f.emotion,
     });
@@ -96,8 +105,12 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: `friction-${f2.trigger}-${f2.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${triggerLabel(f2.trigger)} leaves you feeling ${f2.emotion}`,
-      reason: `This pairing appeared ${f2.count} times. Awareness is the first step.`,
+      title: hi
+        ? `ध्यान दें जब ${tl(f2.trigger, lang)} आपको ${el(f2.emotion, lang)} छोड़े`
+        : `Notice when ${triggerLabel(f2.trigger)} leaves you feeling ${f2.emotion}`,
+      reason: hi
+        ? `ये जोड़ी ${f2.count} बार दिखी। पहचानना पहला कदम है।`
+        : `This pairing appeared ${f2.count} times. Awareness is the first step.`,
       trigger: f2.trigger,
       emotion: f2.emotion,
     });
@@ -109,10 +122,12 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: "drift-check-in",
       type: "awareness",
-      title: subtleDrift ? "Notice how your baseline is shifting" : "Check in with how you're feeling",
-      reason: subtleDrift
-        ? "There's been a subtle shift below your usual baseline. A brief check-in can help."
-        : "Your emotional tone dipped below your baseline this week. A brief pause can help.",
+      title: hi
+        ? (subtleDrift ? "ध्यान दें कि आपकी बेसलाइन कैसे बदल रही है" : "अपने आप से जाँचें कैसा महसूस हो रहा है")
+        : (subtleDrift ? "Notice how your baseline is shifting" : "Check in with how you're feeling"),
+      reason: hi
+        ? (subtleDrift ? "आपकी सामान्य बेसलाइन में हल्का बदलाव आया है। कुछ पल रुकना मदद कर सकता है।" : "इस हफ़्ते आपकी भावनात्मक टोन बेसलाइन से नीचे गई। कुछ पल रुकना मदद कर सकता है।")
+        : (subtleDrift ? "There's been a subtle shift below your usual baseline. A brief check-in can help." : "Your emotional tone dipped below your baseline this week. A brief pause can help."),
     });
   }
 
@@ -126,8 +141,12 @@ export function generateActions(report, feedback = [], prefs = null) {
       candidates.push({
         id: `rising-${trigger}`.toLowerCase().replace(/\s+/g, "-"),
         type: "awareness",
-        title: `${cap(triggerLabel(trigger))} is showing up more`,
-        reason: `Appeared ${d.delta} more times than last week. Worth paying attention.`,
+        title: hi
+          ? `${tl(trigger, lang)} ज़्यादा दिख रहा है`
+          : `${cap(triggerLabel(trigger))} is showing up more`,
+        reason: hi
+          ? `पिछले हफ़्ते से ${d.delta} ज़्यादा बार आया। ध्यान देना ज़रूरी है।`
+          : `Appeared ${d.delta} more times than last week. Worth paying attention.`,
         trigger,
       });
     }
@@ -139,8 +158,12 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: `reinforce-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
-      title: `Keep ${triggerLabel(r.trigger)} in your week`,
-      reason: `It ${r.count >= 4 ? 'consistently' : 'generally'} leaves you feeling ${r.emotion}. Protecting what works matters.`,
+      title: hi
+        ? `${tl(r.trigger, lang)} को अपने हफ़्ते में बनाए रखें`
+        : `Keep ${triggerLabel(r.trigger)} in your week`,
+      reason: hi
+        ? `ये ${r.count >= 4 ? "लगातार" : "आम तौर पर"} आपको ${el(r.emotion, lang)} महसूस कराता है। जो काम करता है उसे बचाना ज़रूरी है।`
+        : `It ${r.count >= 4 ? 'consistently' : 'generally'} leaves you feeling ${r.emotion}. Protecting what works matters.`,
       trigger: r.trigger,
       emotion: r.emotion,
     });
@@ -154,8 +177,12 @@ export function generateActions(report, feedback = [], prefs = null) {
         candidates.push({
           id: `liked-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
           type: "regulate",
-          title: `Build on ${triggerLabel(r.trigger)} — it's been working for you`,
-          reason: `You engaged with ${triggerLabel(r.trigger)} last time and it helped. Keep the momentum.`,
+          title: hi
+            ? `${tl(r.trigger, lang)} पर टिके रहें — ये काम कर रहा है`
+            : `Build on ${triggerLabel(r.trigger)} — it's been working for you`,
+          reason: hi
+            ? `पिछली बार आपने ${tl(r.trigger, lang)} आज़माया और मदद मिली। जारी रखें।`
+            : `You engaged with ${triggerLabel(r.trigger)} last time and it helped. Keep the momentum.`,
           trigger: r.trigger,
           emotion: r.emotion,
         });
@@ -175,8 +202,12 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: `pair-${topPair.trigger}-${topPair.emotion}`.toLowerCase().replace(/\s+/g, "-"),
       type: "awareness",
-      title: `Notice when ${triggerLabel(topPair.trigger)} leaves you feeling ${topPair.emotion}`,
-      reason: `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week.${topPair.count >= 3 ? ' Your most common combo.' : ''}`,
+      title: hi
+        ? `ध्यान दें जब ${tl(topPair.trigger, lang)} आपको ${el(topPair.emotion, lang)} छोड़े`
+        : `Notice when ${triggerLabel(topPair.trigger)} leaves you feeling ${topPair.emotion}`,
+      reason: hi
+        ? `ये जोड़ी इस हफ़्ते ${topPair.count} बार दिखी।${topPair.count >= 3 ? " आपकी सबसे आम जोड़ी।" : ""}`
+        : `This pairing appeared ${topPair.count} time${topPair.count === 1 ? "" : "s"} this week.${topPair.count >= 3 ? ' Your most common combo.' : ''}`,
       trigger: topPair.trigger,
       emotion: topPair.emotion,
     });
@@ -189,8 +220,12 @@ export function generateActions(report, feedback = [], prefs = null) {
       candidates.push({
         id,
         type: "awareness",
-        title: `Pay attention to ${triggerLabel(topTrigger)}`,
-        reason: `It's your top trigger this week. Notice how it makes you feel each time.`,
+        title: hi
+          ? `${tl(topTrigger, lang)} पर ध्यान दें`
+          : `Pay attention to ${triggerLabel(topTrigger)}`,
+        reason: hi
+          ? `ये इस हफ़्ते आपका सबसे बड़ा ट्रिगर है। हर बार ध्यान दें कि कैसा महसूस होता है।`
+          : `It's your top trigger this week. Notice how it makes you feel each time.`,
         trigger: topTrigger,
       });
     }
@@ -201,8 +236,10 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: "explore-triggers",
       type: "experiment",
-      title: "Try logging a new trigger",
-      reason: `You've logged ${dq.uniqueTriggers} different trigger${dq.uniqueTriggers === 1 ? "" : "s"} so far. Broadening your map reveals more patterns.`,
+      title: hi ? "एक नया ट्रिगर लॉग करें" : "Try logging a new trigger",
+      reason: hi
+        ? `आपने अब तक ${dq.uniqueTriggers} अलग ट्रिगर लॉग किए हैं। ज़्यादा लॉग करने से नए पैटर्न दिखेंगे।`
+        : `You've logged ${dq.uniqueTriggers} different trigger${dq.uniqueTriggers === 1 ? "" : "s"} so far. Broadening your map reveals more patterns.`,
     });
   }
 
@@ -211,8 +248,10 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: "log-consistency",
       type: "experiment",
-      title: "Log at a different time of day",
-      reason: `You've logged on ${dq.daysLogged} day${dq.daysLogged === 1 ? "" : "s"}. More days give sharper patterns.`,
+      title: hi ? "दिन के किसी अलग समय पर लॉग करें" : "Log at a different time of day",
+      reason: hi
+        ? `आपने ${dq.daysLogged} दिन लॉग किए हैं। ज़्यादा दिन लॉग करने से पैटर्न और स्पष्ट होंगे।`
+        : `You've logged on ${dq.daysLogged} day${dq.daysLogged === 1 ? "" : "s"}. More days give sharper patterns.`,
     });
   }
 
@@ -221,8 +260,12 @@ export function generateActions(report, feedback = [], prefs = null) {
     candidates.push({
       id: `emotion-reflect-${report.topEmotion}`.toLowerCase(),
       type: "awareness",
-      title: `Reflect on why ${report.topEmotion} shows up most`,
-      reason: `Feeling ${report.topEmotion} was your most common emotion. Consider what makes it appear.`,
+      title: hi
+        ? `सोचें कि ${el(report.topEmotion, lang)} सबसे ज़्यादा क्यों आता है`
+        : `Reflect on why ${report.topEmotion} shows up most`,
+      reason: hi
+        ? `${el(report.topEmotion, lang)} आपकी सबसे आम भावना रही। सोचें क्या इसे लाता है।`
+        : `Feeling ${report.topEmotion} was your most common emotion. Consider what makes it appear.`,
     });
   }
 
@@ -243,8 +286,12 @@ export function generateActions(report, feedback = [], prefs = null) {
         candidates.push({
           id,
           type: "experiment",
-          title: `Explore the ${triggerLabel(trigger)} and ${emotion} connection`,
-          reason: `This pairing came up ${count} time${count === 1 ? "" : "s"}. Notice what specifically triggers it.`,
+          title: hi
+            ? `${tl(trigger, lang)} और ${el(emotion, lang)} के बीच के रिश्ते को समझें`
+            : `Explore the ${triggerLabel(trigger)} and ${emotion} connection`,
+          reason: hi
+            ? `ये जोड़ी ${count} बार दिखी। ध्यान दें कि असल में क्या इसे ट्रिगर करता है।`
+            : `This pairing came up ${count} time${count === 1 ? "" : "s"}. Notice what specifically triggers it.`,
           trigger,
           emotion,
         });
@@ -254,11 +301,17 @@ export function generateActions(report, feedback = [], prefs = null) {
 
   // 12. Ultimate safety net — generic but useful actions to guarantee minimum 3
   if (candidates.length < 3) {
-    const fillers = [
-      { id: "reflect-week", type: "awareness", title: "Take 2 minutes to reflect on your week", reason: "A short review helps you notice patterns you might miss in the moment." },
-      { id: "log-new-trigger", type: "experiment", title: "Log something new that affects your mood", reason: "Expanding what you track reveals hidden patterns." },
-      { id: "check-timing", type: "awareness", title: "Notice what time of day your mood shifts", reason: "Timing patterns can reveal environmental triggers." },
-    ];
+    const fillers = hi
+      ? [
+          { id: "reflect-week", type: "awareness", title: "2 मिनट अपने हफ़्ते पर सोचें", reason: "थोड़ा सा रिव्यू आपको वो पैटर्न दिखा सकता है जो पल में नहीं दिखते।" },
+          { id: "log-new-trigger", type: "experiment", title: "कुछ नया लॉग करें जो मूड पर असर डाले", reason: "ज़्यादा चीज़ें ट्रैक करने से छुपे पैटर्न सामने आते हैं।" },
+          { id: "check-timing", type: "awareness", title: "ध्यान दें कि दिन में कब मूड बदलता है", reason: "समय के पैटर्न से माहौल के ट्रिगर्स का पता चलता है।" },
+        ]
+      : [
+          { id: "reflect-week", type: "awareness", title: "Take 2 minutes to reflect on your week", reason: "A short review helps you notice patterns you might miss in the moment." },
+          { id: "log-new-trigger", type: "experiment", title: "Log something new that affects your mood", reason: "Expanding what you track reveals hidden patterns." },
+          { id: "check-timing", type: "awareness", title: "Notice what time of day your mood shifts", reason: "Timing patterns can reveal environmental triggers." },
+        ];
     for (const f of fillers) {
       if (candidates.length >= 3) break;
       if (!candidates.some(c => c.id === f.id)) {
@@ -309,8 +362,8 @@ export function generateActions(report, feedback = [], prefs = null) {
 
   return filtered.slice(0, 5).map((a, i) => ({
     ...a,
-    title: lintText(a.title),
-    reason: lintText(a.reason),
+    title: hi ? a.title : lintText(a.title),
+    reason: hi ? a.reason : lintText(a.reason),
     ...(ACTION_META[a.type] || ACTION_META.awareness),
     order: i,
   }));

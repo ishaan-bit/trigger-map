@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getDailyPrediction, saveDailyPrediction } from "@/services/deviceService";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 
 const OPTIONS = [
@@ -13,6 +14,7 @@ const OPTIONS = [
 
 export function DailyPrediction({ onVisibilityChange }) {
   const [prediction, setPrediction] = useState(undefined);
+  const { t } = useLanguage();
 
   useEffect(() => {
     getDailyPrediction().then((p) => setPrediction(p));
@@ -33,7 +35,7 @@ export function DailyPrediction({ onVisibilityChange }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>How do you think today will feel?</Text>
+      <Text style={styles.title}>{t("prediction.title")}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -45,10 +47,10 @@ export function DailyPrediction({ onVisibilityChange }) {
             style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
             onPress={() => handlePick(opt.key)}
             accessibilityRole="button"
-            accessibilityLabel={`Predict ${opt.label}`}
+            accessibilityLabel={t("emotions." + opt.key)}
           >
             <Text style={styles.emoji}>{opt.emoji}</Text>
-            <Text style={styles.label}>{opt.label}</Text>
+            <Text style={styles.label}>{t("emotions." + opt.key)}</Text>
           </Pressable>
         ))}
       </ScrollView>

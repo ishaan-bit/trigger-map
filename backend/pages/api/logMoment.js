@@ -23,13 +23,14 @@ const schema = z.object({
   timestamp: z.string().optional(),
   prediction: z.string().min(1).max(30).optional(),
   tags: z.array(z.string().min(1).max(40)).max(3).optional(),
+  lang: z.enum(["en", "hi"]).optional(),
 });
 
-async function refreshWeeklyInsight(ownerId) {
+async function refreshWeeklyInsight(ownerId, lang) {
   const aggregates = await getWeeklyAggregates(ownerId);
   const report = generateWeeklyReport({ aggregates });
   if (!report.totalMoments) return;
-  const insight = await generateInsight(report);
+  const insight = await generateInsight(report, { lang });
   await storeWeeklyInsight(ownerId, {
     windowEnd: new Date().toISOString().slice(0, 10),
     summary: insight.summary,
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
     });
 
     await appendMoment(moment);
-    const feedback = await generateImmediateFeedback(ownerId, moment);
+    const feedback = await generateImmediateFeedback(ownerId, moment, result.data.lang);
     await Promise.all([
       touchDailyActive(ownerId),
       incrementCounter("moment_logged"),
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
     ]);
 
     // Fire-and-forget: regenerate rule-based weekly insight so report is fresh
-    refreshWeeklyInsight(ownerId).catch(() => {});
+    refreshWeeklyInsight(ownerId, result.data.lang).catch(() => {});
 
     return sendSuccess(res, {
       moment,

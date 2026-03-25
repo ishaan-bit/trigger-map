@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet,
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
 
@@ -21,6 +22,7 @@ export function ScreenShell({
   const [showTimeout, setShowTimeout] = useState(false);
   const insets = useSafeAreaInsets();
   const { glowColor, glowDeepColor, dominantEmotion } = useEmotionalState();
+  const { t } = useLanguage();
   const breathAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export function ScreenShell({
       </View>
       {showTimeout && onRetry ? (
         <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-          <Text style={styles.retryLabel}>Try again</Text>
+          <Text style={styles.retryLabel}>{t("common.retry")}</Text>
         </Pressable>
       ) : null}
     </View>
