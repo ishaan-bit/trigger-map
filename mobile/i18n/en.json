@@ -516,6 +516,7 @@
       "unlockModes": "Unlock adaptive guidance",
       "modesHint": "Personalised movement, nourishment, and perspective suggestions powered by your patterns.",
       "adaptiveTitle": "Adaptive Guidance",
+      "paywallBody": "Get adaptive guidance, deep signal analysis, pattern intelligence, and personalised levers — all powered by your emotional patterns.",
       "mode": {
         "core": "Core",
         "move": "Move",
@@ -523,6 +524,8 @@
         "perspective": "Perspective",
         "coreBody": "Your core analysis is above. Switch to Move, Fuel, or Perspective for personalised guidance based on your emotional patterns.",
         "generating": "Generating your personalised guidance...",
+        "warmTitle": "Guidance is being prepared",
+        "warmBody": "We're building personalised Move, Fuel, and Perspective suggestions from your patterns. Check back tomorrow for fresh guidance tailored to your week.",
         "helpful": "Helpful",
         "thanksHelpful": "Noted — this works for you",
         "thanksNot": "Noted — we'll adjust"

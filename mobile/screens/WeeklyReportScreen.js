@@ -250,7 +250,7 @@ const TAB_KEYS = [
 
 function TabBar({ activeTab, onTabChange, t }) {
   return (
-    <View style={s.tabBar}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
       {TAB_KEYS.map((tab) => {
         const active = activeTab === tab.key;
         return (
@@ -267,7 +267,7 @@ function TabBar({ activeTab, onTabChange, t }) {
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -298,6 +298,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
   const whatWorking = insight?.whatWorking;
   const invoked = report?.invokedMetrics;
   const compound = report?.compoundPatterns;
+  const tone = bm?.recentAverage != null ? scoreTone(bm.recentAverage, t) : null;
 
   return (
     <View style={s.tabContent}>
@@ -305,9 +306,9 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
       {bm?.stateOfMind ? (
         <AnimatedSection index={0} style={s.section}>
           <SectionHeader label={t("report.currentState")} badge="weekly" t={t} />
-          <View style={s.stateOfMindCard}>
+          <View style={[s.stateOfMindCard, tone && { borderLeftColor: tone.color, borderColor: tone.color + "40" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={s.stateOfMindText}>{capitalize(bm.stateOfMind)}</Text>
+              <Text style={[s.stateOfMindText, tone && { color: tone.color }]}>{tone ? tone.emoji + " " : ""}{capitalize(bm.stateOfMind)}</Text>
               {bm.baselineDeltas?.deltaDrift != null ? (
                 <DeltaChip value={bm.baselineDeltas.deltaDrift} />
               ) : null}
@@ -430,7 +431,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
       {direction ? (
         <AnimatedSection index={4} style={s.section}>
           <SectionHeader label={t("report.direction")} badge="weekly" t={t} />
-          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
+          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: tone?.color || palette.accent }]}>
             <Text style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}>{direction}</Text>
           </View>
         </AnimatedSection>
@@ -1250,7 +1251,11 @@ function ModeCards({ mode, data, t, onFeedback, isPremium }) {
   if (!data) {
     return (
       <View style={s.modeContent}>
-        <Text style={s.modeContentBody}>{t("report.prem.mode.generating")}</Text>
+        <View style={[s.insightStateCard, { paddingVertical: 20 }]}>
+          <Text style={s.insightStateIcon}>✨</Text>
+          <Text style={s.insightStateTitle}>{t("report.prem.mode.warmTitle")}</Text>
+          <Text style={s.insightStateBody}>{t("report.prem.mode.warmBody")}</Text>
+        </View>
       </View>
     );
   }
@@ -1404,307 +1409,239 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
   return (
     <View style={s.tabContent}>
 
-      {/* ── Premium status badge ── */}
-      {isPremium ? (
-        <View style={s.premBadge}>
-          <Text style={s.premBadgeText}>
-            {expiryDate ? t("report.prem.statusUntil", { date: expiryDate }) : t("report.prem.statusActive")}
-          </Text>
-        </View>
-      ) : null}
+      {/* ── Full paywall gate for non-premium ── */}
+      {!isPremium ? (
+        <View style={s.tabContent}>
+          {/* Premium status badge (not premium) */}
+          <View style={s.insightStateCard}>
+            <Text style={s.insightStateIcon}>💎</Text>
+            <Text style={s.insightStateTitle}>{t("report.unlockInsightsTitle")}</Text>
+            <Text style={s.insightStateBody}>{t("report.prem.paywallBody")}</Text>
+            {!isSignedIn ? (
+              <PrimaryButton label={t("report.signInToUnlock")} onPress={handleSignIn} />
+            ) : (
+              <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
+                <Text style={s.teaserCtaButtonText}>{purchasing ? t("common.pleaseWait") : t("report.upgradePremium")}</Text>
+              </Pressable>
+            )}
+          </View>
 
-      {/* ── 1. YOUR DIRECTION (hero) ── */}
-      <AnimatedSection index={0} style={s.section}>
-        <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
-        {renderDirectionCard()}
-      </AnimatedSection>
-
-      {/* ── 2. WHAT'S SHIFTING (signal cards) ── */}
-      {signals.length > 0 ? (
-        isPremium ? (
-          <AnimatedSection index={1} style={s.section}>
-            <SectionHeader label={t("report.prem.shifting")} badge="live" t={t}
-              extra={signals.length !== 1 ? t("report.prem.signalCountPlural", { count: signals.length }) : t("report.prem.signalCount", { count: signals.length })} />
-            <View style={s.premSignalGrid}>
-              {signals.map((sig) => (
-                <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
-                  <Text style={s.premSignalIcon}>{sig.icon}</Text>
-                  <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
-                  <Text style={s.premSignalBody}>{sig.body}</Text>
+          {/* Teaser: show one signal preview if available */}
+          {signals.length > 0 ? (
+            <AnimatedSection index={1} style={s.section}>
+              <SectionHeader label={t("report.prem.shifting")} badge="live" t={t} />
+              <View style={s.premSignalGrid}>
+                <View style={[s.premSignalCard, { borderLeftColor: signals[0].color }]}>
+                  <Text style={s.premSignalIcon}>{signals[0].icon}</Text>
+                  <Text style={[s.premSignalLabel, { color: signals[0].color }]}>{signals[0].label}</Text>
+                  <Text style={s.premSignalBody}>{signals[0].body}</Text>
                 </View>
-              ))}
-            </View>
-          </AnimatedSection>
-        ) : (
-          <AnimatedSection index={1} style={s.section}>
-            <SectionHeader label={t("report.prem.shifting")} badge="live" t={t} />
-            {/* Show first signal as preview, lock the rest */}
-            <View style={s.premSignalGrid}>
-              <View style={[s.premSignalCard, { borderLeftColor: signals[0].color }]}>
-                <Text style={s.premSignalIcon}>{signals[0].icon}</Text>
-                <Text style={[s.premSignalLabel, { color: signals[0].color }]}>{signals[0].label}</Text>
-                <Text style={s.premSignalBody}>{signals[0].body}</Text>
               </View>
-            </View>
-            {signals.length > 1 ? (
-              <LockedSection
-                title={t("report.prem.unlockSignals")}
-                teaser={t("report.prem.shiftingHint")}
-                ctaLabel={lockedCta.label}
-                onPress={lockedCta.onPress}
-              >
-                <View style={s.premSignalGrid}>
-                  {signals.slice(1, 3).map((sig) => (
-                    <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
-                      <Text style={s.premSignalIcon}>{sig.icon}</Text>
-                      <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </LockedSection>
-            ) : null}
-          </AnimatedSection>
-        )
-      ) : null}
+              {signals.length > 1 ? (
+                <LockedSection
+                  title={t("report.prem.unlockSignals")}
+                  teaser={t("report.prem.shiftingHint")}
+                  ctaLabel={lockedCta.label}
+                  onPress={lockedCta.onPress}
+                />
+              ) : null}
+            </AnimatedSection>
+          ) : null}
 
-      {/* ── 3. PATTERN INTELLIGENCE (LLM insight cards) ── */}
-      {isPremium && hasLlmInsight && llmSections ? (
-        <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label={t("report.prem.patternIntel")} badge="weekly" t={t} />
-          <View style={s.insightCardsRow}>
-            {llmSections.map((body, idx) => {
-              if (!body) return null;
-              const insightMeta = getInsightSectionMeta(t);
-              const meta = insightMeta[idx] || {};
-              return (
-                <View key={idx} style={s.insightSectionCard}>
-                  <View style={s.insightSectionHeader}>
-                    <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
-                    <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
-                      {meta.label || t("report.sectionLabel", { num: idx + 1 })}
-                    </Text>
-                  </View>
-                  <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
-                </View>
-              );
-            })}
-            <Text style={s.insightFooter}>
-              {t("report.generatedBy", { date: report.llmInsight.generatedAt
-                ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                : "" })}
+          {/* Teaser: direction preview */}
+          {hasLlmTeaser ? (
+            <AnimatedSection index={2} style={s.section}>
+              <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
+              {renderDirectionCard()}
+            </AnimatedSection>
+          ) : null}
+        </View>
+      ) : (
+        /* ── Premium content (full access) ── */
+        <View style={s.tabContent}>
+
+          {/* ── Premium status badge ── */}
+          <View style={s.premBadge}>
+            <Text style={s.premBadgeText}>
+              {expiryDate ? t("report.prem.statusUntil", { date: expiryDate }) : t("report.prem.statusActive")}
             </Text>
           </View>
-        </AnimatedSection>
-      ) : !isPremium && isSignedIn ? (
-        <AnimatedSection index={2} style={s.section}>
-          <LockedSection
-            title={t("report.prem.unlockIntel")}
-            teaser={t("report.prem.patternIntelHint")}
-            ctaLabel={lockedCta.label}
-            onPress={lockedCta.onPress}
-          >
-            <View style={s.insightCardsRow}>
-              <View style={s.insightSectionCard}>
-                <View style={s.insightSectionHeader}>
-                  <Text style={s.insightSectionIcon}>🔍</Text>
-                  <Text style={s.insightSectionLabel}>{t("report.insightStoodOut")}</Text>
-                </View>
-                <Text style={[s.insightSectionBody, { color: palette.muted }]}>{t("report.prem.patternIntelHint")}</Text>
-              </View>
-            </View>
-          </LockedSection>
-        </AnimatedSection>
-      ) : null}
 
-      {/* ── 4. YOUR LEVERS (adaptive regulators) ── */}
-      {sortedRegulators.length > 0 ? (
-        isPremium ? (
-          <AnimatedSection index={3} style={s.section}>
-            <SectionHeader label={t("report.prem.leversTitle")} badge="weekly" t={t}
-              extra={helpedTriggerSet.size > 0 ? t("report.prem.leversAdaptive") : null} />
-            <View style={s.card}>
-              {sortedRegulators.slice(0, 6).map((r, i) => {
-                const isHelped = helpedTriggerSet.has((r.trigger || "").toLowerCase());
-                return (
-                  <View key={i} style={s.effectRow}>
-                    <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
-                      <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
-                    </View>
-                    <View style={s.effectContent}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
-                        {isHelped ? (
-                          <View style={s.premHelpedBadge}>
-                            <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={s.effectCount}>{r.count !== 1 ? t("report.timesThisPeriodPlural", { count: r.count }) : t("report.timesThisPeriod", { count: r.count })}</Text>
-                    </View>
-                  </View>
-                );
-              })}
+          {/* ── 1. ADAPTIVE MODES (Move · Fuel · Perspective) — moved to top ── */}
+          <AnimatedSection index={0} style={s.section}>
+            <SectionHeader label={t("report.prem.adaptiveTitle")} badge="live" t={t} />
+            <View style={s.modeTabBar}>
+              {["core", "move", "fuel", "perspective"].map((tab) => (
+                <Pressable
+                  key={tab}
+                  style={[s.modeTab, activeMode === tab && s.modeTabActive]}
+                  onPress={() => { tap(); setActiveMode(tab); }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: activeMode === tab }}
+                >
+                  <Text style={[s.modeTabText, activeMode === tab && s.modeTabTextActive]}>
+                    {t(`report.prem.mode.${tab}`)}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
+            {activeMode === "core" ? (
+              <View style={s.modeContent}>
+                <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
+              </View>
+            ) : (
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} onFeedback={onModeFeedback} isPremium={isPremium} />
+            )}
           </AnimatedSection>
-        ) : isSignedIn ? (
-          <AnimatedSection index={3} style={s.section}>
-            <LockedSection
-              title={t("report.prem.unlockLevers")}
-              teaser={t("report.prem.leversHint")}
-              ctaLabel={lockedCta.label}
-              onPress={lockedCta.onPress}
-            >
-              <View style={s.card}>
-                {sortedRegulators.slice(0, 2).map((r, i) => (
-                  <View key={i} style={s.effectRow}>
-                    <View style={[s.effectDot, { backgroundColor: palette.muted + "40" }]}>
-                      <Text style={{ fontSize: 14 }}>🌿</Text>
-                    </View>
-                    <View style={s.effectContent}>
-                      <Text style={s.effectTitle}>{r.trigger} → ...</Text>
-                    </View>
+
+          {/* ── 2. YOUR DIRECTION (hero) ── */}
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
+            {renderDirectionCard()}
+          </AnimatedSection>
+
+          {/* ── 3. WHAT'S SHIFTING (signal cards) ── */}
+          {signals.length > 0 ? (
+            <AnimatedSection index={2} style={s.section}>
+              <SectionHeader label={t("report.prem.shifting")} badge="live" t={t}
+                extra={signals.length !== 1 ? t("report.prem.signalCountPlural", { count: signals.length }) : t("report.prem.signalCount", { count: signals.length })} />
+              <View style={s.premSignalGrid}>
+                {signals.map((sig) => (
+                  <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
+                    <Text style={s.premSignalIcon}>{sig.icon}</Text>
+                    <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
+                    <Text style={s.premSignalBody}>{sig.body}</Text>
                   </View>
                 ))}
               </View>
-            </LockedSection>
-          </AnimatedSection>
-        ) : null
-      ) : null}
+            </AnimatedSection>
+          ) : null}
 
-      {/* ── 5. BEHAVIOUR SNAPSHOT (compact metrics) ── */}
-      {bm?.baseline?.reliable ? (
-        isPremium ? (
-          <AnimatedSection index={4} style={s.section}>
-            <SectionHeader label={t("report.prem.snapshot")} badge="weekly" t={t} />
-            <View style={s.premMetricGrid}>
-              <View style={s.premMetricItem}>
-                <Text style={s.premMetricLabel}>{t("report.prem.baseline")}</Text>
-                <Text style={s.premMetricValue}>{bm.baseline.score.toFixed(1)}/5</Text>
+          {/* ── 4. PATTERN INTELLIGENCE (LLM insight cards) ── */}
+          {hasLlmInsight && llmSections ? (
+            <AnimatedSection index={3} style={s.section}>
+              <SectionHeader label={t("report.prem.patternIntel")} badge="weekly" t={t} />
+              <View style={s.insightCardsRow}>
+                {llmSections.map((body, idx) => {
+                  if (!body) return null;
+                  const insightMeta = getInsightSectionMeta(t);
+                  const meta = insightMeta[idx] || {};
+                  return (
+                    <View key={idx} style={[s.insightSectionCard, { borderLeftWidth: 3, borderLeftColor: meta.color || palette.accent }]}>
+                      <View style={s.insightSectionHeader}>
+                        <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
+                        <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
+                          {meta.label || t("report.sectionLabel", { num: idx + 1 })}
+                        </Text>
+                      </View>
+                      <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
+                    </View>
+                  );
+                })}
+                <Text style={s.insightFooter}>
+                  {t("report.generatedBy", { date: report.llmInsight.generatedAt
+                    ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                    : "" })}
+                </Text>
               </View>
-              {bm.recentAverage != null ? (
-                <View style={s.premMetricItem}>
-                  <Text style={s.premMetricLabel}>{t("report.prem.recentAvg")}</Text>
-                  <Text style={s.premMetricValue}>{bm.recentAverage.toFixed(1)}/5</Text>
-                </View>
-              ) : null}
-              {bm.drift ? (
-                <View style={s.premMetricItem}>
-                  <Text style={s.premMetricLabel}>{t("report.prem.drift")}</Text>
-                  <Text style={[s.premMetricValue, { color: bm.drift.value >= 0 ? palette.success : palette.danger }]}>
-                    {bm.drift.value > 0 ? "+" : ""}{bm.drift.value.toFixed(1)}
-                  </Text>
-                </View>
-              ) : null}
-              {bm.stability ? (
-                <View style={s.premMetricItem}>
-                  <Text style={s.premMetricLabel}>{t("report.prem.stability")}</Text>
-                  <Text style={s.premMetricValue}>{Math.round(bm.stability.score * 100)}%</Text>
-                </View>
-              ) : null}
-              {bm.recoveryLatency ? (
-                <View style={s.premMetricItem}>
-                  <Text style={s.premMetricLabel}>{t("report.prem.recovery")}</Text>
-                  <Text style={s.premMetricValue}>~{bm.recoveryLatency.days}d</Text>
-                </View>
-              ) : null}
-              <View style={s.premMetricItem}>
-                <Text style={s.premMetricLabel}>{t("report.prem.daysTracked")}</Text>
-                <Text style={s.premMetricValue}>{bm.baseline.daysUsed}</Text>
+            </AnimatedSection>
+          ) : null}
+
+          {/* ── 5. YOUR LEVERS (adaptive regulators) ── */}
+          {sortedRegulators.length > 0 ? (
+            <AnimatedSection index={4} style={s.section}>
+              <SectionHeader label={t("report.prem.leversTitle")} badge="weekly" t={t}
+                extra={helpedTriggerSet.size > 0 ? t("report.prem.leversAdaptive") : null} />
+              <View style={s.card}>
+                {sortedRegulators.slice(0, 6).map((r, i) => {
+                  const isHelped = helpedTriggerSet.has((r.trigger || "").toLowerCase());
+                  return (
+                    <View key={i} style={s.effectRow}>
+                      <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
+                        <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
+                      </View>
+                      <View style={s.effectContent}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
+                          {isHelped ? (
+                            <View style={s.premHelpedBadge}>
+                              <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={s.effectCount}>{r.count !== 1 ? t("report.timesThisPeriodPlural", { count: r.count }) : t("report.timesThisPeriod", { count: r.count })}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-            </View>
-          </AnimatedSection>
-        ) : isSignedIn ? (
-          <AnimatedSection index={4} style={s.section}>
-            <LockedSection
-              title={t("report.prem.unlockSnapshot")}
-              teaser={t("report.prem.snapshotHint")}
-              ctaLabel={lockedCta.label}
-              onPress={lockedCta.onPress}
-            >
+            </AnimatedSection>
+          ) : null}
+
+          {/* ── 6. BEHAVIOUR SNAPSHOT (compact metrics) ── */}
+          {bm?.baseline?.reliable ? (
+            <AnimatedSection index={5} style={s.section}>
+              <SectionHeader label={t("report.prem.snapshot")} badge="weekly" t={t} />
               <View style={s.premMetricGrid}>
                 <View style={s.premMetricItem}>
                   <Text style={s.premMetricLabel}>{t("report.prem.baseline")}</Text>
-                  <Text style={s.premMetricValue}>—</Text>
+                  <Text style={s.premMetricValue}>{bm.baseline.score.toFixed(1)}/5</Text>
                 </View>
+                {bm.recentAverage != null ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.recentAvg")}</Text>
+                    <Text style={s.premMetricValue}>{bm.recentAverage.toFixed(1)}/5</Text>
+                  </View>
+                ) : null}
+                {bm.drift ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.drift")}</Text>
+                    <Text style={[s.premMetricValue, { color: bm.drift.value >= 0 ? palette.success : palette.danger }]}>
+                      {bm.drift.value > 0 ? "+" : ""}{bm.drift.value.toFixed(1)}
+                    </Text>
+                  </View>
+                ) : null}
+                {bm.stability ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.stability")}</Text>
+                    <Text style={s.premMetricValue}>{Math.round(bm.stability.score * 100)}%</Text>
+                  </View>
+                ) : null}
+                {bm.recoveryLatency ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.recovery")}</Text>
+                    <Text style={s.premMetricValue}>~{bm.recoveryLatency.days}d</Text>
+                  </View>
+                ) : null}
                 <View style={s.premMetricItem}>
-                  <Text style={s.premMetricLabel}>{t("report.prem.stability")}</Text>
-                  <Text style={s.premMetricValue}>—</Text>
+                  <Text style={s.premMetricLabel}>{t("report.prem.daysTracked")}</Text>
+                  <Text style={s.premMetricValue}>{bm.baseline.daysUsed}</Text>
                 </View>
               </View>
-            </LockedSection>
-          </AnimatedSection>
-        ) : null
-      ) : null}
+            </AnimatedSection>
+          ) : null}
 
-      {/* ── 6. ACTION EFFECTIVENESS (compact) ── */}
-      {(triedCount > 0 || skippedCount > 0) ? (
-        <AnimatedSection index={5} style={s.section}>
-          <SectionHeader label={t("report.prem.effectiveness")} badge="live" t={t} />
-          <View style={s.card}>
-            <View style={s.metricsRow}>
-              <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.success }]}>
-                <Text style={s.metricLabel}>{t("report.helped")}</Text>
-                <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
-              </View>
-              <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.muted }]}>
-                <Text style={s.metricLabel}>{t("report.notHelpful")}</Text>
-                <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
-              </View>
-            </View>
-            <Text style={s.premAdjustingNote}>{t("report.prem.adjusting")}</Text>
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* ── 7. ADAPTIVE MODES (Move · Fuel · Perspective) ── */}
-      {isPremium ? (
-        <AnimatedSection index={6} style={s.section}>
-          <SectionHeader label={t("report.prem.adaptiveTitle")} badge="live" t={t} />
-
-          {/* Mode sub-tabs */}
-          <View style={s.modeTabBar}>
-            {["core", "move", "fuel", "perspective"].map((tab) => (
-              <Pressable
-                key={tab}
-                style={[s.modeTab, activeMode === tab && s.modeTabActive]}
-                onPress={() => { tap(); setActiveMode(tab); }}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: activeMode === tab }}
-              >
-                <Text style={[s.modeTabText, activeMode === tab && s.modeTabTextActive]}>
-                  {t(`report.prem.mode.${tab}`)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* Mode content */}
-          {activeMode === "core" ? (
-            <View style={s.modeContent}>
-              <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
-            </View>
-          ) : (
-            <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} onFeedback={onModeFeedback} isPremium={isPremium} />
-          )}
-        </AnimatedSection>
-      ) : isSignedIn ? (
-        <AnimatedSection index={6} style={s.section}>
-          <LockedSection
-            title={t("report.prem.unlockModes")}
-            teaser={t("report.prem.modesHint")}
-            ctaLabel={lockedCta.label}
-            onPress={lockedCta.onPress}
-          >
-            <View style={s.modeTabBar}>
-              {["core", "move", "fuel", "perspective"].map((tab) => (
-                <View key={tab} style={s.modeTab}>
-                  <Text style={s.modeTabText}>{t(`report.prem.mode.${tab}`)}</Text>
+          {/* ── 7. ACTION EFFECTIVENESS (compact) ── */}
+          {(triedCount > 0 || skippedCount > 0) ? (
+            <AnimatedSection index={6} style={s.section}>
+              <SectionHeader label={t("report.prem.effectiveness")} badge="live" t={t} />
+              <View style={s.card}>
+                <View style={s.metricsRow}>
+                  <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.success }]}>
+                    <Text style={s.metricLabel}>{t("report.helped")}</Text>
+                    <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
+                  </View>
+                  <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.muted }]}>
+                    <Text style={s.metricLabel}>{t("report.notHelpful")}</Text>
+                    <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
+                  </View>
                 </View>
-              ))}
-            </View>
-          </LockedSection>
-        </AnimatedSection>
-      ) : null}
+                <Text style={s.premAdjustingNote}>{t("report.prem.adjusting")}</Text>
+              </View>
+            </AnimatedSection>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -1941,10 +1878,10 @@ const s = StyleSheet.create({
 
   /* Tab bar */
   tabBar: {
-    flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 4,
+    flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 4, paddingHorizontal: 2,
   },
   tab: {
-    flex: 1, alignItems: "center", paddingVertical: 10,
+    alignItems: "center", paddingVertical: 10, paddingHorizontal: 14,
     borderRadius: radius.sm, backgroundColor: palette.glass,
     borderWidth: 1, borderColor: palette.glassBorder,
   },

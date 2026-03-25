@@ -176,6 +176,11 @@ async function handleRequest(req, res) {
     return handleRunJob(req, res, 'generateLlmActions.js', 'generateLlmActions');
   }
 
+  // POST /generate-adaptive-modes
+  if (path === '/generate-adaptive-modes' && req.method === 'POST') {
+    return handleRunJob(req, res, 'generateAdaptiveModes.js', 'generateAdaptiveModes');
+  }
+
   // POST /cancel-job
   if (path === '/cancel-job' && req.method === 'POST') {
     const body = await readBody(req);

@@ -315,7 +315,7 @@ export function computeProgressMetrics({
   baselineScore,
   actionFeedback = [],
 }) {
-  if (!aggregates || aggregates.length < 14) return null; // Need 2+ weeks
+  if (!aggregates || aggregates.length < 10) return null; // Need ~1.5+ weeks
 
   const bins = splitIntoWeeklyBins(aggregates);
   const snapshots = bins.map((bin) => computeBinMetrics(bin, baselineScore));

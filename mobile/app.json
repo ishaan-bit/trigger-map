@@ -55,7 +55,7 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 87,
+      "versionCode": 88,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
