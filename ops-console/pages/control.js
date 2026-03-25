@@ -538,6 +538,8 @@ export default function ControlPage() {
   const [backfillWeeks, setBackfillWeeks] = useState(3);
   const [backfillPersonality, setBackfillPersonality] = useState('steady-achiever');
   const [backfillRunning, setBackfillRunning] = useState(false);
+  const [pilotMetrics, setPilotMetrics] = useState(null);
+  const [pilotLoading, setPilotLoading] = useState(false);
 
   // Persist jobParams to localStorage
   useEffect(() => {
@@ -724,6 +726,171 @@ export default function ControlPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Pilot Validation ── */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>Pilot Validation</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Progress & drift metrics across all users</span>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={pilotLoading}
+              onClick={async () => {
+                setPilotLoading(true);
+                try {
+                  const res = await fetch('/api/control/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'fetch-pilot-metrics', target: 'pilot' }),
+                  });
+                  const data = await res.json();
+                  setPilotMetrics(data.ok !== false ? (data.result || data) : null);
+                  setResults(prev => [{
+                    timestamp: new Date().toISOString(),
+                    action: 'fetch-pilot-metrics',
+                    target: 'pilot',
+                    ok: res.ok,
+                    data,
+                    status: res.status,
+                  }, ...prev].slice(0, 50));
+                } catch (err) {
+                  setPilotMetrics(null);
+                } finally {
+                  setPilotLoading(false);
+                }
+              }}
+            >
+              {pilotLoading ? 'Computing…' : 'Compute'}
+            </button>
+          </div>
+        </div>
+        {pilotMetrics && (
+          <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Overview row */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Total Users', value: pilotMetrics.overall?.totalUsers || 0, color: 'var(--text-primary)' },
+                { label: 'With Progress', value: pilotMetrics.overall?.usersWithProgress || 0, color: 'var(--accent)' },
+                { label: 'Improving', value: `${pilotMetrics.overall?.improvement?.improvingPct || 0}%`, color: 'var(--green)' },
+                { label: 'Declining', value: `${pilotMetrics.overall?.improvement?.decliningPct || 0}%`, color: 'var(--red)' },
+                { label: 'Stable', value: `${pilotMetrics.overall?.improvement?.stablePct || 0}%`, color: 'var(--text-muted)' },
+                { label: 'Stabilising', value: `${pilotMetrics.overall?.stabilization?.stabilizingPct || 0}%`, color: '#a78bfa' },
+                { label: 'Faster Recovery', value: `${pilotMetrics.overall?.recovery?.fasterRecoveryPct || 0}%`, color: '#60a5fa' },
+              ].map(m => (
+                <div key={m.label} style={{ textAlign: 'center', minWidth: 80, padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: m.color }}>{m.value}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Behavioral funnel */}
+            {pilotMetrics.overall?.funnel && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Behavioral Funnel</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {[
+                    { label: 'Drift Detected', val: pilotMetrics.overall.funnel.driftDetected, color: '#ff6b7a' },
+                    { label: 'Patterns Identified', val: pilotMetrics.overall.funnel.patternsIdentified, color: '#ffb347' },
+                    { label: 'Actions Taken', val: pilotMetrics.overall.funnel.actionsTaken, color: '#60a5fa' },
+                    { label: 'Stabilised After Action', val: pilotMetrics.overall.funnel.stabilizedAfterAction, color: '#5ee6a0' },
+                  ].map((step, i) => (
+                    <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                      <div style={{ textAlign: 'center', flex: 1, padding: '8px 6px', borderRadius: 6, background: `${step.color}15`, border: `1px solid ${step.color}40` }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: step.color }}>{step.val}</div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{step.label}</div>
+                      </div>
+                      {i < 3 && <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>→</span>}
+                    </div>
+                  ))}
+                </div>
+                {pilotMetrics.overall.funnel.conversionRate != null && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                    Drift → Stabilisation conversion: <span style={{ fontWeight: 700, color: 'var(--green)' }}>{pilotMetrics.overall.funnel.conversionRate}%</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Free vs Premium comparison */}
+            {pilotMetrics.free && pilotMetrics.premium && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Free vs Premium</div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {[
+                    { label: 'Free', data: pilotMetrics.free, color: 'var(--text-muted)' },
+                    { label: 'Premium', data: pilotMetrics.premium, color: '#a78bfa' },
+                  ].map(tier => (
+                    <div key={tier.label} style={{ flex: 1, borderRadius: 8, padding: 12, background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: tier.color, marginBottom: 8 }}>{tier.label} ({tier.data.totalUsers || 0} users)</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Improving</span>
+                          <span style={{ color: 'var(--green)', fontWeight: 700 }}>{tier.data.improvement?.improvingPct || 0}%</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Stabilising</span>
+                          <span style={{ color: '#a78bfa', fontWeight: 700 }}>{tier.data.stabilization?.stabilizingPct || 0}%</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>With Patterns</span>
+                          <span style={{ fontWeight: 700 }}>{tier.data.patternDetection?.usersWithPatternsPct || 0}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Per-user summaries */}
+            {pilotMetrics.userSummaries?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Per-User Summary</div>
+                <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 6, border: '1px solid var(--border)' }}>
+                  <table className="data-table" style={{ margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ fontSize: 11 }}>Owner</th>
+                        <th style={{ fontSize: 11 }}>Direction</th>
+                        <th style={{ fontSize: 11 }}>Δ Score</th>
+                        <th style={{ fontSize: 11 }}>Weeks</th>
+                        <th style={{ fontSize: 11 }}>Moments</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pilotMetrics.userSummaries.map(u => (
+                        <tr key={u.ownerId}>
+                          <td className="mono" style={{ fontSize: 11 }}>{u.ownerId?.slice(0, 8) || '—'}</td>
+                          <td>
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8,
+                              background: u.direction === 'improving' ? 'rgba(34,197,94,0.12)' : u.direction === 'declining' ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.12)',
+                              color: u.direction === 'improving' ? 'var(--green)' : u.direction === 'declining' ? 'var(--red)' : 'var(--text-muted)',
+                            }}>
+                              {(u.direction || 'N/A').toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: (u.change || 0) > 0 ? 'var(--green)' : (u.change || 0) < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
+                            {u.change != null ? (u.change > 0 ? '+' : '') + u.change : '—'}
+                          </td>
+                          <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{u.weeks || '—'}</td>
+                          <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{u.moments || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              Computed at {pilotMetrics.computedAt ? new Date(pilotMetrics.computedAt).toLocaleString() : '—'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* LLM Models */}

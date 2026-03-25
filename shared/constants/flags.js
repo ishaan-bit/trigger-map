@@ -6,4 +6,5 @@ export const FEATURE_FLAGS = {
   onboardingEnabled: true,
   computeInvokedMetrics: true,
   adaptiveModes: true,
+  progressTracking: true,
 };

@@ -228,6 +228,13 @@ export function submitActionFeedback(actionId, response, deviceId, token) {
   });
 }
 
+// ── Progress & Drift Intelligence ──
+
+export function fetchProgress(token, deviceId) {
+  const params = token ? "" : `?deviceId=${encodeURIComponent(deviceId)}`;
+  return fetchJson(`/progress${params}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
+}
+
 // ── Adaptive Modes ──
 
 export function fetchModes(token) {

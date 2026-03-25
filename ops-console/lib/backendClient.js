@@ -57,3 +57,7 @@ export async function sendPush({ userIds, title, body }) {
     body: JSON.stringify({ userIds, title, body }),
   });
 }
+
+export async function fetchPilotMetrics() {
+  return backendRequest('/api/internal/control/pilot-metrics', { method: 'GET' });
+}

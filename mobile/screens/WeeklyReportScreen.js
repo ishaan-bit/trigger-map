@@ -15,7 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { submitActionFeedback, fetchModes, submitModeFeedback } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
@@ -243,6 +243,7 @@ function NarrativeCard({ icon, title, items, positive, t }) {
 const TAB_KEYS = [
   { key: "mirror", labelKey: "report.tabMirror", icon: "🪞" },
   { key: "week", labelKey: "report.tabThisWeek", icon: "📅" },
+  { key: "progress", labelKey: "report.progress.tabLabel", icon: "📈" },
   { key: "actions", labelKey: "report.tabActions", icon: "⚡" },
   { key: "premium", labelKey: "report.tabPremium", icon: "💎" },
 ];
@@ -769,7 +770,406 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   );
 }
 
-/* ── Tab 4: Premium (decision-oriented) ── */
+/* ── Tab 4: Progress (trajectory + drift intelligence) ── */
+
+function TrendBadge({ trend, t }) {
+  if (!trend) return null;
+  const label =
+    trend === "improving"
+      ? t("report.progress.trendImproving")
+      : trend === "declining"
+      ? t("report.progress.trendDeclining")
+      : t("report.progress.trendStable");
+  const color =
+    trend === "improving" ? palette.success : trend === "declining" ? palette.danger : palette.muted;
+  const arrow = trend === "improving" ? "↑" : trend === "declining" ? "↓" : "→";
+  return (
+    <View style={[s.progressTrendBadge, { backgroundColor: color + "15", borderColor: color + "40" }]}>
+      <Text style={[s.progressTrendBadgeText, { color }]}>{arrow} {label}</Text>
+    </View>
+  );
+}
+
+function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgrade, purchasing, t }) {
+  if (!progress) {
+    return (
+      <View style={s.tabContent}>
+        <View style={s.insightStateCard}>
+          <Text style={s.insightStateIcon}>📈</Text>
+          <Text style={s.insightStateTitle}>{t("report.progress.tabLabel")}</Text>
+          <Text style={s.insightStateBody}>{t("report.progress.needMoreWeeks")}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const { trajectory, metrics, patternShifts, attributions, weeklySnapshots, dataQuality } = progress;
+  const hasShifts =
+    (patternShifts?.strengthening?.length || 0) +
+    (patternShifts?.weakening?.length || 0) +
+    (patternShifts?.unresolved?.length || 0) +
+    (patternShifts?.emerging?.length || 0) > 0;
+  const hasAttributions =
+    (attributions?.helped?.length || 0) +
+    (attributions?.notWorking?.length || 0) +
+    (attributions?.needsAttention?.length || 0) > 0;
+
+  const toneColor = (tone) =>
+    tone === "great" || tone === "good" ? palette.success
+    : tone === "mixed" ? palette.muted
+    : tone === "uneasy" ? palette.warning
+    : tone === "tough" ? palette.danger
+    : palette.text;
+
+  const toneEmoji = (tone) =>
+    tone === "great" ? "🌟" : tone === "good" ? "😌" : tone === "mixed" ? "😐"
+    : tone === "uneasy" ? "😟" : tone === "tough" ? "😤" : "•";
+
+  return (
+    <View style={s.tabContent}>
+
+      {/* ── 1. TRAJECTORY ARC ── */}
+      {trajectory ? (
+        <AnimatedSection index={0} style={s.section}>
+          <SectionHeader label={t("report.progress.trajectoryTitle")} badge="weekly" t={t} />
+
+          {/* Visual arc: past → present → projected */}
+          <View style={s.progressArc}>
+            {/* Past */}
+            <View style={s.progressArcNode}>
+              <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.past?.tone)}</Text>
+              <Text style={[s.progressArcScore, { color: toneColor(trajectory.past?.tone) }]}>
+                {trajectory.past?.score?.toFixed(1) || "—"}
+              </Text>
+              <Text style={s.progressArcLabel}>
+                {t("report.progress.weeksAgo", { count: trajectory.weeksTracked || "—" })}
+              </Text>
+            </View>
+
+            {/* Connector with direction */}
+            <View style={s.progressArcConnector}>
+              <View style={[s.progressArcLine, {
+                backgroundColor: trajectory.direction === "improving" ? palette.success + "60"
+                  : trajectory.direction === "declining" ? palette.danger + "60"
+                  : palette.muted + "40",
+              }]} />
+              {trajectory.change !== null ? (
+                <View style={[s.progressArcDelta, {
+                  backgroundColor: trajectory.direction === "improving" ? palette.successSoft
+                    : trajectory.direction === "declining" ? palette.dangerSoft
+                    : palette.glass,
+                }]}>
+                  <Text style={[s.progressArcDeltaText, {
+                    color: trajectory.direction === "improving" ? palette.success
+                      : trajectory.direction === "declining" ? palette.danger
+                      : palette.muted,
+                  }]}>
+                    {trajectory.change > 0 ? "+" : ""}{trajectory.change.toFixed(1)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Present */}
+            <View style={s.progressArcNode}>
+              <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.present?.tone)}</Text>
+              <Text style={[s.progressArcScore, { color: toneColor(trajectory.present?.tone) }]}>
+                {trajectory.present?.score?.toFixed(1) || "—"}
+              </Text>
+              <Text style={s.progressArcLabel}>{t("report.progress.thisWeek")}</Text>
+            </View>
+
+            {/* Projected */}
+            <View style={s.progressArcConnector}>
+              <View style={[s.progressArcLine, { backgroundColor: palette.muted + "30", borderStyle: "dashed" }]} />
+            </View>
+            <View style={[s.progressArcNode, { opacity: 0.7 }]}>
+              <Text style={s.progressArcEmoji}>
+                {trajectory.projected === "improving" ? "📈" : trajectory.projected === "declining" ? "📉" : "➡️"}
+              </Text>
+              <Text style={[s.progressArcScore, { color: palette.muted, fontSize: 13 }]}>
+                {trajectory.projected === "improving"
+                  ? t("report.progress.projectedImproving")
+                  : trajectory.projected === "declining"
+                  ? t("report.progress.projectedDeclining")
+                  : t("report.progress.projectedHolding")}
+              </Text>
+              <Text style={s.progressArcLabel}>{t("report.progress.projected")}</Text>
+            </View>
+          </View>
+
+          {/* Direction badge */}
+          {trajectory.direction ? (
+            <View style={[s.progressDirectionBadge, {
+              backgroundColor: trajectory.direction === "improving" ? palette.successSoft
+                : trajectory.direction === "declining" ? palette.dangerSoft
+                : palette.glass,
+              borderColor: trajectory.direction === "improving" ? palette.success + "40"
+                : trajectory.direction === "declining" ? palette.danger + "40"
+                : palette.glassBorder,
+            }]}>
+              <Text style={[s.progressDirectionText, {
+                color: trajectory.direction === "improving" ? palette.success
+                  : trajectory.direction === "declining" ? palette.danger
+                  : palette.muted,
+              }]}>
+                {trajectory.direction === "improving" ? "↑ " : trajectory.direction === "declining" ? "↓ " : "→ "}
+                {trajectory.direction === "improving"
+                  ? t("report.progress.changeImproving")
+                  : trajectory.direction === "declining"
+                  ? t("report.progress.changeDeclining")
+                  : t("report.progress.changeStable")}
+                {trajectory.change !== null ? ` (${trajectory.change > 0 ? "+" : ""}${trajectory.change.toFixed(1)})` : ""}
+              </Text>
+            </View>
+          ) : null}
+        </AnimatedSection>
+      ) : null}
+
+      {/* ── 2. WHAT'S CHANGING (core metrics) ── */}
+      {metrics ? (
+        <AnimatedSection index={1} style={s.section}>
+          <SectionHeader label={t("report.progress.metricsTitle")} badge="live" t={t} />
+          <View style={s.progressMetricsGrid}>
+            {[
+              { key: "stability", label: t("report.progress.metricStability"), data: metrics.stability, icon: "🟢", invertDisplay: false },
+              { key: "volatility", label: t("report.progress.metricVolatility"), data: metrics.volatility, icon: "⚡", invertDisplay: true },
+              { key: "drift", label: t("report.progress.metricDrift"), data: metrics.drift, icon: "📊", invertDisplay: false },
+              { key: "recoveryDays", label: t("report.progress.metricRecovery"), data: metrics.recoveryDays, icon: "⏱", invertDisplay: true },
+            ].filter((m) => m.data).map((m) => {
+              const { data: md } = m;
+              const displayCurrent = m.invertDisplay
+                ? (md.current <= 0 ? "—" : (m.key === "recoveryDays" ? `~${md.current}d` : md.current.toFixed(1)))
+                : (md.current === null ? "—" : (m.key === "stability" ? `${Math.round(md.current * 100)}%` : md.current.toFixed(1)));
+              const displayPrev = m.invertDisplay
+                ? (md.previous <= 0 ? "—" : (m.key === "recoveryDays" ? `~${md.previous}d` : md.previous.toFixed(1)))
+                : (md.previous === null ? "—" : (m.key === "stability" ? `${Math.round(md.previous * 100)}%` : md.previous.toFixed(1)));
+
+              return (
+                <View key={m.key} style={s.progressMetricCard}>
+                  <View style={s.progressMetricHeader}>
+                    <Text style={s.progressMetricIcon}>{m.icon}</Text>
+                    <Text style={s.progressMetricLabel}>{m.label}</Text>
+                  </View>
+                  <View style={s.progressThenNow}>
+                    <View style={s.progressThenNowItem}>
+                      <Text style={s.progressThenNowLabel}>{t("report.progress.thenLabel")}</Text>
+                      <Text style={s.progressThenNowValue}>{displayPrev}</Text>
+                    </View>
+                    <Text style={s.progressThenNowArrow}>→</Text>
+                    <View style={s.progressThenNowItem}>
+                      <Text style={s.progressThenNowLabel}>{t("report.progress.nowLabel")}</Text>
+                      <Text style={[s.progressThenNowValue, { fontWeight: "700" }]}>{displayCurrent}</Text>
+                    </View>
+                  </View>
+                  <TrendBadge trend={md.trend} t={t} />
+                </View>
+              );
+            })}
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* ── 3. PATTERN SHIFTS ── */}
+      {hasShifts ? (
+        <AnimatedSection index={2} style={s.section}>
+          <SectionHeader label={t("report.progress.patternsTitle")} badge="weekly" t={t} />
+
+          {patternShifts.strengthening?.length ? (
+            <View style={[s.progressShiftGroup, { borderLeftColor: palette.success }]}>
+              <Text style={[s.progressShiftGroupLabel, { color: palette.success }]}>
+                {t("report.progress.strengthening")}
+              </Text>
+              {patternShifts.strengthening.map((p, i) => (
+                <View key={i} style={s.progressShiftItem}>
+                  <Text style={s.progressShiftPair}>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    {" → "}
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                  </Text>
+                  <Text style={s.progressShiftCount}>
+                    {t("report.progress.patternTimes", { count: p.count })}
+                    {p.prevCount ? ` (${t("report.progress.wasTimes", { count: p.prevCount })})` : ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {patternShifts.weakening?.length ? (
+            <View style={[s.progressShiftGroup, { borderLeftColor: palette.accent }]}>
+              <Text style={[s.progressShiftGroupLabel, { color: palette.accent }]}>
+                {t("report.progress.weakening")}
+              </Text>
+              {patternShifts.weakening.map((p, i) => (
+                <View key={i} style={s.progressShiftItem}>
+                  <Text style={s.progressShiftPair}>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    {" → "}
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                  </Text>
+                  <Text style={s.progressShiftCount}>
+                    {t("report.progress.patternTimes", { count: p.count })}
+                    {p.prevCount ? ` (${t("report.progress.wasTimes", { count: p.prevCount })})` : ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {patternShifts.unresolved?.length ? (
+            <View style={[s.progressShiftGroup, { borderLeftColor: palette.warning }]}>
+              <Text style={[s.progressShiftGroupLabel, { color: palette.warning }]}>
+                {t("report.progress.unresolved")}
+              </Text>
+              {patternShifts.unresolved.map((p, i) => (
+                <View key={i} style={s.progressShiftItem}>
+                  <Text style={s.progressShiftPair}>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    {" → "}
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                  </Text>
+                  <Text style={s.progressShiftCount}>
+                    {t("report.progress.patternTimes", { count: p.count })}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {patternShifts.emerging?.length ? (
+            <View style={[s.progressShiftGroup, { borderLeftColor: palette.purple }]}>
+              <Text style={[s.progressShiftGroupLabel, { color: palette.purple }]}>
+                {t("report.progress.emerging")}
+              </Text>
+              {patternShifts.emerging.map((p, i) => (
+                <View key={i} style={s.progressShiftItem}>
+                  <Text style={s.progressShiftPair}>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    {" → "}
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                  </Text>
+                  <Text style={s.progressShiftCount}>
+                    {t("report.progress.patternTimes", { count: p.count })}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </AnimatedSection>
+      ) : null}
+
+      {/* ── 4. ATTRIBUTIONS ── */}
+      {hasAttributions ? (
+        <AnimatedSection index={3} style={s.section}>
+          <SectionHeader label={t("report.progress.attributionsTitle")} badge="weekly" t={t} />
+
+          {attributions.helped?.length ? (
+            attributions.helped.map((a, i) => (
+              <View key={`h-${i}`} style={[s.progressAttrCard, { borderLeftColor: palette.success }]}>
+                <View style={s.progressAttrHeader}>
+                  <Text style={{ fontSize: 14 }}>✓</Text>
+                  <Text style={[s.progressAttrLabel, { color: palette.success }]}>
+                    {t("report.progress.helped")}
+                  </Text>
+                </View>
+                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                {a.improvement ? (
+                  <Text style={[s.progressAttrNote, { color: palette.success }]}>
+                    {t("report.progress.improvedBy", { value: a.improvement.toFixed(1) })}
+                  </Text>
+                ) : null}
+              </View>
+            ))
+          ) : null}
+
+          {attributions.notWorking?.length ? (
+            attributions.notWorking.map((a, i) => (
+              <View key={`n-${i}`} style={[s.progressAttrCard, { borderLeftColor: palette.warning }]}>
+                <View style={s.progressAttrHeader}>
+                  <Text style={{ fontSize: 14 }}>✕</Text>
+                  <Text style={[s.progressAttrLabel, { color: palette.warning }]}>
+                    {t("report.progress.notWorking")}
+                  </Text>
+                </View>
+                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                {a.note ? <Text style={s.progressAttrNote}>{a.note}</Text> : null}
+              </View>
+            ))
+          ) : null}
+
+          {attributions.needsAttention?.length ? (
+            attributions.needsAttention.map((a, i) => (
+              <View key={`a-${i}`} style={[s.progressAttrCard, { borderLeftColor: palette.danger }]}>
+                <View style={s.progressAttrHeader}>
+                  <Text style={{ fontSize: 14 }}>⚠️</Text>
+                  <Text style={[s.progressAttrLabel, { color: palette.danger }]}>
+                    {t("report.progress.needsAttention")}
+                  </Text>
+                </View>
+                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                {a.note ? <Text style={s.progressAttrNote}>{a.note}</Text> : null}
+              </View>
+            ))
+          ) : null}
+        </AnimatedSection>
+      ) : null}
+
+      {/* ── 5. WEEK BY WEEK ── */}
+      {weeklySnapshots?.length >= 2 ? (
+        <AnimatedSection index={4} style={s.section}>
+          <SectionHeader label={t("report.progress.weeklyTitle")} badge="live" t={t} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.progressWeekScroll}>
+            {weeklySnapshots.map((week) => {
+              const color = toneColor(week.tone);
+              return (
+                <View key={week.weekLabel} style={s.progressWeekCard}>
+                  <Text style={s.progressWeekLabel}>{week.weekLabel}</Text>
+                  <Text style={[s.progressWeekEmoji]}>{toneEmoji(week.tone)}</Text>
+                  <Text style={[s.progressWeekScore, { color }]}>
+                    {week.score?.toFixed(1) || "—"}
+                  </Text>
+                  {week.stability !== null ? (
+                    <Text style={s.progressWeekMeta}>
+                      {Math.round(week.stability * 100)}%
+                    </Text>
+                  ) : null}
+                  <Text style={s.progressWeekMoments}>
+                    {t("report.progress.weekMoments", { count: week.moments })}
+                  </Text>
+                  <Text style={s.progressWeekDate}>
+                    {week.startDate ? new Date(week.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </AnimatedSection>
+      ) : null}
+
+      {/* ── 6. CONFIDENCE ── */}
+      <AnimatedSection index={5} style={s.section}>
+        <View style={s.card}>
+          <Text style={s.aiSummary}>
+            {dataQuality?.confidence === "strong"
+              ? t("report.progress.confidenceStrong", { weeks: dataQuality.weeksAvailable })
+              : dataQuality?.confidence === "moderate"
+              ? t("report.progress.confidenceModerate", { weeks: dataQuality.weeksAvailable })
+              : t("report.progress.confidenceEmerging")}
+          </Text>
+        </View>
+      </AnimatedSection>
+
+      {!isSignedIn ? (
+        <View style={{ marginTop: 8 }}>
+          <PrimaryButton label={t("report.signInDeepen")} onPress={handleSignIn} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ── Tab 5: Premium (decision-oriented) ── */
 
 function getDirectionText(report) {
   if (report?.llmInsight?.narrative) {
@@ -1322,6 +1722,7 @@ export function WeeklyReportScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [activeTab, setActiveTab] = useState("mirror");
   const [modes, setModes] = useState(null);
+  const [progress, setProgress] = useState(null);
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -1355,6 +1756,15 @@ export function WeeklyReportScreen() {
       fetchModes(token).then(setModes).catch(() => null);
     }
   }, [isPremium, token]);
+
+  // Load progress metrics
+  useEffect(() => {
+    if (token || deviceId) {
+      fetchProgress(token, deviceId)
+        .then((res) => setProgress(res?.progress || null))
+        .catch(() => null);
+    }
+  }, [token, deviceId]);
 
   const handleModeFeedback = useCallback((mode, itemId, response) => {
     if (token) {
@@ -1472,6 +1882,11 @@ export function WeeklyReportScreen() {
                 <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} />
               ) : activeTab === "week" ? (
                 <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} />
+              ) : activeTab === "progress" ? (
+                <ProgressTab
+                  progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
+                  handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t}
+                />
               ) : activeTab === "actions" ? (
                 <ActionsTab report={report} deviceId={deviceId} token={token} t={t} />
               ) : (
@@ -1976,4 +2391,75 @@ const s = StyleSheet.create({
   modeFeedbackDone: { paddingVertical: 6, marginTop: 2 },
   modeFeedbackDoneText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
   modeFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
+
+  /* ── Progress tab ── */
+  progressArc: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingVertical: 20, paddingHorizontal: 8, gap: 0,
+  },
+  progressArcNode: { alignItems: "center", gap: 4, width: 80 },
+  progressArcConnector: {
+    flex: 1, flexDirection: "row", alignItems: "center", marginHorizontal: -4,
+  },
+  progressArcLine: { flex: 1, height: 2, backgroundColor: palette.glassBorder },
+  progressArcEmoji: { fontSize: 22 },
+  progressArcScore: { color: palette.text, fontSize: 18, fontWeight: "800" },
+  progressArcLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  progressArcDelta: {
+    alignSelf: "center", flexDirection: "row", alignItems: "center",
+    backgroundColor: "rgba(94,230,160,0.12)", borderRadius: radius.pill,
+    paddingHorizontal: 10, paddingVertical: 4, marginTop: 8,
+  },
+  progressArcDeltaText: { fontSize: 12, fontWeight: "700" },
+  progressDirectionBadge: {
+    alignSelf: "center", borderRadius: radius.pill,
+    paddingHorizontal: 12, paddingVertical: 5, marginTop: 6,
+  },
+  progressDirectionText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
+  progressMetricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  progressMetricCard: {
+    flex: 1, minWidth: "45%", borderRadius: radius.md, padding: 12, gap: 6,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  progressMetricHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  progressMetricIcon: { fontSize: 16 },
+  progressMetricLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  progressThenNow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  progressThenNowItem: { alignItems: "center", gap: 1 },
+  progressThenNowLabel: { color: palette.muted, fontSize: 8, fontWeight: "700", textTransform: "uppercase" },
+  progressThenNowValue: { color: palette.text, fontSize: 16, fontWeight: "800" },
+  progressThenNowArrow: { color: palette.muted, fontSize: 14, marginHorizontal: 2 },
+  progressTrendBadge: {
+    alignSelf: "flex-start", borderRadius: radius.pill,
+    paddingHorizontal: 8, paddingVertical: 2, marginTop: 2,
+  },
+  progressTrendBadgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.3 },
+  progressShiftGroup: { gap: 6 },
+  progressShiftGroupLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.4, textTransform: "uppercase" },
+  progressShiftItem: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: palette.glass, borderRadius: radius.sm, padding: 10,
+    borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  progressShiftPair: { color: palette.text, fontSize: 13, fontWeight: "600" },
+  progressShiftCount: { color: palette.muted, fontSize: 11, fontWeight: "700" },
+  progressAttrCard: {
+    borderRadius: radius.md, padding: 12, gap: 4,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  progressAttrHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  progressAttrLabel: { color: palette.text, fontSize: 13, fontWeight: "700" },
+  progressAttrTrigger: { color: palette.accent, fontSize: 13, fontWeight: "700" },
+  progressAttrNote: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
+  progressWeekScroll: { gap: 8, paddingVertical: 4 },
+  progressWeekCard: {
+    width: 120, borderRadius: radius.md, padding: 12, gap: 4, alignItems: "center",
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  progressWeekLabel: { color: palette.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase" },
+  progressWeekEmoji: { fontSize: 20 },
+  progressWeekScore: { color: palette.text, fontSize: 18, fontWeight: "800" },
+  progressWeekMeta: { color: palette.muted, fontSize: 10, fontWeight: "600" },
+  progressWeekMoments: { color: palette.textSecondary, fontSize: 10 },
+  progressWeekDate: { color: palette.muted, fontSize: 9 },
 });
