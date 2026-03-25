@@ -13,7 +13,8 @@
     "pleaseWait": "Please wait...",
     "cancel": "Cancel",
     "save": "Save",
-    "done": "Done"
+    "done": "Done",
+    "retryError": "Something went wrong — tap to retry"
   },
   "triggers": {
     "work": "Work",
@@ -122,7 +123,18 @@
     "loadingTitle": "Loading your timeline",
     "loadingMessage": "Fetching your latest logged moments.",
     "timeoutMessage": "Unable to load timeline. Check connection.",
-    "tooltip": "Your timeline shows how triggers connect to emotions over time."
+    "tooltip": "Your timeline shows how triggers connect to emotions over time.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete moment?",
+    "deleteConfirmBody": "This cannot be undone.",
+    "emptyTitle": "No moments yet",
+    "emptyBody": "Start logging triggers and emotions to see your timeline come to life.",
+    "retryLabel": "Retry",
+    "editFailed": "Edit failed",
+    "deleteFailed": "Delete failed"
   },
   "prediction": {
     "title": "How do you think today will feel?"
@@ -133,6 +145,36 @@
     "building": "Building momentum.",
     "strong": "Strong habit forming.",
     "legendary": "Legendary awareness streak."
+  },
+  "garden": {
+    "title": "Today's garden",
+    "bloomCount": "{count} bloom",
+    "bloomCountPlural": "{count} blooms"
+  },
+  "feedback": {
+    "patternForming": "{trigger} + {emotion} — {count} times this week. A pattern is forming.",
+    "echoes": {
+      "calm1": "A calm moment — let that settle in.",
+      "calm2": "Stillness noted. Your body remembers this.",
+      "calm3": "That quiet feeling matters more than you think.",
+      "neutral1": "Steady ground. Not every moment needs to be loud.",
+      "neutral2": "Noted — even the in-between matters.",
+      "neutral3": "Sometimes neutral is exactly enough.",
+      "anxious1": "That tension you're carrying — we see it.",
+      "anxious2": "Anxiety logged. Naming it is already a step.",
+      "anxious3": "You showed up even when it felt heavy.",
+      "frustrated1": "Frustration acknowledged. You didn't push it away.",
+      "frustrated2": "That friction is real — and now it's visible.",
+      "frustrated3": "Logged. Frustration loses power when it's seen.",
+      "energized1": "That spark — hold onto it.",
+      "energized2": "Energy captured. This is the fuel you come back to.",
+      "energized3": "Momentum logged. Remember what brought you here."
+    }
+  },
+  "microInsight": {
+    "triggerEmotion": "When {trigger} comes up, you often end up feeling {emotion}. That pattern showed {count} times recently.",
+    "dominantEmotion": "You've been feeling {emotion} about {pct}% of the time. It's your dominant state lately.",
+    "escalating": "{trigger} has been showing up more often recently. Something may have shifted."
   },
   "weather": {
     "quiet": "Quiet",
@@ -351,6 +393,21 @@
     "falseRecoveryBody": "Scores look normal but the underlying pattern hasn't resolved.",
     "maskingLevel": "Masking: {level}",
     "maskingBody": "Your reported emotions may not be telling the full story.",
+    "innerState": "Inner State",
+    "vacuumScore": "Your emotional ground state",
+    "vacuumScoreValue": "{score}/5",
+    "vacuumDriftRising": "Internal state trending up",
+    "vacuumDriftFalling": "Internal state trending down",
+    "vacuumDriftStable": "Internal state holding steady",
+    "vacuumExplainer": "How you'd feel if nothing external happened — your true emotional baseline stripped of trigger influence.",
+    "contextBleed": "Context Bleed",
+    "contextBleedBody": "Emotions from {source} are carrying into your {target} interactions.",
+    "contextBleedExplainer": "When one area of life colours how you feel in another — emotional carry-over between triggers.",
+    "internalSignal": "Internal Signal",
+    "internalDriven": "This week, your emotional shifts were mostly internally driven.",
+    "externalDriven": "This week, your emotions were mostly shaped by situations.",
+    "mixedDriven": "This week, your emotions were a mix of internal state and external situations.",
+    "invokedAvgLabel": "Internal influence: {value}",
     "confidenceLabel": "Confidence",
     "basedOnMoments": "Based on {moments} moments across {days} days",
     "weeklySummary": "Weekly summary",
@@ -498,6 +555,9 @@
       "leverHelped": "Effective for you",
       "snapshot": "Behaviour Snapshot",
       "snapshotHint": "Key metrics at a glance.",
+      "vacuum": "Inner State",
+      "vacuumLabel": "Vacuum",
+      "internalInfluence": "Internal",
       "baseline": "Baseline",
       "recentAvg": "Recent avg",
       "drift": "Drift",
@@ -522,7 +582,7 @@
         "move": "Move",
         "fuel": "Fuel",
         "perspective": "Perspective",
-        "coreBody": "Your core analysis is above. Switch to Move, Fuel, or Perspective for personalised guidance based on your emotional patterns.",
+        "coreBody": "Your core TriggerMap analysis is below. Switch to Move, Fuel, or Perspective for personalised guidance based on your emotional patterns.",
         "generating": "Generating your personalised guidance...",
         "warmTitle": "Guidance is being prepared",
         "warmBody": "We're building personalised Move, Fuel, and Perspective suggestions from your patterns. Check back tomorrow for fresh guidance tailored to your week.",

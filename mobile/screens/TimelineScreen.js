@@ -58,10 +58,10 @@ function mergeSimilarMoments(moments) {
   return merged;
 }
 
-function groupByDay(moments) {
+function groupByDay(moments, t, lang) {
   const groups = {};
   for (const moment of moments) {
-    const label = getRelativeDayLabel(moment.timestamp);
+    const label = getRelativeDayLabel(moment.timestamp, t, lang);
     if (!groups[label]) {
       groups[label] = [];
     }
@@ -73,7 +73,7 @@ function groupByDay(moments) {
 export function TimelineScreen() {
   const router = useRouter();
   const { loadTimeline, updateMoment, removeMoment, user, token } = useAppSession();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -83,9 +83,9 @@ export function TimelineScreen() {
 
   const dayGroups = useMemo(() => {
     const merged = mergeSimilarMoments(moments);
-    return groupByDay(merged);
-  }, [moments]);
-  const microInsights = useMemo(() => generateMicroInsights(moments), [moments]);
+    return groupByDay(merged, t, lang);
+  }, [moments, t, lang]);
+  const microInsights = useMemo(() => generateMicroInsights(moments, t), [moments, t]);
 
   // Identify the newest moment for highlighting
   const newestMomentId = useMemo(() => {
@@ -122,7 +122,7 @@ export function TimelineScreen() {
       }
     } catch {
       setMoments([]);
-      setError("Unable to load timeline. Check connection.");
+      setError(t("timeline.unavailable"));
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ export function TimelineScreen() {
       setEditingMoment(null);
       await load();
     } catch (err) {
-      Alert.alert("Edit failed", err.message);
+      Alert.alert(t("timeline.editFailed"), err.message);
     }
   }, [updateMoment, load]);
 
@@ -153,7 +153,7 @@ export function TimelineScreen() {
       await removeMoment(moment.id);
       setMoments((prev) => prev.filter((m) => m.id !== moment.id));
     } catch (err) {
-      Alert.alert("Delete failed", err.message);
+      Alert.alert(t("timeline.deleteFailed"), err.message);
     }
   }, [removeMoment]);
 
@@ -201,7 +201,7 @@ export function TimelineScreen() {
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>{t("timeline.unavailable")}</Text>
           <Text style={styles.stateBody}>{error}</Text>
-          <PrimaryButton label="Retry" onPress={load} />
+          <PrimaryButton label={t("report.retry")} onPress={load} />
         </View>
       ) : null}
 
@@ -253,11 +253,11 @@ export function TimelineScreen() {
       {!moments.length && !loading && !error ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📝</Text>
-          <Text style={styles.emptyTitle}>No moments yet</Text>
+          <Text style={styles.emptyTitle}>{t("timeline.emptyTitle")}</Text>
           <Text style={styles.emptyBody}>
-            Start logging triggers and emotions to see{"\n"}your timeline come to life.
+            {t("timeline.emptyBody")}
           </Text>
-          <PrimaryButton label="Log a moment" onPress={() => router.push("/(tabs)/log")} />
+          <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
         </View>
       ) : null}
 

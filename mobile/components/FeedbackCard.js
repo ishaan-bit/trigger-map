@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const EMOTION_ICONS = {
   calm: "😌", neutral: "😐", anxious: "😰", frustrated: "😤", energized: "⚡",
@@ -45,9 +46,18 @@ const EMOTION_ECHOES = {
   ],
 };
 
-function getEcho(emotion) {
-  const echoes = EMOTION_ECHOES[emotion] || EMOTION_ECHOES.neutral;
-  return echoes[Math.floor(Math.random() * echoes.length)];
+const ECHO_KEYS = {
+  calm: ["calm1", "calm2", "calm3"],
+  neutral: ["neutral1", "neutral2", "neutral3"],
+  anxious: ["anxious1", "anxious2", "anxious3"],
+  frustrated: ["frustrated1", "frustrated2", "frustrated3"],
+  energized: ["energized1", "energized2", "energized3"],
+};
+
+function getEcho(emotion, t) {
+  const keys = ECHO_KEYS[emotion] || ECHO_KEYS.neutral;
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  return t("feedback.echoes." + key);
 }
 
 /**
@@ -58,6 +68,7 @@ export function FeedbackCard({ feedback, trigger, emotion, onDismiss }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const { t } = useLanguage();
 
   useEffect(() => {
     Animated.parallel([
@@ -91,9 +102,9 @@ export function FeedbackCard({ feedback, trigger, emotion, onDismiss }) {
   if (patternFeedback) {
     message = patternFeedback;
   } else if (pairCount >= 3) {
-    message = `${trigger} + ${emotion} — ${pairCount} times this week. A pattern is forming.`;
+    message = t("feedback.patternForming", { trigger: t("triggers." + trigger) || trigger, emotion: t("emotions." + emotion) || emotion, count: pairCount });
   } else {
-    message = getEcho(emotion);
+    message = getEcho(emotion, t);
   }
 
   const glowOpacity = glowAnim.interpolate({

@@ -1,6 +1,7 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { warning } from "@/utils/haptics";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -20,11 +21,16 @@ const EMOTION_ICONS = {
 };
 
 export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
+  const { t, lang } = useLanguage();
+  const triggerLabel = t("triggers." + moment.trigger) || moment.trigger;
+  const emotionLabel = t("emotions." + moment.emotion) || moment.emotion;
+  const locale = lang === "hi" ? "hi-IN" : "en-IN";
+
   function handleDelete() {
     warning();
-    Alert.alert("Delete moment?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => onDelete(moment) },
+    Alert.alert(t("timeline.deleteConfirmTitle"), t("timeline.deleteConfirmBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("timeline.delete"), style: "destructive", onPress: () => onDelete(moment) },
     ]);
   }
 
@@ -38,10 +44,10 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            <Text style={styles.trigger}>{moment.trigger}</Text>
+            <Text style={styles.trigger}>{triggerLabel}</Text>
             <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}28` }]}>
               <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || "•"}</Text>
-              <Text style={[styles.emotionLabel, { color: emotionColor }]}>{moment.emotion}</Text>
+              <Text style={[styles.emotionLabel, { color: emotionColor }]}>{emotionLabel}</Text>
             </View>
             {groupCount > 1 && (
               <View style={styles.countBadge}>
@@ -61,7 +67,7 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
           ) : null}
         </View>
         <Text style={styles.time}>
-          {new Date(moment.timestamp).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+          {new Date(moment.timestamp).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" })}
         </Text>
       </View>
       {(onEdit || onDelete) ? (
@@ -69,13 +75,13 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
           {onEdit ? (
             <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]} onPress={() => onEdit(moment)} hitSlop={8}>
               <Text style={styles.actionIcon}>✏️</Text>
-              <Text style={styles.actionLabel}>Edit</Text>
+              <Text style={styles.actionLabel}>{t("timeline.edit")}</Text>
             </Pressable>
           ) : null}
           {onDelete ? (
             <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]} onPress={handleDelete} hitSlop={8}>
               <Text style={styles.actionIcon}>🗑️</Text>
-              <Text style={[styles.actionLabel, { color: palette.danger }]}>Delete</Text>
+              <Text style={[styles.actionLabel, { color: palette.danger }]}>{t("timeline.delete")}</Text>
             </Pressable>
           ) : null}
         </View>

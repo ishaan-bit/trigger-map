@@ -5,6 +5,7 @@ const ALLOWED_JOBS = {
   generateWeeklyReports: '../../../../jobs/generateWeeklyReports.js',
   generateLlmInsights: '../../../../jobs/generateLlmInsights.js',
   generateFreePass: '../../../../jobs/generateFreePass.js',
+  generateAdaptiveModes: '../../../../jobs/generateAdaptiveModes.js',
 };
 
 const ALLOWED_LLM_MODELS = ['mistral', 'phi3', 'llama3', 'llama2', 'gemma', 'qwen2'];
@@ -44,6 +45,12 @@ export default async function handler(req, res) {
       result = await runGenerateFreePass({
         force: !!force,
         minMoments: minMoments || 5,
+        ownerIds,
+      });
+    } else if (job === 'generateAdaptiveModes') {
+      const { runGenerateAdaptiveModes } = await import('../../../../jobs/generateAdaptiveModes.js');
+      result = await runGenerateAdaptiveModes({
+        force: !!force,
         ownerIds,
       });
     }

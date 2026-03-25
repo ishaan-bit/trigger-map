@@ -21,6 +21,7 @@ const NAV = [
     group: 'Intelligence',
     items: [
       { label: 'KPIs & Signals', href: '/intelligence', icon: '◆' },
+      { label: 'Pilot Validation', href: '/pilot', icon: '⊕' },
       { label: 'Users', href: '/users', icon: '●' },
       { label: 'Insights', href: '/insights', icon: '✦' },
     ],

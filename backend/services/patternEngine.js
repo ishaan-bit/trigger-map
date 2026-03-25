@@ -354,12 +354,17 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     // Cross-context contamination
     const contamination = detectContamination(moments, correlations);
 
+    const weeklyInvokedAvg = dailyInvoked.length > 0
+      ? Number((dailyInvoked.reduce((s, d) => s + d.meanInvoked, 0) / dailyInvoked.length).toFixed(3))
+      : 0;
+
     invokedMetrics = {
       dailyInvoked,
+      weeklyInvokedAvg,
       vacuumTrajectory,
       currentVacuum: lastVacuum,
       vacuumDrift: Number((lastVacuum - baselineScore).toFixed(3)),
-      masking,
+      weeklyMasking: masking,
       residueHotspots: residueHotspots.slice(0, 5),
       contamination: contamination.slice(0, 3),
     };

@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { tap } from "@/utils/haptics";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const TRIGGER_ICONS = {
   work: "🏢",
@@ -34,6 +35,8 @@ const TRIGGER_TINTS = {
 export function TriggerTile({ label, onPress }) {
   const tint = TRIGGER_TINTS[label] || TRIGGER_TINTS.other;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { t } = useLanguage();
+  const displayLabel = t("triggers." + label) || label;
 
   function handlePressIn() {
     tap();
@@ -58,7 +61,7 @@ export function TriggerTile({ label, onPress }) {
     <Animated.View style={[styles.tileWrap, { transform: [{ scale: scaleAnim }] }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Log ${label} trigger`}
+        accessibilityLabel={displayLabel}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -67,7 +70,7 @@ export function TriggerTile({ label, onPress }) {
         <View style={[styles.iconWrap, { shadowColor: tint.glow }]}>
           <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
         </View>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label}>{displayLabel}</Text>
       </Pressable>
     </Animated.View>
   );

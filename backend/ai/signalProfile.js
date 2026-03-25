@@ -84,7 +84,7 @@ export function buildSignalProfile(report) {
     else if (im.vacuumDrift < -0.15) vacuumDrift = 'negative';
     else if (im.vacuumDrift > 0.15) vacuumDrift = 'positive';
 
-    maskingLevel = im.masking?.level || 'none';
+    maskingLevel = im.weeklyMasking?.level || 'none';
     residueContamination = im.contamination?.length > 0;
   }
 

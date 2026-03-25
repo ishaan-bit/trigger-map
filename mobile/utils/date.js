@@ -1,4 +1,4 @@
-export function getRelativeDayLabel(timestamp) {
+export function getRelativeDayLabel(timestamp, t, lang) {
   const input = new Date(timestamp);
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -6,13 +6,14 @@ export function getRelativeDayLabel(timestamp) {
   const diffDays = Math.round((startOfToday - startOfInput) / 86400000);
 
   if (diffDays === 0) {
-    return "Today";
+    return t ? t("timeline.today") : "Today";
   }
   if (diffDays === 1) {
-    return "Yesterday";
+    return t ? t("timeline.yesterday") : "Yesterday";
   }
 
-  return input.toLocaleDateString("en-IN", {
+  const locale = lang === "hi" ? "hi-IN" : "en-IN";
+  return input.toLocaleDateString(locale, {
     weekday: "long",
     day: "numeric",
     month: "short",

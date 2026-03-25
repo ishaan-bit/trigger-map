@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { emotionTap } from "@/utils/haptics";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const EMOTION_ICONS = {
   calm: "😌",
@@ -31,6 +32,8 @@ export function EmotionChip({ label, active, onPress }) {
   const tint = EMOTION_TINTS[label] || EMOTION_TINTS.neutral;
   const accentColor = EMOTION_ACCENT[label] || palette.muted;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const { t } = useLanguage();
+  const displayLabel = t("emotions." + label) || label;
 
   useEffect(() => {
     if (active) {
@@ -46,7 +49,7 @@ export function EmotionChip({ label, active, onPress }) {
       <Pressable
         onPress={() => { emotionTap(label); onPress?.(); }}
         accessibilityRole="button"
-        accessibilityLabel={`Select ${label} emotion`}
+        accessibilityLabel={displayLabel}
         style={({ pressed }) => [
           styles.chip,
           {
@@ -60,7 +63,7 @@ export function EmotionChip({ label, active, onPress }) {
         <View style={[styles.iconWrap, { backgroundColor: active ? `${accentColor}33` : "rgba(255,255,255,0.08)" }]}>
           <Text style={styles.icon}>{EMOTION_ICONS[label] || "•"}</Text>
         </View>
-        <Text style={[styles.label, active && { color: palette.text }]}>{label}</Text>
+        <Text style={[styles.label, active && { color: palette.text }]}>{displayLabel}</Text>
       </Pressable>
     </Animated.View>
   );

@@ -4,7 +4,7 @@ const MIN_MOMENTS = 5;
  * Generate client-side micro-insight strings from a list of moments.
  * Returns an array of plain-text observation strings (max ~3).
  */
-export function generateMicroInsights(moments) {
+export function generateMicroInsights(moments, t) {
   if (!moments || moments.length < MIN_MOMENTS) {
     return [];
   }
@@ -36,7 +36,13 @@ export function generateMicroInsights(moments) {
 
   if (topPair && topPairCount >= 2) {
     const [trigger, emotion] = topPair.split("→");
-    insights.push(`When ${trigger} comes up, you often end up feeling ${emotion}. That pattern showed ${topPairCount} times recently.`);
+    const triggerName = t ? (t("triggers." + trigger) || trigger) : trigger;
+    const emotionName = t ? (t("emotions." + emotion) || emotion) : emotion;
+    if (t) {
+      insights.push(t("microInsight.triggerEmotion", { trigger: triggerName, emotion: emotionName, count: topPairCount }));
+    } else {
+      insights.push(`When ${trigger} comes up, you often end up feeling ${emotion}. That pattern showed ${topPairCount} times recently.`);
+    }
   }
 
   // Find dominant emotion
@@ -45,7 +51,12 @@ export function generateMicroInsights(moments) {
     const [topEmotion, topCount] = sortedEmotions[0];
     const pct = Math.round((topCount / moments.length) * 100);
     if (pct >= 40) {
-      insights.push(`You've been feeling ${topEmotion} about ${pct}% of the time. It's your dominant state lately.`);
+      const emotionName = t ? (t("emotions." + topEmotion) || topEmotion) : topEmotion;
+      if (t) {
+        insights.push(t("microInsight.dominantEmotion", { emotion: emotionName, pct }));
+      } else {
+        insights.push(`You've been feeling ${topEmotion} about ${pct}% of the time. It's your dominant state lately.`);
+      }
     }
   }
 
@@ -63,7 +74,12 @@ export function generateMicroInsights(moments) {
     const newer = newerTriggers[trigger] || 0;
     const older = olderTriggers[trigger] || 0;
     if (newer >= 3 && newer > older * 2) {
-      insights.push(`${trigger} has been showing up more often recently. Something may have shifted.`);
+      const triggerName = t ? (t("triggers." + trigger) || trigger) : trigger;
+      if (t) {
+        insights.push(t("microInsight.escalating", { trigger: triggerName }));
+      } else {
+        insights.push(`${trigger} has been showing up more often recently. Something may have shifted.`);
+      }
       break;
     }
   }

@@ -582,7 +582,7 @@ async function testArchetype(personality) {
   if (im) {
     console.log("\n── Invoked Metrics ──");
     console.log(`  currentVacuum: ${im.currentVacuum.toFixed(2)} | vacuumDrift: ${im.vacuumDrift > 0 ? "+" : ""}${im.vacuumDrift.toFixed(2)}`);
-    console.log(`  masking: ${im.masking.coefficient.toFixed(2)} (${im.masking.level})${im.masking.alert ? " ⚠ ALERT" : ""}`);
+    console.log(`  masking: ${im.weeklyMasking.coefficient.toFixed(2)} (${im.weeklyMasking.level})${im.weeklyMasking.alert ? " ⚠ ALERT" : ""}`);
     if (im.contamination?.length) {
       console.log(`  contamination: ${im.contamination.map(c => `${c.sourceTrigger}→${c.affectedTriggers.join(",")}`).join("; ")}`);
     }

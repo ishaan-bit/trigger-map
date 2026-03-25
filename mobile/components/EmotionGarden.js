@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 /**
  * EmotionGarden — a visual row of "planted" emotion seeds from today's moments.
@@ -20,6 +21,7 @@ const BLOOM = {
 export function EmotionGarden({ moments }) {
   const todayBlooms = getTodayBlooms(moments);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (todayBlooms.length > 0) {
@@ -32,8 +34,8 @@ export function EmotionGarden({ moments }) {
   return (
     <Animated.View style={[styles.wrap, { opacity: fadeAnim }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Today's garden</Text>
-        <Text style={styles.count}>{todayBlooms.length} bloom{todayBlooms.length !== 1 ? "s" : ""}</Text>
+        <Text style={styles.title}>{t("garden.title")}</Text>
+        <Text style={styles.count}>{todayBlooms.length !== 1 ? t("garden.bloomCountPlural", { count: todayBlooms.length }) : t("garden.bloomCount", { count: todayBlooms.length })}</Text>
       </View>
       <View style={styles.row}>
         {todayBlooms.map((b, i) => (
@@ -53,6 +55,7 @@ export function EmotionGarden({ moments }) {
 function BloomItem({ bloom, index, isNewest }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const targetScale = isNewest ? 1.15 : 1;
+  const { t } = useLanguage();
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -78,7 +81,7 @@ function BloomItem({ bloom, index, isNewest }) {
     }]}>
       <Text style={styles.bloomIcon}>{icon}</Text>
       <View style={[styles.bloomGlow, { backgroundColor: eStyle.color }]} />
-      <Text style={[styles.bloomLabel, { color: eStyle.color }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.bloomLabel, { color: eStyle.color }]} numberOfLines={1}>{t("emotions." + label) || label}</Text>
     </Animated.View>
   );
 }

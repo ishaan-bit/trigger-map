@@ -201,7 +201,7 @@ function buildSignals(report, recentNotes, actionFeedback) {
   const cp = report.compoundPatterns;
   if (im) {
     lines.push(`Vacuum state (emotional ground truth with trigger influence removed): ${im.currentVacuum.toFixed(2)}/5, drift from baseline: ${im.vacuumDrift > 0 ? "+" : ""}${im.vacuumDrift.toFixed(2)}.`);
-    lines.push(`Masking coefficient: ${im.masking.coefficient.toFixed(2)} (${im.masking.level}). ${im.masking.alert ? "ALERT: behavioral patterns diverge from reported stability." : ""}`);
+    lines.push(`Masking coefficient: ${im.weeklyMasking.coefficient.toFixed(2)} (${im.weeklyMasking.level}). ${im.weeklyMasking.alert ? "ALERT: behavioral patterns diverge from reported stability." : ""}`);
     if (im.contamination?.length) {
       const hotspots = im.contamination.map(c => `${c.sourceTrigger} → ${c.affectedTriggers.join(", ")}`);
       lines.push(`Context contamination: emotions from ${hotspots.join("; ")} bleed across contexts.`);

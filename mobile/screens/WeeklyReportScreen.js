@@ -47,11 +47,11 @@ function cleanText(str) {
 function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
-  const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this|suggestion|action\s*(?:item|step))[ \t]*:?/gmi;
+  const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this|suggestion|action\s*(?:item|step)|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[ \t]*:?/gmi;
   const labelMap = [
-    /(?:what (?:stood|stands) out|(?:most )?notable pattern)/i,
-    /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor))/i,
-    /(?:one thing to try|something to try|try this|suggestion|action\s*(?:item|step))/i,
+    /(?:what (?:stood|stands) out|(?:most )?notable pattern|क्या ख़ास रहा)/i,
+    /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)|क्या कारण हो सकता है)/i,
+    /(?:one thing to try|something to try|try this|suggestion|action\s*(?:item|step)|एक बात आज़माएँ)/i,
   ];
   const hits = [];
   let m;
@@ -83,8 +83,22 @@ function parseLlmSections(narrative) {
     }
     return result;
   }
-  const chunks = text.split(/\n\s*\n/).filter(Boolean).slice(0, 3);
-  const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what may be contributing|one thing to try)[:\s]*/i, "").trim();
+  // Fallback: split on paragraph breaks, then try sentence-based splitting
+  let chunks = text.split(/\n\s*\n/).filter(Boolean);
+  if (chunks.length < 3) {
+    // Try splitting one long paragraph into ~3 sentence groups
+    const sentences = text.split(/(?<=[.!?\u0964])\s+/).filter(s => s.length > 5);
+    if (sentences.length >= 3) {
+      const perChunk = Math.ceil(sentences.length / 3);
+      chunks = [
+        sentences.slice(0, perChunk).join(" "),
+        sentences.slice(perChunk, perChunk * 2).join(" "),
+        sentences.slice(perChunk * 2).join(" "),
+      ].filter(Boolean);
+    }
+  }
+  chunks = chunks.slice(0, 3);
+  const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what may be contributing|one thing to try|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[:\s]*/i, "").trim();
   return [
     stripHeader(chunks[0] || text),
     chunks[1] ? stripHeader(chunks[1]) : null,
@@ -116,6 +130,17 @@ function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(
 function triggerDisplay(key, t) {
   const mapped = t ? t("triggers." + key) : null;
   return mapped && mapped !== "triggers." + key ? mapped : capitalize(key);
+}
+
+function emotionDisplay(key, t) {
+  const mapped = t ? t("emotions." + key) : null;
+  return mapped && mapped !== "emotions." + key ? mapped : capitalize(key);
+}
+
+function localeDateStr(dateStr, lang, opts) {
+  if (!dateStr) return "";
+  const locale = lang === "hi" ? "hi-IN" : "en-IN";
+  return new Date(dateStr).toLocaleDateString(locale, opts || { day: "numeric", month: "short" });
 }
 
 function scoreTone(score, t) {
@@ -227,7 +252,7 @@ function NarrativeCard({ icon, title, items, positive, t }) {
               <>
                 <Text style={{ color: TRIGGER_COLORS[item.trigger] || palette.accent, fontWeight: "600" }}>{triggerDisplay(item.trigger, t)}</Text>
                 {positive ? (t ? t("report.helpsFeel") : " helps you feel ") : (t ? t("report.leavesFeeling") : " tends to leave you feeling ")}
-                <Text style={{ color: EMOTION_COLORS[item.emotion] || palette.textSecondary, fontWeight: "600" }}>{item.emotion}</Text>
+                <Text style={{ color: EMOTION_COLORS[item.emotion] || palette.textSecondary, fontWeight: "600" }}>{t("emotions." + item.emotion) || item.emotion}</Text>
                 {item.count ? ` (${item.count}×)` : ""}
               </>
             ) : item.text}
@@ -345,7 +370,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
                 <View key={i} style={[s.driverRow, i < drivers.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.glassBorder }]}>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger, t)}</Text>
-                    {d.emotion ? <Text style={s.driverEmotion}>{d.emotion} · {d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
+                    {d.emotion ? <Text style={s.driverEmotion}>{t("emotions." + d.emotion) || d.emotion} · {d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
                   </View>
                   <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
                     <Text style={[s.effectBadgeText, { color: effectColor }]}>{effectLabel}</Text>
@@ -373,7 +398,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
                   </View>
                   <Text style={s.loopArrow}>→</Text>
                   <View style={[s.loopNode, { backgroundColor: emoColor + "20" }]}>
-                    <Text style={[s.loopNodeText, { color: emoColor }]}>{EMOTION_EMOJIS[loop.emotion] || "•"} {loop.emotion}</Text>
+                    <Text style={[s.loopNodeText, { color: emoColor }]}>{EMOTION_EMOJIS[loop.emotion] || "•"} {t("emotions." + loop.emotion) || loop.emotion}</Text>
                   </View>
                   {loop.recovery ? (
                     <>
@@ -427,9 +452,55 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
         </AnimatedSection>
       ) : null}
 
+      {/* Inner State — Vacuum state score + drift */}
+      {invoked?.currentVacuum != null ? (
+        <AnimatedSection index={4} style={s.section}>
+          <SectionHeader label={t("report.innerState")} badge="weekly" t={t} />
+          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.purple }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ gap: 2 }}>
+                <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
+                  {scoreTone(invoked.currentVacuum, t).emoji} {t("report.vacuumScoreValue", { score: invoked.currentVacuum.toFixed(1) })}
+                </Text>
+                <Text style={{ color: palette.textSecondary, fontSize: 12 }}>{t("report.vacuumScore")}</Text>
+              </View>
+              {invoked.vacuumDrift != null ? (
+                <View style={{ alignItems: "flex-end", gap: 2 }}>
+                  <DeltaChip value={invoked.vacuumDrift} />
+                  <Text style={{ color: palette.muted, fontSize: 11 }}>
+                    {invoked.vacuumDrift > 0.15 ? t("report.vacuumDriftRising") : invoked.vacuumDrift < -0.15 ? t("report.vacuumDriftFalling") : t("report.vacuumDriftStable")}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={{ color: palette.muted, fontSize: 11, marginTop: 6 }}>{t("report.vacuumExplainer")}</Text>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* Context Bleed — emotional carry-over between triggers */}
+      {invoked?.contamination?.length > 0 ? (
+        <AnimatedSection index={5} style={s.section}>
+          <SectionHeader label={t("report.contextBleed")} badge="weekly" t={t} />
+          <View style={s.card}>
+            {invoked.contamination.slice(0, 3).map((c, i) => (
+              <View key={i} style={[s.signalRow, i > 0 && { borderTopWidth: 1, borderTopColor: palette.glassBorder, paddingTop: 8, marginTop: 4 }]}>
+                <Text style={{ fontSize: 16 }}>🔗</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: palette.text, fontSize: 13, fontWeight: "600" }}>
+                    {t("report.contextBleedBody", { source: triggerDisplay(c.sourceTrigger, t), target: c.affectedTriggers.map(tr => triggerDisplay(tr, t)).join(", ") })}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            <Text style={{ color: palette.muted, fontSize: 11, marginTop: 6 }}>{t("report.contextBleedExplainer")}</Text>
+          </View>
+        </AnimatedSection>
+      ) : null}
+
       {/* Actionable Direction */}
       {direction ? (
-        <AnimatedSection index={4} style={s.section}>
+        <AnimatedSection index={6} style={s.section}>
           <SectionHeader label={t("report.direction")} badge="weekly" t={t} />
           <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: tone?.color || palette.accent }]}>
             <Text style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}>{direction}</Text>
@@ -481,7 +552,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
 
 /* ── Tab 2: This Week (temporal) ── */
 
-function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
+function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) {
   const bm = report?.baselineMetrics;
   const deltas = report?.weeklyDeltas;
   const triggerEntries = topEntries(report?.triggerFrequency, 9);
@@ -514,9 +585,32 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
         </AnimatedSection>
       ) : null}
 
+      {/* Internal Signal — evoked vs invoked summary */}
+      {report?.invokedMetrics?.weeklyInvokedAvg != null ? (() => {
+        const avg = report.invokedMetrics.weeklyInvokedAvg;
+        const absAvg = Math.abs(avg);
+        const signalText = absAvg > 0.4 ? t("report.internalDriven") : absAvg < 0.15 ? t("report.externalDriven") : t("report.mixedDriven");
+        const signalColor = avg > 0.3 ? palette.success : avg < -0.3 ? palette.warning : palette.accent;
+        const signalIcon = avg > 0.3 ? "🧘" : avg < -0.3 ? "⚡" : "⚖️";
+        return (
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.internalSignal")} badge="weekly" t={t} />
+            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: signalColor }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 18 }}>{signalIcon}</Text>
+                <Text style={{ color: palette.text, fontSize: 13, lineHeight: 19, flex: 1 }}>{signalText}</Text>
+              </View>
+              <Text style={{ color: palette.muted, fontSize: 11, marginTop: 4 }}>
+                {t("report.invokedAvgLabel", { value: (avg > 0 ? "+" : "") + avg.toFixed(2) })}
+              </Text>
+            </View>
+          </AnimatedSection>
+        );
+      })() : null}
+
       {/* Emotional trajectory */}
       {report.weeklyEmotionTrajectory?.length >= 1 ? (
-        <AnimatedSection index={1} style={s.section}>
+        <AnimatedSection index={2} style={s.section}>
           <SectionHeader label={t("report.emotionalTone")} badge="live" t={t} />
           <View style={s.card}>
             <Text style={s.trajectoryHint}>
@@ -530,7 +624,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
                   <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
                     <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
                     <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
-                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}</Text>
+                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { weekday: "short" })}</Text>
                   </Pressable>
                 );
               })}
@@ -558,7 +652,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
                 return (
                   <View style={[s.driftDay, { borderColor: color + "40" }]} key={day.date}>
                     <Text style={[s.driftBar, { color }]}>{day.deviation > 0 ? "+" : ""}{day.deviation.toFixed(1)}</Text>
-                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString("en-IN", { weekday: "short" })}</Text>
+                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { weekday: "short" })}</Text>
                   </View>
                 );
               })}
@@ -573,7 +667,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
           <SectionHeader label={t("report.emotionsTitle")} badge="live" t={t} extra={t("report.recorded", { count: dq.uniqueEmotions || 0 })} />
           <View style={s.card}>
             {emotionEntries.map(([key, value]) => (
-              <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
+              <HBar key={key} label={t("emotions." + key) || key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
             ))}
           </View>
         </AnimatedSection>
@@ -585,7 +679,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
           <SectionHeader label={t("report.triggersTitle")} badge="live" t={t} extra={t("report.areasCount", { count: dq.uniqueTriggers || 0 })} />
           <View style={s.card}>
             {triggerEntries.map(([key, value]) => (
-              <HBar key={key} label={key} value={value} max={triggerMax} color={TRIGGER_COLORS[key] || palette.accent} highlight />
+              <HBar key={key} label={triggerDisplay(key, t)} value={value} max={triggerMax} color={TRIGGER_COLORS[key] || palette.accent} highlight />
             ))}
           </View>
         </AnimatedSection>
@@ -597,7 +691,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
           <SectionHeader label={t("report.whenLogged")} badge="live" t={t} />
           <View style={s.card}>
             {timeEntries.map(([key, value]) => (
-              <HBar key={key} label={key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
+              <HBar key={key} label={t("report.times." + key) || key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
             ))}
           </View>
         </AnimatedSection>
@@ -612,13 +706,13 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t }) {
               const tColor = TRIGGER_COLORS[trigger] || palette.accent;
               return (
                 <View style={s.correlationRow} key={trigger}>
-                  <Text style={[s.correlationTrigger, { color: tColor }]}>{trigger}</Text>
+                  <Text style={[s.correlationTrigger, { color: tColor }]}>{triggerDisplay(trigger, t)}</Text>
                   <View style={s.correlationChips}>
                     {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
                       const emoColor = EMOTION_COLORS[emo] || palette.text;
                       return (
                         <View style={[s.correlationChip, { backgroundColor: emoColor + "15", borderColor: emoColor + "40" }]} key={emo}>
-                          <Text style={[s.correlationChipText, { color: emoColor }]}>{EMOTION_EMOJIS[emo] || ""} {emo} ×{count}</Text>
+                          <Text style={[s.correlationChipText, { color: emoColor }]}>{EMOTION_EMOJIS[emo] || ""} {t("emotions." + emo) || emo} ×{count}</Text>
                         </View>
                       );
                     })}
@@ -680,10 +774,12 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   });
   const [submitting, setSubmitting] = useState(null);
   const [feedbackAck, setFeedbackAck] = useState({});
+  const [errorId, setErrorId] = useState(null);
 
   async function handleResponse(actionId, response) {
     if (responded[actionId] || submitting) return;
     setSubmitting(actionId);
+    setErrorId(null);
     tap();
     try {
       await submitActionFeedback(actionId, response, deviceId, token);
@@ -691,8 +787,9 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
       setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? t("report.markedHelpful") : t("report.adjustThis") }));
       trackEvent("action_feedback", { actionId, response });
       if (onFeedback) onFeedback(actionId, response);
-    } catch {
-      // Silently fail — user can retry
+    } catch (err) {
+      console.error("Action feedback failed:", err?.message || err);
+      setErrorId(actionId);
     } finally {
       setSubmitting(null);
     }
@@ -724,6 +821,8 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
       {actions.map((action, i) => {
         const done = responded[action.id];
         const ack = feedbackAck[action.id];
+        const isBusy = submitting === action.id;
+        const hasError = errorId === action.id;
         return (
           <AnimatedSection key={action.id} index={i + 1} style={s.section}>
             <View style={[s.actionCard, done && s.actionCardDone]}>
@@ -744,25 +843,32 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
               ) : (
                 <View style={s.actionButtons}>
                   <Pressable
-                    style={[s.actionBtn, s.actionBtnHelped]}
+                    style={[s.actionBtn, s.actionBtnHelped, isBusy && { opacity: 0.5 }]}
                     onPress={() => handleResponse(action.id, "helped")}
                     disabled={!!submitting}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
                     accessibilityLabel={t("report.helped")}
                   >
-                    <Text style={s.actionBtnHelpedText}>✓ {t("report.helped")}</Text>
+                    <Text style={s.actionBtnHelpedText}>{isBusy ? "…" : `✓ ${t("report.helped")}`}</Text>
                   </Pressable>
                   <Pressable
-                    style={[s.actionBtn, s.actionBtnNotHelpful]}
+                    style={[s.actionBtn, s.actionBtnNotHelpful, isBusy && { opacity: 0.5 }]}
                     onPress={() => handleResponse(action.id, "not_helpful")}
                     disabled={!!submitting}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
                     accessibilityLabel={t("report.notHelpful")}
                   >
-                    <Text style={s.actionBtnNotHelpfulText}>✕ {t("report.notHelpful")}</Text>
+                    <Text style={s.actionBtnNotHelpfulText}>{isBusy ? "…" : `✕ ${t("report.notHelpful")}`}</Text>
                   </Pressable>
                 </View>
               )}
+              {hasError ? (
+                <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>
+                  {t("common.retryError") || "Something went wrong — tap to retry"}
+                </Text>
+              ) : null}
             </View>
           </AnimatedSection>
         );
@@ -791,7 +897,7 @@ function TrendBadge({ trend, t }) {
   );
 }
 
-function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgrade, purchasing, t }) {
+function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgrade, purchasing, t, lang }) {
   if (!progress) {
     return (
       <View style={s.tabContent}>
@@ -984,9 +1090,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               {patternShifts.strengthening.map((p, i) => (
                 <View key={i} style={s.progressShiftItem}>
                   <Text style={s.progressShiftPair}>
-                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{triggerDisplay(p.trigger, t)}</Text>
                     {" → "}
-                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{emotionDisplay(p.emotion, t)}</Text>
                   </Text>
                   <Text style={s.progressShiftCount}>
                     {t("report.progress.patternTimes", { count: p.count })}
@@ -1005,9 +1111,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               {patternShifts.weakening.map((p, i) => (
                 <View key={i} style={s.progressShiftItem}>
                   <Text style={s.progressShiftPair}>
-                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{triggerDisplay(p.trigger, t)}</Text>
                     {" → "}
-                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{emotionDisplay(p.emotion, t)}</Text>
                   </Text>
                   <Text style={s.progressShiftCount}>
                     {t("report.progress.patternTimes", { count: p.count })}
@@ -1026,9 +1132,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               {patternShifts.unresolved.map((p, i) => (
                 <View key={i} style={s.progressShiftItem}>
                   <Text style={s.progressShiftPair}>
-                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{triggerDisplay(p.trigger, t)}</Text>
                     {" → "}
-                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{emotionDisplay(p.emotion, t)}</Text>
                   </Text>
                   <Text style={s.progressShiftCount}>
                     {t("report.progress.patternTimes", { count: p.count })}
@@ -1046,9 +1152,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               {patternShifts.emerging.map((p, i) => (
                 <View key={i} style={s.progressShiftItem}>
                   <Text style={s.progressShiftPair}>
-                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{capitalize(p.trigger)}</Text>
+                    <Text style={{ color: TRIGGER_COLORS[p.trigger] || palette.accent }}>{triggerDisplay(p.trigger, t)}</Text>
                     {" → "}
-                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{p.emotion}</Text>
+                    <Text style={{ color: EMOTION_COLORS[p.emotion] || palette.text }}>{emotionDisplay(p.emotion, t)}</Text>
                   </Text>
                   <Text style={s.progressShiftCount}>
                     {t("report.progress.patternTimes", { count: p.count })}
@@ -1074,7 +1180,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     {t("report.progress.helped")}
                   </Text>
                 </View>
-                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                <Text style={s.progressAttrTrigger}>{triggerDisplay(a.trigger, t)}</Text>
                 {a.improvement ? (
                   <Text style={[s.progressAttrNote, { color: palette.success }]}>
                     {t("report.progress.improvedBy", { value: a.improvement.toFixed(1) })}
@@ -1093,7 +1199,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     {t("report.progress.notWorking")}
                   </Text>
                 </View>
-                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                <Text style={s.progressAttrTrigger}>{triggerDisplay(a.trigger, t)}</Text>
                 {a.note ? <Text style={s.progressAttrNote}>{a.note}</Text> : null}
               </View>
             ))
@@ -1108,7 +1214,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     {t("report.progress.needsAttention")}
                   </Text>
                 </View>
-                <Text style={s.progressAttrTrigger}>{capitalize(a.trigger)}</Text>
+                <Text style={s.progressAttrTrigger}>{triggerDisplay(a.trigger, t)}</Text>
                 {a.note ? <Text style={s.progressAttrNote}>{a.note}</Text> : null}
               </View>
             ))
@@ -1139,7 +1245,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     {t("report.progress.weekMoments", { count: week.moments })}
                   </Text>
                   <Text style={s.progressWeekDate}>
-                    {week.startDate ? new Date(week.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
+                    {week.startDate ? localeDateStr(week.startDate, lang) : ""}
                   </Text>
                 </View>
               );
@@ -1212,6 +1318,23 @@ function buildSignals(report, t) {
   }
   if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") {
     out.push({ key: "masking", icon: "🎭", label: t("report.prem.signalMasking"), body: t("report.maskingBody"), color: palette.purple });
+  }
+  if (invoked?.vacuumDrift != null && Math.abs(invoked.vacuumDrift) > 0.15) {
+    out.push({
+      key: "vacuum", icon: invoked.vacuumDrift > 0 ? "🧘" : "⚡",
+      label: t("report.prem.vacuum"),
+      body: invoked.vacuumDrift > 0 ? t("report.vacuumDriftRising") : t("report.vacuumDriftFalling"),
+      color: invoked.vacuumDrift > 0 ? palette.success : palette.warning,
+    });
+  }
+  if (invoked?.contamination?.length > 0) {
+    const c = invoked.contamination[0];
+    out.push({
+      key: "bleed", icon: "🔗",
+      label: t("report.contextBleed"),
+      body: t("report.contextBleedBody", { source: triggerDisplay(c.sourceTrigger, t), target: c.affectedTriggers.map(tr => triggerDisplay(tr, t)).join(", ") }),
+      color: palette.purple,
+    });
   }
   if (report?.volatilityLabel) {
     const high = report.volatilityLabel.toLowerCase().includes("high") || report.volatilityLabel.toLowerCase().includes("volatile");
@@ -1317,14 +1440,14 @@ function ModeCards({ mode, data, t, onFeedback, isPremium }) {
 
       {data.generatedAt ? (
         <Text style={s.modeFooter}>
-          {t("report.generatedBy", { date: new Date(data.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) })}
+          {t("report.generatedBy", { date: localeDateStr(data.generatedAt, lang) })}
         </Text>
       ) : null}
     </View>
   );
 }
 
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, modes, onModeFeedback }) {
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback }) {
   const [activeMode, setActiveMode] = useState("core");
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
@@ -1338,7 +1461,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
   const helpedTriggerSet = new Set(feedback.filter((f) => f.response === "tried" || f.response === "helped").map((f) => (f.trigger || f.category || "").toLowerCase()));
 
   const expiryDate = subscription?.expiresAt
-    ? new Date(subscription.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? localeDateStr(subscription.expiresAt, lang, { day: "numeric", month: "short", year: "numeric" })
     : null;
 
   const lockedCta = !isSignedIn
@@ -1540,7 +1663,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 })}
                 <Text style={s.insightFooter}>
                   {t("report.generatedBy", { date: report.llmInsight.generatedAt
-                    ? new Date(report.llmInsight.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                    ? localeDateStr(report.llmInsight.generatedAt, lang)
                     : "" })}
                 </Text>
               </View>
@@ -1562,7 +1685,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                       </View>
                       <View style={s.effectContent}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Text style={s.effectTitle}>{r.trigger} → {r.emotion}</Text>
+                          <Text style={s.effectTitle}>{triggerDisplay(r.trigger, t)} → {emotionDisplay(r.emotion, t)}</Text>
                           {isHelped ? (
                             <View style={s.premHelpedBadge}>
                               <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
@@ -1617,6 +1740,22 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                   <Text style={s.premMetricLabel}>{t("report.prem.daysTracked")}</Text>
                   <Text style={s.premMetricValue}>{bm.baseline.daysUsed}</Text>
                 </View>
+                {report?.invokedMetrics?.currentVacuum != null ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.vacuum")}</Text>
+                    <Text style={[s.premMetricValue, { color: report.invokedMetrics.vacuumDrift >= 0 ? palette.success : palette.danger }]}>
+                      {report.invokedMetrics.currentVacuum.toFixed(1)}/5
+                    </Text>
+                  </View>
+                ) : null}
+                {report?.invokedMetrics?.weeklyInvokedAvg != null ? (
+                  <View style={s.premMetricItem}>
+                    <Text style={s.premMetricLabel}>{t("report.prem.internalInfluence")}</Text>
+                    <Text style={[s.premMetricValue, { color: report.invokedMetrics.weeklyInvokedAvg >= 0 ? palette.success : palette.warning }]}>
+                      {report.invokedMetrics.weeklyInvokedAvg > 0 ? "+" : ""}{report.invokedMetrics.weeklyInvokedAvg.toFixed(2)}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </AnimatedSection>
           ) : null}
@@ -1765,13 +1904,13 @@ export function WeeklyReportScreen() {
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</Text>
                   <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
-                    {report.topEmotion || t("report.mixedEmotion")}
+                    {report.topEmotion ? (t("emotions." + report.topEmotion) || report.topEmotion) : t("report.mixedEmotion")}
                   </Text>
                 </View>
                 <View style={s.heroPill}>
                   <Text style={s.heroPillEmoji}>🎯</Text>
                   <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
-                    {report.topTrigger || (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
+                    {report.topTrigger ? triggerDisplay(report.topTrigger, t) : (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
                   </Text>
                 </View>
                 <View style={[s.heroPill, s.confidencePill]}>
@@ -1818,11 +1957,11 @@ export function WeeklyReportScreen() {
               {activeTab === "mirror" ? (
                 <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} />
               ) : activeTab === "week" ? (
-                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} />
+                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
               ) : activeTab === "progress" ? (
                 <ProgressTab
                   progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
-                  handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t}
+                  handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
                 />
               ) : activeTab === "actions" ? (
                 <ActionsTab report={report} deviceId={deviceId} token={token} t={t} />
@@ -1832,7 +1971,7 @@ export function WeeklyReportScreen() {
                   isSignedIn={isSignedIn} isPremium={isPremium}
                   hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                  purchasing={purchasing} subscription={subscription} t={t}
+                  purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
                 />
               )}
@@ -2168,8 +2307,8 @@ const s = StyleSheet.create({
   actionReason: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
   actionButtons: { flexDirection: "row", gap: 8, marginTop: 4 },
   actionBtn: {
-    flex: 1, alignItems: "center", paddingVertical: 11,
-    borderRadius: radius.sm, borderWidth: 1.5,
+    flex: 1, alignItems: "center", paddingVertical: 11, minHeight: 44,
+    justifyContent: "center", borderRadius: radius.sm, borderWidth: 1.5,
   },
   actionBtnHelped: {
     backgroundColor: "rgba(94, 230, 160, 0.15)",
