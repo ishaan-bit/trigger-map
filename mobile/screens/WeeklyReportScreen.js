@@ -417,7 +417,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
                 <Text style={[s.signalIcon, { color: palette.purple }]}>🎭</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.signalLabel, { color: palette.purple }]}>{t("report.maskingLevel", { level: invoked.weeklyMasking.level })}</Text>
-                  <Text style={s.signalBody}>{t("report.maskingBody")}
+                  <Text style={s.signalBody}>{t("report.maskingBody")}</Text>
                 </View>
               </View>
             ) : null}
