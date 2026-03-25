@@ -227,3 +227,33 @@ export function submitActionFeedback(actionId, response, deviceId, token) {
     token,
   });
 }
+
+// ── Adaptive Modes ──
+
+export function fetchModes(token) {
+  return fetchJson("/modes", { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
+}
+
+export function fetchModeOutput(mode, token) {
+  return fetchJson(`/modes?mode=${encodeURIComponent(mode)}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
+}
+
+export function submitModeFeedback(mode, itemId, response, token) {
+  return fetchJson("/modes/feedback", {
+    method: "POST",
+    body: { mode, itemId, response },
+    token,
+  });
+}
+
+export function fetchModeProfile(token) {
+  return fetchJson("/modes/profile", { token });
+}
+
+export function updateModeProfile(profile, token) {
+  return fetchJson("/modes/profile", {
+    method: "PUT",
+    body: profile,
+    token,
+  });
+}

@@ -15,7 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { submitActionFeedback } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
@@ -842,7 +842,85 @@ function sortRegulatorsByFeedback(regulators, feedback) {
   });
 }
 
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t }) {
+/* ── Mode Cards (adaptive modes content) ── */
+
+function ModeCards({ mode, data, t, onFeedback, isPremium }) {
+  const [feedbackGiven, setFeedbackGiven] = useState({});
+
+  if (!data) {
+    return (
+      <View style={s.modeContent}>
+        <Text style={s.modeContentBody}>{t("report.prem.mode.generating")}</Text>
+      </View>
+    );
+  }
+
+  const items = data.items || [];
+  const narrative = data.narrative || "";
+
+  function handleFeedback(itemId, response) {
+    tap();
+    setFeedbackGiven((prev) => ({ ...prev, [itemId]: response }));
+    if (onFeedback) onFeedback(mode, itemId, response);
+  }
+
+  return (
+    <View style={s.modeContent}>
+      {narrative ? <Text style={s.modeNarrative}>{cleanText(narrative)}</Text> : null}
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
+        {items.map((item) => {
+          const given = feedbackGiven[item.id];
+          return (
+            <View key={item.id} style={s.modeCard}>
+              <Text style={s.modeCardTitle}>{item.name}</Text>
+              <Text style={s.modeCardDesc}>{item.description}</Text>
+              {item.intensity ? (
+                <Text style={s.modeCardMeta}>{item.intensity} · ~{item.durationMin} min</Text>
+              ) : item.type ? (
+                <Text style={s.modeCardMeta}>{item.type}{item.nutrientFocus ? ` · ${item.nutrientFocus}` : ""}</Text>
+              ) : null}
+
+              {isPremium && !given ? (
+                <View style={s.modeFeedbackRow}>
+                  <Pressable
+                    style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]}
+                    onPress={() => handleFeedback(item.id, "helpful")}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.modeFeedbackBtn, s.modeFeedbackNot]}
+                    onPress={() => handleFeedback(item.id, "not_helpful")}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.modeFeedbackNotText}>👎</Text>
+                  </Pressable>
+                </View>
+              ) : given ? (
+                <View style={s.modeFeedbackDone}>
+                  <Text style={s.modeFeedbackDoneText}>
+                    {given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {data.generatedAt ? (
+        <Text style={s.modeFooter}>
+          {t("report.generatedBy", { date: new Date(data.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) })}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, modes, onModeFeedback }) {
+  const [activeMode, setActiveMode] = useState("core");
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1177,6 +1255,56 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
           </View>
         </AnimatedSection>
       ) : null}
+
+      {/* ── 7. ADAPTIVE MODES (Move · Fuel · Perspective) ── */}
+      {isPremium ? (
+        <AnimatedSection index={6} style={s.section}>
+          <SectionHeader label={t("report.prem.adaptiveTitle")} badge="live" t={t} />
+
+          {/* Mode sub-tabs */}
+          <View style={s.modeTabBar}>
+            {["core", "move", "fuel", "perspective"].map((tab) => (
+              <Pressable
+                key={tab}
+                style={[s.modeTab, activeMode === tab && s.modeTabActive]}
+                onPress={() => { tap(); setActiveMode(tab); }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeMode === tab }}
+              >
+                <Text style={[s.modeTabText, activeMode === tab && s.modeTabTextActive]}>
+                  {t(`report.prem.mode.${tab}`)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Mode content */}
+          {activeMode === "core" ? (
+            <View style={s.modeContent}>
+              <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
+            </View>
+          ) : (
+            <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} onFeedback={onModeFeedback} isPremium={isPremium} />
+          )}
+        </AnimatedSection>
+      ) : isSignedIn ? (
+        <AnimatedSection index={6} style={s.section}>
+          <LockedSection
+            title={t("report.prem.unlockModes")}
+            teaser={t("report.prem.modesHint")}
+            ctaLabel={lockedCta.label}
+            onPress={lockedCta.onPress}
+          >
+            <View style={s.modeTabBar}>
+              {["core", "move", "fuel", "perspective"].map((tab) => (
+                <View key={tab} style={s.modeTab}>
+                  <Text style={s.modeTabText}>{t(`report.prem.mode.${tab}`)}</Text>
+                </View>
+              ))}
+            </View>
+          </LockedSection>
+        </AnimatedSection>
+      ) : null}
     </View>
   );
 }
@@ -1193,6 +1321,7 @@ export function WeeklyReportScreen() {
   const [error, setError] = useState("");
   const [purchasing, setPurchasing] = useState(false);
   const [activeTab, setActiveTab] = useState("mirror");
+  const [modes, setModes] = useState(null);
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -1219,6 +1348,20 @@ export function WeeklyReportScreen() {
     if (t) rs().catch(() => null);
     trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
   }, [load]));
+
+  // Load adaptive modes for premium users
+  useEffect(() => {
+    if (isPremium && token && !modes) {
+      fetchModes(token).then(setModes).catch(() => null);
+    }
+  }, [isPremium, token]);
+
+  const handleModeFeedback = useCallback((mode, itemId, response) => {
+    if (token) {
+      submitModeFeedback(mode, itemId, response, token).catch(() => null);
+      trackEvent("mode_feedback", { mode, itemId, response });
+    }
+  }, [token]);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
@@ -1338,6 +1481,7 @@ export function WeeklyReportScreen() {
                   hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
                   purchasing={purchasing} subscription={subscription} t={t}
+                  modes={modes} onModeFeedback={handleModeFeedback}
                 />
               )}
             </>
@@ -1789,4 +1933,47 @@ const s = StyleSheet.create({
   premMetricLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", textAlign: "center" },
   premMetricValue: { color: palette.text, fontSize: 18, fontWeight: "700" },
   premAdjustingNote: { color: palette.muted, fontSize: 11, fontStyle: "italic", marginTop: 4 },
+
+  /* Adaptive modes */
+  modeTabBar: {
+    flexDirection: "row", gap: 4,
+    backgroundColor: palette.glass, borderRadius: radius.md,
+    borderWidth: 1, borderColor: palette.glassBorder, padding: 4,
+  },
+  modeTab: {
+    flex: 1, alignItems: "center", paddingVertical: 8,
+    borderRadius: radius.sm,
+  },
+  modeTabActive: {
+    backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  modeTabText: { color: palette.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  modeTabTextActive: { color: palette.accent },
+  modeContent: { gap: 10 },
+  modeContentBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
+  modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21 },
+  modeCardsScroll: { gap: 10, paddingVertical: 4 },
+  modeCard: {
+    width: 260, borderRadius: radius.md, padding: 16, gap: 8,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+    borderLeftWidth: 3, borderLeftColor: palette.accent,
+  },
+  modeCardTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
+  modeCardDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
+  modeCardMeta: { color: palette.muted, fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  modeFeedbackRow: { flexDirection: "row", gap: 8, marginTop: 4 },
+  modeFeedbackBtn: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5,
+  },
+  modeFeedbackHelpful: {
+    backgroundColor: "rgba(94, 230, 160, 0.12)", borderColor: "rgba(94, 230, 160, 0.35)",
+  },
+  modeFeedbackNot: {
+    backgroundColor: "rgba(255, 179, 71, 0.10)", borderColor: "rgba(255, 179, 71, 0.30)",
+  },
+  modeFeedbackHelpfulText: { color: "#5ee6a0", fontSize: 12, fontWeight: "700" },
+  modeFeedbackNotText: { color: "#ffb347", fontSize: 12, fontWeight: "700" },
+  modeFeedbackDone: { paddingVertical: 6, marginTop: 2 },
+  modeFeedbackDoneText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
+  modeFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
 });

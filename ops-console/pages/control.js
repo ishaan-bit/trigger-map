@@ -96,6 +96,19 @@ const JOBS = [
       { key: 'force', label: 'Force (generate even without feedback)', type: 'checkbox', default: true },
     ],
   },
+  {
+    id: 'generateAdaptiveModes',
+    label: 'Generate Adaptive Modes (Move/Fuel/Perspective)',
+    description: 'Generate personalised Move, Fuel, and Perspective outputs for premium users using LLM composition engine. Selects from knowledge libraries, applies user profile and anti-repetition.',
+    danger: false,
+    usesLlm: true,
+    hasUserPicker: true,
+    source: 'local',
+    params: [
+      { key: 'force', label: 'Force (regenerate existing)', type: 'checkbox', default: true },
+      { key: 'maxWords', label: 'Max words per mode', type: 'number', default: 100 },
+    ],
+  },
 ];
 
 const CACHE_ACTIONS = [
@@ -123,6 +136,16 @@ const CACHE_ACTIONS = [
     id: 'vacuum',
     label: 'Clear Vacuum State Cache',
     description: 'Remove all cached vacuum state trajectories. Next weekly report generation will recompute invoked metrics.',
+  },
+  {
+    id: 'mode_output',
+    label: 'Clear Adaptive Mode Outputs',
+    description: 'Remove all cached Move/Fuel/Perspective outputs. Next generation cycle will recreate.',
+  },
+  {
+    id: 'mode_feedback',
+    label: 'Clear Mode Feedback',
+    description: 'Remove all stored adaptive mode HiTL feedback.',
   },
 ];
 

@@ -5,4 +5,5 @@ export const FEATURE_FLAGS = {
   triggerAutoDetection: true,
   onboardingEnabled: true,
   computeInvokedMetrics: true,
+  adaptiveModes: true,
 };

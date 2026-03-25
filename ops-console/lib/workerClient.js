@@ -58,6 +58,13 @@ export async function runLlmActions({ model, force, ownerIds, style } = {}) {
   });
 }
 
+export async function runAdaptiveModes({ model, force, maxWords, ownerIds } = {}) {
+  return workerRequest('/generate-adaptive-modes', {
+    method: 'POST',
+    body: JSON.stringify({ model, force, maxWords, ownerIds }),
+  });
+}
+
 export async function cancelWorkerJob(jobName) {
   return workerRequest('/cancel-job', {
     method: 'POST',

@@ -468,7 +468,21 @@
       "unlockSignals": "See what's shifting",
       "unlockIntel": "Unlock pattern intelligence",
       "unlockLevers": "Discover your levers",
-      "unlockSnapshot": "See your behaviour snapshot"
+      "unlockSnapshot": "See your behaviour snapshot",
+      "unlockModes": "Unlock adaptive guidance",
+      "modesHint": "Personalised movement, nourishment, and perspective suggestions powered by your patterns.",
+      "adaptiveTitle": "Adaptive Guidance",
+      "mode": {
+        "core": "Core",
+        "move": "Move",
+        "fuel": "Fuel",
+        "perspective": "Perspective",
+        "coreBody": "Your core analysis is above. Switch to Move, Fuel, or Perspective for personalised guidance based on your emotional patterns.",
+        "generating": "Generating your personalised guidance...",
+        "helpful": "Helpful",
+        "thanksHelpful": "Noted — this works for you",
+        "thanksNot": "Noted — we'll adjust"
+      }
     }
   }
 }
