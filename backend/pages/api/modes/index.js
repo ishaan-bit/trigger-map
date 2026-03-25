@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
   try {
     const token = getBearerToken(req);
-    const user = token ? await validateSession(token) : null;
+    const user = token ? await validateSession(token).catch(() => null) : null;
     if (!user) {
       return sendError(res, 401, "AUTH_REQUIRED", "Sign in to access adaptive modes");
     }

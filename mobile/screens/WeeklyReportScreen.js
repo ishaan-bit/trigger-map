@@ -151,6 +151,48 @@ function scoreTone(score, t) {
   return { emoji: "😤", label: t ? t("report.toneTough") : "Tough", color: "#ff6b7a" };
 }
 
+/* ── Color-coded text: highlights trigger/emotion words in any prose ── */
+
+let _colorWordMap = null;
+function buildColorWordMap(t) {
+  if (_colorWordMap && _colorWordMap._lang === (t?._lang || "")) return _colorWordMap;
+  const map = {};
+  for (const [key, color] of Object.entries(TRIGGER_COLORS)) {
+    map[key.toLowerCase()] = color;
+    const display = triggerDisplay(key, t);
+    if (display) map[display.toLowerCase()] = color;
+  }
+  for (const [key, color] of Object.entries(EMOTION_COLORS)) {
+    map[key.toLowerCase()] = color;
+    const display = emotionDisplay(key, t);
+    if (display) map[display.toLowerCase()] = color;
+  }
+  map._lang = t?._lang || "";
+  _colorWordMap = map;
+  return map;
+}
+
+function renderColoredText(text, t, baseStyle) {
+  if (!text) return null;
+  const colorMap = buildColorWordMap(t);
+  const words = Object.keys(colorMap).filter(k => k !== "_lang" && k.length > 1).sort((a, b) => b.length - a.length);
+  if (!words.length) return <Text style={baseStyle}>{text}</Text>;
+  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`(${escaped.join("|")})`, "gi");
+  const parts = text.split(re);
+  if (parts.length === 1) return <Text style={baseStyle}>{text}</Text>;
+  return (
+    <Text style={baseStyle}>
+      {parts.map((part, i) => {
+        const color = colorMap[part.toLowerCase()];
+        return color
+          ? <Text key={i} style={{ color, fontWeight: "600" }}>{part}</Text>
+          : <Text key={i}>{part}</Text>;
+      })}
+    </Text>
+  );
+}
+
 /* ── Shared sub-components ── */
 
 function AnimatedSection({ children, index = 0, style }) {
@@ -417,7 +459,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
       ) : null}
 
       {/* Invoked Signals — masking, crash risk, false recovery */}
-      {(compound?.falseRecovery || compound?.crashRisk || invoked?.weeklyMasking) ? (
+      {(compound?.falseRecovery || compound?.crashRisk || (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none")) ? (
         <AnimatedSection index={3} style={s.section}>
           <SectionHeader label={t("report.deeperSignals")} badge="weekly" t={t} />
           <View style={s.card}>
@@ -503,7 +545,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
         <AnimatedSection index={6} style={s.section}>
           <SectionHeader label={t("report.direction")} badge="weekly" t={t} />
           <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: tone?.color || palette.accent }]}>
-            <Text style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}>{direction}</Text>
+            {renderColoredText(direction, t, { color: palette.text, fontSize: 14, lineHeight: 21 })}
           </View>
         </AnimatedSection>
       ) : null}
@@ -515,7 +557,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
             <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
               <Text style={s.cardLabel}>{t("report.whatWorking")}</Text>
               {whatWorking.slice(0, 3).map((item, i) => (
-                <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
+                <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
               ))}
             </View>
           ) : null}
@@ -523,7 +565,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
             <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
               <Text style={s.cardLabel}>{t("report.whereToFocus")}</Text>
               {whereToFocus.slice(0, 3).map((item, i) => (
-                <Text key={i} style={{ color: palette.text, fontSize: 13, lineHeight: 19 }}>{item.text}</Text>
+                <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
               ))}
             </View>
           ) : null}
@@ -569,7 +611,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
         <AnimatedSection index={0} style={s.section}>
           <SectionHeader label={t("report.weeklySummary")} badge="weekly" t={t} />
           <View style={s.summaryCard}>
-            <Text style={s.summaryText}>{cleanText(report.aiInsight.summary)}</Text>
+            {renderColoredText(cleanText(report.aiInsight.summary), t, s.summaryText)}
           </View>
           {deltas ? (
             <View style={[s.card, { marginTop: 6 }]}>
@@ -616,7 +658,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
             <Text style={s.trajectoryHint}>
               {report.weeklyEmotionTrajectory.length === 1 ? t("report.toneFromDays") : t("report.toneShifted")}
             </Text>
-            {report.trajectoryNote ? <Text style={s.trajectoryNote}>{cleanText(report.trajectoryNote)}</Text> : null}
+            {report.trajectoryNote ? renderColoredText(cleanText(report.trajectoryNote), t, s.trajectoryNote) : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
               {report.weeklyEmotionTrajectory.map((day) => {
                 const tone = scoreTone(day.score, t);
@@ -833,7 +875,7 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
                   <Text style={s.actionTitle}>{action.title}</Text>
                 </View>
               </View>
-              <Text style={s.actionReason}>{action.reason}</Text>
+              {renderColoredText(action.reason, t, s.actionReason)}
               {done ? (
                 <View style={[s.actionFeedbackDone, { backgroundColor: done === "helped" ? palette.successSoft : palette.warningSoft }]}>
                   <Text style={[s.actionFeedbackDoneText, { color: done === "helped" ? palette.success : palette.warning }]}>
@@ -1368,15 +1410,17 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 
 /* ── Mode Cards (adaptive modes content) ── */
 
-function ModeCards({ mode, data, t, onFeedback, isPremium }) {
+function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
   const [feedbackGiven, setFeedbackGiven] = useState({});
 
-  if (!data) {
+  const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
+
+  if (!data || (!data.items?.length && !data.narrative)) {
     return (
       <View style={s.modeContent}>
-        <View style={[s.insightStateCard, { paddingVertical: 20 }]}>
-          <Text style={s.insightStateIcon}>✨</Text>
-          <Text style={s.insightStateTitle}>{t("report.prem.mode.warmTitle")}</Text>
+        <View style={[s.insightStateCard, { paddingVertical: 20, borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
+          <Text style={s.insightStateIcon}>{MODE_ICONS[mode] || "✨"}</Text>
+          <Text style={s.insightStateTitle}>{t(`report.prem.mode.${mode}`)} — {t("report.prem.mode.warmTitle")}</Text>
           <Text style={s.insightStateBody}>{t("report.prem.mode.warmBody")}</Text>
         </View>
       </View>
@@ -1394,7 +1438,7 @@ function ModeCards({ mode, data, t, onFeedback, isPremium }) {
 
   return (
     <View style={s.modeContent}>
-      {narrative ? <Text style={s.modeNarrative}>{cleanText(narrative)}</Text> : null}
+      {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
         {items.map((item) => {
@@ -1483,7 +1527,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
       return (
         <View style={s.premDirectionCard}>
           <Text style={s.premDirectionKicker}>{t("report.prem.tryThis")}</Text>
-          <Text style={s.premDirectionText}>{cleanText(directionText)}</Text>
+          {renderColoredText(cleanText(directionText), t, s.premDirectionText)}
           <Text style={s.premDirectionHint}>{t("report.prem.directionHint")}</Text>
         </View>
       );
@@ -1613,7 +1657,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
               </View>
             ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} onFeedback={onModeFeedback} isPremium={isPremium} />
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} />
             )}
           </AnimatedSection>
 
@@ -1650,14 +1694,16 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                   const insightMeta = getInsightSectionMeta(t);
                   const meta = insightMeta[idx] || {};
                   return (
-                    <View key={idx} style={[s.insightSectionCard, { borderLeftWidth: 3, borderLeftColor: meta.color || palette.accent }]}>
-                      <View style={s.insightSectionHeader}>
+                    <View key={idx} style={s.insightSectionWrap}>
+                      <View style={s.insightSectionHeaderOuter}>
                         <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
-                        <Text style={[s.insightSectionLabel, meta.color ? { color: meta.color } : null]}>
+                        <Text style={[s.insightSectionLabelOuter, meta.color ? { color: meta.color } : null]}>
                           {meta.label || t("report.sectionLabel", { num: idx + 1 })}
                         </Text>
                       </View>
-                      <Text style={s.insightSectionBody}>{cleanText(body)}</Text>
+                      <View style={[s.insightSectionCard, { borderLeftWidth: 3, borderLeftColor: meta.color || palette.accent }]}>
+                        {renderColoredText(cleanText(body), t, s.insightSectionBody)}
+                      </View>
                     </View>
                   );
                 })}
@@ -1828,8 +1874,10 @@ export function WeeklyReportScreen() {
 
   // Load adaptive modes for premium users
   useEffect(() => {
-    if (isPremium && token && !modes) {
-      fetchModes(token).then(setModes).catch(() => null);
+    if (isPremium && token) {
+      fetchModes(token)
+        .then(setModes)
+        .catch((err) => console.error("Modes fetch failed:", err?.message || err));
     }
   }, [isPremium, token]);
 
@@ -1837,8 +1885,11 @@ export function WeeklyReportScreen() {
   useEffect(() => {
     if (token || deviceId) {
       fetchProgress(token, deviceId)
-        .then((res) => setProgress(res?.progress || null))
-        .catch(() => null);
+        .then((res) => {
+          console.log("Progress response:", res?.progress ? "has data" : "null");
+          setProgress(res?.progress || null);
+        })
+        .catch((err) => console.error("Progress fetch failed:", err?.message || err));
     }
   }, [token, deviceId]);
 
@@ -1848,6 +1899,10 @@ export function WeeklyReportScreen() {
       trackEvent("mode_feedback", { mode, itemId, response });
     }
   }, [token]);
+
+  const handleActionFeedback = useCallback((actionId, response) => {
+    trackEvent("action_feedback", { actionId, response });
+  }, []);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
@@ -1964,7 +2019,7 @@ export function WeeklyReportScreen() {
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
                 />
               ) : activeTab === "actions" ? (
-                <ActionsTab report={report} deviceId={deviceId} token={token} t={t} />
+                <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
               ) : (
                 <PremiumTab
                   report={report} dq={dq} confidence={confidence}
@@ -2224,6 +2279,14 @@ const s = StyleSheet.create({
   insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
   insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
   insightCardsRow: { gap: 10 },
+  insightSectionWrap: { gap: 0 },
+  insightSectionHeaderOuter: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 4, paddingBottom: 6,
+  },
+  insightSectionLabelOuter: {
+    color: palette.accent, fontSize: 12, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase",
+  },
   insightSectionCard: {
     borderRadius: radius.md, padding: 16, gap: 6,
     backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder, overflow: "hidden",

@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   try {
     const token = getBearerToken(req);
-    const user = token ? await validateSession(token) : null;
+    const user = token ? await validateSession(token).catch(() => null) : null;
     const ownerId = user?.id || req.query.deviceId;
 
     if (!ownerId) {

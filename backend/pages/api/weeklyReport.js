@@ -13,6 +13,7 @@ import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession, getSubscription, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
 import { checkFeatureAccess } from "@/services/premiumService.js";
+import { getTimeline } from "@/services/momentService.js";
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) {
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
     }
 
     const token = getBearerToken(req);
-    const user = token ? await validateSession(token) : null;
+    const user = token ? await validateSession(token).catch(() => null) : null;
     const ownerId = user?.id || req.query.deviceId;
     const lang = req.query.lang || "en";
 
@@ -40,10 +41,11 @@ export default async function handler(req, res) {
 
     const isAuthenticated = Boolean(user);
 
-    // Parallel fetch: aggregates (7d + 45d), subscription, LLM insight, stored report, first-free check, free pass, action feedback
-    const [aggregates, allAggregates, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs] = await Promise.all([
+    // Parallel fetch: aggregates (7d + 45d), moments, subscription, LLM insight, stored report, first-free check, free pass, action feedback
+    const [aggregates, allAggregates, allMoments, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
+      getTimeline(ownerId),
       isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
       getStoredLlmInsight(ownerId),
       getStoredWeeklyInsight(ownerId),
@@ -52,6 +54,10 @@ export default async function handler(req, res) {
       getActionFeedback(ownerId),
       getActionPrefs(ownerId),
     ]);
+
+    // Filter moments to last 7 days for invoked metrics computation
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const recentMoments = (allMoments || []).filter(m => m.timestamp >= sevenDaysAgo);
 
     const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
     const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated, subscription });
@@ -62,7 +68,7 @@ export default async function handler(req, res) {
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
-    const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
+    const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates, moments: recentMoments });
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report, { firstName, lang });
