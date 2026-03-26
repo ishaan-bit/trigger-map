@@ -11,8 +11,8 @@
  *       contextualised narrative around the items → store output + history.
  */
 
-import { pickMovements, MOVEMENTS } from "@triggermap/shared";
-import { pickNourishments, NOURISHMENTS } from "@triggermap/shared";
+import { pickMovements, MOVEMENTS } from "../knowledge/movementLibrary.js";
+import { pickNourishments, NOURISHMENTS } from "../knowledge/nourishmentLibrary.js";
 import {
   getModeProfile,
   getRecentItemIds,

@@ -1,8 +1,7 @@
 import enableCors from "@/lib/cors.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
-import { validateSession } from "@/services/authService.js";
-import { verifyPremium } from "@/services/subscriptionService.js";
+import { validateSession, getSubscription } from "@/services/authService.js";
 import { generateAllModes } from "@/ai/modeComposer.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { enforceRateLimit } from "@/services/rateLimitService.js";
@@ -29,8 +28,8 @@ export default async function handler(req, res) {
       return sendError(res, 401, "AUTH_REQUIRED", "Sign in required");
     }
 
-    const sub = await verifyPremium(user.id);
-    if (!sub?.active) {
+    const sub = await getSubscription(user.id);
+    if (sub?.status !== "active" && sub?.status !== "grace_period") {
       return sendError(res, 403, "PREMIUM_REQUIRED", "Premium subscription required");
     }
 
