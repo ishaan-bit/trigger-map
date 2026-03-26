@@ -1,0 +1,17 @@
+diff --git a/node_modules/@react-native-google-signin/google-signin/lib/module/index.js b/node_modules/@react-native-google-signin/google-signin/lib/module/index.js
+index 8a453da..976a937 100644
+--- a/node_modules/@react-native-google-signin/google-signin/lib/module/index.js
++++ b/node_modules/@react-native-google-signin/google-signin/lib/module/index.js
+@@ -1,8 +1,8 @@
+ "use strict";
+ 
+-export { GoogleSignin } from './signIn/GoogleSignin';
+-export { statusCodes } from './errors/errorCodes';
+-export { GoogleSigninButton } from './buttons/GoogleSigninButton';
++export { GoogleSignin } from './signIn/GoogleSignin.js';
++export { statusCodes } from './errors/errorCodes.js';
++export { GoogleSigninButton } from './buttons/GoogleSigninButton.js';
+ export * from "./types.js";
+ export * from "./functions.js";
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
