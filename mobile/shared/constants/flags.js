@@ -1,7 +1,11 @@
 export const FEATURE_FLAGS = {
-  premiumMonthlyReports: true,
-  behavioralExperiments: true,
-  dataExport: true,
+  aiWeeklySummary: true,
+  detailedReportCharts: true,
+  momentEditing: true,
   triggerAutoDetection: true,
   onboardingEnabled: true,
+  computeInvokedMetrics: true,
+  adaptiveModes: true,
+  progressTracking: true,
+  continuousEmotionModel: true,
 };
