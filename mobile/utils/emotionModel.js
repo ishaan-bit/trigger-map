@@ -68,24 +68,50 @@ export const FIELD_GRADIENT = {
   center:      "rgba(184, 200, 216, 0.08)",   // neutral
 };
 
-// ── Label mapping ──
+// ── Label mapping (Plutchik-based) ──
 
-/** Short label shown on tap (1–2 words) */
+/**
+ * Short label shown on tap — based on Plutchik's wheel of emotions.
+ * Two intensity layers: outer (mild) → inner (intense).
+ *
+ * The circumplex is divided into 8 sectors by angle, with intensity
+ * modulated by distance from center (mag).
+ *
+ * Sectors (angle from positive‑X, counter-clockwise):
+ *   0°–45°   → joy / ecstasy
+ *  45°–90°   → anticipation / vigilance
+ *  90°–135°  → anger / rage
+ * 135°–180°  → disgust / loathing
+ * 180°–225°  → sadness / grief
+ * 225°–270°  → surprise / amazement
+ * 270°–315°  → fear / terror
+ * 315°–360°  → trust / admiration
+ */
 export function shortLabel(valence, arousal) {
   const mag = Math.sqrt(valence * valence + arousal * arousal);
-  if (mag < 0.15) return "neutral";
+  if (mag < 0.12) return "neutral";
 
-  const prefix = mag > 0.65 ? "very " : mag > 0.35 ? "" : "slightly ";
+  // angle in degrees 0–360 (0 = right/+valence, 90 = up/+arousal)
+  let angle = Math.atan2(arousal, valence) * (180 / Math.PI);
+  if (angle < 0) angle += 360;
 
-  if (arousal > 0.3 && valence > 0.3)  return prefix + "energized";
-  if (arousal > 0.3 && valence < -0.3) return prefix + "tense";
-  if (arousal > 0.3)                   return prefix + "alert";
-  if (arousal < -0.3 && valence > 0.3) return prefix + "calm";
-  if (arousal < -0.3 && valence < -0.3) return prefix + "low";
-  if (arousal < -0.3)                  return prefix + "settled";
-  if (valence > 0.3)                   return prefix + "content";
-  if (valence < -0.3)                  return prefix + "uneasy";
-  return "neutral";
+  // Plutchik sectors with 3 intensity tiers: mild / base / intense
+  const sectors = [
+    { min: 0,   max: 45,  mild: "serenity",      base: "joy",          intense: "ecstasy" },
+    { min: 45,  max: 90,  mild: "interest",       base: "anticipation", intense: "vigilance" },
+    { min: 90,  max: 135, mild: "annoyance",      base: "anger",        intense: "rage" },
+    { min: 135, max: 180, mild: "boredom",         base: "disgust",      intense: "loathing" },
+    { min: 180, max: 225, mild: "pensiveness",     base: "sadness",      intense: "grief" },
+    { min: 225, max: 270, mild: "distraction",     base: "surprise",     intense: "amazement" },
+    { min: 270, max: 315, mild: "apprehension",    base: "fear",         intense: "terror" },
+    { min: 315, max: 360, mild: "acceptance",      base: "trust",        intense: "admiration" },
+  ];
+
+  const sector = sectors.find((s) => angle >= s.min && angle < s.max) || sectors[0];
+
+  if (mag > 0.65) return sector.intense;
+  if (mag > 0.30) return sector.base;
+  return sector.mild;
 }
 
 /** Emotion score (1–5 scale) from continuous coordinates — backward compat */

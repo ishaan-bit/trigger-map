@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { ScreenShell } from "@/components/ScreenShell";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -15,6 +16,7 @@ import { tap, selection, success as hapticSuccess } from "@/utils/haptics";
 import * as Haptics from "expo-haptics";
 
 const FIELD_SIZE = 280;
+const FIELD_R = FIELD_SIZE / 2;
 
 function showToast(message) {
   if (Platform.OS === "android") {
@@ -41,15 +43,82 @@ export function EmotionSelectionScreen() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Animations
   const dotScale = useRef(new Animated.Value(0)).current;
   const dotOpacity = useRef(new Animated.Value(0)).current;
+  const dotGlow = useRef(new Animated.Value(0)).current;
   const labelAnim = useRef(new Animated.Value(0)).current;
   const tagSectionAnim = useRef(new Animated.Value(0)).current;
   const saveButtonScale = useRef(new Animated.Value(1)).current;
   const rippleScale = useRef(new Animated.Value(0)).current;
   const rippleOpacity = useRef(new Animated.Value(0)).current;
+
+  // Field layout tracking for accurate touch coordinates
+  const fieldLayout = useRef({ x: 0, y: 0, width: FIELD_SIZE, height: FIELD_SIZE });
+
+  const onFieldLayout = useCallback((e) => {
+    fieldLayout.current = e.nativeEvent.layout;
+  }, []);
+
+  // Core touch processing — used for both tap and drag
+  const processTouch = useCallback((locationX, locationY) => {
+    const newCoords = tapToCoordinates(locationX, locationY, FIELD_SIZE);
+    const newLabel = shortLabel(newCoords.valence, newCoords.arousal);
+    setCoords(newCoords);
+    setLabel(newLabel);
+  }, []);
+
+  // PanResponder for tap + drag
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        const { locationX, locationY } = e.nativeEvent;
+        processTouch(locationX, locationY);
+        setIsDragging(true);
+
+        // Haptic on first touch
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        // Show dot immediately
+        dotScale.setValue(0.5);
+        dotOpacity.setValue(1);
+        Animated.spring(dotScale, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
+
+        // Glow up
+        Animated.timing(dotGlow, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+        // Ripple
+        rippleScale.setValue(0.3);
+        rippleOpacity.setValue(0.4);
+        Animated.parallel([
+          Animated.timing(rippleScale, { toValue: 2.5, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(rippleOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]).start();
+
+        // Label appear
+        labelAnim.setValue(0);
+        Animated.timing(labelAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      },
+      onPanResponderMove: (e) => {
+        const { locationX, locationY } = e.nativeEvent;
+        processTouch(locationX, locationY);
+      },
+      onPanResponderRelease: () => {
+        setIsDragging(false);
+        // Settle dot to normal size
+        Animated.parallel([
+          Animated.spring(dotScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+          Animated.timing(dotGlow, { toValue: 0.5, duration: 400, useNativeDriver: true }),
+        ]).start();
+        // Light haptic on release
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      },
+    })
+  ).current;
 
   // Derived legacy emotion for tag loading
   const legacyEmotion = coords ? coordinatesToLegacy(coords.valence, coords.arousal) : null;
@@ -76,35 +145,6 @@ export function EmotionSelectionScreen() {
     });
     return () => { active = false; };
   }, [legacyEmotion, trigger, tagSectionAnim]);
-
-  function handleFieldTap(event) {
-    const { locationX, locationY } = event.nativeEvent;
-    const newCoords = tapToCoordinates(locationX, locationY, FIELD_SIZE);
-    const newLabel = shortLabel(newCoords.valence, newCoords.arousal);
-
-    setCoords(newCoords);
-    setLabel(newLabel);
-
-    // Haptic
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Animate dot appearance
-    dotScale.setValue(0);
-    dotOpacity.setValue(1);
-    Animated.spring(dotScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
-
-    // Animate ripple
-    rippleScale.setValue(0.3);
-    rippleOpacity.setValue(0.5);
-    Animated.parallel([
-      Animated.timing(rippleScale, { toValue: 2.5, duration: 600, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(rippleOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
-    ]).start();
-
-    // Animate label
-    labelAnim.setValue(0);
-    Animated.timing(labelAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-  }
 
   function toggleTag(tag) {
     selection();
@@ -238,34 +278,68 @@ export function EmotionSelectionScreen() {
       <View style={styles.header}>
         <Text style={styles.kicker}>{t(`triggers.${trigger}`) !== `triggers.${trigger}` ? t(`triggers.${trigger}`) : trigger}</Text>
         <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
-        <Text style={styles.hint}>{t("emotion.tapAnywhere") || "Tap anywhere to mark how you feel"}</Text>
+        <Text style={styles.hint}>tap or drag to show how you feel</Text>
       </View>
 
-      {/* ── Circular emotion field ── */}
+      {/* ── Circular emotion field with continuous gradient ── */}
       <View style={styles.fieldContainer}>
-        {/* Anchor labels */}
-        <Text style={[styles.anchor, styles.anchorTop]}>{t("emotion.anchor.energized") || "energized"}</Text>
-        <Text style={[styles.anchor, styles.anchorRight]}>{t("emotion.anchor.calm") || "calm"}</Text>
-        <Text style={[styles.anchor, styles.anchorBottom]}>{t("emotion.anchor.low") || "low"}</Text>
-        <Text style={[styles.anchor, styles.anchorLeft]}>{t("emotion.anchor.tense") || "tense"}</Text>
+        <View style={styles.field} onLayout={onFieldLayout} {...panResponder.panHandlers}>
+          {/* Layered gradients for smooth continuous color blending */}
+          <LinearGradient
+            colors={["rgba(255,107,122,0.30)", "rgba(167,139,250,0.06)", "rgba(94,230,160,0.30)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.fieldGradient}
+          />
+          <LinearGradient
+            colors={["rgba(255,179,71,0.22)", "transparent", "rgba(86,208,224,0.22)"]}
+            start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
+            style={styles.fieldGradient}
+          />
+          <LinearGradient
+            colors={["rgba(167,139,250,0.16)", "transparent", "rgba(86,208,224,0.16)"]}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={styles.fieldGradient}
+          />
+          <LinearGradient
+            colors={["rgba(255,107,122,0.12)", "transparent", "rgba(94,230,160,0.12)"]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={styles.fieldGradient}
+          />
+          {/* Neutral center fade */}
+          <View style={styles.neutralFade} />
 
-        <Pressable style={styles.field} onPress={handleFieldTap}>
-          {/* Gradient zones using layered semi-transparent views */}
-          <View style={[styles.fieldQuadrant, styles.fieldTopLeft]} />
-          <View style={[styles.fieldQuadrant, styles.fieldTopRight]} />
-          <View style={[styles.fieldQuadrant, styles.fieldBottomLeft]} />
-          <View style={[styles.fieldQuadrant, styles.fieldBottomRight]} />
-
-          {/* Center label */}
-          <View style={styles.fieldCenter}>
-            <Text style={styles.fieldCenterLabel}>{t("emotion.neutral") || "neutral"}</Text>
-          </View>
-
-          {/* Crosshair guides */}
+          {/* Subtle crosshair guides */}
           <View style={styles.crosshairH} />
           <View style={styles.crosshairV} />
 
-          {/* Ripple animation on tap */}
+          {/* Quadrant zone labels inside circle (Plutchik outer layer — mild) */}
+          <Text style={[styles.zoneLabel, { top: 22, left: 22 }]}>annoyance</Text>
+          <Text style={[styles.zoneLabel, { top: 22, right: 22 }]}>interest</Text>
+          <Text style={[styles.zoneLabel, { bottom: 22, right: 22 }]}>acceptance</Text>
+          <Text style={[styles.zoneLabel, { bottom: 22, left: 22 }]}>pensiveness</Text>
+
+          {/* Inner ring labels (Plutchik intense layer) */}
+          <Text style={[styles.innerLabel, { top: "24%", left: "14%" }]}>rage</Text>
+          <Text style={[styles.innerLabel, { top: "14%", left: "50%", transform: [{ translateX: -12 }] }]}>vigilance</Text>
+          <Text style={[styles.innerLabel, { top: "24%", right: "14%" }]}>ecstasy</Text>
+          <Text style={[styles.innerLabel, { top: "50%", right: "8%", transform: [{ translateY: -6 }] }]}>joy</Text>
+          <Text style={[styles.innerLabel, { bottom: "24%", right: "14%" }]}>admiration</Text>
+          <Text style={[styles.innerLabel, { bottom: "14%", left: "50%", transform: [{ translateX: -14 }] }]}>amazement</Text>
+          <Text style={[styles.innerLabel, { bottom: "24%", left: "14%" }]}>grief</Text>
+          <Text style={[styles.innerLabel, { top: "50%", left: "8%", transform: [{ translateY: -6 }] }]}>loathing</Text>
+
+          {/* Axis labels */}
+          <Text style={[styles.axisLabel, { top: 6, left: "50%", transform: [{ translateX: -22 }] }]}>high energy</Text>
+          <Text style={[styles.axisLabel, { bottom: 6, left: "50%", transform: [{ translateX: -20 }] }]}>low energy</Text>
+          <Text style={[styles.axisLabel, { left: 8, top: "50%", transform: [{ translateY: -6 }] }]}>-</Text>
+          <Text style={[styles.axisLabel, { right: 8, top: "50%", transform: [{ translateY: -6 }] }]}>+</Text>
+
+          {/* Center neutral marker */}
+          <View style={styles.fieldCenter}>
+            <View style={styles.centerDot} />
+          </View>
+
+          {/* Tap ripple */}
           {dotPos && (
             <Animated.View style={[styles.tapRipple, {
               left: dotPos.x - 30, top: dotPos.y - 30,
@@ -275,17 +349,20 @@ export function EmotionSelectionScreen() {
             }]} />
           )}
 
-          {/* Placed dot */}
+          {/* Active marker */}
           {dotPos && (
             <Animated.View style={[styles.dot, {
-              left: dotPos.x - 12, top: dotPos.y - 12,
+              left: dotPos.x - 14, top: dotPos.y - 14,
               backgroundColor: dotColor,
-              transform: [{ scale: dotScale }],
+              borderColor: isDragging ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.4)",
+              transform: [{ scale: isDragging ? 1.15 : 1 }, { scale: dotScale }],
               opacity: dotOpacity,
               shadowColor: dotColor,
+              shadowOpacity: dotGlow.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] }),
+              shadowRadius: dotGlow.interpolate({ inputRange: [0, 1], outputRange: [6, 16] }),
             }]} />
           )}
-        </Pressable>
+        </View>
       </View>
 
       {/* Derived label */}
@@ -376,15 +453,35 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
     overflow: "hidden", position: "relative",
   },
-  fieldQuadrant: { position: "absolute", width: FIELD_SIZE / 2, height: FIELD_SIZE / 2 },
-  fieldTopLeft: { top: 0, left: 0, backgroundColor: "rgba(255, 107, 122, 0.10)" },
-  fieldTopRight: { top: 0, right: 0, backgroundColor: "rgba(86, 208, 224, 0.10)" },
-  fieldBottomLeft: { bottom: 0, left: 0, backgroundColor: "rgba(167, 139, 250, 0.10)" },
-  fieldBottomRight: { bottom: 0, right: 0, backgroundColor: "rgba(94, 230, 160, 0.10)" },
-  fieldCenter: {
-    position: "absolute", top: FIELD_SIZE / 2 - 10, left: 0, right: 0, alignItems: "center",
+  fieldGradient: { ...StyleSheet.absoluteFillObject, borderRadius: FIELD_SIZE / 2 },
+  neutralFade: {
+    position: "absolute",
+    width: FIELD_SIZE * 0.38, height: FIELD_SIZE * 0.38,
+    borderRadius: FIELD_SIZE * 0.19,
+    backgroundColor: "rgba(13, 20, 36, 0.55)",
+    left: FIELD_SIZE / 2 - FIELD_SIZE * 0.19,
+    top: FIELD_SIZE / 2 - FIELD_SIZE * 0.19,
   },
-  fieldCenterLabel: { color: palette.muted, fontSize: 10, fontWeight: "600", opacity: 0.6 },
+  zoneLabel: {
+    position: "absolute", color: "rgba(255,255,255,0.35)",
+    fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase",
+  },
+  innerLabel: {
+    position: "absolute", color: "rgba(255,255,255,0.22)",
+    fontSize: 8, fontWeight: "600", letterSpacing: 0.3, textTransform: "uppercase",
+  },
+  axisLabel: {
+    position: "absolute", color: "rgba(255,255,255,0.20)",
+    fontSize: 7, fontWeight: "600",
+  },
+  centerDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: "rgba(158, 176, 201, 0.35)",
+  },
+  fieldCenter: {
+    position: "absolute", top: FIELD_SIZE / 2 - 3, left: FIELD_SIZE / 2 - 3,
+    alignItems: "center", justifyContent: "center",
+  },
   crosshairH: {
     position: "absolute", top: FIELD_SIZE / 2, left: 20, right: 20,
     height: 1, backgroundColor: "rgba(148, 180, 224, 0.08)",
@@ -393,14 +490,6 @@ const styles = StyleSheet.create({
     position: "absolute", left: FIELD_SIZE / 2, top: 20, bottom: 20,
     width: 1, backgroundColor: "rgba(148, 180, 224, 0.08)",
   },
-  anchor: {
-    position: "absolute", color: palette.muted, fontSize: 10, fontWeight: "700",
-    letterSpacing: 0.5, textTransform: "uppercase", opacity: 0.5,
-  },
-  anchorTop: { top: 0, left: 0, right: 0, textAlign: "center" },
-  anchorRight: { right: 0, top: FIELD_SIZE / 2 + 20, transform: [{ rotate: "0deg" }] },
-  anchorBottom: { bottom: 0, left: 0, right: 0, textAlign: "center" },
-  anchorLeft: { left: 0, top: FIELD_SIZE / 2 + 20 },
   dot: {
     position: "absolute", width: 24, height: 24, borderRadius: 12,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 8, elevation: 6,
