@@ -2717,7 +2717,7 @@ const s = StyleSheet.create({
   },
   modeTabText: { color: palette.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   modeTabTextActive: { color: palette.accent },
-  modeContent: { gap: 10, backgroundColor: \"rgba(6, 10, 18, 0.70)\", borderRadius: radius.md, padding: 12 },
+  modeContent: { gap: 10, backgroundColor: "rgba(6, 10, 18, 0.70)", borderRadius: radius.md, padding: 12 },
   modeContentBody: { color: palette.text, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeCardsScroll: { gap: 10, paddingVertical: 4 },
