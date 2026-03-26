@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TimelineGroup } from "@/components/TimelineGroup";
@@ -14,6 +14,9 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
 import { palette, radius } from "@/utils/theme";
+import { legacyToCoordinates } from "@triggermap/shared/constants/emotions";
+import { emotionColor as getEmotionColor } from "@/utils/emotionModel";
+import { tap } from "@/utils/haptics";
 
 const EMOTION_COLORS = {
   calm: palette.success,
@@ -24,6 +27,104 @@ const EMOTION_COLORS = {
 };
 
 const MERGE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+const TRAJECTORY_SIZE = 260;
+
+/** 2D Emotional Trajectory — plots moments as dots on valence/arousal field */
+function EmotionTrajectory({ moments, onTapPoint }) {
+  const points = useMemo(() => {
+    return moments
+      .filter((m) => m.timestamp)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      .map((m) => {
+        const v = typeof m.valence === "number" ? m.valence : (legacyToCoordinates(m.emotion)?.valence || 0);
+        const a = typeof m.arousal === "number" ? m.arousal : (legacyToCoordinates(m.emotion)?.arousal || 0);
+        return { id: m.id, valence: v, arousal: a, emotion: m.emotion, trigger: m.trigger, note: m.note, tags: m.tags, timestamp: m.timestamp };
+      });
+  }, [moments]);
+
+  if (points.length < 2) return null;
+
+  const cx = TRAJECTORY_SIZE / 2;
+  const cy = TRAJECTORY_SIZE / 2;
+  const toX = (v) => cx + v * (cx - 20);
+  const toY = (a) => cy - a * (cy - 20);
+
+  return (
+    <View style={ts.container}>
+      <Text style={ts.heading}>Emotional Trajectory</Text>
+      <View style={ts.field}>
+        {/* Axis labels */}
+        <Text style={[ts.axisLabel, ts.axisTop]}>↑ energized</Text>
+        <Text style={[ts.axisLabel, ts.axisBottom]}>↓ low</Text>
+        <Text style={[ts.axisLabel, ts.axisLeft]}>← tense</Text>
+        <Text style={[ts.axisLabel, ts.axisRight]}>calm →</Text>
+        {/* Grid lines */}
+        <View style={[ts.gridH, { top: cy }]} />
+        <View style={[ts.gridV, { left: cx }]} />
+        {/* Connecting lines (trail) */}
+        {points.map((pt, idx) => {
+          if (idx === 0) return null;
+          const prev = points[idx - 1];
+          const x1 = toX(prev.valence);
+          const y1 = toY(prev.arousal);
+          const x2 = toX(pt.valence);
+          const y2 = toY(pt.arousal);
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const opacity = 0.15 + (idx / points.length) * 0.35;
+          return (
+            <View key={`line-${idx}`} style={{
+              position: "absolute", left: x1, top: y1, width: length, height: 1.5,
+              backgroundColor: palette.accent, opacity,
+              transform: [{ rotate: `${angle}deg` }], transformOrigin: "0 0",
+            }} />
+          );
+        })}
+        {/* Dots */}
+        {points.map((pt, idx) => {
+          const isLast = idx === points.length - 1;
+          const color = getEmotionColor(pt.valence, pt.arousal);
+          const size = isLast ? 14 : 8;
+          const opacity = 0.3 + (idx / points.length) * 0.7;
+          return (
+            <Pressable
+              key={pt.id}
+              onPress={() => onTapPoint?.(pt)}
+              style={{
+                position: "absolute",
+                left: toX(pt.valence) - size / 2,
+                top: toY(pt.arousal) - size / 2,
+                width: size, height: size, borderRadius: size / 2,
+                backgroundColor: color, opacity,
+                borderWidth: isLast ? 2 : 0, borderColor: "rgba(255,255,255,0.5)",
+                shadowColor: color, shadowOpacity: isLast ? 0.6 : 0, shadowRadius: 6, elevation: isLast ? 4 : 0,
+              }}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const ts = StyleSheet.create({
+  container: { gap: 8, marginVertical: 8 },
+  heading: { color: palette.text, fontSize: 13, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  field: {
+    width: TRAJECTORY_SIZE, height: TRAJECTORY_SIZE, alignSelf: "center",
+    backgroundColor: "rgba(6, 10, 18, 0.85)", borderRadius: radius.md,
+    borderWidth: 1, borderColor: palette.glassBorder, position: "relative", overflow: "hidden",
+  },
+  axisLabel: { position: "absolute", color: palette.muted, fontSize: 9, fontWeight: "600", opacity: 0.5 },
+  axisTop: { top: 4, left: 0, right: 0, textAlign: "center" },
+  axisBottom: { bottom: 4, left: 0, right: 0, textAlign: "center" },
+  axisLeft: { left: 4, top: TRAJECTORY_SIZE / 2 - 6 },
+  axisRight: { right: 4, top: TRAJECTORY_SIZE / 2 - 6, textAlign: "right" },
+  gridH: { position: "absolute", left: 20, right: 20, height: 1, backgroundColor: "rgba(148,180,224,0.08)" },
+  gridV: { position: "absolute", top: 20, bottom: 20, width: 1, backgroundColor: "rgba(148,180,224,0.08)" },
+});
 
 /**
  * Merge duplicate entries: if same trigger + emotion within 30 min → group into one entry with count
@@ -79,6 +180,7 @@ export function TimelineScreen() {
   const [error, setError] = useState("");
   const [editingMoment, setEditingMoment] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
+  const [showTrajectory, setShowTrajectory] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
 
   const dayGroups = useMemo(() => {
@@ -180,6 +282,32 @@ export function TimelineScreen() {
       {/* Emotional weather ribbon */}
       <MoodWeather moments={moments} />
 
+      {/* Trajectory toggle */}
+      {moments.length >= 2 && (
+        <Pressable
+          onPress={() => { tap(); setShowTrajectory((p) => !p); }}
+          style={styles.trajectoryToggle}
+        >
+          <Text style={styles.trajectoryToggleText}>
+            {showTrajectory ? "▾ hide trajectory" : "▸ emotional trajectory"}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* 2D Emotional Trajectory */}
+      {showTrajectory && moments.length >= 2 && (
+        <EmotionTrajectory
+          moments={moments}
+          onTapPoint={(pt) => {
+            tap();
+            Alert.alert(
+              pt.trigger || "Moment",
+              [pt.emotion, pt.note, new Date(pt.timestamp).toLocaleTimeString()].filter(Boolean).join("\n"),
+            );
+          }}
+        />
+      )}
+
       {/* Today's emotion garden */}
       <EmotionGarden moments={moments} />
 
@@ -210,7 +338,9 @@ export function TimelineScreen() {
           <Text style={styles.dayHeader}>{dayLabel}</Text>
           <View style={styles.timelineConnector}>
             {dayMoments.map((moment, idx) => {
-              const emotionColor = EMOTION_COLORS[moment.emotion] || palette.muted;
+              const emotionColor = (typeof moment.valence === "number")
+                ? getEmotionColor(moment.valence, moment.arousal)
+                : (EMOTION_COLORS[moment.emotion] || palette.muted);
               const isLast = idx === dayMoments.length - 1;
               const isHighlighted = moment.id === highlightId;
               const cardBorderColor = isHighlighted
@@ -382,5 +512,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 260,
     marginBottom: 8,
+  },
+  trajectoryToggle: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    backgroundColor: palette.glass,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+  },
+  trajectoryToggleText: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
 });

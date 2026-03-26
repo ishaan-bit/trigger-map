@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
+import { emotionColor as getFieldColor } from "@/utils/emotionModel";
+import { legacyToCoordinates } from "@triggermap/shared";
 import { useLanguage } from "@/i18n/LanguageContext";
 
 /**
@@ -23,6 +25,23 @@ export function EmotionGarden({ moments }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
 
+  // Compute ambient centroid for today's emotional center
+  const centroid = useMemo(() => {
+    if (!todayBlooms.length) return null;
+    let vSum = 0, aSum = 0, n = 0;
+    for (const b of todayBlooms) {
+      if (typeof b.valence === "number") {
+        vSum += b.valence;
+        aSum += b.arousal;
+        n++;
+      }
+    }
+    if (!n) return null;
+    return { valence: vSum / n, arousal: aSum / n };
+  }, [todayBlooms]);
+
+  const ambientColor = centroid ? getFieldColor(centroid.valence, centroid.arousal) : null;
+
   useEffect(() => {
     if (todayBlooms.length > 0) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
@@ -37,6 +56,13 @@ export function EmotionGarden({ moments }) {
         <Text style={styles.title}>{t("garden.title")}</Text>
         <Text style={styles.count}>{todayBlooms.length !== 1 ? t("garden.bloomCountPlural", { count: todayBlooms.length }) : t("garden.bloomCount", { count: todayBlooms.length })}</Text>
       </View>
+      {/* Ambient centroid strip */}
+      {ambientColor && (
+        <View style={[styles.ambientStrip, { backgroundColor: `${ambientColor}18`, borderColor: `${ambientColor}30` }]}>
+          <View style={[styles.ambientDot, { backgroundColor: ambientColor }]} />
+          <Text style={[styles.ambientLabel, { color: ambientColor }]}>today's center</Text>
+        </View>
+      )}
       <View style={styles.row}>
         {todayBlooms.map((b, i) => (
           <BloomItem key={`${b.emotion}-${i}`} bloom={b} index={i} isNewest={i === todayBlooms.length - 1} />
@@ -71,17 +97,20 @@ function BloomItem({ bloom, index, isNewest }) {
   const eStyle = EMOTION_STYLES[bloom.emotion] || EMOTION_STYLES.neutral;
   const icon = bloom.isMature ? meta.bloom : meta.seed;
   const label = bloom.emotion;
+  const fieldColor = (typeof bloom.valence === "number")
+    ? getFieldColor(bloom.valence, bloom.arousal)
+    : eStyle.color;
 
   return (
     <Animated.View style={[styles.bloomSlot, {
       transform: [{ scale: scaleAnim }],
-      backgroundColor: eStyle.bg,
-      borderColor: eStyle.border,
+      backgroundColor: `${fieldColor}14`,
+      borderColor: `${fieldColor}30`,
       borderWidth: 1,
     }]}>
       <Text style={styles.bloomIcon}>{icon}</Text>
-      <View style={[styles.bloomGlow, { backgroundColor: eStyle.color }]} />
-      <Text style={[styles.bloomLabel, { color: eStyle.color }]} numberOfLines={1}>{t("emotions." + label) || label}</Text>
+      <View style={[styles.bloomGlow, { backgroundColor: fieldColor }]} />
+      <Text style={[styles.bloomLabel, { color: fieldColor }]} numberOfLines={1}>{t("emotions." + label) || label}</Text>
     </Animated.View>
   );
 }
@@ -97,10 +126,17 @@ function getTodayBlooms(moments) {
   return todayMoments
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     .slice(0, 8) // max 8 blooms visible
-    .map((m) => ({
-      emotion: m.emotion,
-      isMature: now - new Date(m.timestamp).getTime() > 3_600_000,
-    }));
+    .map((m) => {
+      const coords = (typeof m.valence === "number")
+        ? { valence: m.valence, arousal: m.arousal }
+        : (legacyToCoordinates(m.emotion) || { valence: 0, arousal: 0 });
+      return {
+        emotion: m.emotion || "neutral",
+        isMature: now - new Date(m.timestamp).getTime() > 3_600_000,
+        valence: coords.valence,
+        arousal: coords.arousal,
+      };
+    });
 }
 
 const styles = StyleSheet.create({
@@ -175,5 +211,25 @@ const styles = StyleSheet.create({
   emptyDot: {
     color: palette.muted,
     fontSize: 16,
+  },
+  ambientStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  ambientDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  ambientLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
 });

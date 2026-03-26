@@ -45,6 +45,10 @@ function parseAggregateHash(record, date) {
       evening: 0,
       night: 0,
     },
+    // Continuous emotion model aggregates
+    valenceSum: Number(record["valence_sum"] || 0) / 1000,
+    arousalSum: Number(record["arousal_sum"] || 0) / 1000,
+    continuousCount: Number(record["continuous_count"] || 0),
   };
 
   for (const [field, rawValue] of Object.entries(record)) {
@@ -92,6 +96,14 @@ export async function appendDailyAggregate(moment) {
     for (const tag of moment.tags) {
       cmds.push(["HINCRBY", key, `tag:${tag}`, "1"]);
     }
+  }
+
+  // Store valence/arousal running sums for centroid computation
+  if (typeof moment.valence === "number" && typeof moment.arousal === "number") {
+    // HINCRBY only works with integers — store scaled by 1000 for precision
+    cmds.push(["HINCRBY", key, "valence_sum", String(Math.round(moment.valence * 1000))]);
+    cmds.push(["HINCRBY", key, "arousal_sum", String(Math.round(moment.arousal * 1000))]);
+    cmds.push(["HINCRBY", key, "continuous_count", "1"]);
   }
 
   await pipeline(cmds);

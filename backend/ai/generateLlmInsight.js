@@ -214,6 +214,21 @@ function buildSignals(report, recentNotes, actionFeedback) {
     }
   }
 
+  // Continuous emotion centroid signals
+  const wc = report.weeklyCentroid;
+  if (wc && wc.count > 0) {
+    lines.push(`Emotional centroid (valence/arousal average): valence ${wc.valence.toFixed(2)}, arousal ${wc.arousal.toFixed(2)} — "${wc.label}" (based on ${wc.count} continuous entries).`);
+  }
+  const cDrift = report.centroidDrift;
+  if (cDrift && (Math.abs(cDrift.valence) > 0.05 || Math.abs(cDrift.arousal) > 0.05)) {
+    lines.push(`Centroid drift (start-of-week to end): valence ${cDrift.valence > 0 ? "+" : ""}${cDrift.valence.toFixed(2)}, arousal ${cDrift.arousal > 0 ? "+" : ""}${cDrift.arousal.toFixed(2)}.`);
+  }
+  const dc = report.dailyCentroids;
+  if (dc?.length >= 3) {
+    const trail = dc.map(d => `${d.date}: v${d.valence.toFixed(2)}/a${d.arousal.toFixed(2)}`);
+    lines.push(`Daily centroid trail: ${trail.join(", ")}.`);
+  }
+
   if (recentNotes?.length) {
     const noteLines = recentNotes.map(n => `[${n.trigger}/${n.emotion}] "${n.note}"`);
     lines.push(`Recent user notes:\n${noteLines.join("\n")}`);

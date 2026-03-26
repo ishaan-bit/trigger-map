@@ -88,6 +88,23 @@ export function buildSignalProfile(report) {
     residueContamination = im.contamination?.length > 0;
   }
 
+  // Centroid classification (continuous valence/arousal model)
+  const wc = report.weeklyCentroid;
+  const cd = report.centroidDrift;
+  let centroidLabel = null;
+  let centroidValenceShift = 'stable';
+  let centroidArousalShift = 'stable';
+
+  if (wc && wc.count > 0) {
+    centroidLabel = wc.label; // e.g. "calm", "very tense", "slightly settled"
+  }
+  if (cd) {
+    if (cd.valence > 0.15) centroidValenceShift = 'improving';
+    else if (cd.valence < -0.15) centroidValenceShift = 'declining';
+    if (cd.arousal > 0.15) centroidArousalShift = 'rising';
+    else if (cd.arousal < -0.15) centroidArousalShift = 'falling';
+  }
+
   return {
     volatility,
     drift: driftLevel,
@@ -101,6 +118,9 @@ export function buildSignalProfile(report) {
     residueContamination,
     falseRecovery: cp?.falseRecovery || false,
     crashRisk: cp?.crashRisk || false,
+    centroidLabel,
+    centroidValenceShift,
+    centroidArousalShift,
   };
 }
 
@@ -169,6 +189,19 @@ export function buildSignalConstraints(profile) {
 
   if (profile.residueContamination) {
     lines.push('CONTEXT CONTAMINATION: Emotional residue from one trigger context is bleeding into subsequent, unrelated contexts within the same day.');
+  }
+
+  // Centroid (continuous emotion model) constraints
+  if (profile.centroidLabel) {
+    lines.push(`Emotional centroid this week: "${profile.centroidLabel}". Use this as the overall tonal anchor when describing the week's feel.`);
+  }
+  if (profile.centroidValenceShift !== 'stable') {
+    const vDir = profile.centroidValenceShift === 'improving' ? 'improving (more positive)' : 'declining (more negative)';
+    lines.push(`Valence shift across the week: ${vDir}.`);
+  }
+  if (profile.centroidArousalShift !== 'stable') {
+    const aDir = profile.centroidArousalShift === 'rising' ? 'rising (more activated/tense)' : 'falling (calmer/lower energy)';
+    lines.push(`Arousal shift across the week: ${aDir}.`);
   }
 
   return lines.join('\n');
@@ -309,6 +342,16 @@ export function rankSignals(report, sp) {
       label: 'active',
       weight: 5,
       valence: 'negative',
+    });
+  }
+
+  // Centroid drift (continuous emotion model)
+  if (sp.centroidValenceShift !== 'stable') {
+    signals.push({
+      type: 'centroidDrift',
+      label: sp.centroidValenceShift,
+      weight: sp.centroidValenceShift === 'declining' ? 4 : 3,
+      valence: sp.centroidValenceShift === 'improving' ? 'positive' : 'negative',
     });
   }
 

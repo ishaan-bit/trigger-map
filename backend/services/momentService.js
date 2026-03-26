@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { TRIGGER_KEYWORDS, TRIGGERS } from "@triggermap/shared/constants/triggers";
-import { EMOTIONS } from "@triggermap/shared/constants/emotions";
+import { EMOTIONS, EMOTION_COORDINATES, coordinatesToLegacy, derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
 import { appendDailyAggregate, getOwnerIndexKey } from "./aggregationService.js";
 import { lrangeJson, pipeline, redis, redisKey } from "./redisClient.js";
 import { sanitizeText } from "./security.js";
@@ -24,15 +24,29 @@ export function getMomentsKey(ownerId) {
   return redisKey("moments", ownerId);
 }
 
-export function createMomentPayload({ ownerId, trigger, emotion, note, occurredAt, isAnonymous, prediction, tags }) {
+export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, prediction, tags }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
-  const finalEmotion = EMOTIONS.includes(emotion) ? emotion : "neutral";
+
+  // Continuous model: valence/arousal provided → derive legacy emotion for backward compat
+  // Legacy model: emotion string provided → map to coordinates
+  const hasContinuous = typeof valence === "number" && typeof arousal === "number";
+  const finalEmotion = hasContinuous
+    ? coordinatesToLegacy(valence, arousal)
+    : (EMOTIONS.includes(emotion) ? emotion : "neutral");
+  const coords = hasContinuous
+    ? { valence, arousal }
+    : (EMOTION_COORDINATES[finalEmotion] || EMOTION_COORDINATES.neutral);
 
   return {
     id: randomUUID(),
     ownerId,
     trigger: finalTrigger,
     emotion: finalEmotion,
+    emotion_legacy: hasContinuous ? undefined : finalEmotion,
+    valence: coords.valence,
+    arousal: coords.arousal,
+    intensity: typeof intensity === "number" ? intensity : Math.sqrt(coords.valence ** 2 + coords.arousal ** 2),
+    derivedLabel: hasContinuous ? derivedEmotionLabel(valence, arousal) : finalEmotion,
     note: sanitizeText(note || ""),
     timestamp: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
     isAnonymous: Boolean(isAnonymous),

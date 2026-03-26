@@ -265,3 +265,12 @@ export function updateModeProfile(profile, token) {
     token,
   });
 }
+
+export function regeneratePremium({ lang, model, maxWords, style } = {}, token) {
+  return fetchJson("/modes/regenerate", {
+    method: "POST",
+    body: { lang, model, maxWords, style },
+    token,
+    timeoutMs: 180_000,
+  });
+}

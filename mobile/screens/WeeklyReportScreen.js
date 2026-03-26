@@ -1,8 +1,9 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Dimensions,
   Easing,
   Image,
   Pressable,
@@ -12,16 +13,19 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { LineChart, BarChart } from "react-native-chart-kit";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress, regeneratePremium } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { MOVEMENTS, EQUIPMENT, filterMovements } from "@triggermap/shared";
+import { NOURISHMENTS, DIETS, filterNourishments } from "@triggermap/shared";
 
 /* ── Helpers ── */
 
@@ -554,28 +558,32 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
       {(whatWorking?.length || whereToFocus?.length) ? (
         <AnimatedSection index={5} style={s.section}>
           {whatWorking?.length ? (
-            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
-              <Text style={s.cardLabel}>{t("report.whatWorking")}</Text>
-              {whatWorking.slice(0, 3).map((item, i) => (
-                <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
-              ))}
-            </View>
+            <>
+              <Text style={s.sectionTitle}>{t("report.whatWorking")}</Text>
+              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
+                {whatWorking.slice(0, 3).map((item, i) => (
+                  <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
+                ))}
+              </View>
+            </>
           ) : null}
           {whereToFocus?.length ? (
-            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
-              <Text style={s.cardLabel}>{t("report.whereToFocus")}</Text>
-              {whereToFocus.slice(0, 3).map((item, i) => (
-                <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
-              ))}
-            </View>
+            <>
+              <Text style={s.sectionTitle}>{t("report.whereToFocus")}</Text>
+              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
+                {whereToFocus.slice(0, 3).map((item, i) => (
+                  <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
+                ))}
+              </View>
+            </>
           ) : null}
         </AnimatedSection>
       ) : null}
 
       {/* Confidence */}
       <AnimatedSection index={6} style={s.section}>
+        <Text style={s.sectionTitle}>{t("report.confidenceLabel")}</Text>
         <View style={s.card}>
-          <Text style={s.cardLabel}>{t("report.confidenceLabel")}</Text>
           <Text style={s.aiSummary}>{getConfidenceLabel(confidence, t)}</Text>
           <Text style={{ color: palette.muted, fontSize: 11 }}>
             {t("report.basedOnMoments", { moments: dq.totalMoments || 0, days: dq.daysLogged || 0 })}
@@ -1079,9 +1087,42 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 2. WHAT'S CHANGING (core metrics) ── */}
+      {/* ── 2. SCORE TREND CHART ── */}
+      {weeklySnapshots?.length >= 2 ? (() => {
+        const chartW = Dimensions.get("window").width - 64;
+        const labels = weeklySnapshots.map(w => w.weekLabel?.replace(/^W/, "") || "");
+        const scores = weeklySnapshots.map(w => w.score ?? 0);
+        return (
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.progress.scoreTrend") || "Score trend"} badge="live" t={t} />
+            <View style={s.chartContainer}>
+              <LineChart
+                data={{ labels, datasets: [{ data: scores }] }}
+                width={chartW}
+                height={180}
+                yAxisSuffix=""
+                fromZero
+                yAxisInterval={1}
+                chartConfig={{
+                  backgroundGradientFrom: palette.glass,
+                  backgroundGradientTo: palette.glass,
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(120, 180, 255, ${opacity})`,
+                  labelColor: () => palette.textSecondary,
+                  propsForDots: { r: "4", strokeWidth: "2", stroke: palette.accent },
+                  propsForBackgroundLines: { stroke: palette.glassBorder || "rgba(255,255,255,0.08)" },
+                }}
+                bezier
+                style={{ borderRadius: 12 }}
+              />
+            </View>
+          </AnimatedSection>
+        );
+      })() : null}
+
+      {/* ── 3. WHAT'S CHANGING (core metrics) ── */}
       {metrics ? (
-        <AnimatedSection index={1} style={s.section}>
+        <AnimatedSection index={2} style={s.section}>
           <SectionHeader label={t("report.progress.metricsTitle")} badge="live" t={t} />
           <View style={s.progressMetricsGrid}>
             {[
@@ -1123,9 +1164,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 3. PATTERN SHIFTS ── */}
+      {/* ── 4. PATTERN SHIFTS ── */}
       {hasShifts ? (
-        <AnimatedSection index={2} style={s.section}>
+        <AnimatedSection index={3} style={s.section}>
           <SectionHeader label={t("report.progress.patternsTitle")} badge="weekly" t={t} />
 
           {patternShifts.strengthening?.length ? (
@@ -1212,9 +1253,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 4. ATTRIBUTIONS ── */}
+      {/* ── 5. ATTRIBUTIONS ── */}
       {hasAttributions ? (
-        <AnimatedSection index={3} style={s.section}>
+        <AnimatedSection index={4} style={s.section}>
           <SectionHeader label={t("report.progress.attributionsTitle")} badge="weekly" t={t} />
 
           {attributions.helped?.length ? (
@@ -1268,9 +1309,9 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 5. WEEK BY WEEK ── */}
+      {/* ── 6. WEEK BY WEEK ── */}
       {weeklySnapshots?.length >= 2 ? (
-        <AnimatedSection index={4} style={s.section}>
+        <AnimatedSection index={5} style={s.section}>
           <SectionHeader label={t("report.progress.weeklyTitle")} badge="live" t={t} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.progressWeekScroll}>
             {weeklySnapshots.map((week) => {
@@ -1300,8 +1341,8 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 6. CONFIDENCE ── */}
-      <AnimatedSection index={5} style={s.section}>
+      {/* ── 7. CONFIDENCE ── */}
+      <AnimatedSection index={6} style={s.section}>
         <View style={s.card}>
           <Text style={s.aiSummary}>
             {dataQuality?.confidence === "strong"
@@ -1416,6 +1457,14 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 
 function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
   const [feedbackGiven, setFeedbackGiven] = useState({});
+  const [showLibrary, setShowLibrary] = useState(false);
+
+  // Move filters
+  const [moveEquipment, setMoveEquipment] = useState(null); // null = any
+  const [moveMaxDuration, setMoveMaxDuration] = useState(null); // null = any
+
+  // Fuel filters
+  const [fuelDiet, setFuelDiet] = useState(null); // null = any
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
@@ -1443,6 +1492,37 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
   return (
     <View style={s.modeContent}>
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
+
+      {/* ── Move filters: equipment + duration ── */}
+      {mode === "move" && (
+        <View style={s.filterRow}>
+          {[{ label: "Any", val: null }, { label: "No Equip", val: "none" }, { label: "Minimal", val: "minimal" }, { label: "Gym", val: "gym" }].map((opt) => (
+            <Pressable key={opt.label} onPress={() => { tap(); setMoveEquipment(opt.val); }} style={[s.filterChip, moveEquipment === opt.val && s.filterChipActive]}>
+              <Text style={[s.filterChipText, moveEquipment === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      {mode === "move" && (
+        <View style={s.filterRow}>
+          {[{ label: "Any time", val: null }, { label: "≤5 min", val: 5 }, { label: "≤10 min", val: 10 }, { label: "≤15 min", val: 15 }, { label: "≤20 min", val: 20 }].map((opt) => (
+            <Pressable key={opt.label} onPress={() => { tap(); setMoveMaxDuration(opt.val); }} style={[s.filterChip, moveMaxDuration === opt.val && s.filterChipActive]}>
+              <Text style={[s.filterChipText, moveMaxDuration === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* ── Fuel filters: dietary preference ── */}
+      {mode === "fuel" && (
+        <View style={s.filterRow}>
+          {[{ label: "All", val: null }, { label: "🥬 Veg", val: "vegetarian" }, { label: "🌱 Vegan", val: "vegan" }, { label: "🍗 Non-Veg", val: "nonVeg" }].map((opt) => (
+            <Pressable key={opt.label} onPress={() => { tap(); setFuelDiet(opt.val); }} style={[s.filterChip, fuelDiet === opt.val && s.filterChipActive]}>
+              <Text style={[s.filterChipText, fuelDiet === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
         {items.map((item) => {
@@ -1491,12 +1571,69 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
           {t("report.generatedBy", { date: localeDateStr(data.generatedAt, lang) })}
         </Text>
       ) : null}
+
+      {/* ── Browse Full Library ── */}
+      {(mode === "move" || mode === "fuel") && (
+        <LibraryBrowser mode={mode} lang={lang} moveEquipment={moveEquipment} moveMaxDuration={moveMaxDuration} fuelDiet={fuelDiet} showLibrary={showLibrary} setShowLibrary={setShowLibrary} />
+      )}
     </View>
   );
 }
 
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback }) {
+/** Library Browser — filterable list of all movement/nourishment items */
+function LibraryBrowser({ mode, lang, moveEquipment, moveMaxDuration, fuelDiet, showLibrary, setShowLibrary }) {
+  const hi = lang === "hi";
+  const items = useMemo(() => {
+    if (mode === "move") {
+      return filterMovements({
+        equipment: moveEquipment || undefined,
+        maxDuration: moveMaxDuration || undefined,
+      });
+    }
+    if (mode === "fuel") {
+      return filterNourishments({
+        diets: fuelDiet ? [fuelDiet] : undefined,
+      });
+    }
+    return [];
+  }, [mode, moveEquipment, moveMaxDuration, fuelDiet]);
+
+  return (
+    <>
+      <Pressable onPress={() => { tap(); setShowLibrary((p) => !p); }} style={s.libraryToggle}>
+        <Text style={s.libraryToggleText}>
+          {showLibrary ? `▾ hide library (${items.length})` : `▸ browse full library (${items.length})`}
+        </Text>
+      </Pressable>
+      {showLibrary && (
+        <View style={s.libraryGrid}>
+          {items.map((item) => (
+            <View key={item.id} style={s.libraryItem}>
+              <Text style={s.libraryItemName}>{hi ? item.nameHi : item.name}</Text>
+              <Text style={s.libraryItemDesc} numberOfLines={2}>{hi ? item.descriptionHi : item.description}</Text>
+              {item.intensity ? (
+                <Text style={s.libraryItemMeta}>{item.equipment} · {item.intensity} · {item.durationMin}m</Text>
+              ) : item.type ? (
+                <Text style={s.libraryItemMeta}>{item.type}{item.diet ? ` · ${item.diet.join(", ")}` : ""}</Text>
+              ) : null}
+            </View>
+          ))}
+          {items.length === 0 && (
+            <Text style={s.libraryEmpty}>No items match these filters</Text>
+          )}
+        </View>
+      )}
+    </>
+  );
+}
+
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh }) {
   const [activeMode, setActiveMode] = useState("core");
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [regenLang, setRegenLang] = useState(lang);
+  const [regenModel, setRegenModel] = useState("mistral");
+  const [regenWords, setRegenWords] = useState(100);
+  const [regenLoading, setRegenLoading] = useState(false);
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1662,6 +1799,65 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
               </View>
             ) : (
               <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} />
+            )}
+
+            {/* ── Regenerate All Toggle ── */}
+            <Pressable onPress={() => { tap(); setRegenOpen((p) => !p); }} style={s.regenToggle}>
+              <Text style={s.regenToggleText}>{regenOpen ? "▾ hide regenerate" : "✨ regenerate all insights"}</Text>
+            </Pressable>
+            {regenOpen && (
+              <View style={s.regenPanel}>
+                <View style={s.regenRow}>
+                  <Text style={s.regenLabel}>Language</Text>
+                  <View style={s.filterRow}>
+                    {[{ label: "English", val: "en" }, { label: "हिंदी", val: "hi" }].map((opt) => (
+                      <Pressable key={opt.val} onPress={() => { tap(); setRegenLang(opt.val); }} style={[s.filterChip, regenLang === opt.val && s.filterChipActive]}>
+                        <Text style={[s.filterChipText, regenLang === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <View style={s.regenRow}>
+                  <Text style={s.regenLabel}>Model</Text>
+                  <View style={s.filterRow}>
+                    {["mistral", "llama3", "gemma2"].map((m) => (
+                      <Pressable key={m} onPress={() => { tap(); setRegenModel(m); }} style={[s.filterChip, regenModel === m && s.filterChipActive]}>
+                        <Text style={[s.filterChipText, regenModel === m && s.filterChipTextActive]}>{m}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <View style={s.regenRow}>
+                  <Text style={s.regenLabel}>Length</Text>
+                  <View style={s.filterRow}>
+                    {[{ label: "Brief", val: 60 }, { label: "Normal", val: 100 }, { label: "Detailed", val: 200 }].map((opt) => (
+                      <Pressable key={opt.val} onPress={() => { tap(); setRegenWords(opt.val); }} style={[s.filterChip, regenWords === opt.val && s.filterChipActive]}>
+                        <Text style={[s.filterChipText, regenWords === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <Pressable
+                  style={[s.regenButton, regenLoading && { opacity: 0.5 }]}
+                  disabled={regenLoading}
+                  onPress={async () => {
+                    tap();
+                    setRegenLoading(true);
+                    try {
+                      await regeneratePremium({ lang: regenLang, model: regenModel, maxWords: regenWords }, token);
+                      if (onModesRefresh) await onModesRefresh();
+                      setRegenOpen(false);
+                      Alert.alert("Regenerated", "All premium insights have been refreshed.");
+                    } catch (err) {
+                      Alert.alert("Error", err.message || "Regeneration failed.");
+                    } finally {
+                      setRegenLoading(false);
+                    }
+                  }}
+                >
+                  <Text style={s.regenButtonText}>{regenLoading ? "Generating…" : "🔄 Regenerate All Premium"}</Text>
+                </Pressable>
+              </View>
             )}
           </AnimatedSection>
 
@@ -2041,6 +2237,7 @@ export function WeeklyReportScreen() {
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
                   purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
+                  token={token} onModesRefresh={async () => { const m = await fetchModes(token); setModes(m); }}
                 />
               )}
             </>
@@ -2198,6 +2395,10 @@ const s = StyleSheet.create({
   },
   cardLabel: {
     color: palette.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 2,
+  },
+  sectionTitle: {
+    color: palette.text, fontSize: 13, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
   /* Horizontal bar */
@@ -2516,9 +2717,9 @@ const s = StyleSheet.create({
   },
   modeTabText: { color: palette.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   modeTabTextActive: { color: palette.accent },
-  modeContent: { gap: 10 },
-  modeContentBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
-  modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21 },
+  modeContent: { gap: 10, backgroundColor: \"rgba(6, 10, 18, 0.70)\", borderRadius: radius.md, padding: 12 },
+  modeContentBody: { color: palette.text, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeCardsScroll: { gap: 10, paddingVertical: 4 },
   modeCard: {
     width: 260, borderRadius: radius.md, padding: 16, gap: 8,
@@ -2544,10 +2745,62 @@ const s = StyleSheet.create({
   modeFeedbackDoneText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
   modeFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
 
+  /* ── Mode filter chips ── */
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 2 },
+  filterChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  filterChipActive: { backgroundColor: "rgba(94,230,160,0.15)", borderColor: "rgba(94,230,160,0.4)" },
+  filterChipText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
+  filterChipTextActive: { color: "#5ee6a0" },
+
+  /* ── Library browser ── */
+  libraryToggle: { alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 0 },
+  libraryToggleText: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  libraryGrid: { gap: 8 },
+  libraryItem: {
+    borderRadius: radius.sm, padding: 12, gap: 4,
+    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  libraryItemName: { color: palette.text, fontSize: 13, fontWeight: "700" },
+  libraryItemDesc: { color: palette.textSecondary, fontSize: 12, lineHeight: 17 },
+  libraryItemMeta: { color: palette.muted, fontSize: 10, fontWeight: "600", textTransform: "capitalize" },
+  libraryEmpty: { color: palette.muted, fontSize: 12, textAlign: "center", paddingVertical: 16 },
+
+  /* ── Regen panel ── */
+  regenToggle: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 0, marginTop: 4 },
+  regenToggleText: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  regenPanel: {
+    gap: 12, padding: 14, borderRadius: radius.md,
+    backgroundColor: "rgba(6, 10, 18, 0.85)", borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  regenRow: { gap: 6 },
+  regenLabel: { color: palette.textSecondary, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  regenButton: {
+    paddingVertical: 12, borderRadius: radius.sm,
+    backgroundColor: "rgba(94, 230, 160, 0.15)", borderWidth: 1, borderColor: "rgba(94, 230, 160, 0.4)",
+    alignItems: "center",
+  },
+  regenButtonText: { color: "#5ee6a0", fontSize: 13, fontWeight: "700" },
+
+  /* ── Charts ── */
+  chartContainer: {
+    backgroundColor: "rgba(6, 10, 18, 0.85)",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+    padding: 12,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+
   /* ── Progress tab ── */
   progressArc: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 20, paddingHorizontal: 8, gap: 0,
+    paddingVertical: 20, paddingHorizontal: 12, gap: 0,
+    backgroundColor: "rgba(6, 10, 18, 0.85)", borderRadius: radius.md,
+    borderWidth: 1, borderColor: palette.glassBorder,
   },
   progressArcNode: { alignItems: "center", gap: 4, width: 80 },
   progressArcConnector: {
@@ -2556,7 +2809,7 @@ const s = StyleSheet.create({
   progressArcLine: { flex: 1, height: 2, backgroundColor: palette.glassBorder },
   progressArcEmoji: { fontSize: 22 },
   progressArcScore: { color: palette.text, fontSize: 18, fontWeight: "800" },
-  progressArcLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  progressArcLabel: { color: palette.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   progressArcDelta: {
     alignSelf: "center", flexDirection: "row", alignItems: "center",
     backgroundColor: "rgba(94,230,160,0.12)", borderRadius: radius.pill,

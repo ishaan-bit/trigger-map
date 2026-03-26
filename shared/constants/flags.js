@@ -7,4 +7,5 @@ export const FEATURE_FLAGS = {
   computeInvokedMetrics: true,
   adaptiveModes: true,
   progressTracking: true,
+  continuousEmotionModel: true,
 };

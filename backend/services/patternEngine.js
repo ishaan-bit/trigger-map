@@ -1,4 +1,4 @@
-import { EMOTION_SCORE, ENERGY_MAP } from "@triggermap/shared/constants/emotions";
+import { EMOTION_SCORE, ENERGY_MAP, derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
 import { FEATURE_FLAGS } from "@triggermap/shared/constants/flags";
 import { computeBaselineMetrics } from "./baselineEngine.js";
 import { computeDailyInvoked, computeResidue, detectContamination } from "./emotionDecomposer.js";
@@ -229,6 +229,40 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     });
   }
 
+  // ── Valence/Arousal centroid computation ──
+  let vSum = 0, aSum = 0, cCount = 0;
+  const dailyCentroids = [];
+  for (const snapshot of filledAggregates) {
+    const sv = Number(snapshot.valenceSum || 0);
+    const sa = Number(snapshot.arousalSum || 0);
+    const sc = Number(snapshot.continuousCount || 0);
+    if (sc > 0) {
+      vSum += sv;
+      aSum += sa;
+      cCount += sc;
+      dailyCentroids.push({
+        date: snapshot.date,
+        valence: Number((sv / sc).toFixed(3)),
+        arousal: Number((sa / sc).toFixed(3)),
+        count: sc,
+      });
+    }
+  }
+  const weeklyCentroid = cCount > 0
+    ? { valence: Number((vSum / cCount).toFixed(3)), arousal: Number((aSum / cCount).toFixed(3)), count: cCount, label: derivedEmotionLabel(vSum / cCount, aSum / cCount) }
+    : null;
+
+  // Valence/arousal drift over the week
+  let centroidDrift = null;
+  if (dailyCentroids.length >= 2) {
+    const first = dailyCentroids[0];
+    const last = dailyCentroids[dailyCentroids.length - 1];
+    centroidDrift = {
+      valence: Number((last.valence - first.valence).toFixed(3)),
+      arousal: Number((last.arousal - first.arousal).toFixed(3)),
+    };
+  }
+
   const daysLogged = filledAggregates.filter((s) => Number(s.total || 0) > 0).length;
   const uniqueTriggers = Object.keys(triggerFrequency).length;
   const uniqueEmotions = Object.keys(emotionFrequency).length;
@@ -443,6 +477,9 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     topEmotion,
     tiedTriggers,
     tiedEmotions,
+    weeklyCentroid,
+    dailyCentroids,
+    centroidDrift,
     hasDominantTrigger,
     hasDominantEmotion,
     topPair,

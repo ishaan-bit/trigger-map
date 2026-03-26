@@ -242,48 +242,19 @@ export const MOVEMENTS = [
     durationMin: 2,
     emotionTags: ["stressed", "tense", "stuck", "numb", "frustrated"],
   },
-
-  // ── Additional — Breathwork ──
-  { id: "alternate_nostril", name: "Alternate Nostril Breathing", nameHi: "अनुलोम विलोम", description: "Close right nostril, inhale left. Close left, exhale right. Alternate for 5 minutes.", descriptionHi: "दायां नथुना बंद करें, बाएं से सांस लें। बायां बंद, दायें से छोड़ें। 5 मिनट।", mechanism: ["vagalTone", "breathwork"], environment: ["indoor", "office", "travel"], equipment: "none", intensity: "low", durationMin: 5, emotionTags: ["anxious", "stressed", "restless", "overwhelmed"] },
-  { id: "wim_hof_light", name: "Wim Hof Lite", nameHi: "विम हॉफ लाइट", description: "30 deep breaths, exhale hold 30s, recovery breath 15s. 3 rounds.", descriptionHi: "30 गहरी सांसें, सांस छोड़कर 30 सेकंड रोकें, रिकवरी 15 सेकंड। 3 राउंड।", mechanism: ["breathwork", "endorphin"], environment: ["indoor"], equipment: "none", intensity: "moderate", durationMin: 10, emotionTags: ["low", "numb", "tired", "disconnected"] },
-
-  // ── Additional — Grounding ──
-  { id: "progressive_relaxation", name: "Progressive Muscle Relaxation", nameHi: "प्रोग्रेसिव मसल रिलैक्सेशन", description: "Tense each muscle group 5s then release. Work from feet to face.", descriptionHi: "हर मांसपेशी समूह को 5 सेकंड कसें फिर छोड़ें। पैरों से चेहरे तक।", mechanism: ["grounding", "vagalTone"], environment: ["indoor", "office", "travel"], equipment: "none", intensity: "low", durationMin: 12, emotionTags: ["anxious", "tense", "stressed", "restless"] },
-  { id: "gentle_neck_rolls", name: "Gentle Neck & Shoulder Rolls", nameHi: "गर्दन और कंधे घुमाना", description: "Slow neck circles and shoulder rolls. 10 each direction.", descriptionHi: "धीरे गर्दन और कंधे घुमाएं। हर दिशा में 10 बार।", mechanism: ["grounding", "proprioception"], environment: ["indoor", "office", "travel"], equipment: "none", intensity: "low", durationMin: 3, emotionTags: ["tense", "stressed", "tired"] },
-  { id: "foam_roller", name: "Foam Roller Release", nameHi: "फोम रोलर रिलीज़", description: "Roll out calves, quads, back, hips for 10 min. Slow pressure.", descriptionHi: "पिंडलियों, जांघों, पीठ, कूल्हों को 10 मिनट रोल करें।", mechanism: ["proprioception", "grounding"], environment: ["indoor"], equipment: "minimal", intensity: "low", durationMin: 10, emotionTags: ["tense", "stressed", "tired", "restless"] },
-  { id: "balance_stand", name: "Single-Leg Balance", nameHi: "एक पैर पर संतुलन", description: "Stand on one leg, eyes open. 30s each side. Repeat 3 times.", descriptionHi: "एक पैर पर खड़े रहें, आंखें खुली। हर तरफ 30 सेकंड। 3 बार।", mechanism: ["proprioception", "grounding"], environment: ["indoor", "office", "outdoor"], equipment: "none", intensity: "low", durationMin: 4, emotionTags: ["anxious", "overwhelmed", "disconnected"] },
-
-  // ── Additional — Moderate ──
-  { id: "stair_climb", name: "Stair Climbing", nameHi: "सीढ़ियां चढ़ना", description: "Find a staircase, climb for 5 minutes at moderate pace.", descriptionHi: "सीढ़ी खोजें, 5 मिनट मध्यम गति से चढ़ें।", mechanism: ["cortisol", "endorphin"], environment: ["indoor", "office"], equipment: "none", intensity: "moderate", durationMin: 5, emotionTags: ["stressed", "restless", "frustrated", "angry"] },
-  { id: "tai_chi_basics", name: "Tai Chi Basics", nameHi: "ताई ची बेसिक्स", description: "Slow, flowing movements — cloud hands, wave hands like clouds. 10 min.", descriptionHi: "धीमी, बहती गतिविधियां — क्लाउड हैंड्स। 10 मिनट।", mechanism: ["grounding", "breathwork", "proprioception"], environment: ["indoor", "outdoor"], equipment: "none", intensity: "moderate", durationMin: 10, emotionTags: ["anxious", "stressed", "tense", "overwhelmed"] },
-  { id: "cycling_easy", name: "Easy Cycling", nameHi: "आसान साइकिलिंग", description: "Cycle at a comfortable pace for 15-20 minutes.", descriptionHi: "15-20 मिनट आरामदायक गति से साइकिलिंग।", mechanism: ["cortisol", "endorphin"], environment: ["outdoor"], equipment: "minimal", intensity: "moderate", durationMin: 15, emotionTags: ["stressed", "restless", "frustrated", "sad"] },
-  { id: "swimming_easy", name: "Easy Swimming", nameHi: "आसान तैराकी", description: "Swim at a gentle pace for 15-20 minutes. Focus on breath rhythm.", descriptionHi: "15-20 मिनट धीमी गति से तैरें। सांस की लय पर ध्यान दें।", mechanism: ["cortisol", "endorphin", "breathwork"], environment: ["indoor"], equipment: "gym", intensity: "moderate", durationMin: 15, emotionTags: ["anxious", "stressed", "tense", "overwhelmed", "sad"] },
-  { id: "resistance_band", name: "Resistance Band Flow", nameHi: "रेज़िस्टेंस बैंड फ्लो", description: "Upper-body pull-aparts and squats with band. 3 rounds of 10.", descriptionHi: "बैंड के साथ ऊपरी शरीर पुल-अपार्ट और स्क्वैट्स। 10-10 के 3 राउंड।", mechanism: ["proprioception", "cortisol"], environment: ["indoor", "office"], equipment: "minimal", intensity: "moderate", durationMin: 8, emotionTags: ["tense", "restless", "stressed", "frustrated"] },
-
-  // ── Additional — High Intensity ──
-  { id: "kettlebell_swings", name: "Kettlebell Swings", nameHi: "केटलबेल स्विंग", description: "3 sets of 15. Focus on hip hinge and explosive extension.", descriptionHi: "15-15 के 3 सेट। हिप हिंज और विस्फोटक एक्सटेंशन पर ध्यान दें।", mechanism: ["cortisol", "endorphin"], environment: ["indoor"], equipment: "gym", intensity: "high", durationMin: 8, emotionTags: ["angry", "frustrated", "restless", "stressed"] },
-  { id: "battle_ropes", name: "Battle Ropes", nameHi: "बैटल रोप्स", description: "30s all-out, 30s rest. 6-8 rounds.", descriptionHi: "30 सेकंड पूरी ताकत, 30 सेकंड आराम। 6-8 राउंड।", mechanism: ["cortisol", "endorphin"], environment: ["indoor"], equipment: "gym", intensity: "high", durationMin: 8, emotionTags: ["angry", "frustrated", "stressed", "restless"] },
-  { id: "mountain_climbers", name: "Mountain Climbers", nameHi: "माउंटेन क्लाइंबर्स", description: "3 sets of 20 reps. Quick, explosive movement.", descriptionHi: "20-20 रेप्स के 3 सेट। तेज़, विस्फोटक गतिविधि।", mechanism: ["cortisol", "endorphin"], environment: ["indoor", "outdoor"], equipment: "none", intensity: "high", durationMin: 6, emotionTags: ["restless", "frustrated", "angry", "stressed"] },
-
-  // ── Additional — Walking / Flexibility ──
-  { id: "nature_walk", name: "Nature Walk", nameHi: "प्रकृति में चलना", description: "Walk in a park or natural setting for 20 min. Notice sights, sounds, smells.", descriptionHi: "पार्क या प्रकृति में 20 मिनट चलें। दृश्य, ध्वनि, गंध नोटिस करें।", mechanism: ["grounding", "cortisol"], environment: ["outdoor"], equipment: "none", intensity: "low", durationMin: 20, emotionTags: ["stressed", "sad", "overwhelmed", "disconnected", "low"] },
-  { id: "walking_meditation", name: "Walking Meditation", nameHi: "चलती ध्यान", description: "Walk extremely slowly. Focus on lifting, moving, placing each foot.", descriptionHi: "बहुत धीरे चलें। हर कदम उठाने, हिलाने, रखने पर ध्यान दें।", mechanism: ["grounding", "breathwork"], environment: ["indoor", "outdoor"], equipment: "none", intensity: "low", durationMin: 10, emotionTags: ["anxious", "overwhelmed", "restless", "disconnected"] },
-  { id: "hip_opener_flow", name: "Hip Opener Flow", nameHi: "हिप ओपनर फ्लो", description: "Pigeon pose, lizard pose, frog stretch. Hold each 60s.", descriptionHi: "कबूतर पोज़, छिपकली पोज़, मेंढक स्ट्रेच। हरेक 60 सेकंड।", mechanism: ["grounding", "proprioception"], environment: ["indoor"], equipment: "minimal", intensity: "low", durationMin: 10, emotionTags: ["tense", "stressed", "anxious", "restless"] },
-  { id: "spinal_twist_series", name: "Spinal Twist Series", nameHi: "स्पाइनल ट्विस्ट सीरीज़", description: "Seated and supine twists. Hold 30s each side.", descriptionHi: "बैठकर और लेटकर ट्विस्ट। हर तरफ 30 सेकंड।", mechanism: ["grounding", "proprioception"], environment: ["indoor", "office"], equipment: "none", intensity: "low", durationMin: 6, emotionTags: ["tense", "tired", "stressed"] },
 ];
 
 /**
  * Resolve movements matching a set of filters.
  * Returns a subset of MOVEMENTS that match ALL specified criteria.
  */
-export function filterMovements({ mechanisms, environments, equipment, intensity, emotions, maxDuration } = {}) {
+export function filterMovements({ mechanisms, environments, equipment, intensity, emotions } = {}) {
   return MOVEMENTS.filter((m) => {
     if (mechanisms?.length && !mechanisms.some((mech) => m.mechanism.includes(mech))) return false;
     if (environments?.length && !environments.some((env) => m.environment.includes(env))) return false;
     if (equipment && m.equipment !== equipment) return false;
     if (intensity && m.intensity !== intensity) return false;
     if (emotions?.length && !emotions.some((e) => m.emotionTags.includes(e))) return false;
-    if (maxDuration && m.durationMin > maxDuration) return false;
     return true;
   });
 }
