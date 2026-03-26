@@ -5,7 +5,7 @@ import { validateSession } from "@/services/authService.js";
 import { verifyPremium } from "@/services/subscriptionService.js";
 import { generateAllModes } from "@/ai/modeComposer.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { checkRateLimit } from "@/services/rateLimitService.js";
+import { enforceRateLimit } from "@/services/rateLimitService.js";
 
 const ALLOWED_MODELS = ["mistral", "llama3", "gemma2"];
 const ALLOWED_STYLES = ["warm", "direct", "poetic"];
@@ -35,8 +35,8 @@ export default async function handler(req, res) {
     }
 
     // Rate limit: max 3 regenerations per hour
-    const rl = await checkRateLimit(`regen:${user.id}`, 3, 3600);
-    if (!rl.allowed) {
+    const allowed = await enforceRateLimit(`regen:${user.id}`, 3, 3600);
+    if (!allowed) {
       return sendError(res, 429, "RATE_LIMITED", "Too many regenerations. Try again later.");
     }
 
