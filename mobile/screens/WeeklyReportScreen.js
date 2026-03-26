@@ -17,15 +17,17 @@ import { LineChart, BarChart } from "react-native-chart-kit";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
-import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress, regeneratePremium } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { MOVEMENTS, EQUIPMENT, filterMovements } from "@triggermap/shared";
-import { NOURISHMENTS, DIETS, filterNourishments } from "@triggermap/shared";
+import { emotionColor as getFieldColor, coordinatesToPosition } from "@/utils/emotionModel";
+import { MOVEMENTS, EQUIPMENT, filterMovements, pickMovements } from "@triggermap/shared";
+import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments } from "@triggermap/shared";
+import { EMOTION_COORDINATES } from "@triggermap/shared/constants/emotions";
 
 /* ── Helpers ── */
 
@@ -156,6 +158,54 @@ function scoreTone(score, t) {
 }
 
 /* ── Color-coded text: highlights trigger/emotion words in any prose ── */
+
+/* ── Circular Emotion Wheel ── */
+const WHEEL_SIZE = 200;
+function EmotionWheel({ emotionEntries, t }) {
+  const total = emotionEntries.reduce((sum, [, v]) => sum + v, 0) || 1;
+  return (
+    <View style={s.wheelWrap}>
+      <View style={s.wheelContainer}>
+        {/* Gradient background circle */}
+        <LinearGradient
+          colors={["rgba(255,107,122,0.25)", "rgba(86,208,224,0.25)", "rgba(94,230,160,0.25)", "rgba(167,139,250,0.25)", "rgba(255,107,122,0.25)"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s.wheelGradient}
+        />
+        {/* Axis labels */}
+        <Text style={[s.wheelAnchor, s.wheelAnchorTop]}>{t("emotion.anchor.energized") || "energized"}</Text>
+        <Text style={[s.wheelAnchor, s.wheelAnchorRight]}>{t("emotion.anchor.calm") || "calm"}</Text>
+        <Text style={[s.wheelAnchor, s.wheelAnchorBottom]}>{t("emotion.anchor.low") || "low"}</Text>
+        <Text style={[s.wheelAnchor, s.wheelAnchorLeft]}>{t("emotion.anchor.tense") || "tense"}</Text>
+        {/* Crosshairs */}
+        <View style={s.wheelCrossH} />
+        <View style={s.wheelCrossV} />
+        {/* Emotion dots */}
+        {emotionEntries.map(([key, value]) => {
+          const coords = EMOTION_COORDINATES[key];
+          if (!coords) return null;
+          const pos = coordinatesToPosition(coords.valence, coords.arousal, WHEEL_SIZE);
+          const color = EMOTION_COLORS[key] || palette.warning;
+          const ratio = value / total;
+          const dotSize = 14 + ratio * 26;
+          return (
+            <View key={key} style={[s.wheelDot, {
+              left: pos.x - dotSize / 2, top: pos.y - dotSize / 2,
+              width: dotSize, height: dotSize, borderRadius: dotSize / 2,
+              backgroundColor: color + "55", borderColor: color,
+            }]}>
+              <Text style={[s.wheelDotLabel, { color }]}>{EMOTION_EMOJIS[key]}</Text>
+            </View>
+          );
+        })}
+        {/* Center neutral zone */}
+        <View style={s.wheelCenter}>
+          <Text style={s.wheelCenterLabel}>{t("emotion.neutral") || "neutral"}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 let _colorWordMap = null;
 function buildColorWordMap(t) {
@@ -386,7 +436,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
             </View>
             {bm.baseline?.reliable ? (
               <Text style={s.stateOfMindSub}>
-                {t("report.baselineText", { baselineScore: bm.baseline.score.toFixed(1), weekScore: bm.recentAverage?.toFixed(1) || "—" })}
+                {t("report.baselineText", { baselineScore: bm.baseline.score.toFixed(1), weekScore: bm.recentAverage?.toFixed(1) || "-" })}
                 {bm.drift ? ` · ${capitalize(bm.drift.label)}` : ""}
               </Text>
             ) : (
@@ -711,10 +761,11 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
         </AnimatedSection>
       ) : null}
 
-      {/* Emotions breakdown */}
+      {/* Emotions breakdown — circular gradient wheel + bar legend */}
       {emotionEntries.length ? (
         <AnimatedSection index={3} style={s.section}>
           <SectionHeader label={t("report.emotionsTitle")} badge="live" t={t} extra={t("report.recorded", { count: dq.uniqueEmotions || 0 })} />
+          <EmotionWheel emotionEntries={emotionEntries} t={t} />
           <View style={s.card}>
             {emotionEntries.map(([key, value]) => (
               <HBar key={key} label={t("emotions." + key) || key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
@@ -919,7 +970,7 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
               {hasError ? (
                 <Pressable onPress={() => handleResponse(action.id, lastAttempt.current[action.id] || "helped")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>
-                    {t("common.retryError") || "Something went wrong — tap to retry"}
+                    {t("common.retryError") || "Something went wrong, tap to retry"}
                   </Text>
                 </Pressable>
               ) : null}
@@ -1000,10 +1051,10 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
             <View style={s.progressArcNode}>
               <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.past?.tone)}</Text>
               <Text style={[s.progressArcScore, { color: toneColor(trajectory.past?.tone) }]}>
-                {trajectory.past?.score?.toFixed(1) || "—"}
+                {trajectory.past?.score?.toFixed(1) || "-"}
               </Text>
               <Text style={s.progressArcLabel}>
-                {t("report.progress.weeksAgo", { count: trajectory.weeksTracked || "—" })}
+                {t("report.progress.weeksAgo", { count: trajectory.weeksTracked || "-" })}
               </Text>
             </View>
 
@@ -1035,7 +1086,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
             <View style={s.progressArcNode}>
               <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.present?.tone)}</Text>
               <Text style={[s.progressArcScore, { color: toneColor(trajectory.present?.tone) }]}>
-                {trajectory.present?.score?.toFixed(1) || "—"}
+                {trajectory.present?.score?.toFixed(1) || "-"}
               </Text>
               <Text style={s.progressArcLabel}>{t("report.progress.thisWeek")}</Text>
             </View>
@@ -1133,11 +1184,11 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
             ].filter((m) => m.data).map((m) => {
               const { data: md } = m;
               const displayCurrent = m.invertDisplay
-                ? (md.current <= 0 ? "—" : (m.key === "recoveryDays" ? `~${md.current}d` : md.current.toFixed(1)))
-                : (md.current === null ? "—" : (m.key === "stability" ? `${Math.round(md.current * 100)}%` : md.current.toFixed(1)));
+                ? (md.current <= 0 ? "-" : (m.key === "recoveryDays" ? `~${md.current}d` : md.current.toFixed(1)))
+                : (md.current === null ? "-" : (m.key === "stability" ? `${Math.round(md.current * 100)}%` : md.current.toFixed(1)));
               const displayPrev = m.invertDisplay
-                ? (md.previous <= 0 ? "—" : (m.key === "recoveryDays" ? `~${md.previous}d` : md.previous.toFixed(1)))
-                : (md.previous === null ? "—" : (m.key === "stability" ? `${Math.round(md.previous * 100)}%` : md.previous.toFixed(1)));
+                ? (md.previous <= 0 ? "-" : (m.key === "recoveryDays" ? `~${md.previous}d` : md.previous.toFixed(1)))
+                : (md.previous === null ? "-" : (m.key === "stability" ? `${Math.round(md.previous * 100)}%` : md.previous.toFixed(1)));
 
               return (
                 <View key={m.key} style={s.progressMetricCard}>
@@ -1321,7 +1372,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                   <Text style={s.progressWeekLabel}>{week.weekLabel}</Text>
                   <Text style={[s.progressWeekEmoji]}>{toneEmoji(week.tone)}</Text>
                   <Text style={[s.progressWeekScore, { color }]}>
-                    {week.score?.toFixed(1) || "—"}
+                    {week.score?.toFixed(1) || "-"}
                   </Text>
                   {week.stability !== null ? (
                     <Text style={s.progressWeekMeta}>
@@ -1455,16 +1506,46 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 
 /* ── Mode Cards (adaptive modes content) ── */
 
-function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
+function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion }) {
   const [feedbackGiven, setFeedbackGiven] = useState({});
-  const [showLibrary, setShowLibrary] = useState(false);
 
-  // Move filters
-  const [moveEquipment, setMoveEquipment] = useState(null); // null = any
-  const [moveMaxDuration, setMoveMaxDuration] = useState(null); // null = any
+  // Move state
+  const [moveDuration, setMoveDuration] = useState(null); // null | 30 | 60 | 90
+  const [moveIdx, setMoveIdx] = useState(0);
 
-  // Fuel filters
-  const [fuelDiet, setFuelDiet] = useState(null); // null = any
+  // Fuel state
+  const [fuelDiet, setFuelDiet] = useState(null);
+  const [fuelIdx, setFuelIdx] = useState(0);
+
+  // Derive emotion tags for state-adaptive pick
+  const emotions = useMemo(() => {
+    if (!dominantEmotion) return [];
+    return [dominantEmotion];
+  }, [dominantEmotion]);
+
+  // Move suggestions — filtered by duration, scored by emotional state
+  const moveSuggestions = useMemo(() => {
+    const maxDur = moveDuration || undefined;
+    const filtered = filterMovements({ maxDuration: maxDur });
+    if (!emotions.length) return filtered;
+    // Sort by emotion relevance
+    return [...filtered].sort((a, b) => {
+      const aScore = (a.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      const bScore = (b.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      return bScore - aScore;
+    });
+  }, [moveDuration, emotions]);
+
+  // Fuel suggestions — filtered by diet, scored by emotional state
+  const fuelSuggestions = useMemo(() => {
+    const filtered = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
+    if (!emotions.length) return filtered;
+    return [...filtered].sort((a, b) => {
+      const aScore = (a.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      const bScore = (b.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      return bScore - aScore;
+    });
+  }, [fuelDiet, emotions]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
@@ -1473,7 +1554,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
       <View style={s.modeContent}>
         <View style={[s.insightStateCard, { paddingVertical: 20, borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
           <Text style={s.insightStateIcon}>{MODE_ICONS[mode] || "✨"}</Text>
-          <Text style={s.insightStateTitle}>{t(`report.prem.mode.${mode}`)} — {t("report.prem.mode.warmTitle")}</Text>
+          <Text style={s.insightStateTitle}>{t(`report.prem.mode.${mode}`)} {t("report.prem.mode.warmTitle")}</Text>
           <Text style={s.insightStateBody}>{t("report.prem.mode.warmBody")}</Text>
         </View>
       </View>
@@ -1482,6 +1563,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
 
   const items = data.items || [];
   const narrative = data.narrative || "";
+  const hi = lang === "hi";
 
   function handleFeedback(itemId, response) {
     tap();
@@ -1489,151 +1571,155 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium }) {
     if (onFeedback) onFeedback(mode, itemId, response);
   }
 
+  // Current suggestion for Move
+  const currentMove = moveSuggestions[moveIdx % moveSuggestions.length] || null;
+  const currentFuel = fuelSuggestions[fuelIdx % fuelSuggestions.length] || null;
+
+  function rotateSuggestion(setIdx, listLen) {
+    tap();
+    setIdx((prev) => (prev + 1) % Math.max(listLen, 1));
+  }
+
   return (
     <View style={s.modeContent}>
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
-      {/* ── Move filters: equipment + duration ── */}
+      {/* ── Move: duration filter + single rotating suggestion ── */}
       {mode === "move" && (
-        <View style={s.filterRow}>
-          {[{ label: "Any", val: null }, { label: "No Equip", val: "none" }, { label: "Minimal", val: "minimal" }, { label: "Gym", val: "gym" }].map((opt) => (
-            <Pressable key={opt.label} onPress={() => { tap(); setMoveEquipment(opt.val); }} style={[s.filterChip, moveEquipment === opt.val && s.filterChipActive]}>
-              <Text style={[s.filterChipText, moveEquipment === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {mode === "move" && (
-        <View style={s.filterRow}>
-          {[{ label: "Any time", val: null }, { label: "≤5 min", val: 5 }, { label: "≤10 min", val: 10 }, { label: "≤15 min", val: 15 }, { label: "≤20 min", val: 20 }].map((opt) => (
-            <Pressable key={opt.label} onPress={() => { tap(); setMoveMaxDuration(opt.val); }} style={[s.filterChip, moveMaxDuration === opt.val && s.filterChipActive]}>
-              <Text style={[s.filterChipText, moveMaxDuration === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {/* ── Fuel filters: dietary preference ── */}
-      {mode === "fuel" && (
-        <View style={s.filterRow}>
-          {[{ label: "All", val: null }, { label: "🥬 Veg", val: "vegetarian" }, { label: "🌱 Vegan", val: "vegan" }, { label: "🍗 Non-Veg", val: "nonVeg" }].map((opt) => (
-            <Pressable key={opt.label} onPress={() => { tap(); setFuelDiet(opt.val); }} style={[s.filterChip, fuelDiet === opt.val && s.filterChipActive]}>
-              <Text style={[s.filterChipText, fuelDiet === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
-        {items.map((item) => {
-          const given = feedbackGiven[item.id];
-          return (
-            <View key={item.id} style={s.modeCard}>
-              <Text style={s.modeCardTitle}>{item.name}</Text>
-              <Text style={s.modeCardDesc}>{item.description}</Text>
-              {item.intensity ? (
-                <Text style={s.modeCardMeta}>{item.intensity} · ~{item.durationMin} min</Text>
-              ) : item.type ? (
-                <Text style={s.modeCardMeta}>{item.type}{item.nutrientFocus ? ` · ${item.nutrientFocus}` : ""}</Text>
-              ) : null}
-
-              {isPremium && !given ? (
+        <>
+          <View style={s.filterRow}>
+            {[{ label: "< 30 min", val: 30 }, { label: "30-60 min", val: 60 }, { label: "60-90 min", val: 90 }].map((opt) => (
+              <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(moveDuration === opt.val ? null : opt.val); setMoveIdx(0); }} style={[s.filterChip, moveDuration === opt.val && s.filterChipActive]}>
+                <Text style={[s.filterChipText, moveDuration === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {currentMove && (
+            <View style={s.suggestionCard}>
+              <View style={s.suggestionHeader}>
+                <Text style={s.suggestionTitle}>{hi ? currentMove.nameHi : currentMove.name}</Text>
+                <Pressable onPress={() => rotateSuggestion(setMoveIdx, moveSuggestions.length)} style={s.rotateBtn} accessibilityRole="button" accessibilityLabel="Next suggestion">
+                  <Text style={s.rotateBtnText}>🔄 next</Text>
+                </Pressable>
+              </View>
+              <Text style={s.suggestionDesc}>{hi ? currentMove.descriptionHi : currentMove.description}</Text>
+              <View style={s.suggestionMeta}>
+                <Text style={s.suggestionMetaText}>{currentMove.intensity} · ~{currentMove.durationMin} min · {currentMove.equipment}</Text>
+              </View>
+              {dominantEmotion && currentMove.emotionTags?.includes(dominantEmotion) && (
+                <View style={s.suggestionMatch}>
+                  <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                </View>
+              )}
+              {isPremium && !feedbackGiven[currentMove.id] ? (
                 <View style={s.modeFeedbackRow}>
-                  <Pressable
-                    style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]}
-                    onPress={() => handleFeedback(item.id, "helpful")}
-                    accessibilityRole="button"
-                  >
+                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(currentMove.id, "helpful")} accessibilityRole="button">
                     <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
                   </Pressable>
-                  <Pressable
-                    style={[s.modeFeedbackBtn, s.modeFeedbackNot]}
-                    onPress={() => handleFeedback(item.id, "not_helpful")}
-                    accessibilityRole="button"
-                  >
+                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(currentMove.id, "not_helpful")} accessibilityRole="button">
                     <Text style={s.modeFeedbackNotText}>👎</Text>
                   </Pressable>
                 </View>
-              ) : given ? (
+              ) : feedbackGiven[currentMove.id] ? (
                 <View style={s.modeFeedbackDone}>
-                  <Text style={s.modeFeedbackDoneText}>
-                    {given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}
-                  </Text>
+                  <Text style={s.modeFeedbackDoneText}>{feedbackGiven[currentMove.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
                 </View>
               ) : null}
+              <Text style={s.suggestionCounter}>{(moveIdx % moveSuggestions.length) + 1} / {moveSuggestions.length}</Text>
             </View>
-          );
-        })}
-      </ScrollView>
+          )}
+          {!currentMove && <Text style={s.modeContentBody}>No exercises match these filters</Text>}
+        </>
+      )}
+
+      {/* ── Fuel: diet filter + single rotating suggestion ── */}
+      {mode === "fuel" && (
+        <>
+          <View style={s.filterRow}>
+            {[{ label: "All", val: null }, { label: "🥬 Veg", val: "vegetarian" }, { label: "🌱 Vegan", val: "vegan" }, { label: "🍗 Non-Veg", val: "nonVeg" }].map((opt) => (
+              <Pressable key={opt.label} onPress={() => { tap(); setFuelDiet(opt.val); setFuelIdx(0); }} style={[s.filterChip, fuelDiet === opt.val && s.filterChipActive]}>
+                <Text style={[s.filterChipText, fuelDiet === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {currentFuel && (
+            <View style={s.suggestionCard}>
+              <View style={s.suggestionHeader}>
+                <Text style={s.suggestionTitle}>{hi ? currentFuel.nameHi : currentFuel.name}</Text>
+                <Pressable onPress={() => rotateSuggestion(setFuelIdx, fuelSuggestions.length)} style={s.rotateBtn} accessibilityRole="button" accessibilityLabel="Next suggestion">
+                  <Text style={s.rotateBtnText}>🔄 next</Text>
+                </Pressable>
+              </View>
+              <Text style={s.suggestionDesc}>{hi ? currentFuel.descriptionHi : currentFuel.description}</Text>
+              <View style={s.suggestionMeta}>
+                <Text style={s.suggestionMetaText}>{currentFuel.type}{currentFuel.nutrientFocus ? ` · ${currentFuel.nutrientFocus}` : ""}{currentFuel.prepLevel ? ` · ${currentFuel.prepLevel} prep` : ""}</Text>
+              </View>
+              {dominantEmotion && currentFuel.emotionTags?.includes(dominantEmotion) && (
+                <View style={s.suggestionMatch}>
+                  <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                </View>
+              )}
+              {isPremium && !feedbackGiven[currentFuel.id] ? (
+                <View style={s.modeFeedbackRow}>
+                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(currentFuel.id, "helpful")} accessibilityRole="button">
+                    <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
+                  </Pressable>
+                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(currentFuel.id, "not_helpful")} accessibilityRole="button">
+                    <Text style={s.modeFeedbackNotText}>👎</Text>
+                  </Pressable>
+                </View>
+              ) : feedbackGiven[currentFuel.id] ? (
+                <View style={s.modeFeedbackDone}>
+                  <Text style={s.modeFeedbackDoneText}>{feedbackGiven[currentFuel.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+                </View>
+              ) : null}
+              <Text style={s.suggestionCounter}>{(fuelIdx % fuelSuggestions.length) + 1} / {fuelSuggestions.length}</Text>
+            </View>
+          )}
+          {!currentFuel && <Text style={s.modeContentBody}>No items match these filters</Text>}
+        </>
+      )}
+
+      {/* ── Perspective: server-driven items only ── */}
+      {mode === "perspective" && items.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
+          {items.map((item) => {
+            const given = feedbackGiven[item.id];
+            return (
+              <View key={item.id} style={s.modeCard}>
+                <Text style={s.modeCardTitle}>{item.name}</Text>
+                <Text style={s.modeCardDesc}>{item.description}</Text>
+                {isPremium && !given ? (
+                  <View style={s.modeFeedbackRow}>
+                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(item.id, "helpful")} accessibilityRole="button">
+                      <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
+                    </Pressable>
+                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(item.id, "not_helpful")} accessibilityRole="button">
+                      <Text style={s.modeFeedbackNotText}>👎</Text>
+                    </Pressable>
+                  </View>
+                ) : given ? (
+                  <View style={s.modeFeedbackDone}>
+                    <Text style={s.modeFeedbackDoneText}>{given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {data.generatedAt ? (
         <Text style={s.modeFooter}>
           {t("report.generatedBy", { date: localeDateStr(data.generatedAt, lang) })}
         </Text>
       ) : null}
-
-      {/* ── Browse Full Library ── */}
-      {(mode === "move" || mode === "fuel") && (
-        <LibraryBrowser mode={mode} lang={lang} moveEquipment={moveEquipment} moveMaxDuration={moveMaxDuration} fuelDiet={fuelDiet} showLibrary={showLibrary} setShowLibrary={setShowLibrary} />
-      )}
     </View>
   );
 }
 
-/** Library Browser — filterable list of all movement/nourishment items */
-function LibraryBrowser({ mode, lang, moveEquipment, moveMaxDuration, fuelDiet, showLibrary, setShowLibrary }) {
-  const hi = lang === "hi";
-  const items = useMemo(() => {
-    if (mode === "move") {
-      return filterMovements({
-        equipment: moveEquipment || undefined,
-        maxDuration: moveMaxDuration || undefined,
-      });
-    }
-    if (mode === "fuel") {
-      return filterNourishments({
-        diets: fuelDiet ? [fuelDiet] : undefined,
-      });
-    }
-    return [];
-  }, [mode, moveEquipment, moveMaxDuration, fuelDiet]);
-
-  return (
-    <>
-      <Pressable onPress={() => { tap(); setShowLibrary((p) => !p); }} style={s.libraryToggle}>
-        <Text style={s.libraryToggleText}>
-          {showLibrary ? `▾ hide library (${items.length})` : `▸ browse full library (${items.length})`}
-        </Text>
-      </Pressable>
-      {showLibrary && (
-        <View style={s.libraryGrid}>
-          {items.map((item) => (
-            <View key={item.id} style={s.libraryItem}>
-              <Text style={s.libraryItemName}>{hi ? item.nameHi : item.name}</Text>
-              <Text style={s.libraryItemDesc} numberOfLines={2}>{hi ? item.descriptionHi : item.description}</Text>
-              {item.intensity ? (
-                <Text style={s.libraryItemMeta}>{item.equipment} · {item.intensity} · {item.durationMin}m</Text>
-              ) : item.type ? (
-                <Text style={s.libraryItemMeta}>{item.type}{item.diet ? ` · ${item.diet.join(", ")}` : ""}</Text>
-              ) : null}
-            </View>
-          ))}
-          {items.length === 0 && (
-            <Text style={s.libraryEmpty}>No items match these filters</Text>
-          )}
-        </View>
-      )}
-    </>
-  );
-}
-
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh }) {
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh, dominantEmotion }) {
   const [activeMode, setActiveMode] = useState("core");
-  const [regenOpen, setRegenOpen] = useState(false);
-  const [regenLang, setRegenLang] = useState(lang);
-  const [regenModel, setRegenModel] = useState("mistral");
-  const [regenWords, setRegenWords] = useState(100);
-  const [regenLoading, setRegenLoading] = useState(false);
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1798,67 +1884,10 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
               </View>
             ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} />
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} />
             )}
 
-            {/* ── Regenerate All Toggle ── */}
-            <Pressable onPress={() => { tap(); setRegenOpen((p) => !p); }} style={s.regenToggle}>
-              <Text style={s.regenToggleText}>{regenOpen ? "▾ hide regenerate" : "✨ regenerate all insights"}</Text>
-            </Pressable>
-            {regenOpen && (
-              <View style={s.regenPanel}>
-                <View style={s.regenRow}>
-                  <Text style={s.regenLabel}>Language</Text>
-                  <View style={s.filterRow}>
-                    {[{ label: "English", val: "en" }, { label: "हिंदी", val: "hi" }].map((opt) => (
-                      <Pressable key={opt.val} onPress={() => { tap(); setRegenLang(opt.val); }} style={[s.filterChip, regenLang === opt.val && s.filterChipActive]}>
-                        <Text style={[s.filterChipText, regenLang === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-                <View style={s.regenRow}>
-                  <Text style={s.regenLabel}>Model</Text>
-                  <View style={s.filterRow}>
-                    {["mistral", "llama3", "gemma2"].map((m) => (
-                      <Pressable key={m} onPress={() => { tap(); setRegenModel(m); }} style={[s.filterChip, regenModel === m && s.filterChipActive]}>
-                        <Text style={[s.filterChipText, regenModel === m && s.filterChipTextActive]}>{m}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-                <View style={s.regenRow}>
-                  <Text style={s.regenLabel}>Length</Text>
-                  <View style={s.filterRow}>
-                    {[{ label: "Brief", val: 60 }, { label: "Normal", val: 100 }, { label: "Detailed", val: 200 }].map((opt) => (
-                      <Pressable key={opt.val} onPress={() => { tap(); setRegenWords(opt.val); }} style={[s.filterChip, regenWords === opt.val && s.filterChipActive]}>
-                        <Text style={[s.filterChipText, regenWords === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-                <Pressable
-                  style={[s.regenButton, regenLoading && { opacity: 0.5 }]}
-                  disabled={regenLoading}
-                  onPress={async () => {
-                    tap();
-                    setRegenLoading(true);
-                    try {
-                      await regeneratePremium({ lang: regenLang, model: regenModel, maxWords: regenWords }, token);
-                      if (onModesRefresh) await onModesRefresh();
-                      setRegenOpen(false);
-                      Alert.alert("Regenerated", "All premium insights have been refreshed.");
-                    } catch (err) {
-                      Alert.alert("Error", err.message || "Regeneration failed.");
-                    } finally {
-                      setRegenLoading(false);
-                    }
-                  }}
-                >
-                  <Text style={s.regenButtonText}>{regenLoading ? "Generating…" : "🔄 Regenerate All Premium"}</Text>
-                </Pressable>
-              </View>
-            )}
+
           </AnimatedSection>
 
           {/* ── Remaining premium sections visible only in Core mode ── */}
@@ -2238,6 +2267,7 @@ export function WeeklyReportScreen() {
                   purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
                   token={token} onModesRefresh={async () => { const m = await fetchModes(token); setModes(m); }}
+                  dominantEmotion={dominantEmotion}
                 />
               )}
             </>
@@ -2867,4 +2897,36 @@ const s = StyleSheet.create({
   progressWeekMeta: { color: palette.muted, fontSize: 10, fontWeight: "600" },
   progressWeekMoments: { color: palette.textSecondary, fontSize: 10 },
   progressWeekDate: { color: palette.muted, fontSize: 9 },
+
+  /* ── Emotion Wheel ── */
+  wheelWrap: { alignItems: "center", marginBottom: 12 },
+  wheelContainer: { width: WHEEL_SIZE, height: WHEEL_SIZE, position: "relative", alignItems: "center", justifyContent: "center" },
+  wheelGradient: { ...StyleSheet.absoluteFillObject, borderRadius: WHEEL_SIZE / 2, opacity: 0.85 },
+  wheelAnchor: { position: "absolute", color: palette.muted, fontSize: 9, fontWeight: "700", letterSpacing: 0.3, textTransform: "uppercase" },
+  wheelAnchorTop: { top: -14, alignSelf: "center" },
+  wheelAnchorRight: { right: -22, top: "46%" },
+  wheelAnchorBottom: { bottom: -14, alignSelf: "center" },
+  wheelAnchorLeft: { left: -20, top: "46%" },
+  wheelCrossH: { position: "absolute", top: "50%", left: 10, right: 10, height: StyleSheet.hairlineWidth, backgroundColor: palette.glassBorder },
+  wheelCrossV: { position: "absolute", left: "50%", top: 10, bottom: 10, width: StyleSheet.hairlineWidth, backgroundColor: palette.glassBorder },
+  wheelDot: { position: "absolute", alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  wheelDotLabel: { fontSize: 12, fontWeight: "700" },
+  wheelCenter: { position: "absolute", width: 36, height: 36, borderRadius: 18, backgroundColor: palette.glass, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: palette.glassBorder },
+  wheelCenterLabel: { color: palette.muted, fontSize: 7, fontWeight: "700", textTransform: "uppercase" },
+
+  /* ── Suggestion Card (Move / Fuel) ── */
+  suggestionCard: {
+    borderRadius: radius.md, padding: 14, gap: 6, marginTop: 6,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+  },
+  suggestionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  suggestionTitle: { color: palette.text, fontSize: 15, fontWeight: "700", flex: 1 },
+  rotateBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, backgroundColor: "rgba(94,230,160,0.12)" },
+  rotateBtnText: { color: "#5ee6a0", fontSize: 12, fontWeight: "700" },
+  suggestionDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
+  suggestionMeta: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
+  suggestionMetaText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
+  suggestionMatch: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  suggestionMatchText: { color: "#5ee6a0", fontSize: 11, fontWeight: "700" },
+  suggestionCounter: { color: palette.muted, fontSize: 10, fontWeight: "600", textAlign: "right", marginTop: 4 },
 });
