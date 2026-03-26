@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-get-random-values";
 import * as Crypto from "expo-crypto";
 import { logMoment } from "@/services/api";
+import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 
 const STORAGE_KEY = "triggermap.local-moments";
 
@@ -22,12 +23,15 @@ export async function getLocalMoments() {
 /**
  * Save a moment to local storage.
  */
-export async function saveLocalMoment({ trigger, emotion, note, tags }) {
+export async function saveLocalMoment({ trigger, emotion, valence, arousal, intensity, note, tags }) {
   const moments = await getLocalMoments();
   const moment = {
     id: Crypto.randomUUID(),
     trigger,
     emotion,
+    ...(typeof valence === "number" ? { valence } : {}),
+    ...(typeof arousal === "number" ? { arousal } : {}),
+    ...(typeof intensity === "number" ? { intensity } : {}),
     note: note || "",
     timestamp: new Date().toISOString(),
     isLocal: true,
@@ -69,7 +73,17 @@ export async function migrateLocalMoments(token, deviceId) {
   for (const m of moments) {
     try {
       await logMoment(
-        { deviceId, trigger: m.trigger, emotion: m.emotion, note: m.note || "", timestamp: m.timestamp },
+        {
+          deviceId,
+          trigger: m.trigger,
+          emotion: m.emotion,
+          ...(typeof m.valence === "number" ? { valence: m.valence } : {}),
+          ...(typeof m.arousal === "number" ? { arousal: m.arousal } : {}),
+          ...(typeof m.intensity === "number" ? { intensity: m.intensity } : {}),
+          note: m.note || "",
+          timestamp: m.timestamp,
+          ...(m.tags?.length ? { tags: m.tags } : {}),
+        },
         token
       );
     } catch {
@@ -103,7 +117,8 @@ export function buildLocalReport(moments) {
 
   for (const m of weekMoments) {
     triggerFrequency[m.trigger] = (triggerFrequency[m.trigger] || 0) + 1;
-    emotionFrequency[m.emotion] = (emotionFrequency[m.emotion] || 0) + 1;
+    const emo = m.emotion || (typeof m.valence === "number" && typeof m.arousal === "number" ? coordinatesToLegacy(m.valence, m.arousal) : "neutral");
+    emotionFrequency[emo] = (emotionFrequency[emo] || 0) + 1;
 
     const hour = new Date(m.timestamp).getHours();
     if (hour < 12) timeOfDayPatterns.morning++;

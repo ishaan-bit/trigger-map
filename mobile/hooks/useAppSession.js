@@ -315,17 +315,26 @@ export function SessionProvider({ children }) {
         // Invalidate caches so next load picks up the new moment
         invalidateCache();
 
+        // Build continuous + legacy emotion fields
+        const emotionFields = {};
+        if (typeof payload.valence === "number" && typeof payload.arousal === "number") {
+          emotionFields.valence = payload.valence;
+          emotionFields.arousal = payload.arousal;
+          if (typeof payload.intensity === "number") emotionFields.intensity = payload.intensity;
+        }
+        if (payload.emotion) emotionFields.emotion = payload.emotion;
+
         if (!token) {
           const localMoment = await saveLocalMoment({
             trigger: payload.trigger,
-            emotion: payload.emotion,
+            ...emotionFields,
             note: notes,
             timestamp,
             ...(payload.tags?.length ? { tags: payload.tags } : {}),
             ...(prediction ? { prediction } : {}),
           });
           await setLastLoggedAt(timestamp);
-          trackEvent("moment_logged", { trigger: payload.trigger, emotion: payload.emotion, local: true });
+          trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
           return { moment: localMoment };
         }
 
@@ -333,7 +342,7 @@ export function SessionProvider({ children }) {
           {
             deviceId: activeDeviceId,
             trigger: payload.trigger,
-            emotion: payload.emotion,
+            ...emotionFields,
             note: notes,
             notes,
             timestamp,

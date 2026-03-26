@@ -2,7 +2,11 @@
  * @typedef {Object} TriggerMoment
  * @property {string} id
  * @property {string} trigger
- * @property {string} emotion
+ * @property {string} emotion - discrete legacy label (calm|neutral|anxious|frustrated|energized)
+ * @property {number} [valence] - continuous, -1 (unpleasant) to +1 (pleasant)
+ * @property {number} [arousal] - continuous, -1 (low energy) to +1 (high energy)
+ * @property {number} [intensity] - continuous, 0 (center) to 1 (edge)
+ * @property {string} [derivedLabel] - human-readable Plutchik label from coordinates
  * @property {string} note
  * @property {string[]} [tags]
  * @property {string} timestamp
