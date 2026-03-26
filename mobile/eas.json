@@ -21,7 +21,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://backend-five-nu-92.vercel.app",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com",
