@@ -8,7 +8,7 @@
     "lint": "expo lint",
     "build:aab": "eas build -p android --profile production",
     "ios": "expo run:ios",
-    "postinstall": "npx patch-package"
+    "postinstall": "node scripts/postinstall.js"
   },
   "expo": {
     "doctor": {
