@@ -6,6 +6,7 @@ import {
   Dimensions,
   Easing,
   Image,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,7 +25,7 @@ import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { emotionColor as getFieldColor, coordinatesToPosition } from "@/utils/emotionModel";
+import { emotionColor as getFieldColor, coordinatesToPosition, tapToCoordinates, shortLabel, emotionColor } from "@/utils/emotionModel";
 import { MOVEMENTS, EQUIPMENT, filterMovements, pickMovements } from "@triggermap/shared";
 import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments } from "@triggermap/shared";
 import { EMOTION_COORDINATES } from "@triggermap/shared/constants/emotions";
@@ -160,49 +161,168 @@ function scoreTone(score, t) {
 /* ── Color-coded text: highlights trigger/emotion words in any prose ── */
 
 /* ── Circular Emotion Wheel ── */
-const WHEEL_SIZE = 200;
+const WHEEL_SIZE = 260;
+const WHEEL_R = WHEEL_SIZE / 2;
+
 function EmotionWheel({ emotionEntries, t }) {
   const total = emotionEntries.reduce((sum, [, v]) => sum + v, 0) || 1;
+
+  // Touch state
+  const [touchPos, setTouchPos] = useState(null);
+  const [touchInfo, setTouchInfo] = useState(null); // { label, color }
+  const cursorScale = useRef(new Animated.Value(0)).current;
+  const cursorOpacity = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const dotAnims = useRef(emotionEntries.map(() => new Animated.Value(0))).current;
+
+  // Pulse neutral center
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.12, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  // Stagger-in data dots
+  useEffect(() => {
+    Animated.stagger(100, dotAnims.map((a) =>
+      Animated.spring(a, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true })
+    )).start();
+  }, []);
+
+  // Touch handler
+  function processTouch(x, y) {
+    const dx = x - WHEEL_R;
+    const dy = y - WHEEL_R;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > WHEEL_R + 4) return; // outside circle
+    // Clamp to circle edge
+    const clampedX = dist > WHEEL_R ? WHEEL_R + dx * (WHEEL_R / dist) : x;
+    const clampedY = dist > WHEEL_R ? WHEEL_R + dy * (WHEEL_R / dist) : y;
+    const coords = tapToCoordinates(clampedX, clampedY, WHEEL_SIZE);
+    const label = shortLabel(coords.valence, coords.arousal);
+    const color = emotionColor(coords.valence, coords.arousal);
+    setTouchPos({ x: clampedX, y: clampedY });
+    setTouchInfo({ label, color });
+    tap();
+  }
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        processTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
+        Animated.parallel([
+          Animated.spring(cursorScale, { toValue: 1, friction: 6, tension: 100, useNativeDriver: true }),
+          Animated.timing(cursorOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+        ]).start();
+      },
+      onPanResponderMove: (e) => {
+        processTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
+      },
+      onPanResponderRelease: () => {
+        Animated.parallel([
+          Animated.timing(cursorScale, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(cursorOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]).start(() => { setTouchPos(null); setTouchInfo(null); });
+      },
+    })
+  ).current;
+
   return (
     <View style={s.wheelWrap}>
-      <View style={s.wheelContainer}>
-        {/* Gradient background circle */}
-        <LinearGradient
-          colors={["rgba(255,107,122,0.25)", "rgba(86,208,224,0.25)", "rgba(94,230,160,0.25)", "rgba(167,139,250,0.25)", "rgba(255,107,122,0.25)"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={s.wheelGradient}
-        />
-        {/* Axis labels */}
-        <Text style={[s.wheelAnchor, s.wheelAnchorTop]}>{t("emotion.anchor.energized") || "energized"}</Text>
-        <Text style={[s.wheelAnchor, s.wheelAnchorRight]}>{t("emotion.anchor.calm") || "calm"}</Text>
-        <Text style={[s.wheelAnchor, s.wheelAnchorBottom]}>{t("emotion.anchor.low") || "low"}</Text>
-        <Text style={[s.wheelAnchor, s.wheelAnchorLeft]}>{t("emotion.anchor.tense") || "tense"}</Text>
-        {/* Crosshairs */}
-        <View style={s.wheelCrossH} />
-        <View style={s.wheelCrossV} />
-        {/* Emotion dots */}
-        {emotionEntries.map(([key, value]) => {
-          const coords = EMOTION_COORDINATES[key];
-          if (!coords) return null;
-          const pos = coordinatesToPosition(coords.valence, coords.arousal, WHEEL_SIZE);
-          const color = EMOTION_COLORS[key] || palette.warning;
-          const ratio = value / total;
-          const dotSize = 14 + ratio * 26;
-          return (
-            <View key={key} style={[s.wheelDot, {
-              left: pos.x - dotSize / 2, top: pos.y - dotSize / 2,
-              width: dotSize, height: dotSize, borderRadius: dotSize / 2,
-              backgroundColor: color + "55", borderColor: color,
-            }]}>
-              <Text style={[s.wheelDotLabel, { color }]}>{EMOTION_EMOJIS[key]}</Text>
-            </View>
-          );
-        })}
-        {/* Center neutral zone */}
-        <View style={s.wheelCenter}>
-          <Text style={s.wheelCenterLabel}>{t("emotion.neutral") || "neutral"}</Text>
+      <View style={s.wheelOuter}>
+        <View style={s.wheelContainer} {...pan.panHandlers}>
+          {/* Layered gradients for smooth color blending */}
+          <LinearGradient
+            colors={["rgba(255,107,122,0.28)", "rgba(167,139,250,0.08)", "rgba(94,230,160,0.28)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={s.wheelGradient}
+          />
+          <LinearGradient
+            colors={["rgba(255,179,71,0.22)", "transparent", "rgba(86,208,224,0.22)"]}
+            start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
+            style={s.wheelGradient}
+          />
+          <LinearGradient
+            colors={["rgba(167,139,250,0.18)", "transparent", "rgba(86,208,224,0.18)"]}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={s.wheelGradient}
+          />
+          <LinearGradient
+            colors={["rgba(255,107,122,0.15)", "transparent", "rgba(94,230,160,0.15)"]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={s.wheelGradient}
+          />
+          {/* Radial neutral fade toward center */}
+          <View style={s.wheelNeutralFade} />
+
+          {/* Subtle axis lines */}
+          <View style={s.wheelCrossH} />
+          <View style={s.wheelCrossV} />
+
+          {/* Quadrant zone labels */}
+          <Text style={[s.wheelZoneLabel, { top: 18, right: 20 }]}>energized</Text>
+          <Text style={[s.wheelZoneLabel, { bottom: 18, right: 20 }]}>calm</Text>
+          <Text style={[s.wheelZoneLabel, { top: 18, left: 20 }]}>tense</Text>
+          <Text style={[s.wheelZoneLabel, { bottom: 18, left: 20 }]}>low</Text>
+
+          {/* Axis endpoint labels */}
+          <Text style={[s.wheelAxisLabel, { top: 4, left: "50%", transform: [{ translateX: -20 }] }]}>high arousal</Text>
+          <Text style={[s.wheelAxisLabel, { bottom: 4, left: "50%", transform: [{ translateX: -18 }] }]}>low arousal</Text>
+          <Text style={[s.wheelAxisLabel, { left: 6, top: "50%", transform: [{ translateY: -6 }] }]}>-</Text>
+          <Text style={[s.wheelAxisLabel, { right: 6, top: "50%", transform: [{ translateY: -6 }] }]}>+</Text>
+
+          {/* Emotion data dots */}
+          {emotionEntries.map(([key, value], i) => {
+            const coords = EMOTION_COORDINATES[key];
+            if (!coords) return null;
+            const pos = coordinatesToPosition(coords.valence, coords.arousal, WHEEL_SIZE);
+            const color = EMOTION_COLORS[key] || palette.warning;
+            const ratio = value / total;
+            const dotSize = 18 + ratio * 28;
+            const anim = dotAnims[i];
+            return (
+              <Animated.View key={key} style={[s.wheelDot, {
+                left: pos.x - dotSize / 2, top: pos.y - dotSize / 2,
+                width: dotSize, height: dotSize, borderRadius: dotSize / 2,
+                backgroundColor: color + "30", borderColor: color,
+                shadowColor: color, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 8, elevation: 4,
+                transform: [{ scale: anim }], opacity: anim,
+              }]}>
+                <Text style={[s.wheelDotLabel, { color, fontSize: Math.max(10, dotSize * 0.45) }]}>{EMOTION_EMOJIS[key]}</Text>
+              </Animated.View>
+            );
+          })}
+
+          {/* Touch cursor */}
+          {touchPos && (
+            <Animated.View style={[s.wheelCursor, {
+              left: touchPos.x - 18, top: touchPos.y - 18,
+              borderColor: touchInfo?.color || palette.accent,
+              shadowColor: touchInfo?.color || palette.accent,
+              transform: [{ scale: cursorScale }], opacity: cursorOpacity,
+            }]} />
+          )}
+
+          {/* Neutral center */}
+          <Animated.View style={[s.wheelCenter, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={s.wheelCenterEmoji}>😐</Text>
+          </Animated.View>
         </View>
+
+        {/* Touch info pill */}
+        {touchInfo && (
+          <View style={[s.wheelInfoPill, { borderColor: touchInfo.color + "60" }]}>
+            <View style={[s.wheelInfoDot, { backgroundColor: touchInfo.color }]} />
+            <Text style={[s.wheelInfoText, { color: touchInfo.color }]}>{touchInfo.label}</Text>
+          </View>
+        )}
       </View>
+      <Text style={s.wheelHint}>{t("report.wheelHint") || "tap and drag to explore"}</Text>
     </View>
   );
 }
@@ -2899,20 +3019,47 @@ const s = StyleSheet.create({
   progressWeekDate: { color: palette.muted, fontSize: 9 },
 
   /* ── Emotion Wheel ── */
-  wheelWrap: { alignItems: "center", marginBottom: 12 },
-  wheelContainer: { width: WHEEL_SIZE, height: WHEEL_SIZE, position: "relative", alignItems: "center", justifyContent: "center" },
-  wheelGradient: { ...StyleSheet.absoluteFillObject, borderRadius: WHEEL_SIZE / 2, opacity: 0.85 },
-  wheelAnchor: { position: "absolute", color: palette.muted, fontSize: 9, fontWeight: "700", letterSpacing: 0.3, textTransform: "uppercase" },
-  wheelAnchorTop: { top: -14, alignSelf: "center" },
-  wheelAnchorRight: { right: -22, top: "46%" },
-  wheelAnchorBottom: { bottom: -14, alignSelf: "center" },
-  wheelAnchorLeft: { left: -20, top: "46%" },
-  wheelCrossH: { position: "absolute", top: "50%", left: 10, right: 10, height: StyleSheet.hairlineWidth, backgroundColor: palette.glassBorder },
-  wheelCrossV: { position: "absolute", left: "50%", top: 10, bottom: 10, width: StyleSheet.hairlineWidth, backgroundColor: palette.glassBorder },
+  wheelWrap: { alignItems: "center", marginBottom: 16 },
+  wheelOuter: { alignItems: "center", position: "relative" },
+  wheelContainer: {
+    width: WHEEL_SIZE, height: WHEEL_SIZE, borderRadius: WHEEL_R,
+    position: "relative", alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(13,20,36,0.7)", borderWidth: 1, borderColor: "rgba(94,230,160,0.15)",
+    overflow: "hidden",
+  },
+  wheelGradient: { ...StyleSheet.absoluteFillObject, borderRadius: WHEEL_R },
+  wheelNeutralFade: {
+    position: "absolute", width: WHEEL_SIZE * 0.45, height: WHEEL_SIZE * 0.45,
+    borderRadius: WHEEL_SIZE * 0.225, alignSelf: "center",
+    backgroundColor: "rgba(13,20,36,0.55)",
+    left: WHEEL_R - WHEEL_SIZE * 0.225, top: WHEEL_R - WHEEL_SIZE * 0.225,
+  },
+  wheelCrossH: { position: "absolute", top: "50%", left: 16, right: 16, height: StyleSheet.hairlineWidth, backgroundColor: "rgba(255,255,255,0.08)" },
+  wheelCrossV: { position: "absolute", left: "50%", top: 16, bottom: 16, width: StyleSheet.hairlineWidth, backgroundColor: "rgba(255,255,255,0.08)" },
+  wheelZoneLabel: { position: "absolute", color: "rgba(255,255,255,0.35)", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  wheelAxisLabel: { position: "absolute", color: "rgba(255,255,255,0.2)", fontSize: 7, fontWeight: "600" },
   wheelDot: { position: "absolute", alignItems: "center", justifyContent: "center", borderWidth: 2 },
-  wheelDotLabel: { fontSize: 12, fontWeight: "700" },
-  wheelCenter: { position: "absolute", width: 36, height: 36, borderRadius: 18, backgroundColor: palette.glass, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: palette.glassBorder },
-  wheelCenterLabel: { color: palette.muted, fontSize: 7, fontWeight: "700", textTransform: "uppercase" },
+  wheelDotLabel: { fontWeight: "700" },
+  wheelCursor: {
+    position: "absolute", width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, backgroundColor: "rgba(255,255,255,0.06)",
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12, elevation: 6,
+  },
+  wheelCenter: {
+    position: "absolute", width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(13,20,36,0.6)", alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "rgba(158,176,201,0.25)",
+    left: WHEEL_R - 20, top: WHEEL_R - 20,
+  },
+  wheelCenterEmoji: { fontSize: 16 },
+  wheelInfoPill: {
+    position: "absolute", bottom: -28, flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 14,
+    backgroundColor: "rgba(13,20,36,0.85)", borderWidth: 1,
+  },
+  wheelInfoDot: { width: 8, height: 8, borderRadius: 4 },
+  wheelInfoText: { fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
+  wheelHint: { color: palette.muted, fontSize: 10, fontWeight: "600", marginTop: 8, opacity: 0.6 },
 
   /* ── Suggestion Card (Move / Fuel) ── */
   suggestionCard: {
