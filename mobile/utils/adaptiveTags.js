@@ -1,101 +1,52 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { emotionRegionKey } from "@triggermap/shared/constants/emotions";
-import { getTriggerTagsForState } from "@triggermap/shared/constants/tags";
+import { REGION_TAGS } from "@triggermap/shared/constants/tags";
 
-const USAGE_KEY = "triggermap.tag_usage";
+const TAG_USAGE_KEY = "adaptive_tag_usage";
+const MAX_SUGGESTED = 6;
 
-let _cache = null;
-
-async function loadUsageData() {
-  if (_cache) return _cache;
-  try {
-    const raw = await AsyncStorage.getItem(USAGE_KEY);
-    _cache = raw ? JSON.parse(raw) : {};
-  } catch {
-    _cache = {};
-  }
-  return _cache;
-}
-
-async function saveUsageData(data) {
-  _cache = data;
-  try {
-    await AsyncStorage.setItem(USAGE_KEY, JSON.stringify(data));
-  } catch {
-    // best-effort persistence
-  }
-}
-
-function normalizeEmotionContext(context) {
-  if (!context) return { emotion: null, regionKey: null };
-  if (typeof context === "string") return { emotion: context, regionKey: context };
-
-  const regionKey = context.regionKey || emotionRegionKey(context.valence, context.arousal);
-  return {
-    emotion: context.emotion || null,
-    regionKey,
-    valence: context.valence,
-    arousal: context.arousal,
-  };
-}
-
-function contextKey(trigger, context) {
-  const normalized = normalizeEmotionContext(context);
-  return normalized.regionKey || normalized.emotion || trigger;
-}
-
-export async function recordTagUsage(trigger, context, tags) {
-  if (!tags?.length || !trigger || !context) return;
-  const data = await loadUsageData();
-  const now = Date.now();
-  const scopedKey = contextKey(trigger, context);
-
-  for (const tag of tags) {
-    const globalKey = `g:${tag}`;
-    const pairKey = `p:${trigger}:${scopedKey}:${tag}`;
-
-    if (!data[globalKey]) data[globalKey] = { count: 0, last: 0 };
-    data[globalKey].count += 1;
-    data[globalKey].last = now;
-
-    if (!data[pairKey]) data[pairKey] = { count: 0, last: 0 };
-    data[pairKey].count += 1;
-    data[pairKey].last = now;
-  }
-
-  await saveUsageData(data);
-}
-
+/**
+ * Return up to MAX_SUGGESTED tags for the current emotion region.
+ * Previously-used tags for this trigger+region are promoted to the front.
+ */
 export async function getRelevantTags(trigger, context) {
-  const normalized = normalizeEmotionContext(context);
-  const baseTags = getTriggerTagsForState(trigger, normalized);
-  if (!baseTags.length) return [];
+  const pool = REGION_TAGS[context.regionKey] || REGION_TAGS.neutral_mid;
+  let usage = {};
+  try {
+    const raw = await AsyncStorage.getItem(TAG_USAGE_KEY);
+    if (raw) usage = JSON.parse(raw);
+  } catch { /* ignore */ }
 
-  const data = await loadUsageData();
-  const now = Date.now();
-  const DAY_MS = 86400000;
-  const scopedKey = contextKey(trigger, normalized);
+  const key = `${trigger}:${context.regionKey}`;
+  const history = usage[key] || {};
 
-  const scored = baseTags.map((tag) => {
-    const globalEntry = data[`g:${tag}`] || { count: 0, last: 0 };
-    const pairEntry = data[`p:${trigger}:${scopedKey}:${tag}`] || { count: 0, last: 0 };
+  // Sort pool by usage count descending, then original order
+  const scored = pool.map((tag, idx) => ({
+    tag,
+    count: history[tag] || 0,
+    order: idx,
+  }));
+  scored.sort((a, b) => b.count - a.count || a.order - b.order);
 
-    const freq = Math.min(globalEntry.count / 10, 1);
-    const cooc = Math.min(pairEntry.count / 5, 1);
-    const lastUsed = Math.max(globalEntry.last, pairEntry.last);
-    const daysSince = lastUsed ? (now - lastUsed) / DAY_MS : 999;
-    const recency = lastUsed ? Math.max(0, 1 - daysSince / 7) : 0;
-
-    return {
-      tag,
-      score: 0.5 * freq + 0.3 * cooc + 0.2 * recency,
-    };
-  });
-
-  scored.sort((a, b) => b.score - a.score || a.tag.localeCompare(b.tag));
-  return scored.map((entry) => entry.tag);
+  return scored.slice(0, MAX_SUGGESTED).map((s) => s.tag);
 }
 
-export function resetTagCache() {
-  _cache = null;
+/**
+ * Record that these tags were selected for a trigger+region combo.
+ * Increments a simple counter per tag so future suggestions are smarter.
+ */
+export async function recordTagUsage(trigger, context, tags) {
+  const storageKey = TAG_USAGE_KEY;
+  let usage = {};
+  try {
+    const raw = await AsyncStorage.getItem(storageKey);
+    if (raw) usage = JSON.parse(raw);
+  } catch { /* ignore */ }
+
+  const key = `${trigger}:${context.regionKey}`;
+  if (!usage[key]) usage[key] = {};
+  for (const tag of tags) {
+    usage[key][tag] = (usage[key][tag] || 0) + 1;
+  }
+
+  await AsyncStorage.setItem(storageKey, JSON.stringify(usage));
 }

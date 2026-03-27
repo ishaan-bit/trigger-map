@@ -3,8 +3,8 @@
     "name": "TriggerMap",
     "slug": "triggermap",
     "scheme": "triggermap",
-    "version": "1.3.0",
-    "orientation": "default",
+    "version": "1.0.0",
+    "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
@@ -12,30 +12,18 @@
     ],
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#060a12"
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1220"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "./plugins/withGoogleSignIn",
-      [
-        "expo-notifications",
-        {
-          "color": "#7bc9d8"
-        }
-      ],
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "resizeMode": "cover",
-          "backgroundColor": "#060a12",
-          "android": {
-            "image": "./assets/splash.png",
-            "resizeMode": "cover",
-            "backgroundColor": "#060a12"
-          }
+          "resizeMode": "contain",
+          "backgroundColor": "#0b1220"
         }
       ],
       [
@@ -44,8 +32,7 @@
           "android": {
             "minSdkVersion": 24,
             "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "useLegacyPackaging": false
+            "targetSdkVersion": 35
           }
         }
       ],
@@ -55,16 +42,13 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 98,
+      "versionCode": 99,
       "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "POST_NOTIFICATIONS"
+        "ACCESS_NETWORK_STATE"
       ],
-      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-padded.png",
-        "backgroundColor": "#060a12"
+        "backgroundColor": "#0b1220"
       }
     },
     "experiments": {
