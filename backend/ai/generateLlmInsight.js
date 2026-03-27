@@ -170,20 +170,6 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Context tags: ${topTags.join(", ")}.`);
   }
 
-  const pa = report.predictionAccuracy;
-  if (pa && pa.daysCompared >= 2) {
-    lines.push(`Prediction accuracy: ${pa.correct} of ${pa.daysCompared} days matched (${Math.round(pa.rate * 100)}%).`);
-  }
-
-  const dailyPredictions = (report.dailyAggregates || []).filter(d => d.prediction && Number(d.total || 0) > 0);
-  if (dailyPredictions.length) {
-    const pLines = dailyPredictions.map(d => {
-      const actual = Object.entries(d.emotions || {}).sort(([, a], [, b]) => b - a)[0]?.[0] || "unknown";
-      return `${d.date}: predicted ${d.prediction}, actual ${actual}`;
-    });
-    lines.push(`Daily predictions vs reality: ${pLines.join("; ")}.`);
-  }
-
   // Action feedback signals — what the user tried or skipped
   if (actionFeedback?.length) {
     const tried = actionFeedback.filter(f => f.response === "tried");
@@ -251,7 +237,6 @@ function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
   const signals = buildSignals(report, recentNotes, actionFeedback);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
-  const hasPredictions = report.predictionAccuracy && report.predictionAccuracy.daysCompared >= 2;
   const hasNotes = recentNotes?.length > 0;
   const hi = lang === "hi";
 
@@ -303,7 +288,7 @@ Format rules:
 - Each header must be alone on its own line, with the body on the next line.
 - ${minWords}-${maxWords} words total. HARD LIMIT: stop at ${hardCap} words. Write SHORT, crisp sentences.
 - Do not echo these instructions. Do not add any preamble or closing remarks.
-- No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasPredictions ? "\n- Compare expected vs actual emotional patterns from prediction data." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags > predictions." : ""}
+- No em dashes, bullet markers, bold markers, colons in headers, or markdown.${hasTags ? "\n- Weave context tags naturally. Prefer note content over tags." : ""}${hasNotes ? "\n- Weave user notes naturally. Priority: notes > tags." : ""}
 - Tone: calm, direct, perceptive. Use simple everyday words. Avoid uncommon or technical vocabulary.
 - Do NOT describe signals independently. Look for contrast (stable surface + subtle drift, active trigger + flat emotion) or alignment between signals. If contrasting, use structures like "${hi ? "जबकि X दिखता है..., Y बताता है..." : "While X appears..., Y suggests..."}" or "${hi ? "ऊपर से..., लेकिन अंदर..." : "On the surface..., but underneath..."}".
 - Prioritize the most important 1-2 signals rather than listing everything.

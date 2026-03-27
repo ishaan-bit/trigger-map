@@ -11,7 +11,6 @@ import {
   getReflectionEnabled,
   getNudgesEnabled,
   getSessionToken,
-  getDailyPrediction,
   setOnboardingComplete,
   setReminderEnabled,
   setReflectionEnabled,
@@ -310,7 +309,6 @@ export function SessionProvider({ children }) {
         const activeDeviceId = await ensureDeviceIdentity();
         const notes = payload.notes ?? payload.note ?? "";
         const timestamp = payload.timestamp || new Date().toISOString();
-        const prediction = await getDailyPrediction().catch(() => null);
 
         // Invalidate caches so next load picks up the new moment
         invalidateCache();
@@ -331,7 +329,6 @@ export function SessionProvider({ children }) {
             note: notes,
             timestamp,
             ...(payload.tags?.length ? { tags: payload.tags } : {}),
-            ...(prediction ? { prediction } : {}),
           });
           await setLastLoggedAt(timestamp);
           trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
@@ -346,7 +343,6 @@ export function SessionProvider({ children }) {
             note: notes,
             notes,
             timestamp,
-            ...(prediction ? { prediction } : {}),
             ...(payload.tags?.length ? { tags: payload.tags } : {}),
           },
           token,

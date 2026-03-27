@@ -775,30 +775,8 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
         </AnimatedSection>
       ) : null}
 
-      {/* Gut check */}
-      {report.predictionAccuracy ? (
-        <AnimatedSection index={7} style={s.section}>
-          <SectionHeader label={t("report.gutCheck")} badge="live" t={t} />
-          <View style={s.card}>
-            <View style={s.gutCheckRow}>
-              <Text style={s.gutCheckEmoji}>{report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}</Text>
-              <View style={s.gutCheckContent}>
-                <Text style={s.gutCheckTitle}>{t("report.gutCheckDays", { correct: report.predictionAccuracy.correct, total: report.predictionAccuracy.daysCompared })}</Text>
-                <Text style={s.gutCheckBody}>
-                  {report.predictionAccuracy.rate >= 0.8 ? t("report.gutCheckPerfect")
-                    : report.predictionAccuracy.rate >= 0.6 ? t("report.gutCheckStrong")
-                    : report.predictionAccuracy.rate >= 0.4 ? t("report.gutCheckMixed")
-                    : report.predictionAccuracy.correct === 0 ? t("report.gutCheckNone")
-                    : t("report.gutCheckOff")}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </AnimatedSection>
-      ) : null}
-
       {/* Timeline CTA */}
-      <AnimatedSection index={8} style={s.section}>
+      <AnimatedSection index={7} style={s.section}>
         <Pressable style={s.ctaCard} onPress={() => { tap(); router.push("/(tabs)/timeline"); }} accessibilityRole="button">
           <Text style={s.ctaCardText}>📖 {t("report.viewTimeline")}</Text>
         </Pressable>
@@ -2438,13 +2416,6 @@ const s = StyleSheet.create({
     borderRadius: radius.pill, backgroundColor: palette.accentStrong,
   },
   lockedCtaText: { color: palette.text, fontSize: 14, fontWeight: "700" },
-
-  /* Gut check */
-  gutCheckRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  gutCheckEmoji: { fontSize: 28, marginTop: 2 },
-  gutCheckContent: { flex: 1, gap: 4 },
-  gutCheckTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  gutCheckBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
 
   /* Teaser / upgrade */
   teaserCard: {

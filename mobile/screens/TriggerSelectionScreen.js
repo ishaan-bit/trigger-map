@@ -5,7 +5,6 @@ import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { ScreenShell } from "@/components/ScreenShell";
 import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
-import { DailyPrediction } from "@/components/DailyPrediction";
 import { MoodWeather } from "@/components/MoodWeather";
 import { StreakOrb } from "@/components/StreakOrb";
 import { useAppSession } from "@/hooks/useAppSession";
@@ -60,7 +59,6 @@ export function TriggerSelectionScreen() {
   const { t } = useLanguage();
   const [todayCount, setTodayCount] = useState(0);
   const [moments, setMoments] = useState([]);
-  const [predictionDone, setPredictionDone] = useState(true);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -141,12 +139,7 @@ export function TriggerSelectionScreen() {
         <Tooltip
           id="log_tooltip"
           text={t("log.tooltip")}
-          hidden={!predictionDone}
         />
-
-        <StaggerIn index={3}>
-          <DailyPrediction onVisibilityChange={(vis) => setPredictionDone(!vis)} />
-        </StaggerIn>
 
         <View style={styles.grid}>
           {TRIGGERS.map((trigger, i) => (

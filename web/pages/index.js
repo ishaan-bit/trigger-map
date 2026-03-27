@@ -13,7 +13,6 @@ import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 import { StreakOrb } from "../components/StreakOrb";
 import { MoodWeather } from "../components/MoodWeather";
-import { DailyPrediction } from "../components/DailyPrediction";
 import { FeedbackCard } from "../components/FeedbackCard";
 import { EMOTION_COLORS, REGION_COLORS, colorForLabel } from "../lib/designSystem";
 
@@ -220,8 +219,6 @@ export default function HomePage() {
               </div>
             </div>
           ) : null}
-
-          <DailyPrediction />
 
           <div className="tileGrid">
             {TRIGGERS.map((t) => (

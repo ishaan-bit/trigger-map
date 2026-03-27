@@ -320,11 +320,3 @@ export function appendTagContextHi(summary, report) {
   if (!topTag || topTag[1] < 2) return summary;
   return `${summary} ख़ास बात: "${topTag[0]}" आपके पलों में ${topTag[1]} बार आया।`;
 }
-
-export function appendPredictionContextHi(summary, report) {
-  const pa = report.predictionAccuracy;
-  if (!pa || pa.daysCompared < 2) return summary;
-  if (pa.rate >= 0.6) return `${summary} आप अपने दिनों का अंदाज़ा काफ़ी सही लगाते हैं।`;
-  if (pa.rate <= 0.3) return `${summary} आपके दिन अक्सर उम्मीद से अलग रहे।`;
-  return summary;
-}

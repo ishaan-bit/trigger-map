@@ -138,9 +138,6 @@
     "strong": "मज़बूत",
     "legendary": "अद्भुत"
   },
-  "prediction": {
-    "title": "आप शायद महसूस करेंगे…"
-  },
   "weather": {
     "clear": "साफ़",
     "clearing": "साफ़ हो रहा",
@@ -436,14 +433,6 @@
     "areasCount": "{count} क्षेत्र",
     "whenLogged": "कब लॉग किया",
     "triggerEmotion": "ट्रिगर + भावना",
-
-    "gutCheck": "अंतर्ज्ञान जाँच",
-    "gutCheckDays": "{total} में से {correct} दिन",
-    "gutCheckPerfect": "आपने खुद को लगभग सही पढ़ा। अंतर्ज्ञान सटीक है।",
-    "gutCheckStrong": "मज़बूत आत्म-जागरूकता। सुबह का अंदाज़ा दिन से मेल खाया।",
-    "gutCheckMixed": "कभी सही, कभी ग़लत — दिन में अप्रत्याशित मोड़ आए।",
-    "gutCheckNone": "कोई अनुमान सही नहीं रहा। दिन अप्रत्याशित रहे।",
-    "gutCheckOff": "ज़्यादातर ग़लत, पर यह भी डेटा है। हैरानी कुछ सिखाती है।",
 
     "insightStoodOut": "क्या अलग दिखा",
     "insightContributing": "क्या कारण हो सकता है",

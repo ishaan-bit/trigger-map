@@ -1414,23 +1414,6 @@ button,
   color: #f07f84;
 }
 
-/* ─── Gut check card ─── */
-.gutCheckCard {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.gutCheckEmoji {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
-.gutCheckContent {
-  display: grid;
-  gap: 4px;
-}
-
 /* ─── Experiment card (Try this week) ─── */
 .experimentCard {
   border-left: 3px solid #9de4b7;
@@ -1959,7 +1942,7 @@ button,
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ANDROID PARITY · EmotionGarden, StreakOrb, MoodWeather, Prediction
+   ANDROID PARITY · EmotionGarden, StreakOrb, MoodWeather
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── Emotion Garden ─── */
@@ -2182,73 +2165,6 @@ button,
   font-size: 13px;
   line-height: 19px;
   margin: 0;
-}
-
-/* ─── Daily Prediction ─── */
-.predictionCard {
-  border-radius: 18px;
-  padding: 14px;
-  display: grid;
-  gap: 10px;
-  background: rgba(13, 20, 36, 0.80);
-  border: 1px solid rgba(86, 208, 224, 0.18);
-}
-
-.predictionTitle {
-  color: #f1f5fb;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  margin: 0;
-}
-
-.predictionOptions {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 2px;
-  justify-content: center;
-}
-.predictionOptions::-webkit-scrollbar { display: none; }
-
-.predictionOption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(86, 208, 224, 0.28);
-  border: 1px solid rgba(86, 208, 224, 0.35);
-  min-width: 62px;
-  cursor: pointer;
-  transition: transform 0.12s, opacity 0.12s;
-  box-shadow: none;
-}
-
-.predictionOption:hover {
-  -webkit-transform: scale(1.05);
-  transform: scale(1.05);
-  opacity: 0.90;
-}
-
-.predictionOption:active {
-  -webkit-transform: scale(0.95);
-  transform: scale(0.95);
-  opacity: 0.7;
-}
-
-.predictionEmoji {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.predictionLabel {
-  color: #f1f5fb;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 /* ─── Feedback Card (Post-log) ─── */
@@ -3138,14 +3054,6 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
     padding: 16px;
   }
 
-  .gutCheckCard {
-    gap: 10px;
-  }
-
-  .gutCheckEmoji {
-    font-size: 24px;
-  }
-
   .experimentCard {
     padding: 16px;
   }
@@ -3337,10 +3245,6 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
     font-size: 10px;
   }
 
-  .gutCheckEmoji {
-    font-size: 22px;
-  }
-
   .momentTrigger,
   .momentEmotion {
     padding: 5px 10px;
@@ -3434,25 +3338,6 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
 
   .streakOrbCount {
     font-size: 13px;
-  }
-
-  .predictionCard {
-    padding: 12px;
-    border-radius: 14px;
-  }
-
-  .predictionOption {
-    padding: 8px 10px;
-    min-width: 54px;
-    border-radius: 10px;
-  }
-
-  .predictionEmoji {
-    font-size: 18px;
-  }
-
-  .predictionLabel {
-    font-size: 10px;
   }
 
   .feedbackCardWeb {

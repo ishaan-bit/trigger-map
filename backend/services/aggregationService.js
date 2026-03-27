@@ -34,7 +34,6 @@ function parseAggregateHash(record, date) {
   const snapshot = {
     date,
     total: Number(record.total || 0),
-    prediction: record.prediction || null,
     triggers: {},
     emotions: {},
     pairs: {},
@@ -86,11 +85,6 @@ export async function appendDailyAggregate(moment) {
     ["EXPIRE", key, String(AGGREGATE_TTL_SECONDS)],
     ["SADD", getOwnerIndexKey(), moment.ownerId],
   ];
-
-  // Store daily prediction (first one per day wins)
-  if (moment.prediction) {
-    cmds.push(["HSETNX", key, "prediction", moment.prediction]);
-  }
 
   if (Array.isArray(moment.tags)) {
     for (const tag of moment.tags) {

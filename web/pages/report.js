@@ -485,32 +485,6 @@ export default function ReportPage() {
                       </div>
                     </>
                   ) : null}
-
-                  {/* Gut check */}
-                  {report.predictionAccuracy ? (
-                    <>
-                      <SectionHeader label="Gut check" badge="live" />
-                      <div className="card gutCheckCard sceneIn">
-                        <span className="gutCheckEmoji">
-                          {report.predictionAccuracy.rate >= 0.5 ? "🎯" : "🔮"}
-                        </span>
-                        <div className="gutCheckContent">
-                          <strong>{report.predictionAccuracy.correct} of {report.predictionAccuracy.daysCompared} days</strong>
-                          <p className="muted">
-                            {report.predictionAccuracy.rate >= 0.8
-                              ? "You read yourself almost perfectly. Your gut is dialled in."
-                              : report.predictionAccuracy.rate >= 0.6
-                                ? "Strong self-awareness. Your morning read mostly matched how the day unfolded."
-                                : report.predictionAccuracy.rate >= 0.4
-                                  ? "Hit-and-miss — your days had more turns than you expected."
-                                  : report.predictionAccuracy.correct === 0
-                                    ? "None of your predictions landed. Your days unfolded in ways you didn't expect."
-                                    : "Mostly off the mark, but that's data too. Surprises teach you something."}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
                 </>
               )}
 

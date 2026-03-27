@@ -24,7 +24,7 @@ export function getMomentsKey(ownerId) {
   return redisKey("moments", ownerId);
 }
 
-export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, prediction, tags }) {
+export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
 
   // Continuous model: valence/arousal provided → derive legacy emotion for backward compat
@@ -50,7 +50,6 @@ export function createMomentPayload({ ownerId, trigger, emotion, valence, arousa
     note: sanitizeText(note || ""),
     timestamp: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
     isAnonymous: Boolean(isAnonymous),
-    ...(prediction ? { prediction } : {}),
     ...(tags?.length ? { tags } : {}),
   };
 }

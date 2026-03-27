@@ -314,22 +314,6 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     else trajectoryNote = "Slight downward shift in emotional tone over the week.";
   }
 
-  // --- Prediction accuracy ("gut check") ---
-  let predictionAccuracy = null;
-  const daysWithPrediction = filledAggregates.filter((s) => s.prediction && Number(s.total || 0) > 0);
-  if (daysWithPrediction.length >= 2) {
-    let correct = 0;
-    for (const day of daysWithPrediction) {
-      const dominantEmotion = topEntry(day.emotions, "neutral");
-      if (day.prediction === dominantEmotion) correct++;
-    }
-    predictionAccuracy = {
-      daysCompared: daysWithPrediction.length,
-      correct,
-      rate: Number((correct / daysWithPrediction.length).toFixed(2)),
-    };
-  }
-
   const dataQuality = {
     totalMoments,
     daysLogged,
@@ -498,7 +482,6 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     volatilityScore,
     volatilityLabel,
     trajectoryNote,
-    predictionAccuracy,
     weeklyEmotionTrajectory,
     busiestTime,
     dataQuality,

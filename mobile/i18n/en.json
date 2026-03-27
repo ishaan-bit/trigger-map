@@ -138,9 +138,7 @@
     "strong": "Strong",
     "legendary": "Legendary"
   },
-  "prediction": {
-    "title": "You might feel…"
-  },
+
   "weather": {
     "clear": "Clear",
     "clearing": "Clearing",
@@ -436,14 +434,6 @@
     "areasCount": "{count} areas",
     "whenLogged": "When you logged",
     "triggerEmotion": "Trigger + Emotion",
-
-    "gutCheck": "Gut check",
-    "gutCheckDays": "{correct} of {total} days",
-    "gutCheckPerfect": "You read yourself almost perfectly. Your gut is dialled in.",
-    "gutCheckStrong": "Strong self-awareness. Your morning read mostly matched how the day unfolded.",
-    "gutCheckMixed": "Hit-and-miss — your days had more turns than you expected.",
-    "gutCheckNone": "None of your predictions landed. Your days unfolded in ways you didn't expect.",
-    "gutCheckOff": "Mostly off the mark, but that's data too. Surprises teach you something.",
 
     "insightStoodOut": "What stood out",
     "insightContributing": "What may be contributing",
