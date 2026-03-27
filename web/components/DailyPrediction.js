@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 
 const OPTIONS = [
   { key: "calm",       emoji: "\u{1F343}", label: "Calm" },
-  { key: "neutral",    emoji: "\u2696\uFE0F", label: "Neutral" },
-  { key: "anxious",    emoji: "\u26A1",     label: "Anxious" },
-  { key: "frustrated", emoji: "\u{1F4A2}",  label: "Frustrated" },
-  { key: "energized",  emoji: "\u2600\uFE0F", label: "Energized" },
+  { key: "steady",     emoji: "\u2696\uFE0F", label: "Steady" },
+  { key: "uneasy",     emoji: "\u{1F32C}\uFE0F", label: "Uneasy" },
+  { key: "energized",  emoji: "\u26A1",     label: "Energized" },
+  { key: "heavy",      emoji: "\u{1F4A2}",  label: "Heavy" },
 ];
 
 const STORAGE_KEY = "triggermap_daily_prediction";

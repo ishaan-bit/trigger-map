@@ -3,6 +3,7 @@
  * Mirrors mobile/utils/designSystem.js for visual parity.
  */
 
+// Legacy discrete emotion colors (kept for backward compat with old moments)
 export const EMOTION_COLORS = {
   calm:       "#5ee6a0",
   neutral:    "#9eb0c9",
@@ -10,6 +11,45 @@ export const EMOTION_COLORS = {
   frustrated: "#ff6b7a",
   energized:  "#a78bfa",
 };
+
+// Region-based colors for the 9-region slider model
+export const REGION_COLORS = {
+  bad_high:     "#ff6b7a",
+  bad_mid:      "#ff8a6b",
+  bad_low:      "#c084fc",
+  neutral_high: "#ffb347",
+  neutral_mid:  "#9eb0c9",
+  neutral_low:  "#7e8fa6",
+  good_high:    "#56d0e0",
+  good_mid:     "#5ee6a0",
+  good_low:     "#a78bfa",
+};
+
+// Derived-label → color mapping (18 labels from derivedEmotionLabel)
+export const DERIVED_LABEL_COLORS = {
+  overwhelmed:  "#ff6b7a",
+  anxious:      "#ffb347",
+  heavy:        "#c084fc",
+  low:          "#9e7bfa",
+  frustrated:   "#ff8a6b",
+  uneasy:       "#ff9f6b",
+  excited:      "#56d0e0",
+  energized:    "#7bc9d8",
+  peaceful:     "#a78bfa",
+  calm:         "#5ee6a0",
+  grateful:     "#88d498",
+  content:      "#5ee6a0",
+  restless:     "#ffb347",
+  alert:        "#ffd166",
+  disconnected: "#7e8fa6",
+  flat:         "#8da4bd",
+  neutral:      "#9eb0c9",
+};
+
+/** Get a color for any emotion label (derived or legacy) */
+export function colorForLabel(label) {
+  return DERIVED_LABEL_COLORS[label] || EMOTION_COLORS[label] || "#9eb0c9";
+}
 
 export const TRIGGER_COLORS = {
   work:     "#56d0e0",

@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
-
-const EMOTION_EMOJIS = {
-  frustrated: "�", anxious: "😰", neutral: "😐", calm: "😌", energized: "⚡",
-};
+import { colorForLabel } from "../lib/designSystem";
 
 const EMOTION_COLORS = {
   calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa",
+  overwhelmed: "#ff6b7a", heavy: "#c084fc", low: "#9e7bfa", uneasy: "#ff9f6b",
+  excited: "#56d0e0", peaceful: "#a78bfa", grateful: "#88d498", content: "#5ee6a0",
+  restless: "#ffb347", alert: "#ffd166", disconnected: "#7e8fa6", flat: "#8da4bd",
 };
 /** Map a 1-5 wellbeing score to a tone emoji and label */
 function scoreTone(score) {
@@ -34,7 +34,9 @@ const CONFIDENCE_LABELS = {
 };
 
 const TRIGGERS_SET = new Set(["work", "family", "partner", "social", "alone", "exercise", "travel", "health", "money"]);
-const EMOTIONS_SET = new Set(["calm", "neutral", "anxious", "frustrated", "energized"]);
+const EMOTIONS_SET = new Set(["calm", "neutral", "anxious", "frustrated", "energized",
+  "overwhelmed", "heavy", "low", "uneasy", "excited", "peaceful", "grateful", "content",
+  "restless", "alert", "disconnected", "flat"]);
 
 function cleanText(str) {
   if (typeof str !== "string") return str;
@@ -263,7 +265,6 @@ export default function ReportPage() {
             {report.totalMoments ? (
               <div className="heroRow">
                 <span className="heroPill" style={{ borderColor: `${EMOTION_COLORS[report.topEmotion] || stateColor}40`, boxShadow: `0 0 12px ${EMOTION_COLORS[report.topEmotion] || stateColor}15` }}>
-                  <span>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</span>
                   <span style={{ color: EMOTION_COLORS[report.topEmotion] || stateColor }}>{report.topEmotion || "Mixed"}</span>
                 </span>
                 <span className="heroPill">
@@ -327,7 +328,7 @@ export default function ReportPage() {
               {emotionEntries.length ? (
                 <div className="card stack sceneIn">
                   {emotionEntries.map(([key, value]) => (
-                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || "#f0b96a"} icon={EMOTION_EMOJIS[key]} glowing={key === topEmotion} />
+                    <HBar key={key} label={key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || colorForLabel(key)} glowing={key === topEmotion} />
                   ))}
                 </div>
               ) : null}
@@ -403,8 +404,8 @@ export default function ReportPage() {
                             <div className="correlationChips">
                               {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => (
                                 <span className="correlationChip" key={emo} data-emotion={emo}
-                                  style={{ color: EMOTION_COLORS[emo], borderColor: `${EMOTION_COLORS[emo]}40`, background: `${EMOTION_COLORS[emo]}10` }}>
-                                  {EMOTION_EMOJIS[emo] || ""} {emo} ×{count}
+                                  style={{ color: EMOTION_COLORS[emo] || colorForLabel(emo), borderColor: `${EMOTION_COLORS[emo] || colorForLabel(emo)}40`, background: `${EMOTION_COLORS[emo] || colorForLabel(emo)}10` }}>
+                                  {emo} ×{count}
                                 </span>
                               ))}
                             </div>

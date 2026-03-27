@@ -9,7 +9,14 @@ const WEATHER_MAP = {
   quiet:     { icon: "\u{1F319}",       label: "Still night",  color: "#9eb0c9", desc: "Not much data yet today, log a moment to see your forecast." },
 };
 
+// Legacy score for old discrete moments
 const SCORE = { frustrated: 1, anxious: 2, neutral: 3, calm: 4, energized: 5 };
+
+/** Map valence to 1-5 score for weather calc (works for both old and new moments) */
+function momentScore(m) {
+  if (m.valence != null) return Math.round((m.valence + 1) * 2) + 1; // -1→1, 0→3, 1→5
+  return SCORE[m.emotion] || 3;
+}
 
 function recencyWeight(ageMs) {
   const hours = ageMs / 3_600_000;
@@ -31,9 +38,11 @@ function computeWeather(moments) {
   const counts = {};
   for (const m of recent) {
     const w = recencyWeight(now - new Date(m.timestamp).getTime());
-    weightedSum += (SCORE[m.emotion] || 3) * w;
+    weightedSum += momentScore(m) * w;
     totalWeight += w;
-    counts[m.emotion] = (counts[m.emotion] || 0) + 1;
+    // Use derived label for bucketing if new format, else legacy emotion
+    const emo = m.emotion || "neutral";
+    counts[emo] = (counts[emo] || 0) + 1;
   }
   const avg = weightedSum / totalWeight;
 

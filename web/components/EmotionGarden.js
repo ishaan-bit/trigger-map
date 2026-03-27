@@ -1,4 +1,5 @@
 import { EMOTION_STYLES } from "../lib/designSystem";
+import { derivedEmotionLabel, coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 
 const BLOOM = {
   calm:       { seed: "\u{1F33F}", bloom: "\u{1F338}", color: "#5ee6a0" },
@@ -7,6 +8,22 @@ const BLOOM = {
   frustrated: { seed: "\u{1FAA8}", bloom: "\u{1F525}", color: "#ff6b7a" },
   energized:  { seed: "\u26A1",    bloom: "\u{1F33B}", color: "#a78bfa" },
 };
+
+/** Get the legacy emotion key for bloom lookup (supports both old and new formats) */
+function bloomKey(m) {
+  if (m.valence != null && m.arousal != null) {
+    return coordinatesToLegacy(m.valence, m.arousal);
+  }
+  return m.emotion || "neutral";
+}
+
+/** Get display label (derived for new, discrete for old) */
+function displayLabel(m) {
+  if (m.valence != null && m.arousal != null) {
+    return derivedEmotionLabel(m.valence, m.arousal);
+  }
+  return m.emotion || "neutral";
+}
 
 function getTodayBlooms(moments) {
   if (!moments?.length) return [];
@@ -19,7 +36,8 @@ function getTodayBlooms(moments) {
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     .slice(0, 8)
     .map((m) => ({
-      emotion: m.emotion,
+      emotion: bloomKey(m),
+      label: displayLabel(m),
       isMature: now - new Date(m.timestamp).getTime() > 3_600_000,
     }));
 }
@@ -51,7 +69,7 @@ export function EmotionGarden({ moments }) {
             >
               <span className="bloomIcon">{icon}</span>
               <div className="bloomGlow" style={{ backgroundColor: eStyle.color }} />
-              <span className="bloomLabel" style={{ color: eStyle.color }}>{b.emotion}</span>
+              <span className="bloomLabel" style={{ color: eStyle.color }}>{b.label}</span>
             </div>
           );
         })}

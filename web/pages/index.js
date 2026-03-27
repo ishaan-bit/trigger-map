@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
-import { EMOTIONS } from "@triggermap/shared/constants/emotions";
-import { TRIGGER_EMOTION_TAGS, TRIGGER_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
+import {
+  createEmotionCoordinates,
+  EMOTION_AXIS_STEPS,
+  emotionRegionKey,
+  derivedEmotionLabel,
+  coordinatesToLegacy,
+} from "@triggermap/shared/constants/emotions";
+import { REGION_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
 import { StreakOrb } from "../components/StreakOrb";
 import { MoodWeather } from "../components/MoodWeather";
 import { DailyPrediction } from "../components/DailyPrediction";
 import { FeedbackCard } from "../components/FeedbackCard";
-import { EMOTION_COLORS } from "../lib/designSystem";
+import { EMOTION_COLORS, REGION_COLORS, colorForLabel } from "../lib/designSystem";
 
 const TRIGGER_EMOJIS = {
   work: "\u{1F3E2}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
@@ -17,47 +23,35 @@ const TRIGGER_EMOJIS = {
   sleep: "\u{1F634}", other: "\u{1F4CC}",
 };
 
-const EMOTION_EMOJIS = {
-  frustrated: "\u{1F624}", anxious: "\u{1F630}", neutral: "\u{1F610}", calm: "\u{1F60C}", energized: "\u26A1",
-};
-
-const SCORE = { frustrated: 1, anxious: 2, neutral: 3, calm: 4, energized: 5 };
-
-const EMOTION_PROMPTS = {
-  calm: "Steady waters. What\u2019s on your mind?",
-  neutral: "What just happened?",
-  anxious: "Something pulling at you?",
-  frustrated: "Name what\u2019s grinding.",
-  energized: "Riding some energy.",
-};
+const FEEL_LABELS = ["Rough", "Off", "Okay", "Good", "Great"];
+const ENERGY_LABELS = ["Drained", "Low", "Steady", "Alert", "Wired"];
 
 const PROMPTS = ["What just happened?", "What pulled you here?", "What\u2019s on your mind?"];
 
-function getPrompt(count, dominantEmotion) {
+function getPrompt(count) {
   if (count >= 3) return "Back again, good habit.";
-  if (dominantEmotion && EMOTION_PROMPTS[dominantEmotion]) return EMOTION_PROMPTS[dominantEmotion];
   return PROMPTS[count % PROMPTS.length];
 }
 
-function getEmotionTags(trigger, emotion) {
-  return TRIGGER_EMOTION_TAGS[trigger]?.[emotion] || TRIGGER_TAGS[trigger] || [];
-}
-
+/** Compute dominant emotion from recent moments (supports both old and new format) */
 function computeDominant(moments) {
-  if (!moments?.length) return { emotion: null, trigger: null, trend: null, color: null, count: 0 };
+  if (!moments?.length) return { label: null, trigger: null, trend: null, color: null, count: 0 };
   const now = Date.now();
   const recent = moments.filter((m) => now - new Date(m.timestamp).getTime() < 48 * 3600000);
-  if (!recent.length) return { emotion: null, trigger: null, trend: null, color: null, count: 0 };
+  if (!recent.length) return { label: null, trigger: null, trend: null, color: null, count: 0 };
 
-  let totalW = 0, wSum = 0;
+  // Average valence of recent moments
+  let totalW = 0, vSum = 0;
   for (const m of recent) {
     const ageH = (now - new Date(m.timestamp).getTime()) / 3600000;
     const w = ageH < 2 ? 1.5 : ageH < 6 ? 1.2 : 1.0;
-    wSum += (SCORE[m.emotion] || 3) * w;
+    const v = m.valence ?? (m.emotion === "calm" ? 0.5 : m.emotion === "energized" ? 0.5 : m.emotion === "neutral" ? 0 : -0.5);
+    vSum += v * w;
     totalW += w;
   }
-  const avg = wSum / totalW;
-  const emotion = avg >= 4.0 ? "calm" : avg >= 3.3 ? "energized" : avg >= 2.6 ? "neutral" : avg >= 1.8 ? "anxious" : "frustrated";
+  const avgV = vSum / totalW;
+  const label = avgV >= 0.3 ? "calm" : avgV >= -0.15 ? "neutral" : "uneasy";
+  const color = colorForLabel(label);
 
   // Dominant trigger (week)
   const weekMs = 7 * 24 * 3600000;
@@ -75,12 +69,12 @@ function computeDominant(moments) {
   const o3 = moments.filter((m) => { const a = now - new Date(m.timestamp).getTime(); return a >= 3 * day && a < 7 * day; });
   let trend = null;
   if (r3.length >= 2 && o3.length >= 2) {
-    const a = (arr) => arr.reduce((s, m) => s + (SCORE[m.emotion] || 3), 0) / arr.length;
-    const d = a(r3) - a(o3);
-    trend = d > 0.5 ? "improving" : d < -0.5 ? "declining" : "stable";
+    const av = (arr) => arr.reduce((s, m) => s + (m.valence ?? 0), 0) / arr.length;
+    const d = av(r3) - av(o3);
+    trend = d > 0.2 ? "improving" : d < -0.2 ? "declining" : "stable";
   }
 
-  return { emotion, trigger, trend, color: EMOTION_COLORS[emotion] || "#56d0e0", count: moments.length };
+  return { label, trigger, trend, color, count: moments.length };
 }
 
 export default function HomePage() {
@@ -88,7 +82,8 @@ export default function HomePage() {
   const { saveMoment, loadTimeline } = useSession();
   const [step, setStep] = useState("trigger");
   const [trigger, setTrigger] = useState(null);
-  const [emotion, setEmotion] = useState(null);
+  const [feel, setFeel] = useState(0);
+  const [energy, setEnergy] = useState(0);
   const [note, setNote] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -111,10 +106,18 @@ export default function HomePage() {
 
   const dominant = useMemo(() => computeDominant(moments), [moments]);
 
+  // Derived emotion values
+  const coords = useMemo(() => createEmotionCoordinates(feel, energy), [feel, energy]);
+  const region = useMemo(() => emotionRegionKey(coords.valence, coords.arousal), [coords]);
+  const derivedLabel = useMemo(() => derivedEmotionLabel(coords.valence, coords.arousal), [coords]);
+  const labelColor = useMemo(() => colorForLabel(derivedLabel), [derivedLabel]);
+  const regionTags = useMemo(() => REGION_TAGS[region] || [], [region]);
+
   function reset() {
     setStep("trigger");
     setTrigger(null);
-    setEmotion(null);
+    setFeel(0);
+    setEnergy(0);
     setNote("");
     setSelectedTags([]);
     setSaved(false);
@@ -122,10 +125,18 @@ export default function HomePage() {
   }
 
   async function handleSave() {
-    if (!trigger || !emotion || loading) return;
+    if (!trigger || loading) return;
     try {
       setLoading(true);
-      const payload = { trigger, emotion, note, notes: note };
+      const payload = {
+        trigger,
+        valence: coords.valence,
+        arousal: coords.arousal,
+        intensity: coords.intensity,
+        emotion: coordinatesToLegacy(coords.valence, coords.arousal),
+        note,
+        notes: note,
+      };
       if (selectedTags.length > 0) payload.tags = selectedTags;
       const response = await saveMoment(payload);
       setTodayCount((c) => c + 1);
@@ -144,29 +155,22 @@ export default function HomePage() {
     }
   }
 
-  const emotionColor = EMOTION_COLORS[emotion] || "#56d0e0";
-  const tags = trigger && emotion ? getEmotionTags(trigger, emotion) : [];
-
-  // ── Post-log: feedback with ripple rings (matches Android EmotionSelectionScreen) ──
+  // ── Post-log: feedback with ripple rings ──
   if (saved && feedback) {
-    const orbColor = EMOTION_COLORS[emotion] || "#56d0e0";
-
     return (
       <Layout title="Heard you.">
-        <div className="stateGlow" style={{ "--state-color": orbColor }} />
+        <div className="stateGlow" style={{ "--state-color": labelColor }} />
         <section className="postLogScene sceneIn">
-          {/* Ripple rings */}
-          <div className="rippleRing rippleRing1" style={{ "--ripple-color": orbColor }} />
-          <div className="rippleRing rippleRing2" style={{ "--ripple-color": orbColor }} />
-          <div className="rippleRing rippleRing3" style={{ "--ripple-color": orbColor }} />
-          {/* Breathing emotion orb */}
-          <div className="postLogOrb" style={{ "--orb-color": orbColor }}>
+          <div className="rippleRing rippleRing1" style={{ "--ripple-color": labelColor }} />
+          <div className="rippleRing rippleRing2" style={{ "--ripple-color": labelColor }} />
+          <div className="rippleRing rippleRing3" style={{ "--ripple-color": labelColor }} />
+          <div className="postLogOrb" style={{ "--orb-color": labelColor }}>
             <div className="postLogOrbInner">
-              <span className="postLogEmoji">{EMOTION_EMOJIS[emotion] || "\u{1F610}"}</span>
+              <span className="postLogEmoji" style={{ fontSize: 18, fontWeight: 700, color: labelColor }}>{derivedLabel}</span>
             </div>
           </div>
-          <h2 className="postLogTitle" style={{ color: orbColor }}>Heard you.</h2>
-          <FeedbackCard feedback={feedback} trigger={trigger} emotion={emotion} />
+          <h2 className="postLogTitle" style={{ color: labelColor }}>Heard you.</h2>
+          <FeedbackCard feedback={feedback} trigger={trigger} emotion={derivedLabel} />
           <button
             className="goTimelineBtn"
             type="button"
@@ -181,13 +185,12 @@ export default function HomePage() {
 
   return (
     <Layout title="Log a moment">
-      {/* ── Step 1: Trigger selection (matches Android TriggerSelectionScreen) ── */}
+      {/* ── Step 1: Trigger selection ── */}
       {step === "trigger" ? (
         <section className="sceneIn stack">
-          {/* Header */}
           <article className="card cardFeature stack">
             <p className="sectionKicker">Quick log</p>
-            <h2>{getPrompt(todayCount, dominant.emotion)}</h2>
+            <h2>{getPrompt(todayCount)}</h2>
             <p className="muted">
               {todayCount > 0
                 ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
@@ -195,19 +198,15 @@ export default function HomePage() {
             </p>
           </article>
 
-          {/* Mood weather */}
           <MoodWeather moments={moments} />
-
-          {/* Streak orb */}
           <StreakOrb moments={moments} />
 
-          {/* Pattern nudge (matches Android) */}
-          {dominant.emotion && dominant.count >= 3 ? (
+          {dominant.label && dominant.count >= 3 ? (
             <div className="patternNudge" style={{ borderLeftColor: dominant.color }}>
               <div className="nudgeDot" style={{ backgroundColor: dominant.color }} />
               <div className="nudgeContent">
                 <p className="nudgeLabel">
-                  Trending {dominant.emotion}{dominant.trend === "improving" ? " \u2191" : dominant.trend === "declining" ? " \u2193" : ""}
+                  Trending {dominant.label}{dominant.trend === "improving" ? " \u2191" : dominant.trend === "declining" ? " \u2193" : ""}
                 </p>
                 <p className="nudgeBody">
                   {dominant.trigger
@@ -222,10 +221,8 @@ export default function HomePage() {
             </div>
           ) : null}
 
-          {/* Daily prediction */}
           <DailyPrediction />
 
-          {/* Trigger grid */}
           <div className="tileGrid">
             {TRIGGERS.map((t) => (
               <button
@@ -241,14 +238,13 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Bottom card (matches Android) */}
-          <div className="bottomCard" style={dominant.emotion ? { borderColor: `${dominant.color}40` } : undefined}>
+          <div className="bottomCard" style={dominant.label ? { borderColor: `${dominant.color}40` } : undefined}>
             <span className="bottomCardEmoji">
               {moments.length >= 10 ? "\u{1F31F}" : todayCount >= 3 ? "\u2728" : todayCount > 0 ? "\u{1F525}" : "\u{1F331}"}
             </span>
             <span className="bottomCardText">
               {moments.length >= 10 && dominant.trigger
-                ? `Strong data this week. ${dominant.trigger} and ${dominant.emotion || "your patterns"} are becoming clear.`
+                ? `Strong data this week. ${dominant.trigger} and your patterns are becoming clear.`
                 : moments.length >= 10
                   ? "Strong week so far. Your patterns are getting sharper."
                   : todayCount >= 3
@@ -263,37 +259,80 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {/* ── Step 2: Emotion + tags (matches Android EmotionSelectionScreen) ── */}
+      {/* ── Step 2: Two-Slider Emotion + Tags ── */}
       {step === "emotion" ? (
         <section className="sceneIn stack">
-          <button className="backButton" type="button" onClick={() => { setStep("trigger"); setEmotion(null); setNote(""); setSelectedTags([]); }}>
+          <button className="backButton" type="button" onClick={() => { setStep("trigger"); setFeel(0); setEnergy(0); setNote(""); setSelectedTags([]); }}>
             \u2190 Back
           </button>
+
           <div className="emotionHeader">
-            <p className="sectionKicker" style={{ color: emotionColor }}>{trigger}</p>
-            <h2>How did it{"\n"}affect you?</h2>
-            <p className="muted">Choose an emotion, then refine with tags</p>
-          </div>
-          <div className="emotionChipRow">
-            {EMOTIONS.map((e) => (
-              <button
-                key={e}
-                className={`emotionChip ${emotion === e ? "emotionChipActive" : ""}`}
-                data-emotion={e}
-                onClick={() => { setEmotion(e); setSelectedTags([]); }}
-                type="button"
-              >
-                <span className="emotionChipEmoji">{EMOTION_EMOJIS[e] || "\u2022"}</span>
-                <span className="emotionChipLabel">{e}</span>
-              </button>
-            ))}
+            <p className="sectionKicker" style={{ color: labelColor }}>{trigger}</p>
+            <h2>How did it affect you?</h2>
+            <p className="muted">Slide to describe how it felt</p>
           </div>
 
-          {emotion && tags.length > 0 ? (
+          {/* Feel slider */}
+          <div className="sliderGroup">
+            <label className="sliderLabel">How does this feel?</label>
+            <div className="sliderTrackWrap">
+              <div className="sliderTrack sliderTrackFeel" />
+              <input
+                type="range"
+                className="axisSlider"
+                min={-1}
+                max={1}
+                step={0.01}
+                value={feel}
+                onChange={(e) => setFeel(parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="sliderStepLabels">
+              {FEEL_LABELS.map((l, i) => (
+                <span key={l} className={`sliderStepLabel ${Math.abs(feel - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Energy slider */}
+          <div className="sliderGroup">
+            <label className="sliderLabel">What\u2019s your energy like?</label>
+            <div className="sliderTrackWrap">
+              <div className="sliderTrack sliderTrackEnergy" />
+              <input
+                type="range"
+                className="axisSlider"
+                min={-1}
+                max={1}
+                step={0.01}
+                value={energy}
+                onChange={(e) => setEnergy(parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="sliderStepLabels">
+              {ENERGY_LABELS.map((l, i) => (
+                <span key={l} className={`sliderStepLabel ${Math.abs(energy - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Live summary card */}
+          <div className="summaryCardLive sceneIn" style={{ borderColor: `${labelColor}40`, "--summary-color": labelColor }}>
+            <div className="summaryDot" style={{ backgroundColor: labelColor }} />
+            <div className="summaryContent">
+              <span className="summaryLabel" style={{ color: labelColor }}>{derivedLabel}</span>
+              <span className="summaryCoords">
+                feel {coords.valence > 0 ? "+" : ""}{coords.valence} · energy {coords.arousal > 0 ? "+" : ""}{coords.arousal}
+              </span>
+            </div>
+          </div>
+
+          {/* Adaptive tags */}
+          {regionTags.length > 0 ? (
             <div className="tagSection sceneIn">
-              <p className="tagLabel">What about this felt <em style={{ color: emotionColor }}>{emotion}</em>?</p>
+              <p className="tagLabel">What about this felt <em style={{ color: labelColor }}>{derivedLabel}</em>?</p>
               <div className="tagChipRow">
-                {tags.map((tag) => {
+                {regionTags.map((tag) => {
                   const active = selectedTags.includes(tag);
                   const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
                   return (
@@ -327,7 +366,7 @@ export default function HomePage() {
 
           <button
             className="primaryButton saveButton"
-            disabled={!emotion || loading}
+            disabled={loading}
             onClick={handleSave}
             type="button"
           >

@@ -1,21 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
-import { EMOTIONS } from "@triggermap/shared/constants/emotions";
+import {
+  derivedEmotionLabel,
+  coordinatesToLegacy,
+  EMOTION_AXIS_STEPS,
+  createEmotionCoordinates,
+} from "@triggermap/shared/constants/emotions";
 import { EmotionGarden } from "../components/EmotionGarden";
 import { MoodWeather } from "../components/MoodWeather";
 import { MicroInsight } from "../components/MicroInsight";
-import { EMOTION_COLORS } from "../lib/designSystem";
+import { EMOTION_COLORS, colorForLabel } from "../lib/designSystem";
 import { generateMicroInsights } from "../lib/microInsights";
-
-const EMOTION_EMOJIS = {
-  frustrated: "\u{1F624}", anxious: "\u{1F630}", neutral: "\u{1F610}", calm: "\u{1F60C}", energized: "\u26A1",
-};
 
 const TRIGGER_EMOJIS = {
   work: "\u{1F4BC}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
   alone: "\u{1F9D8}", exercise: "\u{1F3C3}", travel: "\u2708\uFE0F", health: "\u{1FA7A}", money: "\u{1F4B0}",
 };
+
+/** Get the display label and color for a moment (supports old and new format) */
+function momentDisplayInfo(m) {
+  if (m.valence != null && m.arousal != null) {
+    const label = derivedEmotionLabel(m.valence, m.arousal);
+    return { label, color: colorForLabel(label) };
+  }
+  // Legacy format — use discrete emotion string
+  const label = m.emotion || "neutral";
+  return { label, color: EMOTION_COLORS[label] || "#9eb0c9" };
+}
 
 const MERGE_WINDOW_MS = 30 * 60 * 1000;
 
@@ -73,7 +85,8 @@ export default function TimelinePage() {
 
   function startEdit(moment) {
     setEditing(moment.id);
-    setEditEmotion(moment.emotion);
+    const info = momentDisplayInfo(moment);
+    setEditEmotion(info.label);
     setEditNote(moment.note || "");
   }
 
@@ -112,23 +125,26 @@ export default function TimelinePage() {
   // Determine dominant emotion for state-adaptive glow
   const dominantEmotion = (() => {
     if (!moments?.length) return null;
-    const counts = {};
     const now = Date.now();
-    for (const m of moments) {
-      if (now - new Date(m.timestamp).getTime() < 24 * 60 * 60 * 1000) {
-        counts[m.emotion] = (counts[m.emotion] || 0) + 1;
-      }
+    const recent = moments.filter((m) => now - new Date(m.timestamp).getTime() < 24 * 60 * 60 * 1000);
+    if (!recent.length) return null;
+    let vSum = 0, count = 0;
+    for (const m of recent) {
+      const v = m.valence ?? (m.emotion === "calm" || m.emotion === "energized" ? 0.5 : m.emotion === "neutral" ? 0 : -0.5);
+      vSum += v;
+      count++;
     }
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    return sorted[0]?.[0] || null;
+    const avgV = vSum / count;
+    return avgV >= 0.3 ? "calm" : avgV >= -0.15 ? "neutral" : "frustrated";
   })();
+  const dominantColor = EMOTION_COLORS[dominantEmotion] || "#7bc9d8";
 
   return (
     <Layout
       title="Timeline"
       actions={<button className="ghostButton" onClick={load} type="button">Refresh</button>}
     >
-      {dominantEmotion && <div className="stateGlow" style={{ "--state-color": EMOTION_COLORS[dominantEmotion] || "#7bc9d8" }} />}
+      {dominantEmotion && <div className="stateGlow" style={{ "--state-color": dominantColor }} />}
 
       <div className="card cardFeature stack sceneIn">
         <p className="sectionKicker">Past 7 days</p>
@@ -178,7 +194,8 @@ export default function TimelinePage() {
           </div>
           <div className="tlConnector">
             {dayMoments.map((moment, idx) => {
-              const eColor = EMOTION_COLORS[moment.emotion] || "#9eb0c9";
+              const mInfo = momentDisplayInfo(moment);
+              const eColor = mInfo.color;
               const isLast = idx === dayMoments.length - 1;
               return (
                 <div key={moment.id} className="tlItem">
@@ -201,9 +218,9 @@ export default function TimelinePage() {
                           </span>
                           <span className="momentTrigger">{moment.trigger}</span>
                           <span className="momentArrow">{"\u2192"}</span>
-                          <select className="editSelect" value={editEmotion} onChange={(e) => setEditEmotion(e.target.value)}>
-                            {EMOTIONS.map((e) => <option key={e} value={e}>{EMOTION_EMOJIS[e] || ""} {e}</option>)}
-                          </select>
+                          <span className="momentEmotion" style={{ color: eColor, borderColor: `${eColor}40`, background: `${eColor}12` }}>
+                            {editEmotion}
+                          </span>
                         </div>
                         <textarea className="editTextarea" value={editNote} onChange={(e) => setEditNote(e.target.value)} rows={2} placeholder="Note (optional)" />
                         <div className="editActions">
@@ -219,9 +236,8 @@ export default function TimelinePage() {
                           </span>
                           <span className="momentTrigger">{moment.trigger}</span>
                           <span className="momentArrow">{"\u2192"}</span>
-                          <span className="momentEmotion" data-emotion={moment.emotion}>
-                            <span className="emotionEmoji">{EMOTION_EMOJIS[moment.emotion] || "\u2022"}</span>
-                            {moment.emotion}
+                          <span className="momentEmotion" style={{ color: eColor, borderColor: `${eColor}40`, background: `${eColor}12` }}>
+                            {mInfo.label}
                           </span>
                           {moment._count > 1 ? <span className="momentBadge">{"\u00D7"}{moment._count}</span> : null}
                         </div>
