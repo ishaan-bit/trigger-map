@@ -1072,43 +1072,45 @@ button,
   margin: 0;
 }
 
-/* Track wrapper (contains gradient track + range input) */
-.sliderTrackWrap {
-  position: relative;
-  height: 40px;
-  display: flex;
-  align-items: center;
-}
-
-.sliderTrack {
-  position: absolute;
-  inset: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 8px;
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.sliderTrackFeel {
-  background: linear-gradient(90deg, #ff6b7a, #ffb347, #9eb0c9, #88d498, #5ee6a0);
-}
-
-.sliderTrackEnergy {
-  background: linear-gradient(90deg, #7e8fa6, #9eb0c9, #b8c8dc, #ffb347, #ff6b7a);
-}
-
-/* Range input overlay (styled) */
+/* Range slider base */
 .axisSlider {
-  position: relative;
-  z-index: 1;
+  display: block;
   width: 100%;
   height: 40px;
   background: transparent;
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
+  padding: 0;
   cursor: pointer;
+  touch-action: none;          /* prevent scroll from stealing touch */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Webkit track */
+.axisSlider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+}
+.axisSliderFeel::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, #ff6b7a, #ffb347, #9eb0c9, #88d498, #5ee6a0);
+}
+.axisSliderEnergy::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, #7e8fa6, #9eb0c9, #b8c8dc, #ffb347, #ff6b7a);
+}
+
+/* Firefox track */
+.axisSlider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+}
+.axisSliderFeel::-moz-range-track {
+  background: linear-gradient(90deg, #ff6b7a, #ffb347, #9eb0c9, #88d498, #5ee6a0);
+}
+.axisSliderEnergy::-moz-range-track {
+  background: linear-gradient(90deg, #7e8fa6, #9eb0c9, #b8c8dc, #ffb347, #ff6b7a);
 }
 
 /* Webkit thumb */
@@ -1121,9 +1123,9 @@ button,
   border: 3px solid rgba(123, 201, 216, 0.6);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), 0 0 12px rgba(123, 201, 216, 0.25);
   cursor: grab;
+  margin-top: -10px;           /* center 28px thumb on 8px track */
   transition: box-shadow 0.15s, transform 0.1s;
 }
-
 .axisSlider::-webkit-slider-thumb:active {
   transform: scale(1.15);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4), 0 0 20px rgba(123, 201, 216, 0.4);
@@ -1140,23 +1142,9 @@ button,
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), 0 0 12px rgba(123, 201, 216, 0.25);
   cursor: grab;
 }
-
 .axisSlider::-moz-range-thumb:active {
   transform: scale(1.15);
   cursor: grabbing;
-}
-
-/* Firefox track (transparent so gradient shows through) */
-.axisSlider::-moz-range-track {
-  background: transparent;
-  height: 8px;
-  border: none;
-}
-
-/* Webkit track */
-.axisSlider::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 8px;
 }
 
 /* Step labels row */
@@ -1231,10 +1219,14 @@ button,
   .axisSlider::-webkit-slider-thumb {
     width: 24px;
     height: 24px;
+    margin-top: -8px;
   }
   .axisSlider::-moz-range-thumb {
     width: 24px;
     height: 24px;
+  }
+  .axisSlider {
+    height: 36px;
   }
 }
 

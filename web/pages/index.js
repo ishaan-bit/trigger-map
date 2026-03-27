@@ -275,18 +275,15 @@ export default function HomePage() {
           {/* Feel slider */}
           <div className="sliderGroup">
             <label className="sliderLabel">How does this feel?</label>
-            <div className="sliderTrackWrap">
-              <div className="sliderTrack sliderTrackFeel" />
-              <input
-                type="range"
-                className="axisSlider"
-                min={-1}
-                max={1}
-                step={0.01}
-                value={feel}
-                onChange={(e) => setFeel(parseFloat(e.target.value))}
-              />
-            </div>
+            <input
+              type="range"
+              className="axisSlider axisSliderFeel"
+              min={-1}
+              max={1}
+              step={0.01}
+              value={feel}
+              onChange={(e) => setFeel(parseFloat(e.target.value))}
+            />
             <div className="sliderStepLabels">
               {FEEL_LABELS.map((l, i) => (
                 <span key={l} className={`sliderStepLabel ${Math.abs(feel - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
@@ -297,18 +294,15 @@ export default function HomePage() {
           {/* Energy slider */}
           <div className="sliderGroup">
             <label className="sliderLabel">{"What\u2019s your energy like?"}</label>
-            <div className="sliderTrackWrap">
-              <div className="sliderTrack sliderTrackEnergy" />
-              <input
-                type="range"
-                className="axisSlider"
-                min={-1}
-                max={1}
-                step={0.01}
-                value={energy}
-                onChange={(e) => setEnergy(parseFloat(e.target.value))}
-              />
-            </div>
+            <input
+              type="range"
+              className="axisSlider axisSliderEnergy"
+              min={-1}
+              max={1}
+              step={0.01}
+              value={energy}
+              onChange={(e) => setEnergy(parseFloat(e.target.value))}
+            />
             <div className="sliderStepLabels">
               {ENERGY_LABELS.map((l, i) => (
                 <span key={l} className={`sliderStepLabel ${Math.abs(energy - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
