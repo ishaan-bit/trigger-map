@@ -39,19 +39,24 @@ function translateEmotionLabel(t, key) {
 
 function AxisSlider({ question, helper, leftLabel, rightLabel, value, onChange, gradientColors, accentColor }) {
   const [trackWidth, setTrackWidth] = useState(1);
-
-  const updateFromLocation = (locationX) => {
-    const nextX = Math.max(0, Math.min(trackWidth, locationX));
-    const rawValue = (nextX / trackWidth) * 2 - 1;
-    onChange(rawValue);
-  };
+  const trackWidthRef = useRef(1);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => updateFromLocation(event.nativeEvent.locationX),
-      onPanResponderMove: (event) => updateFromLocation(event.nativeEvent.locationX),
+      onPanResponderGrant: (event) => {
+        const w = trackWidthRef.current;
+        const nextX = Math.max(0, Math.min(w, event.nativeEvent.locationX));
+        onChangeRef.current((nextX / w) * 2 - 1);
+      },
+      onPanResponderMove: (event) => {
+        const w = trackWidthRef.current;
+        const nextX = Math.max(0, Math.min(w, event.nativeEvent.locationX));
+        onChangeRef.current((nextX / w) * 2 - 1);
+      },
     })
   ).current;
 
@@ -65,7 +70,11 @@ function AxisSlider({ question, helper, leftLabel, rightLabel, value, onChange, 
       </View>
       <View
         style={styles.sliderTrackWrap}
-        onLayout={(event) => setTrackWidth(Math.max(event.nativeEvent.layout.width, 1))}
+        onLayout={(event) => {
+          const w = Math.max(event.nativeEvent.layout.width, 1);
+          trackWidthRef.current = w;
+          setTrackWidth(w);
+        }}
         {...panResponder.panHandlers}
       >
         <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.sliderTrack} />
