@@ -812,6 +812,331 @@ button,
   letter-spacing: 0.04em;
 }
 
+/* ─── Report Tab Bar ─── */
+.reportTabBar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(10, 16, 24, 0.85);
+  border: 1px solid rgba(197, 214, 235, 0.08);
+  border-radius: 999px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  position: -webkit-sticky;
+  position: sticky;
+  top: max(10px, env(safe-area-inset-top, 10px));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  z-index: 10;
+  margin-bottom: 16px;
+}
+.reportTabBar::-webkit-scrollbar { display: none; }
+
+.reportTab {
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8da4bd;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  min-height: auto;
+  box-shadow: none;
+}
+.reportTab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5fb;
+}
+.reportTabActive {
+  background: rgba(123, 201, 216, 0.15);
+  color: #56d0e0;
+}
+
+/* ─── Report new components ─── */
+.deltaChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.stateOfMindCard {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.driverRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(197, 214, 235, 0.06);
+  gap: 8px;
+}
+.driverRow:last-child {
+  border-bottom: none;
+}
+
+.effectBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.loopCard {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.loopFlow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.loopNode {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.loopArrow {
+  color: #9eb0c9;
+  font-size: 14px;
+}
+
+.signalRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.signalIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ─── Progress Tab ─── */
+.progressArc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 16px 8px;
+}
+
+.progressArcNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 60px;
+}
+
+.progressArcEmoji {
+  font-size: 28px;
+}
+
+.progressArcConnector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 40px;
+}
+
+.progressArcLine {
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+}
+
+.progressArcDelta {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.progressDirectionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 13px;
+  font-weight: 700;
+  width: fit-content;
+  margin-top: 8px;
+}
+
+.progressThenNow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.weekSnapshotRow {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 0;
+}
+.weekSnapshotRow::-webkit-scrollbar { display: none; }
+
+.weekSnapshotCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 70px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(197, 214, 235, 0.08);
+  flex-shrink: 0;
+}
+
+/* ─── Actions Tab ─── */
+.actionCard {
+  transition: opacity 0.2s;
+}
+
+.actionCardDone {
+  opacity: 0.85;
+}
+
+.actionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.actionIcon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.actionTitle {
+  display: block;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.actionBtn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid;
+  min-height: auto;
+  box-shadow: none;
+}
+
+.actionBtnHelped {
+  background: rgba(94, 230, 160, 0.12);
+  border-color: rgba(94, 230, 160, 0.3);
+  color: #5ee6a0;
+}
+.actionBtnHelped:hover {
+  background: rgba(94, 230, 160, 0.2);
+}
+
+.actionBtnNot {
+  background: rgba(255, 179, 71, 0.12);
+  border-color: rgba(255, 179, 71, 0.3);
+  color: #ffb347;
+}
+.actionBtnNot:hover {
+  background: rgba(255, 179, 71, 0.2);
+}
+
+.actionFeedbackDone {
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+  width: fit-content;
+}
+
+/* ─── Premium Tab ─── */
+.premSignalGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.premSignalCard {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(197, 214, 235, 0.08);
+  border-left-width: 3px;
+  border-left-style: solid;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .premSignalGrid {
+    grid-template-columns: 1fr;
+  }
+  .progressArc {
+    gap: 0;
+    padding: 12px 0;
+  }
+  .progressArcNode {
+    min-width: 50px;
+  }
+  .actionButtons {
+    flex-direction: column;
+  }
+}
+
 /* ─── Trigger tile grid (log page step 1) ─── */
 @keyframes tileStagger {
   from { opacity: 0; transform: translateY(18px); }

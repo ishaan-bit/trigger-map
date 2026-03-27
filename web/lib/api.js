@@ -128,3 +128,20 @@ export function deleteAllDataApi(token) {
 export function fetchHealth() {
   return request("/health", { timeoutMs: 3000 });
 }
+
+export function fetchProgress(token) {
+  const query = token ? "" : `?deviceId=${encodeURIComponent(getDeviceId())}`;
+  return request(`/progress${query}`, { timeoutMs: 10000, token });
+}
+
+export function fetchModes(token) {
+  return request("/modes", { timeoutMs: 10000, token });
+}
+
+export function submitActionFeedback(actionId, response, token) {
+  return request("/actionFeedback", {
+    method: "POST",
+    body: JSON.stringify({ actionId, response, deviceId: getDeviceId() }),
+    token,
+  });
+}

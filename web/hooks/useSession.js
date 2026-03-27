@@ -3,6 +3,9 @@ import {
   fetchMe,
   fetchTimeline as fetchTimelineApi,
   fetchWeeklyReport as fetchWeeklyReportApi,
+  fetchProgress as fetchProgressApi,
+  fetchModes as fetchModesApi,
+  submitActionFeedback as submitActionFeedbackApi,
   logMoment as logMomentApi,
   loginApi,
   registerApi,
@@ -106,6 +109,19 @@ export function SessionProvider({ children }) {
     async loadWeeklyReport() {
       const response = await fetchWeeklyReportApi(token);
       return response.report || null;
+    },
+
+    async loadProgress() {
+      const response = await fetchProgressApi(token);
+      return response.progress || null;
+    },
+
+    async loadModes() {
+      return fetchModesApi(token);
+    },
+
+    async sendActionFeedback(actionId, response) {
+      return submitActionFeedbackApi(actionId, response, token);
     },
 
     async updateMoment(momentId, updates) {
