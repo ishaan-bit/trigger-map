@@ -41,7 +41,7 @@ export function InstallModalIOS({ open, onClose }) {
           </li>
           <li>
             <span className="iosModalStepIcon">{"\u2795"}</span>
-            <span>Tap <strong>\u201CAdd to Home Screen\u201D</strong></span>
+            <span>Tap <strong>{"\u201CAdd to Home Screen\u201D"}</strong></span>
           </li>
         </ol>
         <button className="iosModalClose" type="button" onClick={onClose}>Got it</button>

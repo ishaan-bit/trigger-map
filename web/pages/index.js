@@ -176,7 +176,7 @@ export default function HomePage() {
             type="button"
             onClick={() => { clearTimeout(timerRef.current); router.push("/timeline"); }}
           >
-            View on timeline \u2192
+            View on timeline {"\u2192"}
           </button>
         </section>
       </Layout>
@@ -263,7 +263,7 @@ export default function HomePage() {
       {step === "emotion" ? (
         <section className="sceneIn stack">
           <button className="backButton" type="button" onClick={() => { setStep("trigger"); setFeel(0); setEnergy(0); setNote(""); setSelectedTags([]); }}>
-            \u2190 Back
+            {"\u2190"} Back
           </button>
 
           <div className="emotionHeader">
@@ -296,7 +296,7 @@ export default function HomePage() {
 
           {/* Energy slider */}
           <div className="sliderGroup">
-            <label className="sliderLabel">What\u2019s your energy like?</label>
+            <label className="sliderLabel">{"What\u2019s your energy like?"}</label>
             <div className="sliderTrackWrap">
               <div className="sliderTrack sliderTrackEnergy" />
               <input
