@@ -13,6 +13,7 @@
 
 import { pickMovements, MOVEMENTS } from "../knowledge/movementLibrary.js";
 import { pickNourishments, NOURISHMENTS } from "../knowledge/nourishmentLibrary.js";
+import { emotionSignalKeywords } from "../shared/constants/emotions.js";
 import {
   getModeProfile,
   getRecentItemIds,
@@ -30,7 +31,13 @@ const REQUEST_TIMEOUT_MS = 180_000; // 3 min for mode generation
 function extractEmotions(report) {
   const emoFreq = report?.emotionFrequency || {};
   const sorted = Object.entries(emoFreq).sort(([, a], [, b]) => b - a);
-  return sorted.slice(0, 5).map(([e]) => e.toLowerCase());
+  const discrete = sorted.slice(0, 4).map(([emotion]) => emotion.toLowerCase());
+
+  const centroidKeywords = report?.weeklyCentroid?.count
+    ? emotionSignalKeywords(report.weeklyCentroid.valence, report.weeklyCentroid.arousal)
+    : [];
+
+  return [...new Set([...discrete, ...centroidKeywords])].slice(0, 6);
 }
 
 function extractBriefContext(report) {

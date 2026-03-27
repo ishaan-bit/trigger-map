@@ -79,6 +79,56 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   const deltas = report.weeklyDeltas;
   const likedTriggers = new Set(prefs?.likedTriggers || []);
   const sp = buildSignalProfile(report);
+  const centroid = report.weeklyCentroid;
+  const centroidDrift = report.centroidDrift;
+
+  if (centroid?.count >= 3) {
+    if (centroid.valence <= -0.2 && centroid.arousal >= 0.2) {
+      candidates.push({
+        id: "centroid-activated-negative",
+        type: "awareness",
+        title: hi
+          ? `ध्यान दें क्या आपको ${el(centroid.label, lang)} बनाए रखता है`
+          : `Notice what keeps you feeling ${centroid.label}`,
+        reason: hi
+          ? `इस हफ़्ते आपका औसत मूड ${el(centroid.label, lang)} की तरफ रहा। बार-बार चढ़ी हुई ऊर्जा किस चीज़ से जुड़ती है, उसे पहचानें।`
+          : `Your week averaged toward ${centroid.label}. Notice what repeatedly sends your energy up while the emotional tone stays tough.`,
+      });
+    } else if (centroid.valence <= -0.2 && centroid.arousal <= -0.2) {
+      candidates.push({
+        id: "centroid-heavy-negative",
+        type: "regulate",
+        title: hi
+          ? `भारी दिनों में रिकवरी के लिए जगह बचाएँ`
+          : `Protect recovery when the week feels heavy`,
+        reason: hi
+          ? `इस हफ़्ते का औसत मूड ${el(centroid.label, lang)} रहा। कम-ऊर्जा वाले पलों के बाद थोड़ा नरम सहारा जोड़ना मदद कर सकता है।`
+          : `Your week averaged toward ${centroid.label}. Adding one gentle support after low-energy moments can help stop that heaviness from stacking.`,
+      });
+    } else if (centroid.valence >= 0.2 && centroid.arousal <= 0.2) {
+      candidates.push({
+        id: "centroid-settled-positive",
+        type: "regulate",
+        title: hi
+          ? `जो चीज़ आपको ${el(centroid.label, lang)} रखती है उसे बनाए रखें`
+          : `Keep the conditions that made this week feel ${centroid.label}`,
+        reason: hi
+          ? `इस हफ़्ते आपका औसत मूड ${el(centroid.label, lang)} रहा। जो आपको टिकाव देता है, उसे अगले हफ़्ते में भी जगह दें।`
+          : `Your week averaged toward ${centroid.label}. Carry one thing that helped that steadier tone into next week.`,
+      });
+    }
+
+    if (centroidDrift && centroidDrift.arousal >= 0.2 && !candidates.some((candidate) => candidate.id === "centroid-rising-energy")) {
+      candidates.push({
+        id: "centroid-rising-energy",
+        type: "awareness",
+        title: hi ? "ध्यान दें कि ऊर्जा कब चढ़ने लगती है" : "Notice when your energy starts climbing",
+        reason: hi
+          ? `हफ़्ते के दौरान आपकी ऊर्जा ऊपर गई। किस समय या किस ट्रिगर के बाद यह बदलता है, उस पर नज़र रखें।`
+          : `Your weekly energy trended upward. Pay attention to the time, trigger, or context right before that activation rises.`,
+      });
+    }
+  }
 
   // 1. Friction + Regulator pairing
   if (friction.length && regulators.length) {

@@ -16,6 +16,7 @@ import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationServic
 import { generateWeeklyReport } from "../services/patternEngine.js";
 import { getUserById } from "../services/authService.js";
 import { getActionFeedback, getActionPrefs, storeActionPrefs } from "../services/reportStore.js";
+import { emotionSignalKeywords } from "../shared/constants/emotions.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
 import { lintText } from "../utils/textGrammar.js";
 
@@ -56,6 +57,15 @@ function buildActionSignals(report, feedback, prefs, firstName) {
   if (bm?.stability) lines.push(`Stability: ${bm.stability.label}.`);
 
   if (report.volatilityLabel) lines.push(`Volatility: ${report.volatilityLabel}.`);
+
+  if (report.weeklyCentroid?.count) {
+    const centroidKeywords = emotionSignalKeywords(report.weeklyCentroid.valence, report.weeklyCentroid.arousal);
+    lines.push(`Continuous mood center: ${report.weeklyCentroid.label} (valence ${report.weeklyCentroid.valence.toFixed(2)}, arousal ${report.weeklyCentroid.arousal.toFixed(2)}).`);
+    lines.push(`Slider-derived mood keywords: ${centroidKeywords.join(", ")}.`);
+  }
+  if (report.centroidDrift && (Math.abs(report.centroidDrift.valence) > 0.05 || Math.abs(report.centroidDrift.arousal) > 0.05)) {
+    lines.push(`Slider drift this week: valence ${report.centroidDrift.valence > 0 ? "+" : ""}${report.centroidDrift.valence.toFixed(2)}, arousal ${report.centroidDrift.arousal > 0 ? "+" : ""}${report.centroidDrift.arousal.toFixed(2)}.`);
+  }
 
   // Feedback signals
   const tried = feedback.filter(f => f.response === "tried");
