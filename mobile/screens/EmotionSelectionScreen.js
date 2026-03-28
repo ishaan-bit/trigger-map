@@ -266,8 +266,6 @@ export function EmotionSelectionScreen() {
         t={t}
       />
 
-      <Text style={styles.summaryBody}>{t("emotion.liveSummary", { emotion: derivedLabel.toLowerCase(), trigger: triggerLabel.toLowerCase() })}</Text>
-
       {hasInteracted && adaptiveTags.length > 0 && (
         <Animated.View style={[styles.tagSection, {
           opacity: tagSectionAnim,
@@ -345,7 +343,6 @@ const styles = StyleSheet.create({
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   prompt: { color: palette.text, fontSize: 28, lineHeight: 34, fontWeight: "800" },
   hint: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
-  summaryBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, paddingHorizontal: 4 },
   tagSection: { marginTop: 18, gap: 10 },
   tagHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   tagLabel: { color: palette.accent, fontSize: 13, fontWeight: "700" },
