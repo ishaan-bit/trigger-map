@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -19,6 +19,8 @@ const CURSOR_HALF = CURSOR_SIZE / 2;
 const HIT_SLOP = 24; // invisible touch padding around pad
 const CENTER_MAGNETIC_RADIUS = 0.08; // snap threshold near center
 const SPRING_CURSOR = { damping: 28, stiffness: 400, mass: 0.8 };
+const TRAIL_SIZE = 6;
+const TRAIL_OPACITIES = [0.22, 0.15, 0.10, 0.06, 0.03];
 
 /**
  * Generate a human-readable intensity-qualified summary from coords.
@@ -53,7 +55,33 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
   const cursorX = useSharedValue(140);
   const cursorY = useSharedValue(140);
   const isDragging = useSharedValue(0);
-  const prevQuadrant = useSharedValue(-1); // for haptic on quadrant cross
+  const prevQuadrant = useSharedValue(-1);
+  const cursorPop = useSharedValue(1);
+
+  // Trail positions (5 past cursor locations)
+  const t0x = useSharedValue(140); const t0y = useSharedValue(140);
+  const t1x = useSharedValue(140); const t1y = useSharedValue(140);
+  const t2x = useSharedValue(140); const t2y = useSharedValue(140);
+  const t3x = useSharedValue(140); const t3y = useSharedValue(140);
+  const t4x = useSharedValue(140); const t4y = useSharedValue(140);
+
+  // Axis crossing flash
+  const axisFlashH = useSharedValue(0);
+  const axisFlashV = useSharedValue(0);
+  const prevSideH = useSharedValue(-1);
+  const prevSideV = useSharedValue(-1);
+
+  // Label animation
+  const labelScale = useSharedValue(1);
+  const prevLabelRef = useRef(derivedLabel);
+
+  useEffect(() => {
+    if (prevLabelRef.current !== derivedLabel) {
+      prevLabelRef.current = derivedLabel;
+      labelScale.value = 0.88;
+      labelScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+    }
+  }, [derivedLabel]);
 
   // Sync cursor to external value when not dragging
   useEffect(() => {
@@ -93,6 +121,32 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     return 3;
   }
 
+  function shiftTrail(x, y) {
+    "worklet";
+    t4x.value = t3x.value; t4y.value = t3y.value;
+    t3x.value = t2x.value; t3y.value = t2y.value;
+    t2x.value = t1x.value; t2y.value = t1y.value;
+    t1x.value = t0x.value; t1y.value = t0y.value;
+    t0x.value = x; t0y.value = y;
+  }
+
+  function checkAxisCross(x, y, s) {
+    "worklet";
+    const half = s / 2;
+    const sH = y < half ? 0 : 1;
+    const sV = x < half ? 0 : 1;
+    if (prevSideH.value >= 0 && sH !== prevSideH.value) {
+      axisFlashH.value = 1;
+      axisFlashH.value = withTiming(0, { duration: 400 });
+    }
+    if (prevSideV.value >= 0 && sV !== prevSideV.value) {
+      axisFlashV.value = 1;
+      axisFlashV.value = withTiming(0, { duration: 400 });
+    }
+    prevSideH.value = sH;
+    prevSideV.value = sV;
+  }
+
   const gesture = Gesture.Pan()
     .minDistance(0)
     .hitSlop({ top: HIT_SLOP, bottom: HIT_SLOP, left: HIT_SLOP, right: HIT_SLOP })
@@ -104,7 +158,16 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
       cursorX.value = x;
       cursorY.value = y;
       isDragging.value = withTiming(1, { duration: 80 });
+      cursorPop.value = 1;
       prevQuadrant.value = quadrantIndex(x, y, s);
+      // Init trail to tap point
+      t0x.value = x; t0y.value = y;
+      t1x.value = x; t1y.value = y;
+      t2x.value = x; t2y.value = y;
+      t3x.value = x; t3y.value = y;
+      t4x.value = x; t4y.value = y;
+      prevSideH.value = y < s / 2 ? 0 : 1;
+      prevSideV.value = x < s / 2 ? 0 : 1;
       const valence = (x / s) * 2 - 1;
       const arousal = -((y / s) * 2 - 1);
       runOnJS(emitChange)(valence, arousal);
@@ -115,21 +178,25 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
       const s = padSize.value;
       const x = Math.max(0, Math.min(s, e.x));
       const y = Math.max(0, Math.min(s, e.y));
+      shiftTrail(x, y);
       cursorX.value = x;
       cursorY.value = y;
       const valence = (x / s) * 2 - 1;
       const arousal = -((y / s) * 2 - 1);
       runOnJS(emitChange)(valence, arousal);
-      // Haptic on quadrant boundary crossing
       const q = quadrantIndex(x, y, s);
       if (q !== prevQuadrant.value) {
         prevQuadrant.value = q;
         runOnJS(fireHaptic)();
       }
+      checkAxisCross(x, y, s);
     })
     .onEnd(() => {
       "worklet";
       isDragging.value = withTiming(0, { duration: 200 });
+      cursorPop.value = withSpring(1.2, { damping: 8, stiffness: 400 }, () => {
+        cursorPop.value = withSpring(1, { damping: 12, stiffness: 200 });
+      });
     })
     .onFinalize(() => {
       "worklet";
@@ -138,28 +205,28 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
 
   // ── Animated styles ──
 
-  // Cursor: translate + scale on touch + intensity-based glow
+  // Cursor: translate + scale on touch
   const cursorStyle = useAnimatedStyle(() => {
-    const scale = interpolate(isDragging.value, [0, 1], [1, 1.15], Extrapolation.CLAMP);
+    const dragScale = interpolate(isDragging.value, [0, 1], [1, 1.1], Extrapolation.CLAMP);
     return {
       transform: [
         { translateX: cursorX.value - CURSOR_HALF },
         { translateY: cursorY.value - CURSOR_HALF },
-        { scale },
+        { scale: dragScale * cursorPop.value },
       ],
     };
   });
 
-  // Glow: size and opacity scale with intensity (distance from center)
+  // Glow: tighter, intensity-driven
   const cursorGlowStyle = useAnimatedStyle(() => {
     const s = padSize.value;
     const half = s / 2;
-    const dx = (cursorX.value - half) / half; // -1..1
+    const dx = (cursorX.value - half) / half;
     const dy = (cursorY.value - half) / half;
     const mag = Math.min(1, Math.sqrt(dx * dx + dy * dy));
-    const glowScale = interpolate(mag, [0, 0.3, 1], [0.6, 1, 1.8], Extrapolation.CLAMP);
-    const baseOpacity = interpolate(mag, [0, 0.2, 0.6, 1], [0.05, 0.12, 0.25, 0.4], Extrapolation.CLAMP);
-    const dragBoost = interpolate(isDragging.value, [0, 1], [0, 0.1], Extrapolation.CLAMP);
+    const glowScale = interpolate(mag, [0, 0.3, 1], [0.5, 0.85, 1.4], Extrapolation.CLAMP);
+    const baseOpacity = interpolate(mag, [0, 0.2, 0.6, 1], [0.04, 0.09, 0.18, 0.3], Extrapolation.CLAMP);
+    const dragBoost = interpolate(isDragging.value, [0, 1], [0, 0.06], Extrapolation.CLAMP);
     return {
       opacity: baseOpacity + dragBoost,
       transform: [
@@ -213,6 +280,35 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     return { left: cursorX.value, opacity };
   });
 
+  // Axis flash styles
+  const gridHFlashStyle = useAnimatedStyle(() => ({
+    opacity: axisFlashH.value * 0.45,
+  }));
+  const gridVFlashStyle = useAnimatedStyle(() => ({
+    opacity: axisFlashV.value * 0.45,
+  }));
+
+  // Trail dot styles
+  const trailStyle = (tx, ty, alpha) =>
+    useAnimatedStyle(() => ({
+      opacity: isDragging.value * alpha,
+      transform: [
+        { translateX: tx.value - TRAIL_SIZE / 2 },
+        { translateY: ty.value - TRAIL_SIZE / 2 },
+      ],
+    }));
+  const ts0 = trailStyle(t0x, t0y, TRAIL_OPACITIES[0]);
+  const ts1 = trailStyle(t1x, t1y, TRAIL_OPACITIES[1]);
+  const ts2 = trailStyle(t2x, t2y, TRAIL_OPACITIES[2]);
+  const ts3 = trailStyle(t3x, t3y, TRAIL_OPACITIES[3]);
+  const ts4 = trailStyle(t4x, t4y, TRAIL_OPACITIES[4]);
+
+  // Label animated style
+  const labelAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: labelScale.value }],
+    opacity: interpolate(labelScale.value, [0.88, 1], [0.5, 1], Extrapolation.CLAMP),
+  }));
+
   const labelLive = derivedLabel || "neutral";
   const summary = useMemo(
     () => humanSummary(value.valence, value.arousal, t),
@@ -221,8 +317,10 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
 
   return (
     <View style={styles.container}>
-      {/* Live state label — large, expressive */}
-      <Text style={[styles.liveLabel, { color: accentColor }]}>{labelLive}</Text>
+      {/* Animated live state label */}
+      <Animated.View style={labelAnimStyle}>
+        <Text style={[styles.liveLabel, { color: accentColor }]}>{labelLive}</Text>
+      </Animated.View>
       <Text style={styles.liveSummary}>{summary}</Text>
 
       {/* The 2D Pad */}
@@ -248,8 +346,8 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             {/* Background gradient — four emotional quadrants */}
             <LinearGradient
               colors={[
-                "rgba(255, 107, 122, 0.18)",  // top-left: tense (red)
-                "rgba(86, 208, 224, 0.18)",    // top-right: energized (cyan)
+                "rgba(255, 107, 122, 0.18)",
+                "rgba(86, 208, 224, 0.18)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -257,17 +355,37 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             />
             <LinearGradient
               colors={[
-                "rgba(167, 139, 250, 0.18)",   // bottom-left: low (purple)
-                "rgba(94, 230, 160, 0.18)",    // bottom-right: calm (green)
+                "rgba(167, 139, 250, 0.18)",
+                "rgba(94, 230, 160, 0.18)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[StyleSheet.absoluteFill, { top: "50%", height: "50%" }]}
             />
 
+            {/* Vignette — surface depth */}
+            <LinearGradient
+              colors={["rgba(6,10,18,0.32)", "transparent", "transparent", "rgba(6,10,18,0.32)"]}
+              locations={[0, 0.12, 0.88, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={["rgba(6,10,18,0.22)", "transparent", "transparent", "rgba(6,10,18,0.22)"]}
+              locations={[0, 0.12, 0.88, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+
             {/* Grid lines — center cross */}
             <View style={styles.gridH} />
             <View style={styles.gridV} />
+
+            {/* Axis crossing flash */}
+            <Animated.View style={[styles.gridHFlash, gridHFlashStyle]} />
+            <Animated.View style={[styles.gridVFlash, gridVFlashStyle]} />
 
             {/* Center neutral indicator */}
             <Animated.View style={[styles.centerDot, centerDotStyle]} />
@@ -289,6 +407,13 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             {/* Dynamic crosshairs (subtle) */}
             <Animated.View style={[styles.crosshairH, crosshairHStyle]} />
             <Animated.View style={[styles.crosshairV, crosshairVStyle]} />
+
+            {/* Trajectory trail */}
+            <Animated.View style={[styles.trailDot, { backgroundColor: accentColor }, ts4]} />
+            <Animated.View style={[styles.trailDot, { backgroundColor: accentColor }, ts3]} />
+            <Animated.View style={[styles.trailDot, { backgroundColor: accentColor }, ts2]} />
+            <Animated.View style={[styles.trailDot, { backgroundColor: accentColor }, ts1]} />
+            <Animated.View style={[styles.trailDot, { backgroundColor: accentColor }, ts0]} />
 
             {/* Cursor glow — grows with intensity */}
             <Animated.View style={[styles.cursorGlow, { backgroundColor: accentColor }, cursorGlowStyle]} />
@@ -363,6 +488,24 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(148, 180, 224, 0.15)",
   },
+  gridHFlash: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "rgba(148, 180, 224, 0.5)",
+    marginTop: -1,
+  },
+  gridVFlash: {
+    position: "absolute",
+    left: "50%",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: "rgba(148, 180, 224, 0.5)",
+    marginLeft: -1,
+  },
   // ── Center neutral dot ──
   centerDot: {
     position: "absolute",
@@ -429,6 +572,13 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
+  },
+  // ── Trail dots ──
+  trailDot: {
+    position: "absolute",
+    width: TRAIL_SIZE,
+    height: TRAIL_SIZE,
+    borderRadius: TRAIL_SIZE / 2,
   },
   // ── Axis anchors ──
   axisAnchor: {

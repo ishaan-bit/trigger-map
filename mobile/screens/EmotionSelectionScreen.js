@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { Alert, Animated, BackHandler, Easing, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -273,7 +273,11 @@ export function EmotionSelectionScreen() {
         }]}>
           <View style={styles.tagHeaderRow}>
             <Text style={styles.tagLabel}>{t("emotion.whatContributed")}</Text>
-            <Text style={styles.tagHint}>{tagHint !== "emotion.tagHint" ? tagHint : `Pick up to ${MAX_TAGS_PER_MOMENT}`}</Text>
+            <View style={styles.tagDots}>
+              {Array.from({ length: MAX_TAGS_PER_MOMENT }).map((_, i) => (
+                <View key={i} style={[styles.tagDot, i < selectedTags.length && [styles.tagDotActive, { backgroundColor: accentColor }]]} />
+              ))}
+            </View>
           </View>
           <View style={styles.tagWrap}>
             {adaptiveTags.map((tag) => {
@@ -295,8 +299,7 @@ export function EmotionSelectionScreen() {
         </Animated.View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "android" ? "padding" : "height"}>
-        <View style={styles.noteCard}>
+      <View style={styles.noteCard}>
           <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
           <TextInput
             multiline
@@ -309,7 +312,6 @@ export function EmotionSelectionScreen() {
             maxFontSizeMultiplier={1.2}
           />
         </View>
-      </KeyboardAvoidingView>
 
       <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
         <Pressable
@@ -346,7 +348,9 @@ const styles = StyleSheet.create({
   tagSection: { marginTop: 18, gap: 10 },
   tagHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   tagLabel: { color: palette.accent, fontSize: 13, fontWeight: "700" },
-  tagHint: { color: palette.muted, fontSize: 12, fontWeight: "600" },
+  tagDots: { flexDirection: "row", gap: 6, alignItems: "center" },
+  tagDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(148,180,224,0.25)" },
+  tagDotActive: {},
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tagChip: {
     paddingHorizontal: 14,

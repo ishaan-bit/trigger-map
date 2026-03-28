@@ -180,6 +180,7 @@ export function TimelineScreen() {
   const [error, setError] = useState("");
   const [editingMoment, setEditingMoment] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
+  const [gardenHighlight, setGardenHighlight] = useState(null);
   const [showTrajectory, setShowTrajectory] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
 
@@ -237,6 +238,8 @@ export function TimelineScreen() {
   );
 
   const handleEdit = useCallback((moment) => {
+    setGardenHighlight(moment.emotion || "neutral");
+    setTimeout(() => setGardenHighlight(null), 1500);
     setEditingMoment(moment);
   }, []);
 
@@ -309,7 +312,7 @@ export function TimelineScreen() {
       )}
 
       {/* Today's emotion garden */}
-      <EmotionGarden moments={moments} />
+      <EmotionGarden moments={moments} highlightEmotion={gardenHighlight} />
 
       <Tooltip
         id="timeline_tooltip"

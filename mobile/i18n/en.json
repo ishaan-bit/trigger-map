@@ -181,7 +181,11 @@
   "garden": {
     "title": "Today's garden",
     "bloomCount": "{count} bloom",
-    "bloomCountPlural": "{count} blooms"
+    "bloomCountPlural": "{count} blooms",
+    "todaysCenter": "today's center",
+    "feltCount": "Felt {count}× today",
+    "mostlyFrom": "Mostly from {trigger}",
+    "peak": "Peak: {period}"
   },
   "microInsight": {
     "triggerEmotion": "{trigger} brought up {emotion} {count} times",

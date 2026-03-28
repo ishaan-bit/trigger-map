@@ -1,76 +1,160 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
 import { emotionColor as getFieldColor } from "@/utils/emotionModel";
 import { legacyToCoordinates } from "@triggermap/shared";
 import { useLanguage } from "@/i18n/LanguageContext";
 
-/**
- * EmotionGarden — a visual row of "planted" emotion seeds from today's moments.
- * Each moment becomes a small bloom. Inspired by indie-game terrarium/garden
- * mechanics where tiny player actions slowly fill a living scene.
- */
-
-const BLOOM = {
-  calm:       { seed: "🌿", bloom: "🌸", color: "#5ee6a0" },
-  neutral:    { seed: "🌱", bloom: "🌼", color: "#9eb0c9" },
-  anxious:    { seed: "🍂", bloom: "🍁", color: "#ffb347" },
-  frustrated: { seed: "🪨", bloom: "🔥", color: "#ff6b7a" },
-  energized:  { seed: "⚡", bloom: "🌻", color: "#a78bfa" },
+// ── Animation configs per emotion feel ──
+const ANIM_CONFIGS = {
+  float:   { prop: "translateY", from: 0, to: -3, dur: [3200, 4200] },
+  breathe: { prop: "scale", from: 1, to: 1.04, dur: [3500, 4500] },
+  jitter:  { prop: "translateX", from: -1.2, to: 1.2, dur: [250, 400] },
+  shake:   { prop: "translateX", from: -1.5, to: 1.5, dur: [350, 550] },
+  pulse:   { prop: "scale", from: 1, to: 1.06, dur: [1200, 1800] },
 };
 
-export function EmotionGarden({ moments }) {
-  const todayBlooms = getTodayBlooms(moments);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+const EMOTION_ANIM = {
+  calm: "float", neutral: "breathe", anxious: "jitter",
+  frustrated: "shake", energized: "pulse", overwhelmed: "shake",
+  heavy: "float", uneasy: "jitter", excited: "pulse",
+  peaceful: "float", grateful: "breathe", content: "breathe",
+  restless: "jitter", alert: "pulse", disconnected: "float",
+  flat: "breathe", low: "float",
+};
+
+function getPeakPeriod(hours) {
+  const m = hours.filter(h => h < 12).length;
+  const a = hours.filter(h => h >= 12 && h < 17).length;
+  const e = hours.filter(h => h >= 17).length;
+  if (m >= a && m >= e) return "morning";
+  if (a >= e) return "afternoon";
+  return "evening";
+}
+
+/**
+ * EmotionGarden — living emotional field from today's moments.
+ * Each unique emotion becomes a bloom. Size = frequency, motion = emotion type.
+ */
+export function EmotionGarden({ moments, highlightEmotion }) {
   const { t } = useLanguage();
+  const [expandedIdx, setExpandedIdx] = useState(null);
 
-  // Compute ambient centroid for today's emotional center
-  const centroid = useMemo(() => {
-    if (!todayBlooms.length) return null;
+  // Group today's moments by emotion
+  const { blooms, centroid, todayCount } = useMemo(() => {
+    if (!moments?.length) return { blooms: [], centroid: null, todayCount: 0 };
+    const today = new Date().toDateString();
+    const todayMoments = moments.filter(m => new Date(m.timestamp).toDateString() === today);
+    if (!todayMoments.length) return { blooms: [], centroid: null, todayCount: 0 };
+
+    const groups = {};
     let vSum = 0, aSum = 0, n = 0;
-    for (const b of todayBlooms) {
-      if (typeof b.valence === "number") {
-        vSum += b.valence;
-        aSum += b.arousal;
-        n++;
-      }
+    for (const m of todayMoments) {
+      const emo = m.emotion || "neutral";
+      if (!groups[emo]) groups[emo] = { emotion: emo, count: 0, triggers: {}, hours: [], valence: 0, arousal: 0 };
+      groups[emo].count++;
+      if (m.trigger) groups[emo].triggers[m.trigger] = (groups[emo].triggers[m.trigger] || 0) + 1;
+      groups[emo].hours.push(new Date(m.timestamp).getHours());
+      const v = typeof m.valence === "number" ? m.valence : (legacyToCoordinates(m.emotion)?.valence || 0);
+      const a = typeof m.arousal === "number" ? m.arousal : (legacyToCoordinates(m.emotion)?.arousal || 0);
+      groups[emo].valence += v;
+      groups[emo].arousal += a;
+      vSum += v; aSum += a; n++;
     }
-    if (!n) return null;
-    return { valence: vSum / n, arousal: aSum / n };
-  }, [todayBlooms]);
 
-  const ambientColor = centroid ? getFieldColor(centroid.valence, centroid.arousal) : null;
+    const bloomList = Object.values(groups)
+      .map(g => ({
+        ...g,
+        valence: g.valence / g.count,
+        arousal: g.arousal / g.count,
+        topTrigger: Object.entries(g.triggers).sort((a, b) => b[1] - a[1])[0]?.[0],
+        peakPeriod: getPeakPeriod(g.hours),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
 
+    return {
+      blooms: bloomList,
+      centroid: n > 0 ? { valence: vSum / n, arousal: aSum / n } : null,
+      todayCount: todayMoments.length,
+    };
+  }, [moments]);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (todayBlooms.length > 0) {
+    if (blooms.length > 0) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
     }
-  }, [todayBlooms.length, fadeAnim]);
+  }, [blooms.length, fadeAnim]);
 
-  if (todayBlooms.length === 0) return null;
+  const handleTap = useCallback((idx) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    setExpandedIdx(prev => prev === idx ? null : idx);
+  }, []);
+
+  if (blooms.length === 0) return null;
+
+  const ambientColor = centroid ? getFieldColor(centroid.valence, centroid.arousal) : palette.accent;
+  // Background mood tint: calmer day → cooler, intense → warmer
+  const avgMag = centroid ? Math.sqrt(centroid.valence ** 2 + centroid.arousal ** 2) : 0;
+  const warmth = Math.min(1, avgMag * 1.5);
 
   return (
     <Animated.View style={[styles.wrap, { opacity: fadeAnim }]}>
+      {/* Mood-tinted background */}
+      <LinearGradient
+        colors={[
+          `rgba(${Math.round(86 + warmth * 80)}, ${Math.round(208 - warmth * 80)}, ${Math.round(224 - warmth * 40)}, 0.06)`,
+          "transparent",
+        ]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       <View style={styles.header}>
         <Text style={styles.title}>{t("garden.title")}</Text>
-        <Text style={styles.count}>{todayBlooms.length !== 1 ? t("garden.bloomCountPlural", { count: todayBlooms.length }) : t("garden.bloomCount", { count: todayBlooms.length })}</Text>
+        <Text style={styles.count}>
+          {todayCount !== 1 ? t("garden.bloomCountPlural", { count: todayCount }) : t("garden.bloomCount", { count: todayCount })}
+        </Text>
       </View>
-      {/* Ambient centroid strip */}
-      {ambientColor && (
-        <View style={[styles.ambientStrip, { backgroundColor: `${ambientColor}18`, borderColor: `${ambientColor}30` }]}>
-          <View style={[styles.ambientDot, { backgroundColor: ambientColor }]} />
-          <Text style={[styles.ambientLabel, { color: ambientColor }]}>today's center</Text>
+
+      {/* Today's emotional center — mini 2D indicator */}
+      {centroid && (
+        <View style={styles.centroidRow}>
+          <View style={[styles.centroidField, { borderColor: `${ambientColor}30` }]}>
+            <View style={styles.centroidGridH} />
+            <View style={styles.centroidGridV} />
+            <View style={[styles.centroidDot, {
+              backgroundColor: ambientColor,
+              left: `${((centroid.valence + 1) / 2) * 100}%`,
+              top: `${((1 - (centroid.arousal + 1) / 2)) * 100}%`,
+            }]} />
+          </View>
+          <Text style={[styles.centroidLabel, { color: ambientColor }]}>{t("garden.todaysCenter") || "today's center"}</Text>
         </View>
       )}
-      <View style={styles.row}>
-        {todayBlooms.map((b, i) => (
-          <BloomItem key={`${b.emotion}-${i}`} bloom={b} index={i} isNewest={i === todayBlooms.length - 1} />
+
+      {/* Organic bloom field */}
+      <View style={styles.bloomField}>
+        {blooms.map((bloom, i) => (
+          <BloomItem
+            key={bloom.emotion}
+            bloom={bloom}
+            index={i}
+            maxCount={blooms[0]?.count || 1}
+            isExpanded={expandedIdx === i}
+            isHighlighted={highlightEmotion === bloom.emotion}
+            onTap={() => handleTap(i)}
+          />
         ))}
-        {/* Empty soil slots for visual rhythm */}
-        {todayBlooms.length < 6 && Array.from({ length: Math.min(3, 6 - todayBlooms.length) }).map((_, i) => (
-          <View key={`empty-${i}`} style={styles.emptySlot}>
-            <Text style={styles.emptyDot}>·</Text>
+        {/* Seed placeholders */}
+        {blooms.length < 4 && Array.from({ length: Math.min(2, 4 - blooms.length) }).map((_, i) => (
+          <View key={`seed-${i}`} style={styles.seedSlot}>
+            <Text style={styles.seedIcon}>·</Text>
           </View>
         ))}
       </View>
@@ -78,65 +162,100 @@ export function EmotionGarden({ moments }) {
   );
 }
 
-function BloomItem({ bloom, index, isNewest }) {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const targetScale = isNewest ? 1.15 : 1;
+function BloomItem({ bloom, index, maxCount, isExpanded, isHighlighted, onTap }) {
   const { t } = useLanguage();
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const lifeAnim = useRef(new Animated.Value(0)).current;
+  const highlightAnim = useRef(new Animated.Value(0)).current;
 
+  // Growth animation
   useEffect(() => {
     Animated.spring(scaleAnim, {
-      toValue: targetScale,
+      toValue: 1,
       friction: 5,
-      tension: 60,
-      delay: index * 100,
+      tension: 55,
+      delay: index * 120,
       useNativeDriver: true,
     }).start();
-  }, [scaleAnim, index, targetScale]);
+  }, [index, scaleAnim]);
 
-  const meta = BLOOM[bloom.emotion] || BLOOM.neutral;
+  // Living animation
+  useEffect(() => {
+    const animType = EMOTION_ANIM[bloom.emotion] || "breathe";
+    const config = ANIM_CONFIGS[animType];
+    const dur = config.dur[0] + Math.random() * (config.dur[1] - config.dur[0]);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(lifeAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(lifeAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [bloom.emotion, lifeAnim]);
+
+  // Highlight pulse
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.sequence([
+        Animated.timing(highlightAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(highlightAnim, { toValue: 0, duration: 800, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ]).start();
+    }
+  }, [isHighlighted, highlightAnim]);
+
+  const animType = EMOTION_ANIM[bloom.emotion] || "breathe";
+  const config = ANIM_CONFIGS[animType];
+
+  const lifeTransform = config.prop === "scale"
+    ? { scale: lifeAnim.interpolate({ inputRange: [0, 1], outputRange: [config.from, config.to] }) }
+    : { [config.prop]: lifeAnim.interpolate({ inputRange: [0, 1], outputRange: [config.from, config.to] }) };
+
   const eStyle = EMOTION_STYLES[bloom.emotion] || EMOTION_STYLES.neutral;
-  const icon = bloom.isMature ? meta.bloom : meta.seed;
-  const label = bloom.emotion;
-  const fieldColor = (typeof bloom.valence === "number")
-    ? getFieldColor(bloom.valence, bloom.arousal)
-    : eStyle.color;
+  const fieldColor = getFieldColor(bloom.valence, bloom.arousal);
+  const sizeScale = 0.85 + (bloom.count / Math.max(maxCount, 1)) * 0.35;
+  const bloomLabel = t(`emotions.${bloom.emotion}`) !== `emotions.${bloom.emotion}` ? t(`emotions.${bloom.emotion}`) : bloom.emotion;
+  const triggerLabel = bloom.topTrigger
+    ? (t(`triggers.${bloom.topTrigger}`) !== `triggers.${bloom.topTrigger}` ? t(`triggers.${bloom.topTrigger}`) : bloom.topTrigger)
+    : null;
 
   return (
-    <Animated.View style={[styles.bloomSlot, {
-      transform: [{ scale: scaleAnim }],
-      backgroundColor: `${fieldColor}14`,
-      borderColor: `${fieldColor}30`,
-      borderWidth: 1,
-    }]}>
-      <Text style={styles.bloomIcon}>{icon}</Text>
-      <View style={[styles.bloomGlow, { backgroundColor: fieldColor }]} />
-      <Text style={[styles.bloomLabel, { color: fieldColor }]} numberOfLines={1}>{t("emotions." + label) || label}</Text>
-    </Animated.View>
-  );
-}
+    <Pressable onPress={onTap} accessibilityRole="button">
+      <Animated.View style={[
+        styles.bloomSlot,
+        {
+          transform: [
+            { scale: Animated.multiply(scaleAnim, Animated.add(new Animated.Value(sizeScale), Animated.multiply(highlightAnim, new Animated.Value(0.1)))) },
+            lifeTransform,
+          ],
+          backgroundColor: `${fieldColor}14`,
+          borderColor: `${fieldColor}30`,
+          borderWidth: 1,
+        },
+      ]}>
+        {/* Glow proportional to intensity */}
+        <View style={[styles.bloomGlow, {
+          backgroundColor: fieldColor,
+          opacity: 0.15 + Math.min(bloom.count / 6, 0.3),
+          width: 20 + bloom.count * 3,
+          height: 4 + bloom.count * 0.5,
+        }]} />
+        <Text style={styles.bloomIcon}>{eStyle.icon || "🌱"}</Text>
+        <Text style={[styles.bloomLabel, { color: fieldColor }]} numberOfLines={1}>{bloomLabel}</Text>
+        {bloom.count > 1 && <Text style={[styles.bloomCount, { color: fieldColor }]}>×{bloom.count}</Text>}
+      </Animated.View>
 
-function getTodayBlooms(moments) {
-  if (!moments?.length) return [];
-  const today = new Date().toDateString();
-  const todayMoments = moments.filter(
-    (m) => new Date(m.timestamp).toDateString() === today
+      {/* Expanded detail overlay */}
+      {isExpanded && (
+        <View style={[styles.bloomDetail, { borderColor: `${fieldColor}40` }]}>
+          <Text style={[styles.detailTitle, { color: fieldColor }]}>{bloomLabel}</Text>
+          <Text style={styles.detailRow}>{t("garden.feltCount", { count: bloom.count }) || `Felt ${bloom.count}× today`}</Text>
+          {triggerLabel && <Text style={styles.detailRow}>{t("garden.mostlyFrom", { trigger: triggerLabel }) || `Mostly from ${triggerLabel}`}</Text>}
+          <Text style={styles.detailRow}>{t("garden.peak", { period: bloom.peakPeriod }) || `Peak: ${bloom.peakPeriod}`}</Text>
+        </View>
+      )}
+    </Pressable>
   );
-  // A bloom is "mature" if more than 1 hour old (the emotion had time to settle)
-  const now = Date.now();
-  return todayMoments
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-    .slice(0, 8) // max 8 blooms visible
-    .map((m) => {
-      const coords = (typeof m.valence === "number")
-        ? { valence: m.valence, arousal: m.arousal }
-        : (legacyToCoordinates(m.emotion) || { valence: 0, arousal: 0 });
-      return {
-        emotion: m.emotion || "neutral",
-        isMature: now - new Date(m.timestamp).getTime() > 3_600_000,
-        valence: coords.valence,
-        arousal: coords.arousal,
-      };
-    });
 }
 
 const styles = StyleSheet.create({
@@ -147,6 +266,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     gap: 10,
+    overflow: "hidden",
+    position: "relative",
   },
   header: {
     flexDirection: "row",
@@ -164,18 +285,66 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-  row: {
+  // ── Centroid mini-plane ──
+  centroidRow: {
     flexDirection: "row",
-    gap: 6,
-    alignItems: "flex-end",
+    alignItems: "center",
+    gap: 8,
+  },
+  centroidField: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: "rgba(6,10,18,0.6)",
+    borderWidth: 1,
+    position: "relative",
+    overflow: "hidden",
+  },
+  centroidGridH: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(148,180,224,0.12)",
+  },
+  centroidGridV: {
+    position: "absolute",
+    left: "50%",
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(148,180,224,0.12)",
+  },
+  centroidDot: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: -3,
+    marginLeft: -3,
+  },
+  centroidLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  // ── Bloom field ──
+  bloomField: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "flex-start",
+    paddingVertical: 4,
   },
   bloomSlot: {
     alignItems: "center",
     justifyContent: "center",
-    width: 44,
-    height: 52,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    minWidth: 52,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
     position: "relative",
   },
   bloomIcon: {
@@ -184,11 +353,8 @@ const styles = StyleSheet.create({
   },
   bloomGlow: {
     position: "absolute",
-    bottom: 12,
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.3,
+    bottom: 10,
+    borderRadius: 3,
   },
   bloomLabel: {
     fontSize: 10,
@@ -197,39 +363,45 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.2,
   },
-  emptySlot: {
+  bloomCount: {
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 1,
+    opacity: 0.7,
+  },
+  // ── Expanded detail ──
+  bloomDetail: {
+    marginTop: 4,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(13,20,36,0.95)",
+    borderWidth: 1,
+    gap: 3,
+  },
+  detailTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  detailRow: {
+    color: palette.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  // ── Seed placeholders ──
+  seedSlot: {
     alignItems: "center",
     justifyContent: "center",
-    width: 36,
-    height: 40,
+    width: 40,
+    height: 44,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.08)",
     borderStyle: "dashed",
   },
-  emptyDot: {
+  seedIcon: {
     color: palette.muted,
     fontSize: 16,
-  },
-  ambientStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  ambientDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  ambientLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
+    opacity: 0.4,
   },
 });

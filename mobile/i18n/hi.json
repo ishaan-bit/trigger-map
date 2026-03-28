@@ -180,7 +180,11 @@
   "garden": {
     "title": "आज का बगीचा",
     "bloomCount": "{count} खिलावट",
-    "bloomCountPlural": "{count} खिलावट"
+    "bloomCountPlural": "{count} खिलने",
+    "todaysCenter": "आज का केंद्र",
+    "feltCount": "आज {count}× महसूस किया",
+    "mostlyFrom": "ज़्यादातर {trigger} से",
+    "peak": "चरम: {period}"
   },
   "microInsight": {
     "triggerEmotion": "{trigger} ने {emotion} {count} बार लाया",
