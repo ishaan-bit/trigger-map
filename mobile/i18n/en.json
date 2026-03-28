@@ -47,6 +47,11 @@
   "emotion": {
     "prompt": "How are you feeling?",
     "hint": "Slide to capture how pleasant and how activated you feel right now.",
+    "padHint": "Tap or drag to place how you feel",
+    "qAnxious": "anxious",
+    "qEnergized": "energized",
+    "qLow": "low",
+    "qCalm": "calm",
     "axisFeelQuestion": "How does this feel?",
     "axisFeelHelper": "Bad ↔ Good",
     "axisFeelLeft": "Very bad",

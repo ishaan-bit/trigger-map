@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
 import {
-  createEmotionCoordinates,
   coordinatesToLegacy,
   derivedEmotionLabel,
-  EMOTION_AXIS_STEPS,
   emotionRegionKey,
 } from "@triggermap/shared/constants/emotions";
 import { ScreenShell } from "@/components/ScreenShell";
+import { EmotionPad } from "@/components/EmotionPad";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -37,79 +35,13 @@ function translateEmotionLabel(t, key) {
   return key.replace(/_/g, " ");
 }
 
-function AxisSlider({ question, helper, leftLabel, rightLabel, value, onChange, gradientColors, accentColor }) {
-  const [trackWidth, setTrackWidth] = useState(1);
-  const trackWidthRef = useRef(1);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => {
-        const w = trackWidthRef.current;
-        const nextX = Math.max(0, Math.min(w, event.nativeEvent.locationX));
-        onChangeRef.current((nextX / w) * 2 - 1);
-      },
-      onPanResponderMove: (event) => {
-        const w = trackWidthRef.current;
-        const nextX = Math.max(0, Math.min(w, event.nativeEvent.locationX));
-        onChangeRef.current((nextX / w) * 2 - 1);
-      },
-    })
-  ).current;
-
-  const thumbLeft = ((value + 1) / 2) * trackWidth;
-
-  return (
-    <View style={styles.sliderCard}>
-      <View style={styles.sliderHeadingRow}>
-        <Text style={styles.sliderQuestion}>{question}</Text>
-        <Text style={[styles.sliderHelper, { color: accentColor }]}>{helper}</Text>
-      </View>
-      <View
-        style={styles.sliderTrackWrap}
-        onLayout={(event) => {
-          const w = Math.max(event.nativeEvent.layout.width, 1);
-          trackWidthRef.current = w;
-          setTrackWidth(w);
-        }}
-        {...panResponder.panHandlers}
-      >
-        <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.sliderTrack} />
-        <View style={styles.sliderTrackOverlay} />
-        {EMOTION_AXIS_STEPS.map((step) => (
-          <View
-            key={step}
-            style={[
-              styles.sliderStop,
-              {
-                left: `${((step + 1) / 2) * 100}%`,
-              },
-            ]}
-          />
-        ))}
-        <Animated.View style={[styles.sliderThumbShadow, { left: thumbLeft - 20, shadowColor: accentColor }]} />
-        <View style={[styles.sliderThumb, { left: thumbLeft - 15, borderColor: accentColor }]}>
-          <View style={[styles.sliderThumbCore, { backgroundColor: accentColor }]} />
-        </View>
-      </View>
-      <View style={styles.sliderLabelsRow}>
-        <Text style={styles.sliderEdgeLabel}>{leftLabel}</Text>
-        <Text style={styles.sliderEdgeLabel}>{rightLabel}</Text>
-      </View>
-    </View>
-  );
-}
-
 export function EmotionSelectionScreen() {
   const { trigger } = useLocalSearchParams();
   const router = useRouter();
   const { saveMoment } = useAppSession();
   const { t, lang } = useLanguage();
 
-  const [sliderValues, setSliderValues] = useState({ feel: 0, energy: 0 });
+  const [emotionCoords, setEmotionCoords] = useState({ valence: 0, arousal: 0, intensity: 0 });
   const [selectedTags, setSelectedTags] = useState([]);
   const [adaptiveTags, setAdaptiveTags] = useState([]);
   const [note, setNote] = useState("");
@@ -127,40 +59,44 @@ export function EmotionSelectionScreen() {
   const ripple3 = useRef(new Animated.Value(0)).current;
   const previousSnapKey = useRef("0:0");
 
-  const coords = useMemo(
-    () => createEmotionCoordinates(sliderValues.feel, sliderValues.energy),
-    [sliderValues.feel, sliderValues.energy]
-  );
   const regionKey = useMemo(
-    () => emotionRegionKey(coords.valence, coords.arousal),
-    [coords.arousal, coords.valence]
+    () => emotionRegionKey(emotionCoords.valence, emotionCoords.arousal),
+    [emotionCoords.valence, emotionCoords.arousal]
   );
   const legacyEmotion = useMemo(
-    () => coordinatesToLegacy(coords.valence, coords.arousal),
-    [coords.arousal, coords.valence]
+    () => coordinatesToLegacy(emotionCoords.valence, emotionCoords.arousal),
+    [emotionCoords.valence, emotionCoords.arousal]
   );
   const derivedLabelKey = useMemo(
-    () => derivedEmotionLabel(coords.valence, coords.arousal),
-    [coords.arousal, coords.valence]
+    () => derivedEmotionLabel(emotionCoords.valence, emotionCoords.arousal),
+    [emotionCoords.valence, emotionCoords.arousal]
   );
   const derivedLabel = translateEmotionLabel(t, derivedLabelKey);
-  const accentColor = emotionColor(coords.valence, coords.arousal);
+  const accentColor = emotionColor(emotionCoords.valence, emotionCoords.arousal);
   const contextForTags = useMemo(
     () => ({
       emotion: legacyEmotion,
       regionKey,
-      valence: coords.valence,
-      arousal: coords.arousal,
+      valence: emotionCoords.valence,
+      arousal: emotionCoords.arousal,
     }),
-    [coords.arousal, coords.valence, legacyEmotion, regionKey]
+    [emotionCoords.valence, emotionCoords.arousal, legacyEmotion, regionKey]
   );
 
+  const handleEmotionChange = useCallback((valence, arousal, intensity) => {
+    setHasInteracted(true);
+    setEmotionCoords({ valence, arousal, intensity });
+  }, []);
+
   useEffect(() => {
-    const snapKey = `${coords.valence}:${coords.arousal}`;
+    // Snap key based on rounded coordinates for haptic feedback at region transitions
+    const rv = Math.round(emotionCoords.valence * 2) / 2;
+    const ra = Math.round(emotionCoords.arousal * 2) / 2;
+    const snapKey = `${rv}:${ra}`;
     if (!hasInteracted || previousSnapKey.current === snapKey) return;
     previousSnapKey.current = snapKey;
     Haptics.selectionAsync().catch(() => null);
-  }, [coords.arousal, coords.valence, hasInteracted]);
+  }, [emotionCoords.valence, emotionCoords.arousal, hasInteracted]);
 
   useEffect(() => {
     if (!hasInteracted || !trigger) {
@@ -196,11 +132,6 @@ export function EmotionSelectionScreen() {
     return () => handler.remove();
   }, [saved, router]);
 
-  const updateAxis = (axis, value) => {
-    setHasInteracted(true);
-    setSliderValues((current) => ({ ...current, [axis]: value }));
-  };
-
   function toggleTag(tag) {
     selection();
     setSelectedTags((prev) => {
@@ -222,9 +153,9 @@ export function EmotionSelectionScreen() {
 
       const payload = {
         trigger,
-        valence: coords.valence,
-        arousal: coords.arousal,
-        intensity: coords.intensity,
+        valence: emotionCoords.valence,
+        arousal: emotionCoords.arousal,
+        intensity: emotionCoords.intensity,
         note,
         lang,
       };
@@ -323,39 +254,19 @@ export function EmotionSelectionScreen() {
       <View style={styles.header}>
         <Text style={styles.kicker}>{triggerLabel}</Text>
         <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
-        <Text style={styles.hint}>{t("emotion.hint")}</Text>
+        <Text style={styles.hint}>{t("emotion.padHint") !== "emotion.padHint" ? t("emotion.padHint") : "Tap or drag to place how you feel"}</Text>
       </View>
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryLabelRow}>
-          <Text style={styles.summaryEyebrow}>{t("emotion.liveRead")}</Text>
-          <Text style={[styles.summaryRegion, { color: accentColor }]}>{t(`emotion.regions.${regionKey}`)}</Text>
-        </View>
-        <Text style={[styles.summaryEmotion, { color: accentColor }]}>{derivedLabel}</Text>
-        <Text style={styles.summaryBody}>{t("emotion.liveSummary", { emotion: derivedLabel.toLowerCase(), trigger: triggerLabel.toLowerCase() })}</Text>
-      </View>
-
-      <AxisSlider
-        question={t("emotion.axisFeelQuestion")}
-        helper={t("emotion.axisFeelHelper")}
-        leftLabel={t("emotion.axisFeelLeft")}
-        rightLabel={t("emotion.axisFeelRight")}
-        value={sliderValues.feel}
-        onChange={(value) => updateAxis("feel", value)}
-        gradientColors={["rgba(255,107,122,0.95)", "rgba(255,179,71,0.85)", "rgba(94,230,160,0.95)"]}
-        accentColor={sliderValues.feel >= 0 ? palette.success : palette.danger}
+      <EmotionPad
+        value={emotionCoords}
+        onChange={handleEmotionChange}
+        accentColor={accentColor}
+        derivedLabel={derivedLabel}
+        regionLabel={t(`emotion.regions.${regionKey}`)}
+        t={t}
       />
 
-      <AxisSlider
-        question={t("emotion.axisEnergyQuestion")}
-        helper={t("emotion.axisEnergyHelper")}
-        leftLabel={t("emotion.axisEnergyLeft")}
-        rightLabel={t("emotion.axisEnergyRight")}
-        value={sliderValues.energy}
-        onChange={(value) => updateAxis("energy", value)}
-        gradientColors={["rgba(167,139,250,0.95)", "rgba(127,168,212,0.85)", "rgba(86,208,224,0.95)"]}
-        accentColor={sliderValues.energy >= 0 ? palette.accent : palette.purple}
-      />
+      <Text style={styles.summaryBody}>{t("emotion.liveSummary", { emotion: derivedLabel.toLowerCase(), trigger: triggerLabel.toLowerCase() })}</Text>
 
       {hasInteracted && adaptiveTags.length > 0 && (
         <Animated.View style={[styles.tagSection, {
@@ -434,88 +345,7 @@ const styles = StyleSheet.create({
   kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   prompt: { color: palette.text, fontSize: 28, lineHeight: 34, fontWeight: "800" },
   hint: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
-  summaryCard: {
-    marginTop: 18,
-    padding: 18,
-    borderRadius: radius.lg,
-    backgroundColor: palette.glass,
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    gap: 6,
-  },
-  summaryLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
-  summaryEyebrow: { color: palette.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
-  summaryRegion: { fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
-  summaryEmotion: { fontSize: 28, lineHeight: 32, fontWeight: "800", textTransform: "capitalize" },
-  summaryBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21 },
-  sliderCard: {
-    marginTop: 18,
-    padding: 18,
-    borderRadius: radius.lg,
-    backgroundColor: palette.glass,
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    gap: 16,
-  },
-  sliderHeadingRow: { gap: 4 },
-  sliderQuestion: { color: palette.text, fontSize: 18, lineHeight: 24, fontWeight: "700" },
-  sliderHelper: { fontSize: 13, fontWeight: "600" },
-  sliderTrackWrap: {
-    height: 52,
-    justifyContent: "center",
-    position: "relative",
-  },
-  sliderTrack: {
-    height: 16,
-    borderRadius: radius.pill,
-  },
-  sliderTrackOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    top: 18,
-    bottom: 18,
-    backgroundColor: "rgba(6, 10, 18, 0.12)",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  sliderStop: {
-    position: "absolute",
-    top: 17,
-    marginLeft: -1,
-    width: 2,
-    height: 18,
-    borderRadius: 1,
-    backgroundColor: "rgba(255,255,255,0.35)",
-  },
-  sliderThumbShadow: {
-    position: "absolute",
-    top: 6,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  sliderThumb: {
-    position: "absolute",
-    top: 11,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: palette.surface,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sliderThumbCore: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  sliderLabelsRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  sliderEdgeLabel: { color: palette.textSecondary, fontSize: 13, fontWeight: "600" },
+  summaryBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, paddingHorizontal: 4 },
   tagSection: { marginTop: 18, gap: 10 },
   tagHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   tagLabel: { color: palette.accent, fontSize: 13, fontWeight: "700" },
