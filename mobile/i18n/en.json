@@ -391,7 +391,7 @@
 
     "currentState": "Current state",
     "baselineText": "Baseline {baselineScore}/5 · This week {weekScore}/5",
-    "baselineForming": "Baseline forming — keep logging for a clearer picture.",
+    "baselineForming": "Baseline forming - keep logging for a clearer picture.",
     "logMoreForState": "Log more moments to see your current state.",
 
     "drivers": "What's driving things",
@@ -409,7 +409,7 @@
     "crashRiskBody": "A sustained negative pattern may be building. Pay attention to recovery.",
     "falseRecoveryLabel": "False recovery",
     "falseRecoveryBody": "Positive moments may be masking an underlying pattern. Stay aware.",
-    "maskingLevel": "Masking — {level}",
+    "maskingLevel": "Masking - {level}",
     "maskingBody": "Your expressed emotions may not fully reflect what's going on inside.",
 
     "innerState": "Inner state",
@@ -418,7 +418,7 @@
     "vacuumDriftRising": "Rising",
     "vacuumDriftFalling": "Falling",
     "vacuumDriftStable": "Stable",
-    "vacuumExplainer": "The vacuum score measures your inner emotional fullness — how present and engaged you feel beneath the surface.",
+    "vacuumExplainer": "The vacuum score measures your inner emotional fullness - how present and engaged you feel beneath the surface.",
 
     "contextBleed": "Context bleed",
     "contextBleedBody": "{source} may be bleeding into {target}.",
@@ -437,7 +437,7 @@
     "fewerMomentsPlural": "{count} fewer moments than last week",
     "sameMoments": "Same number of moments as last week",
 
-    "internalDriven": "Your emotions this week were largely internally driven — more about your inner state than external triggers.",
+    "internalDriven": "Your emotions this week were largely internally driven - more about your inner state than external triggers.",
     "externalDriven": "Your emotions this week were mostly triggered by external events and situations.",
     "mixedDriven": "A mix of internal states and external triggers shaped your week.",
     "internalSignal": "Internal signal",
@@ -520,7 +520,7 @@
       "weekMoments": "{count} moments",
       "confidenceStrong": "High confidence based on {weeks} weeks of data.",
       "confidenceModerate": "Moderate confidence with {weeks} weeks tracked.",
-      "confidenceEmerging": "Patterns are still forming — keep logging."
+      "confidenceEmerging": "Patterns are still forming - keep logging."
     },
 
     "prem": {
@@ -533,7 +533,7 @@
       "unlockSignals": "Unlock all signals",
       "tryThis": "Try this",
       "teaserHint": "Upgrade to Premium for the full picture.",
-      "paywallBody": "Deep pattern analysis, behavioral signals, adaptive modes, and actionable direction — all powered by your data.",
+      "paywallBody": "Deep pattern analysis, behavioral signals, adaptive modes, and actionable direction - all powered by your data.",
       "shifting": "What's shifting",
       "shiftingHint": "Premium reveals all your behavioral signals.",
       "signalCount": "{count} signal",
@@ -548,9 +548,9 @@
       "driftDown": "Your emotional tone is trending below your baseline.",
       "driftStable": "Your emotional tone is holding steady near your baseline.",
       "stabilityHigh": "Your emotional patterns are consistent and predictable.",
-      "stabilityLow": "Your emotional patterns are variable — wider swings between moments.",
+      "stabilityLow": "Your emotional patterns are variable - wider swings between moments.",
       "volatilityHigh": "High day-to-day emotional variability. A lot is shifting.",
-      "volatilityLow": "Low variability — your days have been emotionally consistent.",
+      "volatilityLow": "Low variability - your days have been emotionally consistent.",
       "vacuum": "Inner vacuum",
       "patternIntel": "Pattern intelligence",
       "leversTitle": "Your levers",
@@ -577,8 +577,8 @@
         "warmBody": "Your personalised suggestions will appear here once we have enough data.",
         "coreBody": "Switch to Move, Fuel, or Perspective for state-adaptive suggestions based on your patterns.",
         "helpful": "Helpful",
-        "thanksHelpful": "Thanks — noted",
-        "thanksNot": "Noted — we'll adjust"
+        "thanksHelpful": "Thanks - noted",
+        "thanksNot": "Noted - we'll adjust"
       }
     }
   }

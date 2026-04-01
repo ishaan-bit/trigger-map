@@ -133,14 +133,20 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   // 1. Friction + Regulator pairing
   if (friction.length && regulators.length) {
     const f = friction[0];
-    const r = regulators[0];
+    // Pick a regulator whose trigger differs from the friction trigger
+    const r = regulators.find((reg) => reg.trigger.toLowerCase() !== f.trigger.toLowerCase()) || regulators[0];
+    const sameTrigger = f.trigger.toLowerCase() === r.trigger.toLowerCase();
     const freq1 = f.count <= 2 ? (hi ? 'कभी-कभी' : 'sometimes') : (hi ? 'अक्सर' : 'often');
     candidates.push({
       id: `reg-${f.trigger}-${r.trigger}`.toLowerCase().replace(/\s+/g, "-"),
       type: "regulate",
       title: hi
-        ? `जब ${tl(f.trigger, lang)} मुश्किल हो, तो ${tl(r.trigger, lang)} आज़माएँ`
-        : `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`,
+        ? (sameTrigger
+          ? `${tl(f.trigger, lang)} में ${el(r.emotion, lang)} वाले पलों पर ध्यान दें`
+          : `जब ${tl(f.trigger, lang)} मुश्किल हो, तो ${tl(r.trigger, lang)} आज़माएँ`)
+        : (sameTrigger
+          ? `Lean into the ${r.emotion} side of ${triggerLabel(r.trigger)}`
+          : `Try ${triggerLabel(r.trigger)} when ${triggerLabel(f.trigger)} gets tough`),
       reason: hi
         ? `${tl(f.trigger, lang)} ${freq1} आपको ${el(f.emotion, lang)} छोड़ता है। ${tl(r.trigger, lang)} आपको ${el(r.emotion, lang)} महसूस कराने में मदद करता है।`
         : `${cap(triggerLabel(f.trigger))} ${freq1} leaves you feeling ${f.emotion}. ${cap(triggerLabel(r.trigger))} has been helping you feel ${r.emotion}.`,

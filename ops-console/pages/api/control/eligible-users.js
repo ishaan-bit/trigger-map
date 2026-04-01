@@ -30,24 +30,40 @@ export default async function handler(req, res) {
       return res.status(200).json({ users: [], total: 0 });
     }
 
-    // Pipeline: LLEN moments + HGETALL user hash per owner
+    // Pipeline: LLEN moments + HGETALL user hash + LINDEX last moment + GET llm_insight per owner
     const cmds = [];
     for (const oid of allIds) {
       cmds.push(['LLEN', redisKey('moments', oid)]);
       cmds.push(['HGETALL', redisKey('user', oid)]);
+      cmds.push(['LINDEX', redisKey('moments', oid), -1]);
+      cmds.push(['GET', redisKey('llm_insight', oid)]);
     }
 
     const results = await pipeline(cmds);
     const users = [];
 
     for (let i = 0; i < allIds.length; i++) {
-      const momentCount = results[i * 2] || 0;
-      const userHash = flatArr(results[i * 2 + 1]);
+      const momentCount = results[i * 4] || 0;
+      const userHash = flatArr(results[i * 4 + 1]);
+      const lastMomentRaw = results[i * 4 + 2];
+      const llmInsightRaw = results[i * 4 + 3];
 
       // Must be signed-in (has user hash with email or name)
       if (!userHash.email && !userHash.name) continue;
       // Must meet min-moments threshold
       if (momentCount < minMoments) continue;
+
+      // Extract lastMomentAt
+      let lastMomentAt = null;
+      if (lastMomentRaw) {
+        try { lastMomentAt = JSON.parse(lastMomentRaw).timestamp || null; } catch {}
+      }
+
+      // Extract lastLlmAt
+      let lastLlmAt = null;
+      if (llmInsightRaw) {
+        try { lastLlmAt = JSON.parse(llmInsightRaw).generatedAt || null; } catch {}
+      }
 
       users.push({
         ownerId: allIds[i],
@@ -55,6 +71,8 @@ export default async function handler(req, res) {
         email: userHash.email || null,
         momentCount,
         isAnonymous: !userHash.email,
+        lastMomentAt,
+        lastLlmAt,
       });
     }
 

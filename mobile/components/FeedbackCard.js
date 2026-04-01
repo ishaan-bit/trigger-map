@@ -20,27 +20,27 @@ const DEFAULT_CARD_TINT = EMOTION_CARD_TINTS.neutral;
 /** Emotion-aware acknowledgment messages — the app echoes back what it heard */
 const EMOTION_ECHOES = {
   calm: [
-    "A calm moment — let that settle in.",
+    "A calm moment - let that settle in.",
     "Stillness noted. Your body remembers this.",
     "That quiet feeling matters more than you think.",
   ],
   neutral: [
     "Steady ground. Not every moment needs to be loud.",
-    "Noted — even the in-between matters.",
+    "Noted - even the in-between matters.",
     "Sometimes neutral is exactly enough.",
   ],
   anxious: [
-    "That tension you're carrying — we see it.",
+    "That tension you're carrying - we see it.",
     "Anxiety logged. Naming it is already a step.",
     "You showed up even when it felt heavy.",
   ],
   frustrated: [
     "Frustration acknowledged. You didn't push it away.",
-    "That friction is real — and now it's visible.",
+    "That friction is real - and now it's visible.",
     "Logged. Frustration loses power when it's seen.",
   ],
   energized: [
-    "That spark — hold onto it.",
+    "That spark - hold onto it.",
     "Energy captured. This is the fuel you come back to.",
     "Momentum logged. Remember what brought you here.",
   ],

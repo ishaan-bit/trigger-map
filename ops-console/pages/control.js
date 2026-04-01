@@ -1065,7 +1065,7 @@ export default function ControlPage() {
                               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading eligible users…</div>
                             ) : (eligibleUsers[job.id] && eligibleUsers[job.id].length > 0) ? (
                               <>
-                                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                                <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
                                   <button
                                     type="button"
                                     className="btn btn-sm"
@@ -1081,6 +1081,23 @@ export default function ControlPage() {
                                     style={{ fontSize: 11, padding: '2px 8px' }}
                                     onClick={() => setSelectedUsers((p) => ({ ...p, [job.id]: new Set() }))}
                                   >Deselect All</button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                    onClick={() => {
+                                      const active = (eligibleUsers[job.id] || []).filter((u) => {
+                                        if (!u.lastMomentAt) return false;
+                                        if (!u.lastLlmAt) return true; // never had LLM, always active
+                                        return new Date(u.lastMomentAt) > new Date(u.lastLlmAt);
+                                      });
+                                      setSelectedUsers((p) => ({
+                                        ...p,
+                                        [job.id]: new Set(active.map((u) => u.ownerId)),
+                                      }));
+                                    }}
+                                    title="Select only users who logged moments after their last LLM insight generation"
+                                  >Active Since LLM</button>
                                   <button
                                     type="button"
                                     className="btn btn-sm"
@@ -1111,8 +1128,11 @@ export default function ControlPage() {
                                       <span style={{ color: 'var(--text-secondary)' }}>
                                         {u.name || u.email || '(anonymous)'}
                                       </span>
-                                      <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                                      <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap', display: 'flex', gap: 6, alignItems: 'center' }}>
                                         {u.momentCount} moments
+                                        {u.lastMomentAt && (!u.lastLlmAt || new Date(u.lastMomentAt) > new Date(u.lastLlmAt)) && (
+                                          <span title="Active since last LLM run" style={{ color: '#56d0e0', fontSize: 10 }}>●</span>
+                                        )}
                                       </span>
                                     </label>
                                   );

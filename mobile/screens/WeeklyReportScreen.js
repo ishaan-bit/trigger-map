@@ -1439,11 +1439,9 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
   // Move state
   const [moveDuration, setMoveDuration] = useState(null); // null | 30 | 60 | 90
-  const [moveIdx, setMoveIdx] = useState(0);
 
   // Fuel state
   const [fuelDiet, setFuelDiet] = useState(null);
-  const [fuelIdx, setFuelIdx] = useState(0);
 
   // Derive emotion tags for state-adaptive pick
   const emotions = useMemo(() => {
@@ -1475,6 +1473,27 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     });
   }, [fuelDiet, emotions]);
 
+  // Fuel day plan - one item per meal slot, prioritized by emotion relevance
+  const fuelPlan = useMemo(() => {
+    const isHi = lang === "hi";
+    const SLOTS = [
+      { key: "morning", label: isHi ? "सुबह का पेय" : "Morning", icon: "☀️", types: ["drink"] },
+      { key: "breakfast", label: isHi ? "नाश्ता" : "Breakfast", icon: "🍳", types: ["meal"] },
+      { key: "midSnack", label: isHi ? "दोपहर का स्नैक" : "Mid-morning Snack", icon: "🥜", types: ["snack"] },
+      { key: "lunch", label: isHi ? "दोपहर का खाना" : "Lunch", icon: "🍱", types: ["meal"] },
+      { key: "eveSnack", label: isHi ? "शाम का स्नैक" : "Evening Snack", icon: "🫖", types: ["snack", "drink"] },
+      { key: "dinner", label: isHi ? "रात का खाना" : "Dinner", icon: "🍽️", types: ["meal"] },
+      { key: "ritual", label: isHi ? "भोजन रिचुअल" : "Food Ritual", icon: "🧘", types: ["ritual"] },
+    ];
+    const used = new Set();
+    return SLOTS.map((slot) => {
+      const pool = fuelSuggestions.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
+      const pick = pool[0] || null;
+      if (pick) used.add(pick.id);
+      return { ...slot, item: pick };
+    }).filter((slot) => slot.item);
+  }, [fuelSuggestions, lang]);
+
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
   if (!data || (!data.items?.length && !data.narrative)) {
@@ -1499,112 +1518,101 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     if (onFeedback) onFeedback(mode, itemId, response);
   }
 
-  // Current suggestion for Move
-  const currentMove = moveSuggestions[moveIdx % moveSuggestions.length] || null;
-  const currentFuel = fuelSuggestions[fuelIdx % fuelSuggestions.length] || null;
-
-  function rotateSuggestion(setIdx, listLen) {
-    tap();
-    setIdx((prev) => (prev + 1) % Math.max(listLen, 1));
-  }
-
   return (
     <View style={s.modeContent}>
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
-      {/* ── Move: duration filter + single rotating suggestion ── */}
+      {/* ── Move: duration filter + exercise list ── */}
       {mode === "move" && (
         <>
           <View style={s.filterRow}>
             {[{ label: "< 30 min", val: 30 }, { label: "30-60 min", val: 60 }, { label: "60-90 min", val: 90 }].map((opt) => (
-              <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(moveDuration === opt.val ? null : opt.val); setMoveIdx(0); }} style={[s.filterChip, moveDuration === opt.val && s.filterChipActive]}>
+              <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(moveDuration === opt.val ? null : opt.val); }} style={[s.filterChip, moveDuration === opt.val && s.filterChipActive]}>
                 <Text style={[s.filterChipText, moveDuration === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
               </Pressable>
             ))}
           </View>
-          {currentMove && (
-            <View style={s.suggestionCard}>
-              <View style={s.suggestionHeader}>
-                <Text style={s.suggestionTitle}>{hi ? currentMove.nameHi : currentMove.name}</Text>
-                <Pressable onPress={() => rotateSuggestion(setMoveIdx, moveSuggestions.length)} style={s.rotateBtn} accessibilityRole="button" accessibilityLabel="Next suggestion">
-                  <Text style={s.rotateBtnText}>🔄 next</Text>
-                </Pressable>
-              </View>
-              <Text style={s.suggestionDesc}>{hi ? currentMove.descriptionHi : currentMove.description}</Text>
-              <View style={s.suggestionMeta}>
-                <Text style={s.suggestionMetaText}>{currentMove.intensity} · ~{currentMove.durationMin} min · {currentMove.equipment}</Text>
-              </View>
-              {dominantEmotion && currentMove.emotionTags?.includes(dominantEmotion) && (
-                <View style={s.suggestionMatch}>
-                  <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+          {moveSuggestions.length > 0 ? (
+            <>
+              {moveSuggestions.slice(0, 8).map((mv) => (
+                <View key={mv.id} style={s.suggestionCard}>
+                  <Text style={s.suggestionTitle}>{hi ? mv.nameHi : mv.name}</Text>
+                  <Text style={s.suggestionDesc}>{hi ? mv.descriptionHi : mv.description}</Text>
+                  <View style={s.suggestionMeta}>
+                    <Text style={s.suggestionMetaText}>{mv.intensity} · ~{mv.durationMin} min · {mv.equipment}</Text>
+                  </View>
+                  {dominantEmotion && mv.emotionTags?.includes(dominantEmotion) && (
+                    <View style={s.suggestionMatch}>
+                      <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                    </View>
+                  )}
+                  {isPremium && !feedbackGiven[mv.id] ? (
+                    <View style={s.modeFeedbackRow}>
+                      <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(mv.id, "helpful")} accessibilityRole="button">
+                        <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
+                      </Pressable>
+                      <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(mv.id, "not_helpful")} accessibilityRole="button">
+                        <Text style={s.modeFeedbackNotText}>👎</Text>
+                      </Pressable>
+                    </View>
+                  ) : feedbackGiven[mv.id] ? (
+                    <View style={s.modeFeedbackDone}>
+                      <Text style={s.modeFeedbackDoneText}>{feedbackGiven[mv.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+                    </View>
+                  ) : null}
                 </View>
-              )}
-              {isPremium && !feedbackGiven[currentMove.id] ? (
-                <View style={s.modeFeedbackRow}>
-                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(currentMove.id, "helpful")} accessibilityRole="button">
-                    <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
-                  </Pressable>
-                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(currentMove.id, "not_helpful")} accessibilityRole="button">
-                    <Text style={s.modeFeedbackNotText}>👎</Text>
-                  </Pressable>
-                </View>
-              ) : feedbackGiven[currentMove.id] ? (
-                <View style={s.modeFeedbackDone}>
-                  <Text style={s.modeFeedbackDoneText}>{feedbackGiven[currentMove.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
-                </View>
-              ) : null}
-              <Text style={s.suggestionCounter}>{(moveIdx % moveSuggestions.length) + 1} / {moveSuggestions.length}</Text>
-            </View>
+              ))}
+              <Text style={s.suggestionCounter}>Showing {Math.min(moveSuggestions.length, 8)} of {moveSuggestions.length}</Text>
+            </>
+          ) : (
+            <Text style={s.modeContentBody}>No exercises match these filters</Text>
           )}
-          {!currentMove && <Text style={s.modeContentBody}>No exercises match these filters</Text>}
         </>
       )}
 
-      {/* ── Fuel: diet filter + single rotating suggestion ── */}
+      {/* ── Fuel: diet filter + full-day plan ── */}
       {mode === "fuel" && (
         <>
           <View style={s.filterRow}>
             {[{ label: "All", val: null }, { label: "🥬 Veg", val: "vegetarian" }, { label: "🌱 Vegan", val: "vegan" }, { label: "🍗 Non-Veg", val: "nonVeg" }].map((opt) => (
-              <Pressable key={opt.label} onPress={() => { tap(); setFuelDiet(opt.val); setFuelIdx(0); }} style={[s.filterChip, fuelDiet === opt.val && s.filterChipActive]}>
+              <Pressable key={opt.label} onPress={() => { tap(); setFuelDiet(opt.val); }} style={[s.filterChip, fuelDiet === opt.val && s.filterChipActive]}>
                 <Text style={[s.filterChipText, fuelDiet === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
               </Pressable>
             ))}
           </View>
-          {currentFuel && (
-            <View style={s.suggestionCard}>
-              <View style={s.suggestionHeader}>
-                <Text style={s.suggestionTitle}>{hi ? currentFuel.nameHi : currentFuel.name}</Text>
-                <Pressable onPress={() => rotateSuggestion(setFuelIdx, fuelSuggestions.length)} style={s.rotateBtn} accessibilityRole="button" accessibilityLabel="Next suggestion">
-                  <Text style={s.rotateBtnText}>🔄 next</Text>
-                </Pressable>
+          {fuelPlan.length > 0 ? (
+            fuelPlan.map(({ key, label, icon, item }) => (
+              <View key={key} style={s.suggestionCard}>
+                <Text style={s.fuelSlotLabel}>{icon} {label}</Text>
+                <Text style={s.suggestionTitle}>{hi ? item.nameHi : item.name}</Text>
+                <Text style={s.suggestionDesc}>{hi ? item.descriptionHi : item.description}</Text>
+                <View style={s.suggestionMeta}>
+                  <Text style={s.suggestionMetaText}>{item.nutrientFocus}{item.prepLevel ? ` · ${item.prepLevel} prep` : ""}</Text>
+                </View>
+                {dominantEmotion && item.emotionTags?.includes(dominantEmotion) && (
+                  <View style={s.suggestionMatch}>
+                    <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                  </View>
+                )}
+                {isPremium && !feedbackGiven[item.id] ? (
+                  <View style={s.modeFeedbackRow}>
+                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(item.id, "helpful")} accessibilityRole="button">
+                      <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
+                    </Pressable>
+                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(item.id, "not_helpful")} accessibilityRole="button">
+                      <Text style={s.modeFeedbackNotText}>👎</Text>
+                    </Pressable>
+                  </View>
+                ) : feedbackGiven[item.id] ? (
+                  <View style={s.modeFeedbackDone}>
+                    <Text style={s.modeFeedbackDoneText}>{feedbackGiven[item.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+                  </View>
+                ) : null}
               </View>
-              <Text style={s.suggestionDesc}>{hi ? currentFuel.descriptionHi : currentFuel.description}</Text>
-              <View style={s.suggestionMeta}>
-                <Text style={s.suggestionMetaText}>{currentFuel.type}{currentFuel.nutrientFocus ? ` · ${currentFuel.nutrientFocus}` : ""}{currentFuel.prepLevel ? ` · ${currentFuel.prepLevel} prep` : ""}</Text>
-              </View>
-              {dominantEmotion && currentFuel.emotionTags?.includes(dominantEmotion) && (
-                <View style={s.suggestionMatch}>
-                  <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
-                </View>
-              )}
-              {isPremium && !feedbackGiven[currentFuel.id] ? (
-                <View style={s.modeFeedbackRow}>
-                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(currentFuel.id, "helpful")} accessibilityRole="button">
-                    <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
-                  </Pressable>
-                  <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(currentFuel.id, "not_helpful")} accessibilityRole="button">
-                    <Text style={s.modeFeedbackNotText}>👎</Text>
-                  </Pressable>
-                </View>
-              ) : feedbackGiven[currentFuel.id] ? (
-                <View style={s.modeFeedbackDone}>
-                  <Text style={s.modeFeedbackDoneText}>{feedbackGiven[currentFuel.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
-                </View>
-              ) : null}
-              <Text style={s.suggestionCounter}>{(fuelIdx % fuelSuggestions.length) + 1} / {fuelSuggestions.length}</Text>
-            </View>
+            ))
+          ) : (
+            <Text style={s.modeContentBody}>No items match these filters</Text>
           )}
-          {!currentFuel && <Text style={s.modeContentBody}>No items match these filters</Text>}
         </>
       )}
 
@@ -2826,6 +2834,7 @@ const s = StyleSheet.create({
   },
   suggestionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   suggestionTitle: { color: palette.text, fontSize: 15, fontWeight: "700", flex: 1 },
+  fuelSlotLabel: { color: palette.accent, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
   rotateBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, backgroundColor: "rgba(94,230,160,0.12)" },
   rotateBtnText: { color: "#5ee6a0", fontSize: 12, fontWeight: "700" },
   suggestionDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },

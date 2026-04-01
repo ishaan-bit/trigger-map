@@ -123,7 +123,7 @@ export default async function handler(req, res) {
         report.aiPreview = {
           available: true,
           teaser: lang === "hi"
-            ? "Google से साइन इन करें और अपने पैटर्न इनसाइट्स अनलॉक करें — सभी अकाउंट्स के लिए मुफ़्त।"
+            ? "Google से साइन इन करें और अपने पैटर्न इनसाइट्स अनलॉक करें - सभी अकाउंट्स के लिए मुफ़्त।"
             : "Sign in with Google to unlock your pattern insights, free for all accounts.",
           action: "sign-in",
         };
