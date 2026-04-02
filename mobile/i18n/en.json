@@ -308,6 +308,16 @@
     "previewTitle": "Preview",
     "previewText": "Get a taste of what Premium reveals.",
     "previewHint": "Based on your real data",
+    "transform1Before": "I keep reacting the same way but don't understand why",
+    "transform1After": "Your patterns reveal that work stress triggers frustration most often on weekday evenings",
+    "transform2Before": "I feel off but can't tell what changed",
+    "transform2After": "Your emotional baseline shifted downward this week - energy dipped after Thursday",
+    "transform3Before": "I journaled but nothing useful came out of it",
+    "transform3After": "Your calm moments cluster around morning walks - that routine is working for you",
+    "feature1": "Deep pattern analysis across weeks and months",
+    "feature2": "Behavioral signals like drift, stability, and recovery",
+    "feature3": "Personalized adaptive modes - Move, Fuel, Perspective",
+    "feature4": "AI-powered weekly narrative insights",
     "featureCardTitle": "Premium features",
     "createFreeAccount": "Create free account",
     "unlockPatterns": "Unlock patterns",
@@ -578,7 +588,11 @@
         "coreBody": "Switch to Move, Fuel, or Perspective for state-adaptive suggestions based on your patterns.",
         "helpful": "Helpful",
         "thanksHelpful": "Thanks - noted",
-        "thanksNot": "Noted - we'll adjust"
+        "thanksNot": "Noted - we'll adjust",
+        "matchesMood": "matches your current mood",
+        "showing": "Showing {shown} of {total}",
+        "noExercises": "No exercises match these filters",
+        "noFuelItems": "No items match these filters"
       }
     }
   }

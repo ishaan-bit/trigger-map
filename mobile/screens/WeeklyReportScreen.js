@@ -52,16 +52,38 @@ function cleanText(str) {
 function parseLlmSections(narrative) {
   if (!narrative) return null;
   const text = cleanText(narrative);
-  const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something to try|try this|suggestion|action\s*(?:item|step)|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[ \t]*:?/gmi;
-  const labelMap = [
-    /(?:what (?:stood|stands) out|(?:most )?notable pattern|क्या ख़ास रहा)/i,
-    /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)|क्या कारण हो सकता है)/i,
-    /(?:one thing to try|something to try|try this|suggestion|action\s*(?:item|step)|एक बात आज़माएँ)/i,
+
+  const headerPatterns = [
+    /(?:what (?:stood|stands) out|(?:most )?notable pattern[s]?|क्या ख़ास रहा)/i,
+    /(?:what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|क्या कारण हो सकता है)/i,
+    /(?:one thing to try|something (?:to try|worth trying)|try this|suggestion|action\s*(?:item|step)|एक बात आज़माएँ)/i,
   ];
+
+  const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something (?:to try|worth trying)|try this|suggestion|action\s*(?:item|step)|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[:\s]*/i, "").trim();
+
+  // Primary: split by double-newline (matches backend storage format)
+  const chunks = text.split(/\n\s*\n/).filter(Boolean);
+  if (chunks.length >= 3) {
+    const result = [null, null, null];
+    const assigned = new Set();
+    for (const chunk of chunks) {
+      const firstLine = chunk.split("\n")[0];
+      const idx = headerPatterns.findIndex((p, i) => !assigned.has(i) && p.test(firstLine));
+      if (idx >= 0) {
+        assigned.add(idx);
+        const body = stripHeader(chunk);
+        result[idx] = body.length >= 5 ? body : null;
+      }
+    }
+    if (assigned.size >= 2) return result;
+  }
+
+  // Secondary: scan for header positions within the text
+  const headerRe = /^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what (?:stands|stood) out|(?:most )?notable pattern[s]?|what may be contributing|(?:possible|potential|likely) (?:cause|contributing factor)[s]?|one thing to try|something (?:to try|worth trying)|try this|suggestion|action\s*(?:item|step)|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[ \t]*:?/gmi;
   const hits = [];
   let m;
   while ((m = headerRe.exec(text)) !== null) {
-    const section = labelMap.findIndex((p) => p.test(m[0]));
+    const section = headerPatterns.findIndex((p) => p.test(m[0]));
     if (section >= 0) hits.push({ idx: m.index, section, len: m[0].length });
   }
   const seen = new Set();
@@ -86,28 +108,42 @@ function parseLlmSections(narrative) {
       body = body.replace(/\s+$/, "");
       result[firstHits[i].section] = body.length >= 5 ? body : null;
     }
+    // If only 2 hits found, try splitting the longest section into 2
+    if (firstHits.length === 2) {
+      const missing = [0, 1, 2].find((i) => result[i] === null);
+      const longest = result[0] && result[1] ? (result[0].length > result[1].length ? 0 : 1) : (result[0] ? 0 : (result[1] ? 1 : 2));
+      if (missing != null && result[longest] && result[longest].length > 40) {
+        const sentences = result[longest].split(/(?<=[.!?\u0964])\s+/);
+        if (sentences.length >= 2) {
+          const mid = Math.ceil(sentences.length / 2);
+          const first = sentences.slice(0, mid).join(" ");
+          const second = sentences.slice(mid).join(" ");
+          result[longest] = first;
+          result[missing] = second;
+        }
+      }
+    }
     return result;
   }
+
   // Fallback: split on paragraph breaks, then try sentence-based splitting
-  let chunks = text.split(/\n\s*\n/).filter(Boolean);
-  if (chunks.length < 3) {
-    // Try splitting one long paragraph into ~3 sentence groups
+  let fallbackChunks = text.split(/\n\s*\n/).filter(Boolean);
+  if (fallbackChunks.length < 3) {
     const sentences = text.split(/(?<=[.!?\u0964])\s+/).filter(s => s.length > 5);
     if (sentences.length >= 3) {
       const perChunk = Math.ceil(sentences.length / 3);
-      chunks = [
+      fallbackChunks = [
         sentences.slice(0, perChunk).join(" "),
         sentences.slice(perChunk, perChunk * 2).join(" "),
         sentences.slice(perChunk * 2).join(" "),
       ].filter(Boolean);
     }
   }
-  chunks = chunks.slice(0, 3);
-  const stripHeader = (s) => s.replace(/^[ \t]*(?:\d+[.)]\s*)?(?:what stood out|what may be contributing|one thing to try|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)[:\s]*/i, "").trim();
+  fallbackChunks = fallbackChunks.slice(0, 3);
   return [
-    stripHeader(chunks[0] || text),
-    chunks[1] ? stripHeader(chunks[1]) : null,
-    chunks[2] ? stripHeader(chunks[2]) : null,
+    stripHeader(fallbackChunks[0] || text),
+    fallbackChunks[1] ? stripHeader(fallbackChunks[1]) : null,
+    fallbackChunks[2] ? stripHeader(fallbackChunks[2]) : null,
   ];
 }
 
@@ -1438,7 +1474,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   const [feedbackGiven, setFeedbackGiven] = useState({});
 
   // Move state
-  const [moveDuration, setMoveDuration] = useState(null); // null | 30 | 60 | 90
+  const [moveDuration, setMoveDuration] = useState(null); // null | [min,max]
 
   // Fuel state
   const [fuelDiet, setFuelDiet] = useState(null);
@@ -1449,10 +1485,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     return [dominantEmotion];
   }, [dominantEmotion]);
 
-  // Move suggestions — filtered by duration, scored by emotional state
+  // Move suggestions — filtered by duration range, scored by emotional state
   const moveSuggestions = useMemo(() => {
-    const maxDur = moveDuration || undefined;
-    const filtered = filterMovements({ maxDuration: maxDur });
+    let filtered = filterMovements({});
+    if (moveDuration) {
+      const [lo, hi] = moveDuration;
+      filtered = filtered.filter((m) => m.durationMin >= lo && m.durationMin <= hi);
+    }
     if (!emotions.length) return filtered;
     // Sort by emotion relevance
     return [...filtered].sort((a, b) => {
@@ -1496,7 +1535,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
-  if (!data || (!data.items?.length && !data.narrative)) {
+  // Only perspective mode requires server data; move/fuel are client-side
+  if (mode === "perspective" && (!data || (!data.items?.length && !data.narrative))) {
     return (
       <View style={s.modeContent}>
         <View style={[s.insightStateCard, { paddingVertical: 20, borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
@@ -1508,8 +1548,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     );
   }
 
-  const items = data.items || [];
-  const narrative = data.narrative || "";
+  const items = data?.items || [];
+  const narrative = data?.narrative || "";
   const hi = lang === "hi";
 
   function handleFeedback(itemId, response) {
@@ -1526,11 +1566,14 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       {mode === "move" && (
         <>
           <View style={s.filterRow}>
-            {[{ label: "< 30 min", val: 30 }, { label: "30-60 min", val: 60 }, { label: "60-90 min", val: 90 }].map((opt) => (
-              <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(moveDuration === opt.val ? null : opt.val); }} style={[s.filterChip, moveDuration === opt.val && s.filterChipActive]}>
-                <Text style={[s.filterChipText, moveDuration === opt.val && s.filterChipTextActive]}>{opt.label}</Text>
-              </Pressable>
-            ))}
+            {[{ label: "< 5 min", val: [0, 4] }, { label: "5-10 min", val: [5, 10] }, { label: "10+ min", val: [10, 999] }].map((opt) => {
+              const active = moveDuration && moveDuration[0] === opt.val[0] && moveDuration[1] === opt.val[1];
+              return (
+                <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(active ? null : opt.val); }} style={[s.filterChip, active && s.filterChipActive]}>
+                  <Text style={[s.filterChipText, active && s.filterChipTextActive]}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
           {moveSuggestions.length > 0 ? (
             <>
@@ -1543,7 +1586,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                   </View>
                   {dominantEmotion && mv.emotionTags?.includes(dominantEmotion) && (
                     <View style={s.suggestionMatch}>
-                      <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                      <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                     </View>
                   )}
                   {isPremium && !feedbackGiven[mv.id] ? (
@@ -1562,10 +1605,10 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                   ) : null}
                 </View>
               ))}
-              <Text style={s.suggestionCounter}>Showing {Math.min(moveSuggestions.length, 8)} of {moveSuggestions.length}</Text>
+              <Text style={s.suggestionCounter}>{t("report.prem.mode.showing", { shown: Math.min(moveSuggestions.length, 8), total: moveSuggestions.length })}</Text>
             </>
           ) : (
-            <Text style={s.modeContentBody}>No exercises match these filters</Text>
+            <Text style={s.modeContentBody}>{t("report.prem.mode.noExercises")}</Text>
           )}
         </>
       )}
@@ -1591,7 +1634,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                 </View>
                 {dominantEmotion && item.emotionTags?.includes(dominantEmotion) && (
                   <View style={s.suggestionMatch}>
-                    <Text style={s.suggestionMatchText}>✓ matches your current mood</Text>
+                    <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                   </View>
                 )}
                 {isPremium && !feedbackGiven[item.id] ? (
@@ -1611,7 +1654,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
               </View>
             ))
           ) : (
-            <Text style={s.modeContentBody}>No items match these filters</Text>
+            <Text style={s.modeContentBody}>{t("report.prem.mode.noFuelItems")}</Text>
           )}
         </>
       )}
@@ -2451,8 +2494,8 @@ const s = StyleSheet.create({
   insightStateTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
   insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
   insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
-  insightCardsRow: { gap: 10 },
-  insightSectionWrap: { gap: 0 },
+  insightCardsRow: { gap: 18 },
+  insightSectionWrap: { gap: 4 },
   insightSectionHeaderOuter: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 4, paddingBottom: 6,
