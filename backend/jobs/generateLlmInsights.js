@@ -58,13 +58,19 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
   for (const ownerId of owners) {
     try {
       const user = await getUserById(ownerId);
-      if (!user) { skipped++; continue; }
+      if (!user) {
+        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — user not found`);
+        skipped++;
+        continue;
+      }
 
       if (!force) {
         const existing = await getStoredLlmInsight(ownerId);
         if (existing?.generatedAt) {
           const elapsed = Date.now() - new Date(existing.generatedAt).getTime();
           if (elapsed < LLM_WINDOW_MS) {
+            const hoursLeft = ((LLM_WINDOW_MS - elapsed) / 3600000).toFixed(1);
+            console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — cooldown (${hoursLeft}h remaining)`);
             results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
             skipped++;
             continue;
@@ -76,6 +82,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       const weeklyReport = generateWeeklyReport({ aggregates, allAggregates: aggregates });
 
       if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
+        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — ${weeklyReport.totalMoments || 0} moments < ${minMoments} min`);
         results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });
         skipped++;
         continue;

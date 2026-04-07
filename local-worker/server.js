@@ -342,6 +342,10 @@ async function handlePullModel(req, res) {
 
 // ── Start ──
 const server = http.createServer(handleRequest);
+// LLM jobs can take 10+ minutes — disable Node's default 300s request timeout
+server.requestTimeout = 0;
+server.headersTimeout = 0;
+server.timeout = 0;
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n  TriggerMap Local Worker`);
   console.log(`  ─────────────────────`);
