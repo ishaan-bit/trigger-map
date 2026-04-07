@@ -10,6 +10,7 @@ import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
+import { OnboardingProvider } from "@/hooks/useOnboarding";
 import { EmotionalStateProvider } from "@/hooks/useEmotionalState";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import { setLastOpenedAt } from "@/services/deviceService";
@@ -93,6 +94,7 @@ export default function RootLayout() {
         <AppErrorBoundary>
           <LanguageProvider>
           <SessionProvider>
+            <OnboardingProvider>
             <EmotionalStateProvider>
             <StatusBar style="light" translucent={Platform.OS === "android"} backgroundColor="transparent" />
             <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
@@ -103,6 +105,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
             </Stack>
             </EmotionalStateProvider>
+            </OnboardingProvider>
           </SessionProvider>
           </LanguageProvider>
         </AppErrorBoundary>

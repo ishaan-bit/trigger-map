@@ -277,6 +277,24 @@
     "startLogging": "Start logging",
     "continue": "Continue"
   },
+  "ftue": {
+    "framingMessage": "Each moment you log adds a data-point. Over time, patterns emerge — and that's where the insight lives.",
+    "logFirstMoment": "Log your first moment",
+    "skipGuide": "Skip guide",
+    "whatHappened": "What happened? Tap the area of life it touched.",
+    "howAffected": "How did it affect you? Slide to where it feels right.",
+    "firstDataPoint": "First data-point captured",
+    "firstDataPointSub": "One moment logged — your timeline just started.",
+    "patternsForming": "Patterns forming",
+    "patternsFormingSub": "Another data-point. Patterns are starting to take shape.",
+    "seeTimeline": "See your timeline",
+    "seeInsights": "See your insights",
+    "timelineExplain": "Each moment shows up here as it happens.",
+    "patternsOverTime": "Over time, patterns start forming — that's where insights come from.",
+    "insightsExplain": "This is where your patterns show up. The more you log, the clearer they get.",
+    "actionsExplain": "Small things you can try — based on what your data says.",
+    "closeLoop": "Log moments when they happen. The patterns will follow."
+  },
   "login": {
     "authError": "Authentication error",
     "googleError": "Google sign-in failed",

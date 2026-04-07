@@ -4,12 +4,14 @@ import { useRouter } from "expo-router";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 
 export function OnboardingScreen() {
   const router = useRouter();
   const { completeOnboarding } = useAppSession();
+  const { advance } = useOnboarding();
   const { t } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef(null);
@@ -21,6 +23,7 @@ export function OnboardingScreen() {
     setLoading(true);
     try {
       await completeOnboarding();
+      advance("framing_shown");
       router.replace("/(tabs)/log");
     } catch {
       setLoading(false);

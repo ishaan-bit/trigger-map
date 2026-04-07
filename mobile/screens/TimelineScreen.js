@@ -9,7 +9,9 @@ import { MicroInsight } from "@/components/MicroInsight";
 import { MoodWeather } from "@/components/MoodWeather";
 import { EmotionGarden } from "@/components/EmotionGarden";
 import { Tooltip } from "@/components/Tooltip";
+import { SpotlightOverlay, GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
@@ -174,6 +176,7 @@ function groupByDay(moments, t, lang) {
 export function TimelineScreen() {
   const router = useRouter();
   const { loadTimeline, updateMoment, removeMoment, user, token } = useAppSession();
+  const { state: obState, advance: obAdvance } = useOnboarding();
   const { t, lang } = useLanguage();
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,7 +185,10 @@ export function TimelineScreen() {
   const [highlightId, setHighlightId] = useState(null);
   const [gardenHighlight, setGardenHighlight] = useState(null);
   const [showTrajectory, setShowTrajectory] = useState(false);
+  const [showTimelineGuide, setShowTimelineGuide] = useState(false);
+  const [showLogMoreGuide, setShowLogMoreGuide] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
+  const isFirstLogTimeline = obState === "first_log_done";
 
   const dayGroups = useMemo(() => {
     const merged = mergeSimilarMoments(moments);
@@ -317,7 +323,26 @@ export function TimelineScreen() {
       <Tooltip
         id="timeline_tooltip"
         text={t("timeline.tooltip")}
-        hidden={microInsights.length > 0}
+        hidden={microInsights.length > 0 || isFirstLogTimeline}
+      />
+
+      {/* FTUE: timeline introduction after first log */}
+      <GuidedTooltip
+        visible={isFirstLogTimeline && moments.length > 0 && !showLogMoreGuide}
+        text={t("ftue.timelineExplain")}
+        onDismiss={() => {
+          setShowLogMoreGuide(true);
+          obAdvance("timeline_seen");
+        }}
+        duration={5000}
+        delay={500}
+      />
+      <GuidedTooltip
+        visible={showLogMoreGuide && isFirstLogTimeline}
+        text={t("ftue.patternsOverTime")}
+        onDismiss={() => setShowLogMoreGuide(false)}
+        duration={4000}
+        delay={300}
       />
 
       {microInsights.length > 0 ? (

@@ -5,9 +5,11 @@ import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { ScreenShell } from "@/components/ScreenShell";
 import { TriggerTile } from "@/components/TriggerTile";
 import { Tooltip } from "@/components/Tooltip";
+import { SpotlightOverlay, GuidedTooltip } from "@/components/SpotlightOverlay";
 import { MoodWeather } from "@/components/MoodWeather";
 import { StreakOrb } from "@/components/StreakOrb";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
@@ -55,13 +57,32 @@ function getPrompt(count, dominantEmotion, t) {
 export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
+  const { state: obState, advance: obAdvance, skip: obSkip } = useOnboarding();
   const { dominantEmotion, dominantTrigger, emotionalTrend, emotionColor, momentCount } = useEmotionalState();
   const { t } = useLanguage();
   const [todayCount, setTodayCount] = useState(0);
   const [moments, setMoments] = useState([]);
+  const [showFraming, setShowFraming] = useState(false);
+  const [showTriggerHint, setShowTriggerHint] = useState(false);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Show framing overlay on first visit after onboarding carousel
+  useEffect(() => {
+    if (obState === "framing_shown") {
+      // Small delay so screen renders first
+      const timer = setTimeout(() => setShowFraming(true), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [obState]);
+
+  // Show trigger hint after framing is dismissed (or if state is framing_shown and user returns)
+  useEffect(() => {
+    if (obState === "framing_shown" && !showFraming) {
+      setShowTriggerHint(true);
+    }
+  }, [obState, showFraming]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,6 +160,15 @@ export function TriggerSelectionScreen() {
         <Tooltip
           id="log_tooltip"
           text={t("log.tooltip")}
+          hidden={obState === "framing_shown"}
+        />
+
+        {/* Guided trigger hint for first-time users */}
+        <GuidedTooltip
+          visible={showTriggerHint}
+          text={t("ftue.whatHappened")}
+          onDismiss={() => setShowTriggerHint(false)}
+          duration={5000}
         />
 
         <View style={styles.grid}>
@@ -173,6 +203,18 @@ export function TriggerSelectionScreen() {
           </Text>
         </View>
       </StaggerIn>
+
+      {/* FTUE framing overlay — shown once after onboarding carousel */}
+      <SpotlightOverlay
+        visible={showFraming}
+        emoji="🎯"
+        message={t("ftue.framingMessage")}
+        cta={t("ftue.logFirstMoment")}
+        onDismiss={() => setShowFraming(false)}
+        skipLabel={t("ftue.skipGuide")}
+        onSkip={() => { setShowFraming(false); obSkip(); }}
+        position="center"
+      />
     </ScreenShell>
   );
 }

@@ -12,7 +12,9 @@ import {
 import { ScreenShell } from "@/components/ScreenShell";
 import { EmotionPad } from "@/components/EmotionPad";
 import { FeedbackCard } from "@/components/FeedbackCard";
+import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
 import { emotionColor } from "@/utils/emotionModel";
@@ -39,7 +41,10 @@ export function EmotionSelectionScreen() {
   const { trigger } = useLocalSearchParams();
   const router = useRouter();
   const { saveMoment } = useAppSession();
+  const { state: obState, advance: obAdvance } = useOnboarding();
   const { t, lang } = useLanguage();
+  const isFirstLog = obState === "framing_shown";
+  const isSecondLog = obState === "first_log_done";
 
   const [emotionCoords, setEmotionCoords] = useState({ valence: 0, arousal: 0, intensity: 0 });
   const [selectedTags, setSelectedTags] = useState([]);
@@ -48,6 +53,7 @@ export function EmotionSelectionScreen() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [emotionHintDismissed, setEmotionHintDismissed] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
   const tagSectionAnim = useRef(new Animated.Value(0)).current;
@@ -176,7 +182,17 @@ export function EmotionSelectionScreen() {
 
       hapticSuccess();
       showToast(t("emotion.savedToast") !== "emotion.savedToast" ? t("emotion.savedToast") : "Moment logged");
-      setTimeout(() => router.replace("/(tabs)/timeline"), 3000);
+
+      // Advance onboarding state and navigate appropriately
+      if (isFirstLog) {
+        obAdvance("first_log_done");
+        setTimeout(() => router.replace("/(tabs)/timeline"), 3000);
+      } else if (isSecondLog) {
+        obAdvance("second_log_done");
+        setTimeout(() => router.replace("/(tabs)/report"), 3000);
+      } else {
+        setTimeout(() => router.replace("/(tabs)/timeline"), 3000);
+      }
     } catch {
       showError(t("emotion.saveFailed"), t("emotion.saveFailedMessage"));
     } finally {
@@ -230,10 +246,23 @@ export function EmotionSelectionScreen() {
           <Animated.View style={{ transform: [{ scale: orbScale }] }}>
             <Text style={styles.feedbackEmoji}>{derivedLabel}</Text>
           </Animated.View>
-          <Text style={[styles.feedbackTitle, { color: accentColor }]}>{t("emotion.heardYou")}</Text>
+          <Text style={[styles.feedbackTitle, { color: accentColor }]}>
+            {isFirstLog ? t("ftue.firstDataPoint") : isSecondLog ? t("ftue.patternsForming") : t("emotion.heardYou")}
+          </Text>
           <FeedbackCard feedback={feedback} trigger={trigger} emotion={legacyEmotion || "neutral"} />
-          <Pressable style={styles.goTimelineBtn} onPress={() => { tap(); router.replace("/(tabs)/timeline"); }} accessibilityRole="button">
-            <Text style={styles.goTimelineText}>{t("emotion.goTimeline")}</Text>
+          {isFirstLog ? (
+            <Text style={styles.ftueSubtext}>{t("ftue.firstDataPointSub")}</Text>
+          ) : isSecondLog ? (
+            <Text style={styles.ftueSubtext}>{t("ftue.patternsFormingSub")}</Text>
+          ) : null}
+          <Pressable style={styles.goTimelineBtn} onPress={() => {
+            tap();
+            if (isSecondLog) { router.replace("/(tabs)/report"); }
+            else { router.replace("/(tabs)/timeline"); }
+          }} accessibilityRole="button">
+            <Text style={styles.goTimelineText}>
+              {isFirstLog ? t("ftue.seeTimeline") : isSecondLog ? t("ftue.seeInsights") : t("emotion.goTimeline")}
+            </Text>
           </Pressable>
         </View>
       </ScreenShell>
@@ -264,6 +293,15 @@ export function EmotionSelectionScreen() {
         derivedLabel={derivedLabel}
         regionLabel={t(`emotion.regions.${regionKey}`)}
         t={t}
+      />
+
+      {/* FTUE emotion hint */}
+      <GuidedTooltip
+        visible={isFirstLog && !hasInteracted && !emotionHintDismissed}
+        text={t("ftue.howAffected")}
+        onDismiss={() => setEmotionHintDismissed(true)}
+        duration={5000}
+        delay={600}
       />
 
       {hasInteracted && adaptiveTags.length > 0 && (
@@ -414,4 +452,5 @@ const styles = StyleSheet.create({
   feedbackOrbInner: { width: 80, height: 80, borderRadius: 40, opacity: 0.2, marginBottom: -20 },
   feedbackEmoji: { fontSize: 24, fontWeight: "700", color: palette.text, marginBottom: 4, textTransform: "capitalize" },
   feedbackTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
+  ftueSubtext: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 260 },
 });

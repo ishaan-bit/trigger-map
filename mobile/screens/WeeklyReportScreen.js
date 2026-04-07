@@ -16,7 +16,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { LineChart, BarChart } from "react-native-chart-kit";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
@@ -2107,6 +2109,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
 export function WeeklyReportScreen() {
   const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId, invalidateCache } = useAppSession();
   const router = useRouter();
+  const { state: obState, advance: obAdvance } = useOnboarding();
   const { dominantEmotion } = useEmotionalState();
   const { t, lang } = useLanguage();
   const [report, setReport] = useState(null);
@@ -2116,6 +2119,9 @@ export function WeeklyReportScreen() {
   const [activeTab, setActiveTab] = useState("mirror");
   const [modes, setModes] = useState(null);
   const [progress, setProgress] = useState(null);
+  const [showInsightsGuide, setShowInsightsGuide] = useState(false);
+  const [showActionsGuide, setShowActionsGuide] = useState(false);
+  const [showCloseLoop, setShowCloseLoop] = useState(false);
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -2141,7 +2147,13 @@ export function WeeklyReportScreen() {
     const { token: t, refreshSession: rs, isPremium: p, isSignedIn: si } = callbacksRef.current;
     if (t) rs().catch(() => null);
     trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
-  }, [load]));
+
+    // FTUE: show insights guide when arriving from second log
+    if (obState === "second_log_done") {
+      const timer = setTimeout(() => setShowInsightsGuide(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [load, obState]));
 
   // Load adaptive modes for premium users
   useEffect(() => {
@@ -2289,6 +2301,39 @@ export function WeeklyReportScreen() {
             <>
               {/* Tab bar */}
               <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+
+              {/* FTUE guided tooltips */}
+              {showInsightsGuide ? (
+                <GuidedTooltip
+                  text={t("ftue.insightsExplain")}
+                  onDismiss={() => {
+                    setShowInsightsGuide(false);
+                    obAdvance("insights_seen");
+                    setTimeout(() => setShowActionsGuide(true), 400);
+                  }}
+                  duration={6000}
+                />
+              ) : null}
+              {showActionsGuide ? (
+                <GuidedTooltip
+                  text={t("ftue.actionsExplain")}
+                  onDismiss={() => {
+                    setShowActionsGuide(false);
+                    setTimeout(() => setShowCloseLoop(true), 400);
+                  }}
+                  duration={6000}
+                />
+              ) : null}
+              {showCloseLoop ? (
+                <GuidedTooltip
+                  text={t("ftue.closeLoop")}
+                  onDismiss={() => {
+                    setShowCloseLoop(false);
+                    obAdvance("completed");
+                  }}
+                  duration={7000}
+                />
+              ) : null}
 
               {/* Light week banner for historical users with sparse current data */}
               {confidence === "too_early" && isHistoricalUser ? (
