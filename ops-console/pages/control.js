@@ -646,12 +646,59 @@ export default function ControlPage() {
         body: JSON.stringify({ action, target, params }),
       });
       const data = await res.json();
-      setResults((prev) => [
-        { timestamp, action, target, ok: res.ok, data, status: res.status },
-        ...prev,
-      ].slice(0, 50));
-      // After job run, refresh worker status (active jobs may have changed)
-      if (action === 'run-job' || action === 'cancel-job') checkWorker();
+
+      // Async job — worker accepted, now poll for completion
+      if (res.status === 202 && data.async) {
+        setResults((prev) => [
+          { timestamp, action, target, ok: true, data: { ...data, message: `Job "${target}" started — polling for completion...` }, status: 202, polling: true },
+          ...prev,
+        ].slice(0, 50));
+        checkWorker();
+
+        // Poll every 5s until job completes (max 1 hour)
+        const deadline = Date.now() + 60 * 60 * 1000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            const pollRes = await fetch(`/api/control/job-status?job=${encodeURIComponent(target)}`);
+            const pollData = await pollRes.json();
+            if (pollData.status === 'completed') {
+              setResults((prev) => {
+                const updated = [...prev];
+                const idx = updated.findIndex((r) => r.target === target && r.polling);
+                if (idx >= 0) {
+                  updated[idx] = { timestamp: new Date().toISOString(), action, target, ok: pollData.ok !== false, data: pollData, status: 200 };
+                } else {
+                  updated.unshift({ timestamp: new Date().toISOString(), action, target, ok: pollData.ok !== false, data: pollData, status: 200 });
+                }
+                return updated.slice(0, 50);
+              });
+              checkWorker();
+              break;
+            }
+            // Update elapsed time in the polling entry
+            if (pollData.status === 'running') {
+              setResults((prev) => {
+                const updated = [...prev];
+                const idx = updated.findIndex((r) => r.target === target && r.polling);
+                if (idx >= 0) {
+                  const elapsed = Math.round((pollData.elapsed || 0) / 1000);
+                  updated[idx] = { ...updated[idx], data: { ...updated[idx].data, message: `Running... (${elapsed}s)`, tail: pollData.tail } };
+                }
+                return updated;
+              });
+            }
+          } catch {
+            // transient — keep polling
+          }
+        }
+      } else {
+        setResults((prev) => [
+          { timestamp, action, target, ok: res.ok, data, status: res.status },
+          ...prev,
+        ].slice(0, 50));
+        if (action === 'run-job' || action === 'cancel-job') checkWorker();
+      }
     } catch (err) {
       setResults((prev) => [
         { timestamp, action, target, ok: false, data: { error: err.message }, status: 0 },

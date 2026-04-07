@@ -11,7 +11,7 @@ export async function workerRequest(path, options = {}) {
 
   const url = `${WORKER_URL()}${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 600000); // 10min for LLM jobs
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s for the initial request
 
   try {
     const res = await fetch(url, {
@@ -63,6 +63,10 @@ export async function runAdaptiveModes({ model, force, maxWords, ownerIds, style
     method: 'POST',
     body: JSON.stringify({ model, force, maxWords, ownerIds, style }),
   });
+}
+
+export async function getJobStatus(jobName) {
+  return workerRequest(`/job-status?job=${encodeURIComponent(jobName)}`, { method: 'GET' });
 }
 
 export async function cancelWorkerJob(jobName) {

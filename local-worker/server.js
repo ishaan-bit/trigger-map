@@ -29,7 +29,8 @@ if (!WORKER_KEY || WORKER_KEY === 'change-me-to-a-strong-secret') {
 }
 
 // ── Active job tracking (prevent concurrent runs of the same job) ──
-const activeJobs = new Map(); // jobName → { startedAt, abortController }
+const activeJobs = new Map(); // jobName → { startedAt, child, stdout, stderr }
+const completedJobs = new Map(); // jobName → { ok, exitCode, durationMs, stdout, stderr, completedAt }
 
 // ── CORS helpers ──
 function setCorsHeaders(res) {
@@ -195,6 +196,32 @@ async function handleRequest(req, res) {
     return json(res, 400, { error: 'Job cannot be cancelled' });
   }
 
+  // GET /job-status?job=<jobName> — poll for async job completion
+  if (path === '/job-status' && req.method === 'GET') {
+    const jobName = url.searchParams.get('job');
+    if (!jobName) return json(res, 400, { error: 'job query param required' });
+
+    // Still running
+    const active = activeJobs.get(jobName);
+    if (active) {
+      return json(res, 200, {
+        status: 'running',
+        job: jobName,
+        startedAt: active.startedAt,
+        elapsed: Date.now() - active.startedAt,
+        tail: active.stdout.slice(-1000),
+      });
+    }
+
+    // Completed
+    const completed = completedJobs.get(jobName);
+    if (completed) {
+      return json(res, 200, { status: 'completed', job: jobName, ...completed });
+    }
+
+    return json(res, 404, { status: 'unknown', job: jobName });
+  }
+
   return json(res, 404, { error: 'Not found' });
 }
 
@@ -233,8 +260,7 @@ async function handleRunJob(req, res, scriptName, jobName) {
   }
 
   const startTime = Date.now();
-  let stdout = '';
-  let stderr = '';
+  const jobEntry = { startedAt: startTime, child: null, stdout: '', stderr: '' };
 
   const child = spawn('node', args, {
     cwd: BACKEND_DIR,
@@ -243,33 +269,46 @@ async function handleRunJob(req, res, scriptName, jobName) {
     windowsHide: true,
   });
 
-  activeJobs.set(jobName, { startedAt: startTime, child });
+  jobEntry.child = child;
+  activeJobs.set(jobName, jobEntry);
 
-  child.stdout.on('data', (d) => { stdout += d.toString(); });
-  child.stderr.on('data', (d) => { stderr += d.toString(); });
+  child.stdout.on('data', (d) => { jobEntry.stdout += d.toString(); });
+  child.stderr.on('data', (d) => { jobEntry.stderr += d.toString(); });
 
   child.on('close', (code) => {
     activeJobs.delete(jobName);
     const duration = Date.now() - startTime;
-    json(res, code === 0 ? 200 : 500, {
+    completedJobs.set(jobName, {
       ok: code === 0,
-      action: jobName,
       exitCode: code,
       durationMs: duration,
-      stdout: stdout.slice(-4000),
-      stderr: stderr.slice(-2000),
+      stdout: jobEntry.stdout.slice(-4000),
+      stderr: jobEntry.stderr.slice(-2000),
+      completedAt: Date.now(),
       source: 'local-worker',
     });
+    console.log(`[worker] Job "${jobName}" finished (code=${code}, ${Math.round(duration / 1000)}s)`);
   });
 
   child.on('error', (err) => {
     activeJobs.delete(jobName);
-    json(res, 500, {
+    completedJobs.set(jobName, {
       ok: false,
-      action: jobName,
       error: err.message,
+      completedAt: Date.now(),
+      durationMs: Date.now() - startTime,
       source: 'local-worker',
     });
+    console.error(`[worker] Job "${jobName}" error: ${err.message}`);
+  });
+
+  // Return immediately — client polls /job-status for completion
+  return json(res, 202, {
+    ok: true,
+    action: jobName,
+    status: 'started',
+    startedAt: startTime,
+    source: 'local-worker',
   });
 }
 

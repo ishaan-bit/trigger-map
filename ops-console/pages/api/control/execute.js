@@ -51,16 +51,21 @@ export default async function handler(req, res) {
         } else if (target === 'rewriteSummaries') {
           result = await runRewriteSummaries(workerParams);
         } else if (target === 'generateLlmActions') {
-          result = await runLlmActions(workerParams);        } else if (target === 'generateAdaptiveModes') {
-          result = await runAdaptiveModes(workerParams);        } else {
+          result = await runLlmActions(workerParams);
+        } else if (target === 'generateAdaptiveModes') {
+          result = await runAdaptiveModes(workerParams);
+        } else {
           result = await runFreePass(workerParams);
         }
         const duration = Date.now() - startTime;
-        return res.status(result.ok ? 200 : 502).json({
+        // Worker returns 202 for async jobs — pass through
+        const isAsync = result.status === 202;
+        return res.status(isAsync ? 202 : (result.ok ? 200 : 502)).json({
           ok: result.ok,
           action,
           target,
           source: 'local-worker',
+          async: isAsync,
           durationMs: duration,
           result: result.data,
         });
