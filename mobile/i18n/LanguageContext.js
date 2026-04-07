@@ -43,7 +43,13 @@ export function LanguageProvider({ children }) {
       const value = resolve(dict, key);
       if (value === undefined) {
         const fallback = resolve(translations[DEFAULT_LANG], key);
-        if (fallback === undefined) return key;
+        if (fallback === undefined) {
+          // Never leak raw i18n key paths to the UI.
+          // Extract the last segment and humanize it as a readable fallback.
+          if (__DEV__) console.warn(`[i18n] Missing key: "${key}"`);
+          const last = key.split(".").pop() || key;
+          return last.replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").trim().replace(/^\w/, (c) => c.toUpperCase());
+        }
         return typeof fallback === "string" ? interpolate(fallback, vars) : fallback;
       }
       return typeof value === "string" ? interpolate(value, vars) : value;

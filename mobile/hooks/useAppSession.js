@@ -210,6 +210,7 @@ export function SessionProvider({ children }) {
       reminderEnabled,
       reflectionEnabled,
       nudgesEnabled,
+      invalidateCache,
       async completeOnboarding() {
         await setOnboardingComplete(true);
         setOnboardingCompleteState(true);

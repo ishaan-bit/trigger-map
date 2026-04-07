@@ -14,7 +14,7 @@ import { generateWeeklyReport } from "../services/patternEngine.js";
 import { getTimeline } from "../services/momentService.js";
 import { getUserById } from "../services/authService.js";
 import { redis, redisKey } from "../services/redisClient.js";
-import { getStoredLlmInsight, getLlmInsightKey, getActionFeedback } from "../services/reportStore.js";
+import { getStoredLlmInsight, getLlmInsightKey, getActionFeedback, appendLlmInsightHistory } from "../services/reportStore.js";
 import { phraseText, extractFirstName } from "../utils/phrasingLayer.js";
 
 const LLM_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
@@ -33,6 +33,10 @@ function parseCliFlags(argv) {
 
 async function storeLlmInsight(ownerId, payload) {
   await redis(["SET", getLlmInsightKey(ownerId), JSON.stringify(payload)]);
+  // Also append to the insight history archive
+  await appendLlmInsightHistory(ownerId, payload).catch((err) =>
+    console.error(`  History append failed for ${ownerId.slice(0, 8)}: ${err.message}`)
+  );
   return payload;
 }
 

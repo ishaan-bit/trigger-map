@@ -75,7 +75,28 @@ function parseLlmSections(narrative) {
         result[idx] = body.length >= 5 ? body : null;
       }
     }
-    if (assigned.size >= 2) return result;
+    // Post-process: check if an assigned chunk secretly contains an unassigned header mid-text
+    if (assigned.size >= 2) {
+      const unassigned = [0, 1, 2].filter((i) => !assigned.has(i));
+      for (const missing of unassigned) {
+        const inlineRe = headerPatterns[missing];
+        for (const filled of [...assigned]) {
+          if (!result[filled]) continue;
+          const match = inlineRe.exec(result[filled]);
+          if (match) {
+            const before = result[filled].slice(0, match.index).trim();
+            const after = stripHeader(result[filled].slice(match.index)).trim();
+            if (before.length >= 5 && after.length >= 5) {
+              result[filled] = before;
+              result[missing] = after;
+              assigned.add(missing);
+              break;
+            }
+          }
+        }
+      }
+      return result;
+    }
   }
 
   // Secondary: scan for header positions within the text
@@ -1699,6 +1720,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
 function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh, dominantEmotion }) {
   const [activeMode, setActiveMode] = useState("core");
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1927,6 +1949,42 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
             </AnimatedSection>
           ) : null}
 
+          {/* ── 4b. PAST INSIGHTS ARCHIVE ── */}
+          {report?.insightHistory?.length > 0 ? (
+            <AnimatedSection index={3.5} style={s.section}>
+              <SectionHeader label={t("report.prem.pastInsights")} badge="archive" t={t} />
+              <View style={s.pastInsightsList}>
+                {(historyExpanded ? report.insightHistory : report.insightHistory.slice(0, 3)).map((entry, idx) => {
+                  const preview = (entry.narrative || "").split(/\n\s*\n/)[0] || entry.narrative || "";
+                  return (
+                    <View key={entry.generatedAt || idx} style={s.pastInsightCard}>
+                      <Text style={s.pastInsightDate}>
+                        {entry.weekLabel || (entry.generatedAt ? localeDateStr(entry.generatedAt, lang) : "")}
+                      </Text>
+                      <Text style={s.pastInsightPreview} numberOfLines={3}>{cleanText(preview)}</Text>
+                      {entry.sectionCount ? (
+                        <Text style={s.pastInsightMeta}>
+                          {entry.sectionCount} {entry.sectionCount === 1 ? "section" : "sections"}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+                {report.insightHistory.length > 3 ? (
+                  <Pressable
+                    style={s.pastInsightToggle}
+                    onPress={() => { tap(); setHistoryExpanded((v) => !v); }}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.pastInsightToggleText}>
+                      {historyExpanded ? t("report.prem.showLess") : t("report.prem.showMore")}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </AnimatedSection>
+          ) : null}
+
           {/* ── 5. YOUR LEVERS (adaptive regulators) ── */}
           {sortedRegulators.length > 0 ? (
             <AnimatedSection index={4} style={s.section}>
@@ -2047,7 +2105,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
 /* ── Main screen ── */
 
 export function WeeklyReportScreen() {
-  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId } = useAppSession();
+  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId, invalidateCache } = useAppSession();
   const router = useRouter();
   const { dominantEmotion } = useEmotionalState();
   const { t, lang } = useLanguage();
@@ -2119,12 +2177,19 @@ export function WeeklyReportScreen() {
 
   const handleActionFeedback = useCallback((actionId, response) => {
     trackEvent("action_feedback", { actionId, response });
-  }, []);
+    // Invalidate cached report so next load fetches fresh actions
+    invalidateCache("weeklyReport");
+    load();
+  }, [invalidateCache, load]);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
   const hasLlmInsight = !!report?.llmInsight?.narrative;
   const hasLlmTeaser = !!report?.llmTeaser?.narrative;
+  // Historical users with sparse current week should still see tabs
+  const lifetimeMoments = report?.lifetimeMoments ?? 0;
+  const isHistoricalUser = lifetimeMoments >= 3;
+  const showTabs = confidence !== "too_early" || isHistoricalUser;
 
   function handleSignIn() { tap(); trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
   async function handleUpgrade() {
@@ -2200,7 +2265,7 @@ export function WeeklyReportScreen() {
             </View>
           ) : null}
 
-          {report && !error && confidence === "too_early" ? (
+          {report && !error && confidence === "too_early" && !isHistoricalUser ? (
             <View style={s.starterCard}>
               <Text style={s.starterEmoji}>🌱</Text>
               <Text style={s.starterTitle}>{isSignedIn ? t("report.starterSignedIn") : t("report.starterAnon")}</Text>
@@ -2220,10 +2285,19 @@ export function WeeklyReportScreen() {
             </View>
           ) : null}
 
-          {report && !error && confidence !== "too_early" ? (
+          {report && !error && showTabs ? (
             <>
               {/* Tab bar */}
               <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+
+              {/* Light week banner for historical users with sparse current data */}
+              {confidence === "too_early" && isHistoricalUser ? (
+                <View style={s.lightWeekBanner}>
+                  <Text style={s.lightWeekText}>
+                    {t("report.lightWeek") || "Quiet week so far \u2014 showing your recent patterns and past insights."}
+                  </Text>
+                </View>
+              ) : null}
 
               {/* Tab content */}
               {activeTab === "mirror" ? (
@@ -2495,6 +2569,19 @@ const s = StyleSheet.create({
   insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
   insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
   insightCardsRow: { gap: 18 },
+
+  /* Past insights archive */
+  pastInsightsList: { gap: 10 },
+  pastInsightCard: {
+    padding: 14, borderRadius: radius.md, backgroundColor: palette.glass,
+    borderWidth: 1, borderColor: palette.glassBorder, gap: 6,
+  },
+  pastInsightDate: { color: palette.accent, fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
+  pastInsightPreview: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
+  pastInsightMeta: { color: palette.muted, fontSize: 11 },
+  pastInsightToggle: { alignItems: "center", paddingVertical: 10 },
+  pastInsightToggleText: { color: palette.accent, fontSize: 13, fontWeight: "600" },
+
   insightSectionWrap: { gap: 4 },
   insightSectionHeaderOuter: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -2544,6 +2631,13 @@ const s = StyleSheet.create({
   starterEmoji: { fontSize: 40 },
   starterTitle: { color: palette.text, fontSize: 18, fontWeight: "700", textAlign: "center" },
   starterBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
+
+  lightWeekBanner: {
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.sm,
+    backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
+    marginBottom: 8,
+  },
+  lightWeekText: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center" },
 
   nudgeSecondary: { marginTop: 4, paddingVertical: 10, alignItems: "center" },
   nudgeSecondaryText: { color: palette.accent, fontSize: 14, fontWeight: "600", textDecorationLine: "underline" },

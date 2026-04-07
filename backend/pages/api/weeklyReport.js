@@ -7,7 +7,7 @@ import { phraseText, extractFirstName } from "@/utils/phrasingLayer.js";
 import enableCors from "@/lib/cors.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
 import { captureServerError } from "@/services/monitoringService.js";
-import { getStoredWeeklyInsight, getStoredLlmInsight, hasFreePass, getActionFeedback, getActionPrefs } from "@/services/reportStore.js";
+import { getStoredWeeklyInsight, getStoredLlmInsight, hasFreePass, getActionFeedback, getActionPrefs, getLlmInsightHistory } from "@/services/reportStore.js";
 import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const isAuthenticated = Boolean(user);
 
     // Parallel fetch: aggregates (7d + 45d), moments, subscription, LLM insight, stored report, first-free check, free pass, action feedback
-    const [aggregates, allAggregates, allMoments, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs] = await Promise.all([
+    const [aggregates, allAggregates, allMoments, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs, insightHistory] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
       getTimeline(ownerId),
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
       getActionFeedback(ownerId),
       getActionPrefs(ownerId),
+      isAuthenticated ? getLlmInsightHistory(ownerId) : Promise.resolve([]),
     ]);
 
     // Filter moments to last 7 days for invoked metrics computation
@@ -69,7 +70,8 @@ export default async function handler(req, res) {
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
     const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates, moments: recentMoments });
-    console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: moments=${recentMoments.length}, correlations=${Object.keys(report.correlations || {}).length}, invokedMetrics=${report.invokedMetrics != null}, compound=${report.compoundPatterns != null}`);
+    report.lifetimeMoments = (allMoments || []).length;
+    console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: moments=${recentMoments.length}, lifetime=${report.lifetimeMoments}, correlations=${Object.keys(report.correlations || {}).length}, invokedMetrics=${report.invokedMetrics != null}, compound=${report.compoundPatterns != null}`);
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
     if (canViewRuleBased && report.totalMoments) {
       report.aiInsight = await generateInsight(report, { firstName, lang });
@@ -115,6 +117,11 @@ export default async function handler(req, res) {
           generatedAt: llmInsight.generatedAt,
         };
       }
+    }
+
+    // Attach insight history for premium / free-pass / first-free users
+    if (insightHistory.length && (hasPremium || freePass || firstFreeAvailable)) {
+      report.insightHistory = insightHistory;
     }
 
     if (report.totalMoments >= 3) {

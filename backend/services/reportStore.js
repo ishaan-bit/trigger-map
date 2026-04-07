@@ -32,6 +32,44 @@ export async function getStoredLlmInsight(ownerId) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// --- Insight history (append-only archive) ---
+
+export function getLlmInsightHistoryKey(ownerId) {
+  return redisKey("llm_insight_history", ownerId);
+}
+
+export async function appendLlmInsightHistory(ownerId, insight) {
+  const key = getLlmInsightHistoryKey(ownerId);
+  const entry = JSON.stringify({
+    narrative: insight.narrative,
+    generatedAt: insight.generatedAt,
+    sectionCount: insight.sectionCount,
+    weekLabel: insight.weekLabel || null,
+  });
+  await pipeline([
+    ["RPUSH", key, entry],
+    ["EXPIRE", key, String(60 * 60 * 24 * 180)], // 6 months
+  ]);
+}
+
+export async function getLlmInsightHistory(ownerId, limit = 12) {
+  const key = getLlmInsightHistoryKey(ownerId);
+  // Most recent last in Redis list; return newest-first
+  const raw = await redis(["LRANGE", key, "0", "-1"]);
+  if (!Array.isArray(raw) || !raw.length) return [];
+  const parsed = raw
+    .map((r) => { try { return JSON.parse(r); } catch { return null; } })
+    .filter(Boolean);
+  // Deduplicate by generatedAt
+  const seen = new Set();
+  const unique = [];
+  for (let i = parsed.length - 1; i >= 0; i--) {
+    const key = parsed[i].generatedAt || `idx-${i}`;
+    if (!seen.has(key)) { seen.add(key); unique.push(parsed[i]); }
+  }
+  return unique.slice(0, limit);
+}
+
 // --- Free-pass (one-time view) helpers ---
 
 export function getFreePassKey(ownerId) {
