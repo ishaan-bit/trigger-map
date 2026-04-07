@@ -2,6 +2,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { palette, radius } from "@/utils/theme";
 import { warning } from "@/utils/haptics";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { emotionColor as getEmotionColorFromCoords } from "@/utils/emotionModel";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -23,7 +24,8 @@ const EMOTION_ICONS = {
 export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   const { t, lang } = useLanguage();
   const triggerLabel = t("triggers." + moment.trigger) || moment.trigger;
-  const emotionLabel = t("emotions." + moment.emotion) || moment.emotion;
+  const displayEmotion = moment.derivedLabel || moment.emotion;
+  const emotionLabel = t("emotions." + displayEmotion) || displayEmotion;
   const locale = lang === "hi" ? "hi-IN" : "en-IN";
 
   function handleDelete() {
@@ -34,7 +36,10 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
     ]);
   }
 
-  const emotionColor = EMOTION_COLORS[moment.emotion] || palette.muted;
+  const hasCoords = typeof moment.valence === "number" && typeof moment.arousal === "number";
+  const emotionColor = hasCoords
+    ? getEmotionColorFromCoords(moment.valence, moment.arousal)
+    : (EMOTION_COLORS[moment.emotion] || palette.muted);
 
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: emotionColor }]}>

@@ -27,11 +27,11 @@ export function getMomentsKey(ownerId) {
 export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
 
-  // Continuous model: valence/arousal provided → derive legacy emotion for backward compat
+  // Continuous model: valence/arousal provided → derive label from circumplex region
   // Legacy model: emotion string provided → map to coordinates
   const hasContinuous = typeof valence === "number" && typeof arousal === "number";
   const finalEmotion = hasContinuous
-    ? coordinatesToLegacy(valence, arousal)
+    ? derivedEmotionLabel(valence, arousal)
     : (EMOTIONS.includes(emotion) ? emotion : "neutral");
   const coords = hasContinuous
     ? { valence, arousal }
@@ -42,7 +42,7 @@ export function createMomentPayload({ ownerId, trigger, emotion, valence, arousa
     ownerId,
     trigger: finalTrigger,
     emotion: finalEmotion,
-    emotion_legacy: hasContinuous ? undefined : finalEmotion,
+    emotion_legacy: hasContinuous ? coordinatesToLegacy(valence, arousal) : finalEmotion,
     valence: coords.valence,
     arousal: coords.arousal,
     intensity: typeof intensity === "number" ? intensity : Math.sqrt(coords.valence ** 2 + coords.arousal ** 2),

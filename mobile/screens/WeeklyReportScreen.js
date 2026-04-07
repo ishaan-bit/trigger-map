@@ -178,6 +178,30 @@ function getInsightSectionMeta(t) {
   ];
 }
 
+function PastInsightExpanded({ narrative, t }) {
+  const sections = parseLlmSections(narrative);
+  if (!sections || sections.every((s) => !s)) {
+    return <Text style={s.pastInsightPreview}>{cleanText(narrative || "")}</Text>;
+  }
+  const meta = getInsightSectionMeta(t);
+  return (
+    <View style={{ gap: 14 }}>
+      {sections.map((body, idx) => {
+        if (!body) return null;
+        const m = meta[idx] || {};
+        return (
+          <View key={idx} style={{ gap: 4 }}>
+            <Text style={{ color: palette.accent, fontSize: 13, fontWeight: "700" }}>
+              {m.icon ? m.icon + " " : ""}{m.label || ""}
+            </Text>
+            <Text style={s.pastInsightPreview}>{cleanText(body)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const EMOTION_EMOJIS = { frustrated: "😤", anxious: "😰", neutral: "😐", calm: "😌", energized: "⚡" };
 const EMOTION_COLORS = { calm: "#5ee6a0", neutral: "#9eb0c9", anxious: "#ffb347", frustrated: "#ff6b7a", energized: "#a78bfa" };
 const TIME_ICONS = { morning: "🌅", afternoon: "☀️", evening: "🌆", night: "🌙" };
@@ -681,7 +705,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }
                     <Text style={{ color: palette.muted, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</Text>
                   </View>
                   {isOpen ? (
-                    <Text style={[s.pastInsightPreview, { numberOfLines: undefined }]}>{cleanText(entry.narrative || "")}</Text>
+                    <PastInsightExpanded narrative={entry.narrative} t={t} />
                   ) : (
                     <Text style={s.pastInsightPreview} numberOfLines={2}>{cleanText(preview)}</Text>
                   )}
