@@ -122,7 +122,8 @@ export function deleteMomentApi(momentId, token) {
 }
 
 export function fetchTimeline(deviceId, token) {
-  const query = token ? "" : `?deviceId=${encodeURIComponent(deviceId)}`;
+  const t = Date.now();
+  const query = token ? `?_t=${t}` : `?deviceId=${encodeURIComponent(deviceId)}&_t=${t}`;
   return fetchJson(`/timeline${query}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 

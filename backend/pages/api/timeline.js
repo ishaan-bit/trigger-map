@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     }
 
     const moments = await getTimeline(ownerId);
-    res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=30");
+    res.setHeader("Cache-Control", "private, no-cache, no-store, must-revalidate");
     return sendSuccess(res, {
       moments,
       grouped: groupMomentsByDay(moments),
