@@ -1,6 +1,7 @@
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 import { lintText, triggerLabel, cap } from "../utils/textGrammar.js";
 import { buildSignalProfile, rankSignals, detectRelationship } from "./signalProfile.js";
+import { retrieveForRuleBased, retrieveIntervention } from "../knowledge/ragEngine.js";
 import {
   triggerHi, emotionHi,
   MICRO_EXPERIMENTS_HI,
@@ -430,6 +431,10 @@ export async function generateInsight(report, opts = {}) {
   const pool = expPool[trigger] || expPool.work;
   const microExperiment = confidence !== "too_early" ? pool[Math.floor(Math.random() * pool.length)] : null;
 
+  // RAG-retrieved context for richer output
+  const rag = confidence !== "too_early" ? retrieveForRuleBased(report, 4) : { interpretations: [], framing: [] };
+  const topInterpretation = rag.interpretations[0]?.content || null;
+
   // Build structured fields for the new tab-based UI
   let whatWorking = buildWhatWorking(report);
   let whereToFocus = buildWhereToFocus(report);
@@ -470,8 +475,9 @@ export async function generateInsight(report, opts = {}) {
     drivers,
     behavioralLoop,
     actionableDirection: actionableDirection ? (hi ? actionableDirection : lintText(actionableDirection)) : null,
+    patternContext: topInterpretation,
     confidence,
-    model: "rule-based-v3",
+    model: "rule-based-v4",
     generatedAt: new Date().toISOString(),
   };
 }
@@ -599,11 +605,14 @@ function buildActionableDirection(report) {
   const sp = buildSignalProfile(report);
   const bm = report.baselineMetrics;
 
-  if (sp.crashRisk) return "Your surface metrics look stable but deeper signals are diverging. Prioritize rest and check in with yourself.";
-  if (sp.falseRecovery) return "Your scores bounced back but the underlying pattern hasn't resolved. Ease back into demanding situations gradually.";
-  if (sp.maskingLevel === "high") return "There's more going on than your logged emotions suggest. Try logging more freely without filtering.";
-  if (bm?.drift?.direction === "declining") return `Your baseline has been dipping. Lean into what helps: ${report.regulators?.[0] ? triggerLabel(report.regulators[0].trigger) : "your regulators"}.`;
-  if (sp.isFlattening) return "Your emotional range is narrowing. Try something outside your routine to see what shifts.";
+  // RAG-informed base directions
+  const ragIntervention = retrieveIntervention(report);
+
+  if (sp.crashRisk) return ragIntervention || "Your surface metrics look stable but deeper signals are diverging. Prioritize rest and check in with yourself.";
+  if (sp.falseRecovery) return ragIntervention || "Your scores bounced back but the underlying pattern hasn't resolved. Ease back into demanding situations gradually.";
+  if (sp.maskingLevel === "high") return ragIntervention || "There's more going on than your logged emotions suggest. Try logging more freely without filtering.";
+  if (bm?.drift?.direction === "declining") return ragIntervention || `Your baseline has been dipping. Lean into what helps: ${report.regulators?.[0] ? triggerLabel(report.regulators[0].trigger) : "your regulators"}.`;
+  if (sp.isFlattening) return ragIntervention || "Your emotional range is narrowing. Try something outside your routine to see what shifts.";
   if (report.regulators?.length && bm?.stability?.score >= 0.6) return `Things are steady. Keep ${triggerLabel(report.regulators[0].trigger)} in your week.`;
-  return null;
+  return ragIntervention || null;
 }

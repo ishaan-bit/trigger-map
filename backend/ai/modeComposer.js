@@ -13,6 +13,7 @@
 
 import { pickMovements, MOVEMENTS } from "../knowledge/movementLibrary.js";
 import { pickNourishments, NOURISHMENTS } from "../knowledge/nourishmentLibrary.js";
+import { retrieveForMode } from "../knowledge/ragEngine.js";
 import { emotionSignalKeywords } from "../shared/constants/emotions.js";
 import {
   getModeProfile,
@@ -184,7 +185,9 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   const model = modelOverride || process.env.LLM_MODEL || DEFAULT_MODEL;
   const report = await getStoredWeeklyInsight(ownerId);
   const emotions = extractEmotions(report);
-  const context = extractBriefContext(report);
+  const baseContext = extractBriefContext(report);
+  const ragContext = report ? retrieveForMode(report, 3) : "";
+  const context = ragContext ? `${baseContext}\n${ragContext}` : baseContext;
   const profile = await getModeProfile(ownerId);
 
   let items = [];

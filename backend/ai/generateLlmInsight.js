@@ -10,6 +10,7 @@
 
 import { getStylePrompt } from "./styleProfiles.js";
 import { buildSignalProfile, buildSignalConstraints, rankSignals, detectRelationship } from "./signalProfile.js";
+import { retrieveForLLM } from "../knowledge/ragEngine.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "mistral";
@@ -235,6 +236,7 @@ function buildSignals(report, recentNotes, actionFeedback) {
 
 function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
   const signals = buildSignals(report, recentNotes, actionFeedback);
+  const ragContext = retrieveForLLM(report, 6);
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
   const hasNotes = recentNotes?.length > 0;
@@ -257,7 +259,7 @@ function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
 
 ---
 ${signals}
----
+---${ragContext ? `\n\n${ragContext}` : ''}
 
 Using ONLY the data above, write EXACTLY three short sections. Use the EXACT format shown in the example below.
 
