@@ -58,10 +58,10 @@ export async function runLlmActions({ model, force, ownerIds, style } = {}) {
   });
 }
 
-export async function runAdaptiveModes({ model, force, maxWords, ownerIds } = {}) {
+export async function runAdaptiveModes({ model, force, maxWords, ownerIds, style } = {}) {
   return workerRequest('/generate-adaptive-modes', {
     method: 'POST',
-    body: JSON.stringify({ model, force, maxWords, ownerIds }),
+    body: JSON.stringify({ model, force, maxWords, ownerIds, style }),
   });
 }
 

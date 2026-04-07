@@ -220,6 +220,7 @@ async function handleRunJob(req, res, scriptName, jobName) {
   const args = ['jobs/' + scriptName];
   if (force) args.push('--force');
   if (minMoments != null) args.push(`--min-moments=${minMoments}`);
+  if (maxWords != null) args.push(`--max-words=${maxWords}`);
 
   const env = { ...process.env };
   if (model) env.LLM_MODEL = model;

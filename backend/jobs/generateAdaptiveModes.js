@@ -30,7 +30,8 @@ function parseCliFlags(argv) {
   return flags;
 }
 
-export async function runGenerateAdaptiveModes({ force = false, maxWords = 100, ownerIds, model } = {}) {
+export async function runGenerateAdaptiveModes({ force = false, maxWords, ownerIds, model } = {}) {
+  const effectiveMaxWords = maxWords ?? (process.env.LLM_MAX_WORDS ? parseInt(process.env.LLM_MAX_WORDS, 10) : 100);
   const envIds = process.env.LLM_OWNER_IDS;
   const owners = Array.isArray(ownerIds) && ownerIds.length > 0
     ? ownerIds
@@ -72,7 +73,7 @@ export async function runGenerateAdaptiveModes({ force = false, maxWords = 100, 
       }
 
       console.log(`[adaptive-modes] Generating modes for ${ownerId.slice(0, 8)}...`);
-      const modeResults = await generateAllModes({ ownerId, lang: user.lang || "en", model, maxWords });
+      const modeResults = await generateAllModes({ ownerId, lang: user.lang || "en", model, maxWords: effectiveMaxWords });
       const generated = Object.keys(modeResults).filter((k) => modeResults[k] != null);
 
       results.push({ ownerId, ok: true, modes: generated });
