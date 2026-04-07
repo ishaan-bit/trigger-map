@@ -13,8 +13,8 @@ import { buildSignalProfile, buildSignalConstraints, rankSignals, detectRelation
 import { retrieveForLLM } from "../knowledge/ragEngine.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
-const DEFAULT_MODEL = "mistral";
-const REQUEST_TIMEOUT_MS = 300_000;
+const DEFAULT_MODEL = "phi3";
+const REQUEST_TIMEOUT_MS = 600_000;
 const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
 
 /**

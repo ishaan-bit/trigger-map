@@ -24,8 +24,8 @@ import {
 import { getStoredWeeklyInsight } from "../services/reportStore.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
-const DEFAULT_MODEL = "mistral";
-const REQUEST_TIMEOUT_MS = 180_000; // 3 min for mode generation
+const DEFAULT_MODEL = "phi3";
+const REQUEST_TIMEOUT_MS = 600_000; // 10 min for mode generation
 
 // ── Signal extraction ──────────────────────────────────────────────────
 
