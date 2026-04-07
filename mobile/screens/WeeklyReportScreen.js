@@ -419,7 +419,7 @@ function DeltaChip({ value, label, inverted = false }) {
 
 /* ── Tab 1: Mirror (persistent identity) ── */
 
-function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
+function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }) {
   const bm = report?.baselineMetrics;
   const insight = report?.aiInsight;
   const drivers = insight?.drivers;
@@ -430,6 +430,8 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
   const invoked = report?.invokedMetrics;
   const compound = report?.compoundPatterns;
   const tone = bm?.recentAverage != null ? scoreTone(bm.recentAverage, t) : null;
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [expandedInsight, setExpandedInsight] = useState(null);
 
   return (
     <View style={s.tabContent}>
@@ -655,6 +657,55 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t }) {
         <View style={{ marginTop: 8 }}>
           <PrimaryButton label={t("report.signInDeepen")} onPress={handleSignIn} />
         </View>
+      ) : null}
+
+      {/* Past Insights Archive — at bottom of Mirror tab */}
+      {report?.insightHistory?.length > 0 ? (
+        <AnimatedSection index={8} style={s.section}>
+          <SectionHeader label={t("report.prem.pastInsights")} badge="archive" t={t} />
+          <View style={s.pastInsightsList}>
+            {(historyExpanded ? report.insightHistory : report.insightHistory.slice(0, 3)).map((entry, idx) => {
+              const isOpen = expandedInsight === (entry.generatedAt || idx);
+              const preview = (entry.narrative || "").split(/\n\s*\n/)[0] || entry.narrative || "";
+              return (
+                <Pressable
+                  key={entry.generatedAt || idx}
+                  style={[s.pastInsightCard, isOpen && { borderColor: palette.accent + "60" }]}
+                  onPress={() => { tap(); setExpandedInsight(isOpen ? null : (entry.generatedAt || idx)); }}
+                  accessibilityRole="button"
+                >
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={s.pastInsightDate}>
+                      {entry.weekLabel || (entry.generatedAt ? localeDateStr(entry.generatedAt, lang) : "")}
+                    </Text>
+                    <Text style={{ color: palette.muted, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</Text>
+                  </View>
+                  {isOpen ? (
+                    <Text style={[s.pastInsightPreview, { numberOfLines: undefined }]}>{cleanText(entry.narrative || "")}</Text>
+                  ) : (
+                    <Text style={s.pastInsightPreview} numberOfLines={2}>{cleanText(preview)}</Text>
+                  )}
+                  {entry.sectionCount && !isOpen ? (
+                    <Text style={s.pastInsightMeta}>
+                      {entry.sectionCount} {entry.sectionCount === 1 ? "section" : "sections"}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            {report.insightHistory.length > 3 ? (
+              <Pressable
+                style={s.pastInsightToggle}
+                onPress={() => { tap(); setHistoryExpanded((v) => !v); }}
+                accessibilityRole="button"
+              >
+                <Text style={s.pastInsightToggleText}>
+                  {historyExpanded ? t("report.prem.showLess") : t("report.prem.showMore", { count: report.insightHistory.length - 3 })}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </AnimatedSection>
       ) : null}
     </View>
   );
@@ -1722,7 +1773,6 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
 function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh, dominantEmotion }) {
   const [activeMode, setActiveMode] = useState("core");
-  const [historyExpanded, setHistoryExpanded] = useState(false);
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1951,42 +2001,6 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
             </AnimatedSection>
           ) : null}
 
-          {/* ── 4b. PAST INSIGHTS ARCHIVE ── */}
-          {report?.insightHistory?.length > 0 ? (
-            <AnimatedSection index={3.5} style={s.section}>
-              <SectionHeader label={t("report.prem.pastInsights")} badge="archive" t={t} />
-              <View style={s.pastInsightsList}>
-                {(historyExpanded ? report.insightHistory : report.insightHistory.slice(0, 3)).map((entry, idx) => {
-                  const preview = (entry.narrative || "").split(/\n\s*\n/)[0] || entry.narrative || "";
-                  return (
-                    <View key={entry.generatedAt || idx} style={s.pastInsightCard}>
-                      <Text style={s.pastInsightDate}>
-                        {entry.weekLabel || (entry.generatedAt ? localeDateStr(entry.generatedAt, lang) : "")}
-                      </Text>
-                      <Text style={s.pastInsightPreview} numberOfLines={3}>{cleanText(preview)}</Text>
-                      {entry.sectionCount ? (
-                        <Text style={s.pastInsightMeta}>
-                          {entry.sectionCount} {entry.sectionCount === 1 ? "section" : "sections"}
-                        </Text>
-                      ) : null}
-                    </View>
-                  );
-                })}
-                {report.insightHistory.length > 3 ? (
-                  <Pressable
-                    style={s.pastInsightToggle}
-                    onPress={() => { tap(); setHistoryExpanded((v) => !v); }}
-                    accessibilityRole="button"
-                  >
-                    <Text style={s.pastInsightToggleText}>
-                      {historyExpanded ? t("report.prem.showLess") : t("report.prem.showMore")}
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </AnimatedSection>
-          ) : null}
-
           {/* ── 5. YOUR LEVERS (adaptive regulators) ── */}
           {sortedRegulators.length > 0 ? (
             <AnimatedSection index={4} style={s.section}>
@@ -2189,10 +2203,11 @@ export function WeeklyReportScreen() {
 
   const handleActionFeedback = useCallback((actionId, response) => {
     trackEvent("action_feedback", { actionId, response });
-    // Invalidate cached report so next load fetches fresh actions
+    // Only invalidate cache — do NOT reload the report here.
+    // The optimistic UI in ActionsTab already shows the feedback.
+    // Fresh actions will be fetched on next report load (new moment, tab revisit, etc).
     invalidateCache("weeklyReport");
-    load();
-  }, [invalidateCache, load]);
+  }, [invalidateCache]);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
@@ -2346,7 +2361,7 @@ export function WeeklyReportScreen() {
 
               {/* Tab content */}
               {activeTab === "mirror" ? (
-                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} />
+                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
               ) : activeTab === "week" ? (
                 <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
               ) : activeTab === "progress" ? (
