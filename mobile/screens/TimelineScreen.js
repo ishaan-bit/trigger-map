@@ -176,7 +176,7 @@ function groupByDay(moments, t, lang) {
 export function TimelineScreen() {
   const router = useRouter();
   const { loadTimeline, updateMoment, removeMoment, user, token } = useAppSession();
-  const { state: obState, advance: obAdvance } = useOnboarding();
+  const { state: obState, advance: obAdvance, isCompleted: obCompleted, markNudgeSeen, isNudgeSeen } = useOnboarding();
   const { t, lang } = useLanguage();
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,6 +187,7 @@ export function TimelineScreen() {
   const [showTrajectory, setShowTrajectory] = useState(false);
   const [showTimelineGuide, setShowTimelineGuide] = useState(false);
   const [showLogMoreGuide, setShowLogMoreGuide] = useState(false);
+  const [showDeeperNudge, setShowDeeperNudge] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const isFirstLogTimeline = obState === "first_log_done";
 
@@ -242,6 +243,16 @@ export function TimelineScreen() {
       load();
     }, [load])
   );
+
+  // Progressive nudge: deeper patterns when 10+ moments
+  useEffect(() => {
+    if (!obCompleted || moments.length < 10) return;
+    let active = true;
+    isNudgeSeen("deeper_patterns").then((seen) => {
+      if (active && !seen) setShowDeeperNudge(true);
+    });
+    return () => { active = false; };
+  }, [obCompleted, moments.length, isNudgeSeen]);
 
   const handleEdit = useCallback((moment) => {
     setGardenHighlight(moment.emotion || "neutral");
@@ -343,6 +354,15 @@ export function TimelineScreen() {
         onDismiss={() => setShowLogMoreGuide(false)}
         duration={4000}
         delay={300}
+      />
+
+      {/* Progressive nudge: deeper patterns at 10+ moments */}
+      <GuidedTooltip
+        visible={showDeeperNudge}
+        text={t("nudge.deeperPatterns")}
+        onDismiss={() => { setShowDeeperNudge(false); markNudgeSeen("deeper_patterns"); }}
+        duration={6000}
+        delay={600}
       />
 
       {microInsights.length > 0 ? (

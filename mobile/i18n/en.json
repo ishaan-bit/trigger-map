@@ -295,6 +295,10 @@
     "actionsExplain": "Small things you can try — based on what your data says.",
     "closeLoop": "Log moments when they happen. The patterns will follow."
   },
+  "nudge": {
+    "insightsReady": "You have enough data for real patterns. Check your weekly insights.",
+    "deeperPatterns": "With this much data, your weekly report carries real weight. Take a look."
+  },
   "login": {
     "authError": "Authentication error",
     "googleError": "Google sign-in failed",

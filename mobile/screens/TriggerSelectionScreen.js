@@ -57,13 +57,14 @@ function getPrompt(count, dominantEmotion, t) {
 export function TriggerSelectionScreen() {
   const router = useRouter();
   const { loadTimeline } = useAppSession();
-  const { state: obState, advance: obAdvance, skip: obSkip } = useOnboarding();
+  const { state: obState, advance: obAdvance, skip: obSkip, isCompleted: obCompleted, markNudgeSeen, isNudgeSeen } = useOnboarding();
   const { dominantEmotion, dominantTrigger, emotionalTrend, emotionColor, momentCount } = useEmotionalState();
   const { t } = useLanguage();
   const [todayCount, setTodayCount] = useState(0);
   const [moments, setMoments] = useState([]);
   const [showFraming, setShowFraming] = useState(false);
   const [showTriggerHint, setShowTriggerHint] = useState(false);
+  const [showInsightsNudge, setShowInsightsNudge] = useState(false);
   const loadTimelineRef = useRef(loadTimeline);
   loadTimelineRef.current = loadTimeline;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -83,6 +84,16 @@ export function TriggerSelectionScreen() {
       setShowTriggerHint(true);
     }
   }, [obState, showFraming]);
+
+  // Progressive nudge: suggest checking insights after enough data
+  useEffect(() => {
+    if (!obCompleted || momentCount < 5) return;
+    let active = true;
+    isNudgeSeen("insights_ready").then((seen) => {
+      if (active && !seen) setShowInsightsNudge(true);
+    });
+    return () => { active = false; };
+  }, [obCompleted, momentCount, isNudgeSeen]);
 
   useFocusEffect(
     useCallback(() => {
@@ -161,6 +172,15 @@ export function TriggerSelectionScreen() {
           id="log_tooltip"
           text={t("log.tooltip")}
           hidden={obState === "framing_shown"}
+        />
+
+        {/* Progressive nudge: check your insights */}
+        <GuidedTooltip
+          visible={showInsightsNudge}
+          text={t("nudge.insightsReady")}
+          onDismiss={() => { setShowInsightsNudge(false); markNudgeSeen("insights_ready"); }}
+          duration={6000}
+          delay={800}
         />
 
         {/* Guided trigger hint for first-time users */}
