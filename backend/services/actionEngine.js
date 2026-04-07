@@ -56,6 +56,11 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   const fb = buildFeedbackIndex(feedback);
   const hi = lang === "hi";
 
+  // Rotation epoch: every 3 feedback responses, rotate action IDs so
+  // the user always gets fresh items after responding to the current set.
+  const epoch = Math.floor(fb.all.size / 3);
+  const eid = epoch > 0 ? `-r${epoch}` : "";
+
   // If LLM actions exist in prefs, use them as the primary source.
   // Filter out any that the user already tried/skipped.
   if (prefs?.llmActions?.length) {
@@ -376,17 +381,30 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     }
   }
 
-  // Remove actions the user said "not helpful" 2+ times
+  // Remove actions the user said "not helpful" 2+ times (by base ID pattern)
   const blacklisted = new Set();
   for (const [id, c] of Object.entries(fb.counters)) {
     if (c.notHelpful >= 2) blacklisted.add(id);
   }
 
+  // Apply rotation epoch to candidate IDs so new feedback rounds produce fresh IDs
+  if (eid) {
+    for (const c of candidates) { c.id = c.id + eid; }
+  }
+
+  // Blacklist check: strip epoch suffix from candidate IDs for pattern matching
+  function isBlacklisted(actionId) {
+    if (blacklisted.has(actionId)) return true;
+    // Also check the base ID without the epoch suffix
+    const base = actionId.replace(/-r\d+$/, "");
+    return blacklisted.has(base);
+  }
+
   // Filter out already-responded and permanently-blacklisted actions
-  let filtered = candidates.filter(a => !fb.all.has(a.id) && !blacklisted.has(a.id));
+  let filtered = candidates.filter(a => !fb.all.has(a.id) && !isBlacklisted(a.id));
 
   if (filtered.length < 3) {
-    const remaining = candidates.filter(a => !filtered.some(f => f.id === a.id) && !blacklisted.has(a.id));
+    const remaining = candidates.filter(a => !filtered.some(f => f.id === a.id) && !isBlacklisted(a.id));
     for (const c of remaining) {
       if (filtered.length >= 3) break;
       if (!fb.notHelpful.has(c.id)) filtered.push(c);
@@ -394,11 +412,20 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   }
 
   // Rank: boost actions related to triggers the user found helpful
+  // Extract triggers from both current candidates AND feedback IDs (via pattern matching)
   const helpedTriggers = new Set();
   for (const [id, c] of Object.entries(fb.counters)) {
     if (c.helped > 0) {
-      const matched = candidates.find(a => a.id === id);
+      // Try matching from current candidates
+      const baseId = id.replace(/-r\d+$/, "");
+      const matched = candidates.find(a => a.id === id || a.id.replace(/-r\d+$/, "") === baseId);
       if (matched?.trigger) helpedTriggers.add(matched.trigger);
+      // Also extract trigger from ID pattern (e.g., "friction-work-anxious" → "work")
+      const parts = baseId.split("-");
+      if (parts.length >= 2 && parts[0] !== "centroid" && parts[0] !== "drift") {
+        const possibleTrigger = parts[1];
+        if (possibleTrigger) helpedTriggers.add(possibleTrigger);
+      }
     }
   }
   filtered.sort((a, b) => {

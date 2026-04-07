@@ -111,6 +111,7 @@ function retrieve(userTags, { domains, maxChunks = 5 }) {
  * This gives the LLM richer grounding for its narrative.
  */
 export function retrieveForLLM(report, maxChunks = 6) {
+  if (!report) return "";
   const sp = buildSignalProfile(report);
   const tags = extractTags(sp, report);
   const results = retrieve(tags, { maxChunks });
@@ -129,6 +130,7 @@ export function retrieveForLLM(report, maxChunks = 6) {
  * Returns structured objects for programmatic use.
  */
 export function retrieveForRuleBased(report, maxChunks = 4) {
+  if (!report) return { interpretations: [], framing: [] };
   const sp = buildSignalProfile(report);
   const tags = extractTags(sp, report);
 
@@ -153,6 +155,7 @@ export function retrieveForRuleBased(report, maxChunks = 4) {
  * Focuses on dynamics + interpretation relevant to MODE generation.
  */
 export function retrieveForMode(report, maxChunks = 3) {
+  if (!report) return "";
   const sp = buildSignalProfile(report);
   const tags = extractTags(sp, report);
 
@@ -173,6 +176,7 @@ export function retrieveForMode(report, maxChunks = 3) {
  * contextually appropriate suggestions.
  */
 export function retrieveIntervention(report) {
+  if (!report) return null;
   const sp = buildSignalProfile(report);
   const tags = extractTags(sp, report);
 

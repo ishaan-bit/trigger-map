@@ -236,7 +236,8 @@ function buildSignals(report, recentNotes, actionFeedback) {
 
 function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
   const signals = buildSignals(report, recentNotes, actionFeedback);
-  const ragContext = retrieveForLLM(report, 6);
+  let ragContext = "";
+  try { ragContext = retrieveForLLM(report, 6) || ""; } catch (e) { console.error("[RAG] retrieveForLLM failed:", e.message); }
   const sparse = (report.dataQuality?.totalMoments || 0) < 8;
   const hasTags = Object.keys(report.tagFrequency || {}).length > 0;
   const hasNotes = recentNotes?.length > 0;

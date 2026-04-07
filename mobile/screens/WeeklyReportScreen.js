@@ -1711,7 +1711,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
         </ScrollView>
       )}
 
-      {data.generatedAt ? (
+      {data?.generatedAt ? (
         <Text style={s.modeFooter}>
           {t("report.generatedBy", { date: localeDateStr(data.generatedAt, lang) })}
         </Text>

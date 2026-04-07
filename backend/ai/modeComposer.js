@@ -186,7 +186,8 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   const report = await getStoredWeeklyInsight(ownerId);
   const emotions = extractEmotions(report);
   const baseContext = extractBriefContext(report);
-  const ragContext = report ? retrieveForMode(report, 3) : "";
+  let ragContext = "";
+  try { if (report) ragContext = retrieveForMode(report, 3) || ""; } catch (e) { console.error("[RAG] retrieveForMode failed:", e.message); }
   const context = ragContext ? `${baseContext}\n${ragContext}` : baseContext;
   const profile = await getModeProfile(ownerId);
 

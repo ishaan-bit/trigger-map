@@ -432,7 +432,8 @@ export async function generateInsight(report, opts = {}) {
   const microExperiment = confidence !== "too_early" ? pool[Math.floor(Math.random() * pool.length)] : null;
 
   // RAG-retrieved context for richer output
-  const rag = confidence !== "too_early" ? retrieveForRuleBased(report, 4) : { interpretations: [], framing: [] };
+  let rag = { interpretations: [], framing: [] };
+  try { if (confidence !== "too_early") rag = retrieveForRuleBased(report, 4) || rag; } catch (e) { console.error("[RAG] retrieveForRuleBased failed:", e.message); }
   const topInterpretation = rag.interpretations[0]?.content || null;
 
   // Build structured fields for the new tab-based UI
@@ -606,7 +607,8 @@ function buildActionableDirection(report) {
   const bm = report.baselineMetrics;
 
   // RAG-informed base directions
-  const ragIntervention = retrieveIntervention(report);
+  let ragIntervention = null;
+  try { ragIntervention = retrieveIntervention(report); } catch (e) { console.error("[RAG] retrieveIntervention failed:", e.message); }
 
   if (sp.crashRisk) return ragIntervention || "Your surface metrics look stable but deeper signals are diverging. Prioritize rest and check in with yourself.";
   if (sp.falseRecovery) return ragIntervention || "Your scores bounced back but the underlying pattern hasn't resolved. Ease back into demanding situations gradually.";
