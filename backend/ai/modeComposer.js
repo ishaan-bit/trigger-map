@@ -336,6 +336,41 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         if (match) narrative = match[1].trim();
       }
 
+      // ── Post-processing: fix common LLM garbling ──
+      // phi3 consistently misspells words and produces broken contractions.
+      // Fix known garbles before storing.
+      const garbleMap = [
+        [/\boverwhinely\b/gi, "overwhelmed"],
+        [/\boverwhselming\b/gi, "overwhelming"],
+        [/\boverwhinishing\b/gi, "overwhelming"],
+        [/\boverwhinished\b/gi, "overwhelmed"],
+        [/\boverwhelmfully\b/gi, "overwhelmingly"],
+        [/\boverwhfully\b/gi, "overwhelmingly"],
+        [/\boverwhinely\b/gi, "overwhelmed"],
+        [/\boverwh[a-z]*ly\b/gi, "overwhelmingly"],
+        [/\bexercuries\b/gi, "exercises"],
+        [/\bstayring\b/gi, "staying"],
+        [/\blet'gedo\b/gi, "let's"],
+        [/\bit'in\b/gi, "it's"],
+        [/\bit'selfthey\b/gi, "it's okay, they"],
+        [/\btryptophan'increasing\b/gi, "tryptophan, increasing"],
+        [/\blife' endless\b/gi, "life's endless"],
+        [/\bIt'd\b/g, "It would"],
+        [/\bt'these\b/gi, "these"],
+        [/\b[a-z]'[a-z]{4,}\b/gi, (m) => m.replace(/'/, "")],
+      ];
+      for (const [pattern, fix] of garbleMap) {
+        narrative = narrative.replace(pattern, fix);
+      }
+      // Strip markdown artifacts, control chars, excessive whitespace
+      narrative = narrative
+        .replace(/\*\*/g, "")
+        .replace(/#{1,3}\s+/g, "")
+        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+        .replace(/[\u200b-\u200f\ufeff]/g, "")
+        .replace(/ {2,}/g, " ")
+        .trim();
+
       const itemIds = items.map((i) => i.id);
       const itemSummaries = items.map((i) => ({
         id: i.id,
