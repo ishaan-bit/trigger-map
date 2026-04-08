@@ -65,7 +65,7 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   // Filter out any that the user already tried/skipped.
   if (prefs?.llmActions?.length) {
     const fresh = prefs.llmActions.filter(a => !fb.all.has(a.id));
-    if (fresh.length >= 3) {
+    if (fresh.length > 0) {
       return fresh.slice(0, 4).map((a, i) => ({
         ...a,
         title: lintText(a.title),
@@ -74,7 +74,7 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
         order: i,
       }));
     }
-    // If some LLM actions remain, use them as seeds and fill with rule-based
+    // All LLM actions already tried/skipped — fall through to rule-based
   }
 
   const candidates = [];

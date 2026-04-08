@@ -9,7 +9,7 @@
  * Setting it below the total layer count leaves VRAM headroom for the KV cache.
  */
 
-const DEFAULT_NUM_CTX = 4096;
+const DEFAULT_NUM_CTX = 8192;
 const DEFAULT_NUM_GPU = 26; // phi3 has 32 layers; 26 on GPU ≈ 81% GPU / 19% CPU
 
 /**
