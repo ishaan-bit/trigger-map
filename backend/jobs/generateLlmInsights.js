@@ -160,7 +160,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const flags = parseCliFlags(process.argv);
   console.log("=== QuietDen LLM Insight Generator ===");
   console.log(`LLM endpoint: ${process.env.LLM_API_URL || "http://localhost:11434/v1"}`);
-  console.log(`Model: ${process.env.LLM_MODEL || "mistral"}`);
+  console.log(`Model: ${process.env.LLM_MODEL || "phi3"}`);
   console.log("");
 
   runGenerateLlmInsights(flags)

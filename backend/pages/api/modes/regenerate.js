@@ -6,7 +6,7 @@ import { generateAllModes } from "@/ai/modeComposer.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { enforceRateLimit } from "@/services/rateLimitService.js";
 
-const ALLOWED_MODELS = ["mistral", "llama3", "gemma2"];
+const ALLOWED_MODELS = ["phi3", "mistral", "llama3", "llama2", "gemma", "gemma4", "qwen2"];
 const ALLOWED_STYLES = ["warm", "direct", "poetic"];
 
 /**

@@ -15,8 +15,10 @@ import { pickMovements, MOVEMENTS } from "../knowledge/movementLibrary.js";
 import { pickNourishments, NOURISHMENTS } from "../knowledge/nourishmentLibrary.js";
 import { retrieveForMode } from "../knowledge/ragEngine.js";
 import { emotionSignalKeywords } from "../shared/constants/emotions.js";
+import { ollamaChat } from "./ollamaChat.js";
 import {
   getModeProfile,
+  getModeFeedback,
   getRecentItemIds,
   storeModeOutput,
   appendModeHistory,
@@ -26,6 +28,46 @@ import { getStoredWeeklyInsight } from "../services/reportStore.js";
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
 const REQUEST_TIMEOUT_MS = 600_000; // 10 min for mode generation
+const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
+const RETRY_DELAY_MS = 3_000; // 3 s between retries
+const MAX_RETRIES = 1;
+
+// ── Model availability check ──────────────────────────────────────────
+
+async function ensureModelAvailable(ollamaBase, model) {
+  const nativeBase = ollamaBase.replace(/\/v1\/?$/, "");
+  try {
+    const showRes = await fetch(`${nativeBase}/api/show`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model }),
+    });
+    if (showRes.ok) return;
+  } catch {
+    return; // Ollama might not be running — let the main call handle the error
+  }
+
+  console.log(`[modeComposer] Model "${model}" not found. Pulling...`);
+  const controller = new AbortController();
+  const pullTimeout = setTimeout(() => controller.abort(), PULL_TIMEOUT_MS);
+  try {
+    const pullRes = await fetch(`${nativeBase}/api/pull`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model, stream: false }),
+      signal: controller.signal,
+    });
+    if (!pullRes.ok) {
+      const text = await pullRes.text();
+      throw new Error(`Pull failed (${pullRes.status}): ${text}`);
+    }
+    console.log(`[modeComposer] Model "${model}" pulled successfully.`);
+  } catch (err) {
+    console.error(`[modeComposer] Model pull failed: ${err.message}`);
+  } finally {
+    clearTimeout(pullTimeout);
+  }
+}
 
 // ── Signal extraction ──────────────────────────────────────────────────
 
@@ -58,6 +100,48 @@ function extractBriefContext(report) {
   return lines.join(" ");
 }
 
+// ── Feedback context for HiTL personalisation ──────────────────────────
+
+function buildFeedbackContext(feedback, mode, items, lang) {
+  if (!feedback || feedback.length === 0) return "";
+
+  const modeFb = feedback.filter((f) => f.mode === mode);
+  if (modeFb.length === 0) return "";
+
+  // Build liked / disliked item ID lists from recent feedback
+  const liked = modeFb.filter((f) => f.response === "helpful").map((f) => f.itemId);
+  const disliked = modeFb.filter((f) => f.response === "not_helpful").map((f) => f.itemId);
+
+  // Resolve names from the full library for richer context
+  const allItems = items; // full library passed in
+  const nameOf = (id) => {
+    const item = allItems.find((i) => i.id === id);
+    return item ? (lang === "hi" ? item.nameHi : item.name) : id;
+  };
+
+  const lines = [];
+  const hi = lang === "hi";
+
+  if (liked.length) {
+    const uniqueLiked = [...new Set(liked)].slice(0, 6);
+    lines.push(
+      hi
+        ? `उपयोगकर्ता ने पहले ये पसंद किये: ${uniqueLiked.map(nameOf).join(", ")}। इन जैसे विकल्प पसंद करें।`
+        : `The user previously liked: ${uniqueLiked.map(nameOf).join(", ")}. Favour similar approaches.`
+    );
+  }
+  if (disliked.length) {
+    const uniqueDisliked = [...new Set(disliked)].slice(0, 6);
+    lines.push(
+      hi
+        ? `उपयोगकर्ता ने ये नापसंद किये: ${uniqueDisliked.map(nameOf).join(", ")}। अलग तरीका अपनाएं।`
+        : `The user disliked: ${uniqueDisliked.map(nameOf).join(", ")}. Take a different approach.`
+    );
+  }
+
+  return lines.join("\n");
+}
+
 // ── Item selection (knowledge → structured picks) ──────────────────────
 
 async function selectMoveItems(ownerId, emotions, profile) {
@@ -65,8 +149,9 @@ async function selectMoveItems(ownerId, emotions, profile) {
   const env = profile?.environment || undefined;
   const equip = profile?.equipment || undefined;
   const disliked = profile?.dislikedMovements || [];
+  const liked = profile?.likedMovements || [];
   const exclude = [...recentIds, ...disliked];
-  return pickMovements(emotions, 2, { exclude, environment: env, equipment: equip });
+  return pickMovements(emotions, 2, { exclude, boost: liked, environment: env, equipment: equip });
 }
 
 async function selectFuelItems(ownerId, emotions, profile) {
@@ -74,8 +159,9 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const diet = profile?.diet || undefined;
   const cuisine = profile?.cuisine || undefined;
   const disliked = profile?.dislikedNourishments || [];
+  const liked = profile?.likedNourishments || [];
   const exclude = [...recentIds, ...disliked];
-  return pickNourishments(emotions, 2, { exclude, diet, cuisine });
+  return pickNourishments(emotions, 2, { exclude, boost: liked, diet, cuisine });
 }
 
 // ── Prompt builders ────────────────────────────────────────────────────
@@ -183,6 +269,10 @@ function getSystemPrompt(mode, lang) {
 export async function generateModeOutput({ ownerId, mode, lang = "en", model: modelOverride, maxWords = 100 }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = modelOverride || process.env.LLM_MODEL || DEFAULT_MODEL;
+
+  // Pre-check: ensure model is available in Ollama (auto-pull if missing)
+  await ensureModelAvailable(apiUrl, model);
+
   const report = await getStoredWeeklyInsight(ownerId);
   const emotions = extractEmotions(report);
   const baseContext = extractBriefContext(report);
@@ -191,15 +281,22 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   const context = ragContext ? `${baseContext}\n${ragContext}` : baseContext;
   const profile = await getModeProfile(ownerId);
 
+  // HiTL: fetch user's past feedback for personalisation
+  let feedback = [];
+  try { feedback = await getModeFeedback(ownerId); } catch (e) { console.error("[modeComposer] getModeFeedback failed:", e.message); }
+
   let items = [];
   let prompt;
+  let feedbackCtx = "";
 
   if (mode === "move") {
     items = await selectMoveItems(ownerId, emotions, profile);
-    prompt = buildMovePrompt(items, context, lang);
+    feedbackCtx = buildFeedbackContext(feedback, "move", MOVEMENTS, lang);
+    prompt = buildMovePrompt(items, feedbackCtx ? `${context}\n\n${feedbackCtx}` : context, lang);
   } else if (mode === "fuel") {
     items = await selectFuelItems(ownerId, emotions, profile);
-    prompt = buildFuelPrompt(items, context, lang);
+    feedbackCtx = buildFeedbackContext(feedback, "fuel", NOURISHMENTS, lang);
+    prompt = buildFuelPrompt(items, feedbackCtx ? `${context}\n\n${feedbackCtx}` : context, lang);
   } else {
     // perspective — no knowledge items, LLM composes freely
     prompt = buildPerspectivePrompt(context, lang);
@@ -208,60 +305,61 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   const tokenMultiplier = lang === "hi" ? 3.5 : 2.5;
   const maxTokens = Math.max(200, Math.round(maxWords * tokenMultiplier));
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const chatMessages = [
+    { role: "system", content: getSystemPrompt(mode, lang) },
+    { role: "user", content: prompt },
+  ];
 
-  try {
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      console.log(`[modeComposer] Retry ${attempt}/${MAX_RETRIES} for ${mode} (${ownerId.slice(0, 8)})...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+
+    try {
+      const result = await ollamaChat({
+        apiUrl,
         model,
-        messages: [
-          { role: "system", content: getSystemPrompt(mode, lang) },
-          { role: "user", content: prompt },
-        ],
+        messages: chatMessages,
         temperature: 0.2,
-        max_tokens: maxTokens,
-      }),
-      signal: controller.signal,
-    });
+        maxTokens,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LLM API returned ${response.status}: ${text}`);
+      let narrative = result.content;
+      if (!narrative) throw new Error("LLM returned empty response for mode " + mode);
+
+      // Trim incomplete sentence if token-limited
+      if (result.finishReason === "length") {
+        const match = narrative.match(/^([\s\S]*[.!?])(?:\s|$)/);
+        if (match) narrative = match[1].trim();
+      }
+
+      const itemIds = items.map((i) => i.id);
+      const itemSummaries = items.map((i) => ({
+        id: i.id,
+        name: lang === "hi" ? i.nameHi : i.name,
+        description: lang === "hi" ? i.descriptionHi : i.description,
+        ...(i.intensity ? { intensity: i.intensity } : {}),
+        ...(i.durationMin ? { durationMin: i.durationMin } : {}),
+        ...(i.type ? { type: i.type } : {}),
+        ...(i.nutrientFocus ? { nutrientFocus: i.nutrientFocus } : {}),
+      }));
+
+      // Persist
+      const output = { mode, items: itemSummaries, narrative, model };
+      await storeModeOutput(ownerId, mode, output);
+      await appendModeHistory(ownerId, mode, itemIds);
+
+      return output;
+    } catch (err) {
+      lastError = err;
+      console.error(`[modeComposer] ${mode} attempt ${attempt} failed for ${ownerId.slice(0, 8)}: ${err.message}`);
     }
-
-    const data = await response.json();
-    let narrative = data.choices?.[0]?.message?.content?.trim();
-    if (!narrative) throw new Error("LLM returned empty response for mode " + mode);
-
-    // Trim incomplete sentence if token-limited
-    if (data.choices?.[0]?.finish_reason === "length") {
-      const match = narrative.match(/^([\s\S]*[.!?])(?:\s|$)/);
-      if (match) narrative = match[1].trim();
-    }
-
-    const itemIds = items.map((i) => i.id);
-    const itemSummaries = items.map((i) => ({
-      id: i.id,
-      name: lang === "hi" ? i.nameHi : i.name,
-      description: lang === "hi" ? i.descriptionHi : i.description,
-      ...(i.intensity ? { intensity: i.intensity } : {}),
-      ...(i.durationMin ? { durationMin: i.durationMin } : {}),
-      ...(i.type ? { type: i.type } : {}),
-      ...(i.nutrientFocus ? { nutrientFocus: i.nutrientFocus } : {}),
-    }));
-
-    // Persist
-    const output = { mode, items: itemSummaries, narrative, model };
-    await storeModeOutput(ownerId, mode, output);
-    await appendModeHistory(ownerId, mode, itemIds);
-
-    return output;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastError;
 }
 
 /**

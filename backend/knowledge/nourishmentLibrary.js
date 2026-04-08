@@ -260,15 +260,19 @@ export function filterNourishments({ types, diets, cuisines, prepLevel, emotions
  * Prioritises entries whose emotionTags overlap the most with the input emotions.
  * Excludes items in the `exclude` set (anti-repetition).
  */
-export function pickNourishments(emotions, n = 2, { exclude = [], diet, cuisine } = {}) {
+export function pickNourishments(emotions, n = 2, { exclude = [], boost = [], diet, cuisine } = {}) {
   const pool = filterNourishments({ emotions, diets: diet ? [diet] : undefined, cuisines: cuisine ? [cuisine] : undefined });
   const excludeSet = new Set(exclude);
+  const boostSet = new Set(boost);
   const candidates = pool.filter((item) => !excludeSet.has(item.id));
   if (candidates.length === 0) return pool.slice(0, n);
 
+  // Score by overlap count, boost liked items, then shuffle ties
   const scored = candidates.map((item) => ({
     ...item,
-    _score: emotions.filter((e) => item.emotionTags.includes(e)).length + Math.random() * 0.5,
+    _score: emotions.filter((e) => item.emotionTags.includes(e)).length
+      + (boostSet.has(item.id) ? 1.5 : 0)
+      + Math.random() * 0.5,
   }));
   scored.sort((a, b) => b._score - a._score);
   return scored.slice(0, n);

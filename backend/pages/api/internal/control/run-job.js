@@ -8,7 +8,7 @@ const ALLOWED_JOBS = {
   generateAdaptiveModes: '../../../../jobs/generateAdaptiveModes.js',
 };
 
-const ALLOWED_LLM_MODELS = ['mistral', 'phi3', 'llama3', 'llama2', 'gemma', 'qwen2'];
+const ALLOWED_LLM_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) return;

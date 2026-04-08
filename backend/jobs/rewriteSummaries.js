@@ -21,6 +21,7 @@ import { getStoredWeeklyInsight, storeWeeklyInsight } from "../services/reportSt
 import { getUserById } from "../services/authService.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
 import { getStylePrompt } from "../ai/styleProfiles.js";
+import { ollamaChat } from "../ai/ollamaChat.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -62,27 +63,17 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
     },
   ];
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REWRITE_TIMEOUT_MS);
-
   try {
-    const res = await fetch(`${apiUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.3,
-        max_tokens: 200,
-      }),
-      signal: controller.signal,
+    const result = await ollamaChat({
+      apiUrl,
+      model,
+      messages,
+      temperature: 0.3,
+      maxTokens: 200,
+      timeoutMs: REWRITE_TIMEOUT_MS,
     });
 
-    if (!res.ok) {
-      return { text, changed: false, error: `ollama-http-${res.status}` };
-    }
-    const data = await res.json();
-    const output = data.choices?.[0]?.message?.content?.trim();
+    const output = result.content;
     if (!output || output.length < 10) {
       return { text, changed: false, error: "empty-or-short-response" };
     }
@@ -106,8 +97,6 @@ async function llmRewrite(text, { firstName, apiUrl, model } = {}) {
   } catch (err) {
     const reason = err.name === "AbortError" ? "timeout" : `fetch-error: ${err.message}`;
     return { text, changed: false, error: reason };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

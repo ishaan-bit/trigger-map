@@ -19,6 +19,7 @@ import { getActionFeedback, getActionPrefs, storeActionPrefs } from "../services
 import { emotionSignalKeywords } from "../shared/constants/emotions.js";
 import { extractFirstName } from "../utils/phrasingLayer.js";
 import { lintText } from "../utils/textGrammar.js";
+import { ollamaChat } from "../ai/ollamaChat.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -223,32 +224,20 @@ async function generateForOwner(ownerId, { model, apiUrl, force }) {
   let lastError;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
     try {
-      const response = await fetch(`${apiUrl}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.65,
-          max_tokens: 600,
-        }),
-        signal: controller.signal,
+      const result = await ollamaChat({
+        apiUrl,
+        model,
+        messages: [
+          { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.65,
+        maxTokens: 600,
+        timeoutMs: REQUEST_TIMEOUT_MS,
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`LLM API returned ${response.status}: ${text}`);
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
+      const content = result.content;
       if (!content) throw new Error("LLM returned empty response");
 
       try {
@@ -276,8 +265,6 @@ async function generateForOwner(ownerId, { model, apiUrl, force }) {
       if (attempt < MAX_ATTEMPTS) {
         console.log(`    Attempt ${attempt} failed (${err.message}), retrying...`);
       }
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

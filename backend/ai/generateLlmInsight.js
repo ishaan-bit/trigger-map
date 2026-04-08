@@ -11,6 +11,7 @@
 import { getStylePrompt } from "./styleProfiles.js";
 import { buildSignalProfile, buildSignalConstraints, rankSignals, detectRelationship } from "./signalProfile.js";
 import { retrieveForLLM } from "../knowledge/ragEngine.js";
+import { ollamaChat } from "./ollamaChat.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -217,7 +218,9 @@ function buildSignals(report, recentNotes, actionFeedback) {
   }
 
   if (recentNotes?.length) {
-    const noteLines = recentNotes.map(n => `[${n.trigger}/${n.emotion}] "${n.note}"`);
+    // Cap notes to prevent prompt from exceeding context window (VRAM-limited GPUs)
+    const cappedNotes = recentNotes.slice(0, 8);
+    const noteLines = cappedNotes.map(n => `[${n.trigger}/${n.emotion}] "${(n.note || "").slice(0, 120)}"`);
     lines.push(`Recent user notes:\n${noteLines.join("\n")}`);
   }
 
@@ -334,33 +337,22 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
       ? "You are a concise emotional pattern analyst. Write in natural conversational Hindi (Devanagari script). No Hinglish or transliteration — use pure Hindi. Write plain, grammatically correct Hindi sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'आप' and 'आपका/आपकी' for addressing the user. Do not mix English words into Hindi text. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Be balanced and grounded. Match language intensity to signal strength. Use simple everyday Hindi."
       : "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague. NEVER reference the user by name. Always say 'you' or 'your', never a person's name. NEVER speculate about the user's psychological state, coping ability, or personality. Only describe observable patterns in the data. If the SIGNAL PROFILE section contains a FLATTENING DETECTED or Within-week trajectory constraint, those MUST be the central theme of your response. Do not ignore them.";
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemBase + getStylePrompt(process.env.LLM_STYLE) },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.15,
-        max_tokens: maxTokens,
-      }),
-      signal: controller.signal,
+    const sysContent = systemBase + getStylePrompt(process.env.LLM_STYLE);
+    const result = await ollamaChat({
+      apiUrl,
+      model,
+      messages: [
+        { role: "system", content: sysContent },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.15,
+      maxTokens,
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LLM API returned ${response.status}: ${text}`);
-    }
-
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content?.trim();
-    const finishReason = data.choices?.[0]?.finish_reason;
+    let content = result.content;
+    const finishReason = result.finishReason;
 
     if (!content) {
       throw new Error("LLM returned empty response");
@@ -549,7 +541,10 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
       model: `llm-${model}`,
       generatedAt: new Date().toISOString(),
     };
-  } finally {
-    clearTimeout(timeout);
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`LLM request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
   }
 }

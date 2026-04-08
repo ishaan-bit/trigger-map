@@ -317,7 +317,7 @@ const OLLAMA_BASE = process.env.LLM_API_URL
   ? process.env.LLM_API_URL.replace(/\/v1\/?$/, '')
   : 'http://localhost:11434';
 
-const ALLOWED_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
+const ALLOWED_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
 async function handleListModels(_req, res) {
   try {

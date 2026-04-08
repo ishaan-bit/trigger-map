@@ -2,7 +2,7 @@ import Head from 'next/head';
 import { useState, useEffect, useCallback } from 'react';
 import ConfirmAction from '../components/ConfirmAction';
 
-const LLM_MODELS = ['phi3', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
+const LLM_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
 const LLM_STYLES = [
   { id: 'default',      label: 'Default (System Voice)' },

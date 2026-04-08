@@ -264,16 +264,19 @@ export function filterMovements({ mechanisms, environments, equipment, intensity
  * Prioritises entries whose emotionTags overlap the most with the input emotions.
  * Excludes items in the `exclude` set (anti-repetition).
  */
-export function pickMovements(emotions, n = 2, { exclude = [], environment, equipment: equip } = {}) {
+export function pickMovements(emotions, n = 2, { exclude = [], boost = [], environment, equipment: equip } = {}) {
   const pool = filterMovements({ emotions, environments: environment ? [environment] : undefined, equipment: equip });
   const excludeSet = new Set(exclude);
+  const boostSet = new Set(boost);
   const candidates = pool.filter((m) => !excludeSet.has(m.id));
   if (candidates.length === 0) return pool.slice(0, n);
 
-  // Score by overlap count, then shuffle ties
+  // Score by overlap count, boost liked items, then shuffle ties
   const scored = candidates.map((m) => ({
     ...m,
-    _score: emotions.filter((e) => m.emotionTags.includes(e)).length + Math.random() * 0.5,
+    _score: emotions.filter((e) => m.emotionTags.includes(e)).length
+      + (boostSet.has(m.id) ? 1.5 : 0)
+      + Math.random() * 0.5,
   }));
   scored.sort((a, b) => b._score - a._score);
   return scored.slice(0, n);
