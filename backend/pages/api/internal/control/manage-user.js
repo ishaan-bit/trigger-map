@@ -122,11 +122,9 @@ export default async function handler(req, res) {
     if (action === 'delete-account') {
       const deleted = await clearUserData(ownerId);
 
-      // Remove user record, email lookup, google lookup, subscription, session data
+      // Remove user record, email lookup, google lookup
       const delCmds = [
         ['DEL', redisKey('user', ownerId)],
-        ['DEL', redisKey('subscription', ownerId)],
-        ['DEL', redisKey('first_ai_claimed', ownerId)],
         ['SREM', redisKey('owners'), ownerId],
       ];
 
@@ -150,8 +148,8 @@ export default async function handler(req, res) {
 }
 
 /**
- * Delete all data keys for a user (moments, reports, insights, daily aggregates).
- * Returns the number of keys deleted.
+ * Delete all data keys for a user (moments, reports, insights, daily aggregates,
+ * modes, action feedback, subscription). Returns the number of keys deleted.
  */
 async function clearUserData(ownerId) {
   // Scan for daily aggregate keys: triggermap:daily:{ownerId}:*
@@ -159,10 +157,30 @@ async function clearUserData(ownerId) {
   const dailyKeys = await redis(['KEYS', dailyPattern]);
 
   const keysToDelete = [
+    // Core data
     redisKey('moments', ownerId),
     redisKey('weekly_report', ownerId),
+
+    // LLM insights
     redisKey('llm_insight', ownerId),
+    redisKey('llm_insight_history', ownerId),
     redisKey('llm_free_pass', ownerId),
+
+    // Adaptive modes
+    redisKey('mode_profile', ownerId),
+    redisKey('mode_history', ownerId),
+    redisKey('mode_output', ownerId, 'move'),
+    redisKey('mode_output', ownerId, 'fuel'),
+    redisKey('mode_output', ownerId, 'perspective'),
+    redisKey('mode_feedback', ownerId),
+
+    // Action feedback & preferences
+    redisKey('action_feedback', ownerId),
+    redisKey('action_prefs', ownerId),
+
+    // Premium / subscription
+    redisKey('subscription', ownerId),
+    redisKey('first_ai_claimed', ownerId),
   ];
 
   if (Array.isArray(dailyKeys)) {
