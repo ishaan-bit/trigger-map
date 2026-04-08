@@ -65,8 +65,8 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   // Filter out any that the user already tried/skipped.
   if (prefs?.llmActions?.length) {
     const fresh = prefs.llmActions.filter(a => !fb.all.has(a.id));
-    if (fresh.length > 0) {
-      return fresh.slice(0, 4).map((a, i) => ({
+    if (fresh.length >= 3) {
+      return fresh.slice(0, 3).map((a, i) => ({
         ...a,
         title: lintText(a.title),
         reason: lintText(a.reason),
@@ -74,7 +74,7 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
         order: i,
       }));
     }
-    // All LLM actions already tried/skipped — fall through to rule-based
+    // < 3 LLM fresh — fall through, generate rule-based, prepend LLM at end
   }
 
   const candidates = [];
@@ -434,16 +434,16 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     return bBoost - aBoost;
   });
 
-  // If LLM prefs have leftover actions that weren't filtered, merge them in
-  if (prefs?.llmActions?.length && filtered.length < 4) {
+  // Prepend fresh LLM actions (higher priority than rule-based replacements)
+  if (prefs?.llmActions?.length) {
     const llmFresh = prefs.llmActions.filter(a => !fb.all.has(a.id) && !filtered.some(f => f.id === a.id));
-    for (const a of llmFresh) {
-      if (filtered.length >= 4) break;
-      filtered.push(a);
+    if (llmFresh.length > 0) {
+      filtered = [...llmFresh, ...filtered];
     }
   }
 
-  return filtered.slice(0, 5).map((a, i) => ({
+  // Always return exactly 3 unmarked actions
+  return filtered.slice(0, 3).map((a, i) => ({
     ...a,
     title: hi ? a.title : lintText(a.title),
     reason: hi ? a.reason : lintText(a.reason),
