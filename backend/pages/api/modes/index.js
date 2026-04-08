@@ -2,7 +2,7 @@ import enableCors from "@/lib/cors.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
-import { getStoredModeOutput } from "@/services/modeStore.js";
+import { getStoredModeOutput, getModeFeedback } from "@/services/modeStore.js";
 import { captureServerError } from "@/services/monitoringService.js";
 
 const VALID_MODES = ["move", "fuel", "perspective"];
@@ -38,11 +38,21 @@ export default async function handler(req, res) {
       return sendSuccess(res, { [requestedMode]: output });
     }
 
-    // Return all three modes
+    // Return all three modes + feedback map
     const results = {};
     for (const mode of VALID_MODES) {
       results[mode] = await getStoredModeOutput(ownerId, mode);
     }
+
+    // Include feedback state so the client can restore thumbs
+    const feedbackEntries = await getModeFeedback(ownerId);
+    const feedbackMap = {};
+    for (const entry of feedbackEntries) {
+      // Last feedback per item wins (user may change their mind)
+      feedbackMap[entry.itemId] = entry.response;
+    }
+    results.feedback = feedbackMap;
+
     const populated = VALID_MODES.filter((m) => results[m] != null);
     if (!populated.length) {
       console.log(`[modes] All modes empty for ${ownerId.slice(0, 8)}. Run generateAdaptiveModes job.`);

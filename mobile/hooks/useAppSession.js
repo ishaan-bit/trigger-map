@@ -362,6 +362,8 @@ export function SessionProvider({ children }) {
           scheduleReflectionReminder().catch(() => null);
         }
         trackEvent("moment_logged", { trigger: response.moment.trigger, emotion: response.moment.emotion });
+        // Invalidate report cache so next view gets fresh actions with updated feedback
+        invalidateCache("weeklyReport");
         return response;
       },
       async loadTimeline() {

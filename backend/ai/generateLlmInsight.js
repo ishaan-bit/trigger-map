@@ -514,6 +514,10 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
         .replace(/([a-z])\s*\n\s*([a-z])/g, "$1 $2") // join broken sentences
         .replace(isHi ? /[\x00-\x08\x0b\x0c\x0e-\x1f]/g : /[^\x20-\x7E\u00C0-\u024F',.\-!?()\n]/g, "") // strip junk (preserve Devanagari for Hindi)
         .trim();
+      // Capitalize the first letter of the section body
+      if (trimmedBody.length > 0) {
+        trimmedBody = trimmedBody[0].toUpperCase() + trimmedBody.slice(1);
+      }
       if (trimmedBody.length >= 8) {
         extracted.push({ header, body: trimmedBody });
       }
@@ -539,6 +543,10 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
           // Walk backward from maxPerSection to find sentence boundary
           const partial = words.slice(0, maxPerSection).join(" ");
           sec.body = trimIncomplete(partial);
+          // Re-capitalize after truncation
+          if (sec.body.length > 0) {
+            sec.body = sec.body[0].toUpperCase() + sec.body.slice(1);
+          }
         }
       }
       content = extracted.map(s => `${s.header}\n${s.body}`).join("\n\n");
@@ -548,7 +556,7 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
     const notesText = (recentNotes || []).map(n => (n.note || "").toLowerCase()).join(" ");
     content = content.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi, (match) => {
       return notesText.includes(match.toLowerCase()) ? match : "";
-    }).replace(/\s{2,}/g, " ").replace(/\s([.,;:])/g, "$1").trim();
+    }).replace(/ {2,}/g, " ").replace(/ ([.,;:])/g, "$1").trim();
 
     return {
       narrative: content,

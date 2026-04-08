@@ -42,7 +42,12 @@ function buildFeedbackIndex(feedback) {
       counters[entry.actionId].notHelpful++;
     }
   }
-  return { helped, notHelpful, all: new Set([...helped, ...notHelpful]), counters };
+  const all = new Set([...helped, ...notHelpful]);
+  // Base IDs (epoch suffix stripped) for cross-epoch matching
+  const helpedBases = new Set([...helped].map(id => id.replace(/-r\d+$/, "")));
+  const notHelpfulBases = new Set([...notHelpful].map(id => id.replace(/-r\d+$/, "")));
+  const allBases = new Set([...all].map(id => id.replace(/-r\d+$/, "")));
+  return { helped, notHelpful, all, helpedBases, notHelpfulBases, allBases, counters };
 }
 
 /**
@@ -61,21 +66,8 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   const epoch = Math.floor(fb.all.size / 3);
   const eid = epoch > 0 ? `-r${epoch}` : "";
 
-  // If LLM actions exist in prefs, use them as the primary source.
-  // Filter out any that the user already tried/skipped.
-  if (prefs?.llmActions?.length) {
-    const fresh = prefs.llmActions.filter(a => !fb.all.has(a.id));
-    if (fresh.length >= 3) {
-      return fresh.slice(0, 3).map((a, i) => ({
-        ...a,
-        title: lintText(a.title),
-        reason: lintText(a.reason),
-        ...(ACTION_META[a.type] || ACTION_META.awareness),
-        order: i,
-      }));
-    }
-    // < 3 LLM fresh — fall through, generate rule-based, prepend LLM at end
-  }
+  // LLM actions are mixed into the candidate pool and processed through
+  // the same HiTL feedback pipeline as rule-based candidates (see below).
 
   const candidates = [];
   const friction = report.frictionZones || [];
@@ -381,68 +373,145 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     }
   }
 
-  // Remove actions the user said "not helpful" 2+ times (by base ID pattern)
-  const blacklisted = new Set();
-  for (const [id, c] of Object.entries(fb.counters)) {
-    if (c.notHelpful >= 2) blacklisted.add(id);
+  // ── HiTL Feedback Layer ──────────────────────────────────────
+
+  // Add LLM actions to the candidate pool (given priority in final sort)
+  if (prefs?.llmActions?.length) {
+    for (const a of prefs.llmActions) {
+      if (!candidates.some(c => c.id === a.id)) {
+        candidates.push({ ...a, _llmPriority: true });
+      }
+    }
   }
 
-  // Apply rotation epoch to candidate IDs so new feedback rounds produce fresh IDs
+  // 1. Extract triggers from not-helpful feedback for trigger-level suppression
+  //    "Not helpful" means: don't show this OR similar trigger suggestions again.
+  const notHelpfulTriggers = new Set();
+  for (const [id, c] of Object.entries(fb.counters)) {
+    if (c.notHelpful > 0) {
+      const baseId = id.replace(/-r\d+$/, "");
+      const matched = candidates.find(a => a.id === baseId);
+      if (matched?.trigger) {
+        notHelpfulTriggers.add(matched.trigger.toLowerCase());
+      } else {
+        // Fallback: parse trigger from ID pattern (e.g., "friction-work-anxious" → "work")
+        const parts = baseId.split("-");
+        if (parts.length >= 2 && !["centroid", "drift", "explore", "reflect", "log", "check", "emotion", "enhance", "pair", "top", "fill"].includes(parts[0])) {
+          notHelpfulTriggers.add(parts[1].toLowerCase());
+        }
+      }
+    }
+  }
+
+  // 2. Enhance "helped" candidates — transform into deeper follow-ups
+  //    instead of filtering them out. The user liked this approach, so build on it.
+  const enhanced = [];
+  for (const c of candidates) {
+    const baseId = c.id.replace(/-r\d+$/, "");
+    if (fb.helpedBases.has(baseId)) {
+      enhanced.push({
+        ...c,
+        id: `enhance-${baseId}${eid}`,
+        title: hi
+          ? `${c.title} — इसे और आगे ले जाएँ`
+          : `Build on this: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
+        reason: hi
+          ? `इस तरीके ने पहले आपकी मदद की। अगला कदम उठाएँ और इस प्रयास को और गहरा करें।`
+          : `This approach helped you before. Take the next step and deepen the practice.`,
+      });
+    }
+  }
+
+  // 3. Apply rotation epoch to candidate IDs
   if (eid) {
     for (const c of candidates) { c.id = c.id + eid; }
   }
 
-  // Blacklist check: strip epoch suffix from candidate IDs for pattern matching
-  function isBlacklisted(actionId) {
-    if (blacklisted.has(actionId)) return true;
-    // Also check the base ID without the epoch suffix
-    const base = actionId.replace(/-r\d+$/, "");
-    return blacklisted.has(base);
-  }
+  // 4. Filter candidates:
+  //    - Remove actions the user already responded to (any epoch)
+  //    - Suppress triggers the user said "not helpful" to
+  let filtered = candidates.filter(a => {
+    const aBase = a.id.replace(/-r\d+$/, "");
+    if (fb.allBases.has(aBase)) return false;
+    if (a.trigger && notHelpfulTriggers.has(a.trigger.toLowerCase())) return false;
+    return true;
+  });
 
-  // Filter out already-responded and permanently-blacklisted actions
-  let filtered = candidates.filter(a => !fb.all.has(a.id) && !isBlacklisted(a.id));
+  // 5. Merge: enhanced actions (from "helped" feedback) first, then fresh candidates
+  filtered = [...enhanced, ...filtered];
 
-  if (filtered.length < 3) {
-    const remaining = candidates.filter(a => !filtered.some(f => f.id === a.id) && !isBlacklisted(a.id));
-    for (const c of remaining) {
-      if (filtered.length >= 3) break;
-      if (!fb.notHelpful.has(c.id)) filtered.push(c);
-    }
-  }
+  // Deduplicate by trigger (enhanced actions get priority)
+  const seenTriggers = new Set();
+  filtered = filtered.filter(a => {
+    if (!a.trigger) return true;
+    const key = a.trigger.toLowerCase();
+    if (seenTriggers.has(key)) return false;
+    seenTriggers.add(key);
+    return true;
+  });
 
-  // Rank: boost actions related to triggers the user found helpful
-  // Extract triggers from both current candidates AND feedback IDs (via pattern matching)
+  // 6. Rank: LLM actions first, then boost helped triggers
   const helpedTriggers = new Set();
   for (const [id, c] of Object.entries(fb.counters)) {
     if (c.helped > 0) {
-      // Try matching from current candidates
       const baseId = id.replace(/-r\d+$/, "");
       const matched = candidates.find(a => a.id === id || a.id.replace(/-r\d+$/, "") === baseId);
       if (matched?.trigger) helpedTriggers.add(matched.trigger);
-      // Also extract trigger from ID pattern (e.g., "friction-work-anxious" → "work")
       const parts = baseId.split("-");
       if (parts.length >= 2 && parts[0] !== "centroid" && parts[0] !== "drift") {
-        const possibleTrigger = parts[1];
-        if (possibleTrigger) helpedTriggers.add(possibleTrigger);
+        if (parts[1]) helpedTriggers.add(parts[1]);
       }
     }
   }
   filtered.sort((a, b) => {
+    const aLlm = a._llmPriority ? 2 : 0;
+    const bLlm = b._llmPriority ? 2 : 0;
     const aBoost = a.trigger && helpedTriggers.has(a.trigger) ? 1 : 0;
     const bBoost = b.trigger && helpedTriggers.has(b.trigger) ? 1 : 0;
-    return bBoost - aBoost;
+    return (bLlm + bBoost) - (aLlm + aBoost);
   });
 
-  // Prepend fresh LLM actions (higher priority than rule-based replacements)
-  if (prefs?.llmActions?.length) {
-    const llmFresh = prefs.llmActions.filter(a => !fb.all.has(a.id) && !filtered.some(f => f.id === a.id));
-    if (llmFresh.length > 0) {
-      filtered = [...llmFresh, ...filtered];
+  // 7. Guarantee exactly 3 — post-filter safety net
+  if (filtered.length < 3) {
+    const fillers = hi
+      ? [
+          { id: `reflect-week${eid}`, type: "awareness", title: "2 मिनट अपने हफ़्ते पर सोचें", reason: "थोड़ा सा रिव्यू आपको वो पैटर्न दिखा सकता है जो पल में नहीं दिखते।" },
+          { id: `log-new-trigger${eid}`, type: "experiment", title: "कुछ नया लॉग करें जो मूड पर असर डाले", reason: "ज़्यादा चीज़ें ट्रैक करने से छुपे पैटर्न सामने आते हैं।" },
+          { id: `check-timing${eid}`, type: "awareness", title: "ध्यान दें कि दिन में कब मूड बदलता है", reason: "समय के पैटर्न से माहौल के ट्रिगर्स का पता चलता है।" },
+        ]
+      : [
+          { id: `reflect-week${eid}`, type: "awareness", title: "Take 2 minutes to reflect on your week", reason: "A short review helps you notice patterns you might miss in the moment." },
+          { id: `log-new-trigger${eid}`, type: "experiment", title: "Log something new that affects your mood", reason: "Expanding what you track reveals hidden patterns." },
+          { id: `check-timing${eid}`, type: "awareness", title: "Notice what time of day your mood shifts", reason: "Timing patterns can reveal environmental triggers." },
+        ];
+    for (const f of fillers) {
+      if (filtered.length >= 3) break;
+      const fBase = f.id.replace(/-r\d+$/, "");
+      if (!filtered.some(c => c.id === f.id) && !fb.allBases.has(fBase)) {
+        filtered.push(f);
+      }
     }
   }
 
-  // Always return exactly 3 unmarked actions
+  // Absolute fallback: guarantee 3 with unique IDs
+  if (filtered.length < 3) {
+    const fallback = hi
+      ? [
+          { type: "awareness", title: "अपने हफ़्ते पर एक नज़र डालें", reason: "छोटा सा रिव्यू पैटर्न दिखा सकता है।" },
+          { type: "experiment", title: "आज कुछ नया लॉग करें", reason: "नई चीज़ें ट्रैक करने से छुपे पैटर्न मिलते हैं।" },
+          { type: "awareness", title: "ध्यान दें आज कैसा महसूस हो रहा है", reason: "रोज़ाना की जागरूकता से पैटर्न साफ़ होते हैं।" },
+        ]
+      : [
+          { type: "awareness", title: "Take a moment to review your week", reason: "A quick review can reveal patterns you might otherwise miss." },
+          { type: "experiment", title: "Log something new today", reason: "Tracking new things reveals hidden patterns." },
+          { type: "awareness", title: "Notice how you're feeling right now", reason: "Daily awareness makes patterns clearer over time." },
+        ];
+    for (let i = 0; filtered.length < 3 && i < fallback.length; i++) {
+      filtered.push({ ...fallback[i], id: `fill-${epoch}-${filtered.length}` });
+    }
+  }
+
+  // Always return exactly 3 actions
   return filtered.slice(0, 3).map((a, i) => ({
     ...a,
     title: hi ? a.title : lintText(a.title),

@@ -1568,8 +1568,8 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 
 /* ── Mode Cards (adaptive modes content) ── */
 
-function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion }) {
-  const [feedbackGiven, setFeedbackGiven] = useState({});
+function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion, savedFeedback }) {
+  const [feedbackGiven, setFeedbackGiven] = useState(savedFeedback || {});
 
   // Move state
   const [moveDuration, setMoveDuration] = useState(null); // null | [min,max]
@@ -1583,32 +1583,41 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     return [dominantEmotion];
   }, [dominantEmotion]);
 
-  // Move suggestions — filtered by duration range, scored by emotional state
+  // Move suggestions — filtered by duration range, scored by emotional state + feedback
   const moveSuggestions = useMemo(() => {
     let filtered = filterMovements({});
     if (moveDuration) {
       const [lo, hi] = moveDuration;
       filtered = filtered.filter((m) => m.durationMin >= lo && m.durationMin <= hi);
     }
-    if (!emotions.length) return filtered;
-    // Sort by emotion relevance
+    // Sort by: liked first, then emotion relevance, disliked last
     return [...filtered].sort((a, b) => {
-      const aScore = (a.emotionTags || []).filter((e) => emotions.includes(e)).length;
-      const bScore = (b.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      const aFb = feedbackGiven[a.id];
+      const bFb = feedbackGiven[b.id];
+      const aLiked = aFb === "helpful" ? 1 : aFb === "not_helpful" ? -1 : 0;
+      const bLiked = bFb === "helpful" ? 1 : bFb === "not_helpful" ? -1 : 0;
+      if (aLiked !== bLiked) return bLiked - aLiked;
+      const aScore = emotions.length ? (a.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
+      const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [moveDuration, emotions]);
+  }, [moveDuration, emotions, feedbackGiven]);
 
-  // Fuel suggestions — filtered by diet, scored by emotional state
+  // Fuel suggestions — filtered by diet, scored by emotional state + feedback
   const fuelSuggestions = useMemo(() => {
     const filtered = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
-    if (!emotions.length) return filtered;
+    // Sort by: liked first, then emotion relevance, disliked last
     return [...filtered].sort((a, b) => {
-      const aScore = (a.emotionTags || []).filter((e) => emotions.includes(e)).length;
-      const bScore = (b.emotionTags || []).filter((e) => emotions.includes(e)).length;
+      const aFb = feedbackGiven[a.id];
+      const bFb = feedbackGiven[b.id];
+      const aLiked = aFb === "helpful" ? 1 : aFb === "not_helpful" ? -1 : 0;
+      const bLiked = bFb === "helpful" ? 1 : bFb === "not_helpful" ? -1 : 0;
+      if (aLiked !== bLiked) return bLiked - aLiked;
+      const aScore = emotions.length ? (a.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
+      const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [fuelDiet, emotions]);
+  }, [fuelDiet, emotions, feedbackGiven]);
 
   // Fuel day plan - one item per meal slot, prioritized by emotion relevance
   const fuelPlan = useMemo(() => {
@@ -1961,7 +1970,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
               </View>
             ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} />
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedback} />
             )}
 
 
@@ -2222,6 +2231,8 @@ export function WeeklyReportScreen() {
     if (token) {
       submitModeFeedback(mode, itemId, response, token).catch(() => null);
       trackEvent("mode_feedback", { mode, itemId, response });
+      // Update local feedback cache so it persists across tab switches
+      setModes((prev) => prev ? { ...prev, feedback: { ...prev.feedback, [itemId]: response } } : prev);
     }
   }, [token]);
 
