@@ -98,6 +98,7 @@ const JOBS = [
     danger: false,
     usesLlm: true,
     hasUserPicker: true,
+    premiumOnly: true,
     source: 'local',
     params: [
       { key: 'force', label: 'Force (generate even without feedback)', type: 'checkbox', default: true },
@@ -110,6 +111,7 @@ const JOBS = [
     danger: false,
     usesLlm: true,
     hasUserPicker: true,
+    premiumOnly: true,
     source: 'local',
     params: [
       { key: 'force', label: 'Force (regenerate existing)', type: 'checkbox', default: true },
@@ -281,6 +283,7 @@ function RunLogEntry({ entry, defaultOpen }) {
   const jobResult = data?.result;
   const stdout = data?.result?.stdout || data?.stdout;
   const stderr = data?.result?.stderr || data?.stderr;
+  const tail = data?.tail || data?.showTail && data?.tail;
   const summary = summarizeJobResult(jobResult);
   const isJob = action === 'run-job';
   const errorMsg = data?.error || (!ok && data?.message) || null;
@@ -459,6 +462,20 @@ function RunLogEntry({ entry, defaultOpen }) {
                 whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 240, overflowY: 'auto', margin: 0,
               }}>
                 {stdout}
+              </pre>
+            </div>
+          )}
+
+          {/* Live tail for running jobs */}
+          {!stdout && tail && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>LIVE LOG</div>
+              <pre style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: '#56d0e0',
+                background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflowY: 'auto', margin: 0,
+              }}>
+                {tail}
               </pre>
             </div>
           )}
@@ -773,7 +790,7 @@ export default function ControlPage() {
                 const idx = updated.findIndex((r) => r.target === target && r.polling);
                 if (idx >= 0) {
                   const elapsed = Math.round((pollData.elapsed || 0) / 1000);
-                  updated[idx] = { ...updated[idx], data: { ...updated[idx].data, message: `Running... (${elapsed}s)`, tail: pollData.tail } };
+                  updated[idx] = { ...updated[idx], data: { ...updated[idx].data, message: `Running... (${elapsed}s)`, tail: pollData.tail, showTail: true } };
                 }
                 return updated;
               });
@@ -1201,7 +1218,12 @@ export default function ControlPage() {
                             {eligibleLoading[job.id] ? (
                               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading eligible users…</div>
                             ) : (eligibleUsers[job.id] && eligibleUsers[job.id].length > 0) ? (
-                              <>
+                              (() => {
+                                const displayUsers = job.premiumOnly
+                                  ? eligibleUsers[job.id].filter((u) => u.isPremium)
+                                  : eligibleUsers[job.id];
+                                return displayUsers.length > 0 ? (
+                                <>
                                 <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
                                   <button
                                     type="button"
@@ -1209,7 +1231,7 @@ export default function ControlPage() {
                                     style={{ fontSize: 11, padding: '2px 8px' }}
                                     onClick={() => setSelectedUsers((p) => ({
                                       ...p,
-                                      [job.id]: new Set(eligibleUsers[job.id].map((u) => u.ownerId)),
+                                      [job.id]: new Set(displayUsers.map((u) => u.ownerId)),
                                     }))}
                                   >Select All</button>
                                   <button
@@ -1223,7 +1245,7 @@ export default function ControlPage() {
                                     className="btn btn-sm"
                                     style={{ fontSize: 11, padding: '2px 8px' }}
                                     onClick={() => {
-                                      const active = (eligibleUsers[job.id] || []).filter((u) => {
+                                      const active = displayUsers.filter((u) => {
                                         if (!u.lastMomentAt) return false;
                                         if (!u.lastLlmAt) return true; // never had LLM, always active
                                         return new Date(u.lastMomentAt) > new Date(u.lastLlmAt);
@@ -1242,7 +1264,7 @@ export default function ControlPage() {
                                     onClick={() => fetchEligibleUsers(job.id)}
                                   >Refresh</button>
                                 </div>
-                                {eligibleUsers[job.id].map((u) => {
+                                {displayUsers.map((u) => {
                                   const sel = selectedUsers[job.id] || new Set();
                                   return (
                                     <label key={u.ownerId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
@@ -1267,6 +1289,7 @@ export default function ControlPage() {
                                       </span>
                                       <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap', display: 'flex', gap: 6, alignItems: 'center' }}>
                                         {u.momentCount} moments
+                                        {u.isPremium && <span title="Premium" style={{ color: '#f5a623', fontSize: 10 }}>★</span>}
                                         {u.lastMomentAt && (!u.lastLlmAt || new Date(u.lastMomentAt) > new Date(u.lastLlmAt)) && (
                                           <span title="Active since last LLM run" style={{ color: '#56d0e0', fontSize: 10 }}>●</span>
                                         )}
@@ -1275,6 +1298,10 @@ export default function ControlPage() {
                                   );
                                 })}
                               </>
+                                ) : (
+                                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No premium users found.</div>
+                                );
+                              })()
                             ) : (
                               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No eligible users found for this threshold.</div>
                             )}

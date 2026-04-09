@@ -198,9 +198,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   runRewriteSummaries({ force })
     .then((output) => {
       console.log(JSON.stringify({ ok: true, ...output }, null, 2));
+      process.exit(0);
     })
     .catch((error) => {
       console.error(JSON.stringify({ ok: false, error: error.message }, null, 2));
-      process.exitCode = 1;
+      process.exit(1);
     });
 }

@@ -27,7 +27,7 @@ import { getStoredWeeklyInsight } from "../services/reportStore.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
-const REQUEST_TIMEOUT_MS = 600_000; // 10 min for mode generation
+const REQUEST_TIMEOUT_MS = 120_000; // 2 min per mode generation call
 const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
 const RETRY_DELAY_MS = 3_000; // 3 s between retries
 const MAX_RETRIES = 1;

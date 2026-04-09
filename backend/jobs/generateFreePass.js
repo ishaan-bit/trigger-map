@@ -159,8 +159,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       console.log(`  Free passes granted: ${freePassGranted}`);
       console.log(`  Skipped:          ${skipped}`);
     })
+    .then(() => process.exit(0))
     .catch((error) => {
       console.error("Fatal error:", error.message);
-      process.exitCode = 1;
+      process.exit(1);
     });
 }

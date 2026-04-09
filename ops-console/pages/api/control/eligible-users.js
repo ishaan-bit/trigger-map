@@ -30,23 +30,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ users: [], total: 0 });
     }
 
-    // Pipeline: LLEN moments + HGETALL user hash + LINDEX last moment + GET llm_insight per owner
+    // Pipeline: LLEN moments + HGETALL user hash + LINDEX last moment + GET llm_insight + GET subscription per owner
     const cmds = [];
     for (const oid of allIds) {
       cmds.push(['LLEN', redisKey('moments', oid)]);
       cmds.push(['HGETALL', redisKey('user', oid)]);
       cmds.push(['LINDEX', redisKey('moments', oid), -1]);
       cmds.push(['GET', redisKey('llm_insight', oid)]);
+      cmds.push(['GET', redisKey('subscription', oid)]);
     }
 
     const results = await pipeline(cmds);
     const users = [];
 
     for (let i = 0; i < allIds.length; i++) {
-      const momentCount = results[i * 4] || 0;
-      const userHash = flatArr(results[i * 4 + 1]);
-      const lastMomentRaw = results[i * 4 + 2];
-      const llmInsightRaw = results[i * 4 + 3];
+      const momentCount = results[i * 5] || 0;
+      const userHash = flatArr(results[i * 5 + 1]);
+      const lastMomentRaw = results[i * 5 + 2];
+      const llmInsightRaw = results[i * 5 + 3];
+      const subRaw = results[i * 5 + 4];
 
       // Must be signed-in (has user hash with email or name)
       if (!userHash.email && !userHash.name) continue;
@@ -65,6 +67,15 @@ export default async function handler(req, res) {
         try { lastLlmAt = JSON.parse(llmInsightRaw).generatedAt || null; } catch {}
       }
 
+      // Extract subscription status
+      let isPremium = false;
+      if (subRaw) {
+        try {
+          const sub = JSON.parse(subRaw);
+          isPremium = sub.status === 'active' || sub.status === 'grace_period';
+        } catch {}
+      }
+
       users.push({
         ownerId: allIds[i],
         name: userHash.name || null,
@@ -73,6 +84,7 @@ export default async function handler(req, res) {
         isAnonymous: !userHash.email,
         lastMomentAt,
         lastLlmAt,
+        isPremium,
       });
     }
 

@@ -170,9 +170,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       if (results.filter(r => r.generated).length) {
         console.log("Generated for:", results.filter(r => r.generated).map(r => r.ownerId.slice(0, 8)).join(", "));
       }
+      process.exit(0);
     })
     .catch((error) => {
       console.error("Fatal error:", error.message);
-      process.exitCode = 1;
+      process.exit(1);
     });
 }

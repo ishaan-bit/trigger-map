@@ -23,7 +23,7 @@ import { ollamaChat } from "../ai/ollamaChat.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
-const REQUEST_TIMEOUT_MS = 600_000;
+const REQUEST_TIMEOUT_MS = 120_000; // 2 min per action generation call
 
 function parseCliFlags(argv) {
   const flags = { force: false };
