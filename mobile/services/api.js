@@ -221,6 +221,18 @@ export function unregisterPushToken({ deviceId }, authToken) {
   });
 }
 
+export function saveNotificationPrefs({ daily, weekly, nudge }, authToken) {
+  return fetchJson("/notification-prefs", {
+    method: "POST",
+    body: { daily, weekly, nudge },
+    token: authToken,
+  });
+}
+
+export function getNotificationPrefs(authToken) {
+  return fetchJson("/notification-prefs", { token: authToken });
+}
+
 export function submitActionFeedback(actionId, response, deviceId, token) {
   const params = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
   return fetchJson(`/actions${params}`, {

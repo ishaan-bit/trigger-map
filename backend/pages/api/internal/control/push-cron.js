@@ -77,19 +77,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, action: 'none', reason: 'No users' });
     }
 
-    // Fetch push tokens + last moment for all users in one pipeline
+    // Fetch push tokens + last moment + notification prefs for all users in one pipeline
     const cmds = [];
     for (const oid of ownerIds) {
       cmds.push(['HGETALL', redisKey('push_tokens', oid)]);
       cmds.push(['LINDEX', redisKey('moments', oid), -1]); // last moment
+      cmds.push(['GET', redisKey('notification_prefs', oid)]); // user prefs
     }
     const results = await pipeline(cmds);
 
     // Build user list with tokens and last-activity info
     const usersWithTokens = [];
     for (let i = 0; i < ownerIds.length; i++) {
-      const tokenHash = flatArrayToObject(results[i * 2]);
-      const lastMomentRaw = results[i * 2 + 1];
+      const tokenHash = flatArrayToObject(results[i * 3]);
+      const lastMomentRaw = results[i * 3 + 1];
+      const prefsRaw = results[i * 3 + 2];
 
       const tokens = [];
       for (const [, entryJson] of Object.entries(tokenHash)) {
@@ -105,18 +107,31 @@ export default async function handler(req, res) {
         try { lastMomentAt = JSON.parse(lastMomentRaw).timestamp || null; } catch {}
       }
 
-      usersWithTokens.push({ ownerId: ownerIds[i], tokens, lastMomentAt });
+      // Default: all enabled (for users who never set prefs)
+      let prefs = { daily: true, weekly: true, nudge: true };
+      if (prefsRaw) {
+        try { prefs = { ...prefs, ...JSON.parse(prefsRaw) }; } catch {}
+      }
+
+      usersWithTokens.push({ ownerId: ownerIds[i], tokens, lastMomentAt, prefs });
     }
 
     const summary = [];
 
-    for (const action of actions) {
-      let targetUsers = usersWithTokens;
+    // Map action types to pref keys
+    const prefKeyFor = { reflection_reminder: 'daily', weekly_insight: 'weekly', inactivity_nudge: 'nudge' };
 
-      // For nudges, filter to users inactive for N days
+    for (const action of actions) {
+      // Filter by user notification preferences
+      const prefKey = prefKeyFor[action.type];
+      let targetUsers = prefKey
+        ? usersWithTokens.filter(u => u.prefs[prefKey] !== false)
+        : usersWithTokens;
+
+      // For nudges, also filter to users inactive for N days
       if (action.type === 'inactivity_nudge' && action.inactiveDays) {
         const threshold = Date.now() - action.inactiveDays * 24 * 60 * 60 * 1000;
-        targetUsers = usersWithTokens.filter(u => {
+        targetUsers = targetUsers.filter(u => {
           if (!u.lastMomentAt) return true; // never logged = definitely nudge
           return new Date(u.lastMomentAt).getTime() < threshold;
         });
