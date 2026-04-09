@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       cmds.push(['HGETALL', redisKey('user', oid)]);
       cmds.push(['LINDEX', redisKey('moments', oid), -1]);
       cmds.push(['GET', redisKey('llm_insight', oid)]);
-      cmds.push(['GET', redisKey('subscription', oid)]);
+      cmds.push(['HGETALL', redisKey('subscription', oid)]);
     }
 
     const results = await pipeline(cmds);
@@ -48,7 +48,6 @@ export default async function handler(req, res) {
       const userHash = flatArr(results[i * 5 + 1]);
       const lastMomentRaw = results[i * 5 + 2];
       const llmInsightRaw = results[i * 5 + 3];
-      const subRaw = results[i * 5 + 4];
 
       // Must be signed-in (has user hash with email or name)
       if (!userHash.email && !userHash.name) continue;
@@ -69,11 +68,9 @@ export default async function handler(req, res) {
 
       // Extract subscription status
       let isPremium = false;
-      if (subRaw) {
-        try {
-          const sub = JSON.parse(subRaw);
-          isPremium = sub.status === 'active' || sub.status === 'grace_period';
-        } catch {}
+      const subHash = flatArr(results[i * 5 + 4]);
+      if (subHash.status) {
+        isPremium = subHash.status === 'active' || subHash.status === 'grace_period';
       }
 
       users.push({
