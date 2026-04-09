@@ -41,29 +41,36 @@ export default async function handler(req, res) {
     // ── Daily Check-in ──
     if (config.daily?.enabled) {
       const { amTime, pmTime } = config.daily;
+      const dailyTitle = config.daily.title || 'Time to reflect';
+      const dailyAmBody = config.daily.amBody || 'Good morning — how are you feeling today? A quick log sets the tone.';
+      const dailyPmBody = config.daily.pmBody || 'How did today feel? A quick log helps your pattern map stay current.';
       if (amTime && isTimeMatch(istTime, amTime) && lastRun[`daily_am_${istDateKey}`] !== true) {
-        actions.push({ key: `daily_am_${istDateKey}`, type: 'reflection_reminder', title: 'Time to reflect', body: 'Good morning — how are you feeling today? A quick log sets the tone.' });
+        actions.push({ key: `daily_am_${istDateKey}`, type: 'reflection_reminder', title: dailyTitle, body: dailyAmBody });
       }
       if (pmTime && isTimeMatch(istTime, pmTime) && lastRun[`daily_pm_${istDateKey}`] !== true) {
-        actions.push({ key: `daily_pm_${istDateKey}`, type: 'reflection_reminder', title: 'Time to reflect', body: 'How did today feel? A quick log helps your pattern map stay current.' });
+        actions.push({ key: `daily_pm_${istDateKey}`, type: 'reflection_reminder', title: dailyTitle, body: dailyPmBody });
       }
     }
 
     // ── Weekly Insights ──
     if (config.weekly?.enabled && Array.isArray(config.weekly.days)) {
       const { days, time } = config.weekly;
+      const weeklyTitle = config.weekly.title || 'Your weekly patterns are ready';
+      const weeklyBody = config.weekly.body || 'See what stood out this week — your patterns tell a story.';
       if (days.includes(istDay) && time && isTimeMatch(istTime, time) && lastRun[`weekly_${istDateKey}`] !== true) {
-        actions.push({ key: `weekly_${istDateKey}`, type: 'weekly_insight', title: 'Your weekly patterns are ready', body: 'See what stood out this week — your patterns tell a story.' });
+        actions.push({ key: `weekly_${istDateKey}`, type: 'weekly_insight', title: weeklyTitle, body: weeklyBody });
       }
     }
 
     // ── Gentle Nudge ──
     if (config.nudge?.enabled) {
       const inactiveDays = config.nudge.inactiveDays || 3;
+      const nudgeTitle = config.nudge.title || 'How has your day been?';
+      const nudgeBody = config.nudge.body || 'Log a moment to keep your pattern map current.';
       // Only evaluate nudges once per day (at AM time, or 11:00 IST default)
       const nudgeTime = config.daily?.amTime || '11:00';
       if (isTimeMatch(istTime, nudgeTime) && lastRun[`nudge_${istDateKey}`] !== true) {
-        actions.push({ key: `nudge_${istDateKey}`, type: 'inactivity_nudge', inactiveDays, title: 'How has your day been?', body: 'Log a moment to keep your pattern map current.' });
+        actions.push({ key: `nudge_${istDateKey}`, type: 'inactivity_nudge', inactiveDays, title: nudgeTitle, body: nudgeBody });
       }
     }
 

@@ -1537,6 +1537,23 @@ export default function ControlPage() {
                       onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, pmTime: e.target.value } }))} />
                   </label>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginLeft: 24 }}>
+                  <label style={{ fontSize: 12 }}>Title:
+                    <input type="text" value={schedule.daily?.title || 'Time to reflect'} placeholder="Time to reflect"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, title: e.target.value } }))} />
+                  </label>
+                  <label style={{ fontSize: 12 }}>AM body:
+                    <input type="text" value={schedule.daily?.amBody || 'Good morning — how are you feeling today? A quick log sets the tone.'} placeholder="AM notification body"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, amBody: e.target.value } }))} />
+                  </label>
+                  <label style={{ fontSize: 12 }}>PM body:
+                    <input type="text" value={schedule.daily?.pmBody || 'How did today feel? A quick log helps your pattern map stay current.'} placeholder="PM notification body"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, pmBody: e.target.value } }))} />
+                  </label>
+                </div>
               </div>
 
               {/* Weekly Insights */}
@@ -1575,6 +1592,16 @@ export default function ControlPage() {
                       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'inherit', fontSize: 12 }}
                       onChange={e => setSchedule(s => ({ ...s, weekly: { ...s.weekly, time: e.target.value } }))} />
                   </label>
+                  <label style={{ fontSize: 12 }}>Title:
+                    <input type="text" value={schedule.weekly?.title || 'Your weekly patterns are ready'} placeholder="Your weekly patterns are ready"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, weekly: { ...s.weekly, title: e.target.value } }))} />
+                  </label>
+                  <label style={{ fontSize: 12 }}>Body:
+                    <input type="text" value={schedule.weekly?.body || 'See what stood out this week — your patterns tell a story.'} placeholder="Weekly notification body"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, weekly: { ...s.weekly, body: e.target.value } }))} />
+                  </label>
                 </div>
               </div>
 
@@ -1592,6 +1619,18 @@ export default function ControlPage() {
                     onChange={e => setSchedule(s => ({ ...s, nudge: { ...s.nudge, inactiveDays: parseInt(e.target.value) || 3 } }))} />
                   days of inactivity
                 </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginLeft: 24 }}>
+                  <label style={{ fontSize: 12 }}>Title:
+                    <input type="text" value={schedule.nudge?.title || 'How has your day been?'} placeholder="How has your day been?"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, nudge: { ...s.nudge, title: e.target.value } }))} />
+                  </label>
+                  <label style={{ fontSize: 12 }}>Body:
+                    <input type="text" value={schedule.nudge?.body || 'Log a moment to keep your pattern map current.'} placeholder="Nudge notification body"
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, marginTop: 2 }}
+                      onChange={e => setSchedule(s => ({ ...s, nudge: { ...s.nudge, body: e.target.value } }))} />
+                  </label>
+                </div>
               </div>
 
               {/* Save button */}
