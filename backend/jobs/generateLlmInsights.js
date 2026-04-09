@@ -79,9 +79,37 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       }
 
       const aggregates = await getWeeklyAggregates(ownerId, 45);
-      const weeklyReport = generateWeeklyReport({ aggregates, allAggregates: aggregates });
 
-      if (!weeklyReport.totalMoments || weeklyReport.totalMoments < minMoments) {
+      // Detect silence: check if the last 7 days have 0 moments but lifetime has data
+      const sevenDayAgg = aggregates.slice(-7);
+      const weeklyTotal = sevenDayAgg.reduce((s, a) => s + Number(a.total || 0), 0);
+      const lifetimeTotal = aggregates.reduce((s, a) => s + Number(a.total || 0), 0);
+      const isSilent = weeklyTotal === 0 && lifetimeTotal >= 3;
+
+      let silenceWindow = null;
+      let effectiveAggregates = aggregates;
+
+      if (isSilent) {
+        const activeDays = aggregates.filter(a => Number(a.total || 0) > 0);
+        const lastActiveDate = activeDays[activeDays.length - 1]?.date;
+        const daysSinceLastLog = lastActiveDate
+          ? Math.floor((Date.now() - new Date(lastActiveDate).getTime()) / 86400000)
+          : null;
+        silenceWindow = { isSilent: true, daysSinceLastLog, lastLogDate: lastActiveDate, totalLifetimeMoments: lifetimeTotal };
+        effectiveAggregates = activeDays.slice(-7);
+        console.log(`  ${ownerId.slice(0, 8)}: SILENCE — ${daysSinceLastLog}d gap, sliding to ${effectiveAggregates.length} active days`);
+      }
+
+      const weeklyReport = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates: aggregates, silenceWindow });
+
+      if (!weeklyReport.totalMoments && !isSilent) {
+        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — 0 moments and no history`);
+        results.push({ ownerId, skipped: true, reason: "no-data" });
+        skipped++;
+        continue;
+      }
+
+      if (weeklyReport.totalMoments < minMoments && !isSilent) {
         console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — ${weeklyReport.totalMoments || 0} moments < ${minMoments} min`);
         results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });
         skipped++;

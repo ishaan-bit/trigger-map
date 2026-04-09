@@ -26,8 +26,39 @@ async function processOwner(ownerId, force, { personalize = true } = {}) {
   const aggregates = await getWeeklyAggregates(ownerId);
   const allAggregates = await getWeeklyAggregates(ownerId, 45);
   const previousAggregates = allAggregates.length >= 14 ? allAggregates.slice(-14, -7) : null;
-  const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates });
-  if (!report.totalMoments) {
+
+  // Detect silence: 0 moments in the last 7 days but historical data exists
+  const weeklyTotal = aggregates.reduce((s, a) => s + Number(a.total || 0), 0);
+  const lifetimeTotal = allAggregates.reduce((s, a) => s + Number(a.total || 0), 0);
+  const isSilent = weeklyTotal === 0 && lifetimeTotal >= 3;
+
+  let silenceWindow = null;
+  let effectiveAggregates = aggregates;
+  let effectivePreviousAggregates = previousAggregates;
+
+  if (isSilent) {
+    // Find the last day with data
+    const activeDays = allAggregates.filter(a => Number(a.total || 0) > 0);
+    const lastActiveDate = activeDays[activeDays.length - 1]?.date;
+    const daysSinceLastLog = lastActiveDate
+      ? Math.floor((Date.now() - new Date(lastActiveDate).getTime()) / 86400000)
+      : null;
+
+    silenceWindow = {
+      isSilent: true,
+      daysSinceLastLog,
+      lastLogDate: lastActiveDate,
+      totalLifetimeMoments: lifetimeTotal,
+    };
+
+    effectiveAggregates = activeDays.slice(-7);
+    effectivePreviousAggregates = activeDays.length > 7 ? activeDays.slice(-14, -7) : null;
+
+    console.log(`[generateWeeklyReports] ${ownerId.slice(0, 8)}: SILENCE — ${daysSinceLastLog}d gap, sliding to ${effectiveAggregates.length} active days`);
+  }
+
+  const report = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates, previousAggregates: effectivePreviousAggregates, silenceWindow });
+  if (!report.totalMoments && !isSilent) {
     return { ownerId, skipped: true, reason: "no-data" };
   }
 

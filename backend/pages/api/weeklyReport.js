@@ -58,22 +58,69 @@ export default async function handler(req, res) {
 
     // Filter moments to last 7 days for invoked metrics computation
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const recentMoments = (allMoments || []).filter(m => m.timestamp >= sevenDaysAgo);
+    let recentMoments = (allMoments || []).filter(m => m.timestamp >= sevenDaysAgo);
+
+    // ── Silence detection ──────────────────────────────────────────────
+    // If the user has historical data but nothing in the last 7 days,
+    // slide the data window to their last active period so insights,
+    // actions, and premium sections stay populated instead of vanishing.
+    const lifetimeMoments = (allMoments || []).length;
+    const lastMomentTimestamp = allMoments?.[0]?.timestamp; // sorted DESC by momentService
+    const daysSinceLastLog = lastMomentTimestamp
+      ? Math.floor((Date.now() - new Date(lastMomentTimestamp).getTime()) / 86400000)
+      : null;
+    const isSilent = recentMoments.length === 0 && lifetimeMoments >= 3 && daysSinceLastLog >= 1;
+
+    let silenceWindow = null;
+    let effectiveAggregates = aggregates;
+    let effectivePreviousAggregates;
+
+    if (isSilent) {
+      silenceWindow = {
+        isSilent: true,
+        daysSinceLastLog,
+        lastLogDate: new Date(lastMomentTimestamp).toISOString().slice(0, 10),
+        totalLifetimeMoments: lifetimeMoments,
+      };
+
+      // Slide aggregate window: use the most recent 7 days that had data
+      const activeDays = allAggregates.filter(a => Number(a.total || 0) > 0);
+      effectiveAggregates = activeDays.slice(-7);
+
+      // Recompute previous aggregates relative to the last active window
+      const lastActiveDate = effectiveAggregates[0]?.date;
+      if (lastActiveDate && activeDays.length > 7) {
+        effectivePreviousAggregates = activeDays.slice(-14, -7);
+      } else {
+        effectivePreviousAggregates = null;
+      }
+
+      // Recompute recentMoments to match the last active window
+      if (effectiveAggregates.length) {
+        const windowStart = effectiveAggregates[0].date;
+        const windowEnd = effectiveAggregates[effectiveAggregates.length - 1].date;
+        recentMoments = (allMoments || []).filter(m => {
+          const d = new Date(m.timestamp).toISOString().slice(0, 10);
+          return d >= windowStart && d <= windowEnd;
+        });
+      }
+
+      console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: SILENCE detected — ${daysSinceLastLog}d since last log, sliding to ${effectiveAggregates.length} active days`);
+    } else {
+      effectivePreviousAggregates = allAggregates.length >= 14 ? allAggregates.slice(-14, -7) : null;
+    }
 
     const hasPremium = subscription?.status === "active" || subscription?.status === "grace_period";
     const canViewRuleBased = await checkFeatureAccess(ownerId, "aiWeeklySummary", { isAuthenticated, subscription });
 
-    // Previous week aggregates (days 8-14 ago) for delta comparison
-    const previousAggregates = allAggregates.length >= 14 ? allAggregates.slice(-14, -7) : null;
-
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
-    const report = generateWeeklyReport({ aggregates, allAggregates, previousAggregates, moments: recentMoments });
+    const report = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates, previousAggregates: effectivePreviousAggregates, moments: recentMoments, silenceWindow });
     report.lifetimeMoments = (allMoments || []).length;
     console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: moments=${recentMoments.length}, lifetime=${report.lifetimeMoments}, correlations=${Object.keys(report.correlations || {}).length}, invokedMetrics=${report.invokedMetrics != null}, compound=${report.compoundPatterns != null}`);
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
-    if (canViewRuleBased && report.totalMoments) {
+    if (canViewRuleBased && (report.totalMoments || silenceWindow)) {
       report.aiInsight = await generateInsight(report, { firstName, lang });
 
       // Use LLM-rewritten summary if available (from rewriteSummaries job)
@@ -149,6 +196,11 @@ export default async function handler(req, res) {
     // Generate contextual actions from the report (feedback-aware)
     report.actions = generateActions(report, actionFeedback || [], actionPrefs, lang);
     report.actionFeedback = actionFeedback || [];
+
+    // Attach silence metadata so the client can render a "welcome back" banner
+    if (silenceWindow) {
+      report.silenceWindow = silenceWindow;
+    }
 
     // Local text polish on summary + action reasons (fast, no external API)
     // Skip English lint for Hindi — Hindi text is pre-composed

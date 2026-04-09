@@ -56,8 +56,9 @@ function buildFeedbackIndex(feedback) {
  * @param {object?} prefs    - Stored action prefs (likedTriggers, dislikedApproaches, llmActions)
  */
 export function generateActions(report, feedback = [], prefs = null, lang = "en") {
-  if (!report || report.totalMoments < 3) return [];
+  if (!report || (report.totalMoments < 3 && !report.dataQuality?.isSilent)) return [];
 
+  const isSilent = !!report.dataQuality?.isSilent;
   const fb = buildFeedbackIndex(feedback);
   const hi = lang === "hi";
 
@@ -512,6 +513,19 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   }
 
   // Always return exactly 3 actions
+  // For silent (returning) users, prepend a welcome-back action
+  if (isSilent) {
+    const welcomeBack = {
+      id: `welcome-back${eid}`,
+      type: "awareness",
+      title: hi ? "वापसी पर स्वागत है — एक पल लॉग करें" : "Welcome back — log a moment when you're ready",
+      reason: hi
+        ? "आपके पिछले पैटर्न अभी भी यहाँ हैं। एक नया पल लॉग करने से सब फिर से जुड़ जाएगा।"
+        : "Your previous patterns are still here. Logging one new moment reconnects everything.",
+    };
+    filtered.unshift(welcomeBack);
+  }
+
   return filtered.slice(0, 3).map((a, i) => ({
     ...a,
     title: hi ? a.title : lintText(a.title),

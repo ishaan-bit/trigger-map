@@ -68,8 +68,9 @@ function varianceForDay(emotions) {
 }
 
 // --- Confidence model ---
-// Returns: "too_early" | "low" | "emerging" | "moderate" | "strong"
-function computeConfidence(totalMoments, daysLogged) {
+// Returns: "too_early" | "low" | "emerging" | "moderate" | "strong" | "stale"
+function computeConfidence(totalMoments, daysLogged, { isSilent } = {}) {
+  if (isSilent) return "stale";
   if (totalMoments < 3) return "too_early";
   if (totalMoments < MIN_LOGS_FOR_PATTERNS || daysLogged < 2) return "low";
   if (totalMoments < MIN_LOGS_FOR_PAIRINGS || daysLogged < MIN_DAYS_FOR_RHYTHM) return "emerging";
@@ -178,7 +179,7 @@ function buildChangeHighlights(deltas, report) {
 
 // --- Main generator ---
 
-export function generateWeeklyReport({ aggregates = [], allAggregates = null, previousAggregates = null, aiInsight = null, moments = null } = {}) {
+export function generateWeeklyReport({ aggregates = [], allAggregates = null, previousAggregates = null, aiInsight = null, moments = null, silenceWindow = null } = {}) {
   const filledAggregates = aggregates.filter((s) => s && s.date);
 
   const triggerFrequency = {};
@@ -266,7 +267,7 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
   const daysLogged = filledAggregates.filter((s) => Number(s.total || 0) > 0).length;
   const uniqueTriggers = Object.keys(triggerFrequency).length;
   const uniqueEmotions = Object.keys(emotionFrequency).length;
-  const confidence = computeConfidence(totalMoments, daysLogged);
+  const confidence = computeConfidence(totalMoments, daysLogged, { isSilent: !!silenceWindow });
 
   const tiedTriggers = topTied(triggerFrequency);
   const tiedEmotions = topTied(emotionFrequency);
@@ -324,6 +325,11 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     hasEnoughForRhythm: daysLogged >= MIN_DAYS_FOR_RHYTHM,
     hasEnoughForTrajectory: weeklyEmotionTrajectory.length >= MIN_LOGS_FOR_TRAJECTORY,
     hasEnoughForStability: totalMoments >= MIN_LOGS_FOR_STABILITY && validDays.length >= 2,
+    ...(silenceWindow && {
+      isSilent: true,
+      daysSinceLastLog: silenceWindow.daysSinceLastLog,
+      lastLogDate: silenceWindow.lastLogDate,
+    }),
   };
 
   // Baseline & drift — uses the extended window if available, else falls back to weekly

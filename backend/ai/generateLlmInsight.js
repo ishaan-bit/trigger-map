@@ -75,6 +75,11 @@ function buildSignals(report, recentNotes, actionFeedback) {
   lines.push(`Moments logged: ${dq.totalMoments || 0} over ${dq.daysLogged || 0} days.`);
   lines.push(`Confidence: ${dq.confidence || "unknown"}.`);
 
+  // Silence signal: user returned after a gap
+  if (dq.isSilent) {
+    lines.push(`SILENCE CONTEXT: The user has not logged for ${dq.daysSinceLastLog} days. Last log was on ${dq.lastLogDate}. The data below is from their last active period, not the current week. Frame observations as "from your last active period" and gently encourage them to log again. Do NOT assume they are currently experiencing these patterns.`);
+  }
+
   if (report.topTrigger) {
     lines.push(`Dominant trigger: ${report.topTrigger}.`);
   } else if (report.tiedTriggers?.length) {

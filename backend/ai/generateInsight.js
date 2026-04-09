@@ -5,7 +5,7 @@ import { retrieveForRuleBased, retrieveIntervention } from "../knowledge/ragEngi
 import {
   triggerHi, emotionHi,
   MICRO_EXPERIMENTS_HI,
-  buildTooEarlySummaryHi, buildLowSummaryHi, buildEmergingSummaryHi,
+  buildTooEarlySummaryHi, buildStaleSummaryHi, buildLowSummaryHi, buildEmergingSummaryHi,
   buildModerateSummaryHi, buildStrongSummaryHi,
   buildWhatWorkingHi, buildWhereToFocusHi,
   buildActionableDirectionHi, baselineSummaryHi,
@@ -123,6 +123,30 @@ function streakNote(positiveStreak, negativeStreak) {
 
 function buildTooEarlySummary() {
   return "You're just getting started. Every moment you log helps us learn how you tick. A few more and we'll start spotting patterns.";
+}
+
+function buildStaleSummary(report, firstName) {
+  const dq = report.dataQuality || {};
+  const days = dq.daysSinceLastLog || "a while";
+  const name = firstName ? `${firstName}, it` : "It";
+  const topT = report.topTrigger;
+  const topE = report.topEmotion;
+
+  let core = `${name} has been ${days} days since your last check-in. Here's what we still see from your previous activity.`;
+
+  if (topT && topE) {
+    core += ` ${cap(triggerLabel(topT))} was your most common area, and you felt ${topE} most often.`;
+  } else if (topT) {
+    core += ` ${cap(triggerLabel(topT))} was on your mind the most.`;
+  }
+
+  if (report.regulators?.length) {
+    const r = report.regulators[0];
+    core += ` ${cap(triggerLabel(r.trigger))} tended to bring you back to feeling ${r.emotion}. That anchor is still here.`;
+  }
+
+  core += " Log a moment whenever you're ready — your patterns are waiting.";
+  return core;
 }
 
 function buildLowSummary(report, firstName) {
@@ -396,6 +420,9 @@ export async function generateInsight(report, opts = {}) {
   switch (confidence) {
     case "too_early":
       summary = hi ? buildTooEarlySummaryHi() : buildTooEarlySummary();
+      break;
+    case "stale":
+      summary = hi ? buildStaleSummaryHi(report, firstName) : buildStaleSummary(report, firstName);
       break;
     case "low":
       summary = hi ? buildLowSummaryHi(report, firstName) : buildLowSummary(report, firstName);

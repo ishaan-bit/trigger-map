@@ -101,6 +101,30 @@ export function buildTooEarlySummaryHi() {
   return "आप अभी शुरुआत कर रहे हैं। जो भी पल आप लॉग करते हैं, वो हमें आपको समझने में मदद करता है। कुछ और लॉग करें और हम पैटर्न पहचानना शुरू करेंगे।";
 }
 
+export function buildStaleSummaryHi(report, firstName) {
+  const dq = report.dataQuality || {};
+  const days = dq.daysSinceLastLog || "कुछ";
+  const name = firstName ? `${firstName}, आपकी` : "आपकी";
+  const topT = report.topTrigger;
+  const topE = report.topEmotion;
+
+  let core = `${name} आखिरी चेक-इन ${days} दिन पहले थी। यहाँ आपकी पिछली गतिविधि से जो हम अभी भी देख रहे हैं।`;
+
+  if (topT && topE) {
+    core += ` ${triggerHi(topT)} सबसे ज़्यादा आया, और आपने ${emotionHi(topE)} सबसे अधिक महसूस किया।`;
+  } else if (topT) {
+    core += ` ${triggerHi(topT)} सबसे ज़्यादा आपके मन पर था।`;
+  }
+
+  if (report.regulators?.length) {
+    const r = report.regulators[0];
+    core += ` ${triggerHi(r.trigger)} आपको ${emotionHi(r.emotion)} की ओर लाता रहा। वो सहारा अभी भी यहाँ है।`;
+  }
+
+  core += " जब मन हो, एक पल लॉग करें — आपके पैटर्न इंतज़ार कर रहे हैं।";
+  return core;
+}
+
 export function buildLowSummaryHi(report, firstName) {
   const n = report.dataQuality.totalMoments;
   const opener = firstName ? `${firstName}, आपने` : "आपने";

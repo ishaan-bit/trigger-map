@@ -2411,6 +2411,16 @@ export function WeeklyReportScreen() {
                 </View>
               ) : null}
 
+              {/* Silence banner for returning users who haven't logged in 7+ days */}
+              {confidence === "stale" && report?.silenceWindow ? (
+                <View style={s.lightWeekBanner}>
+                  <Text style={s.lightWeekText}>
+                    {t("report.silenceBanner") || "Welcome back!"}{" "}
+                    {(t("report.silenceBannerBody") || "It's been {days} days since your last check-in. Here's what we still see from your previous activity.").replace("{days}", report.silenceWindow.daysSinceLastLog || "a few")}
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Tab content */}
               {activeTab === "mirror" ? (
                 <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />

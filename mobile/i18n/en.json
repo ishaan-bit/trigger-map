@@ -384,6 +384,8 @@
     "starterBodySignedIn": "Log at least 3 moments this week for your pattern report to take shape. With 5 or more, you unlock personalised AI insights that get sharper the more you log.",
     "starterBodyAnon": "Log at least 3 moments to see your first patterns. Sign in and log 5+ to unlock personalised AI insights.",
     "lightWeek": "Quiet week so far \u2014 showing your recent patterns and past insights.",
+    "silenceBanner": "Welcome back!",
+    "silenceBannerBody": "It's been {days} days since your last check-in. Here's what we still see from your previous activity.",
     "signInDeepen": "Sign in to deepen insights",
     "signInDeeper": "Sign in for deeper insights",
     "signInAnalytics": "Sign in for pattern analytics",
@@ -406,7 +408,8 @@
       "low": "Early patterns",
       "emerging": "Taking shape",
       "moderate": "Solid picture",
-      "strong": "High confidence"
+      "strong": "High confidence",
+      "stale": "Returning"
     },
 
     "times": {

@@ -85,6 +85,13 @@ function extractEmotions(report) {
 
 function extractBriefContext(report) {
   const lines = [];
+  const dq = report?.dataQuality;
+
+  // Silence signal: data is from a past active period, not current week
+  if (dq?.isSilent) {
+    lines.push(`SILENCE: user last logged ${dq.daysSinceLastLog} days ago (${dq.lastLogDate}). Data below is from their last active period. Suggest gentle re-engagement, not new demands.`);
+  }
+
   const bm = report?.baselineMetrics;
   if (bm?.baseline?.reliable) {
     lines.push(`Baseline: ${bm.baseline.score.toFixed(1)}/5 (${bm.baseline.label}).`);
