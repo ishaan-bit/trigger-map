@@ -151,7 +151,7 @@ async function selectMoveItems(ownerId, emotions, profile) {
   const disliked = profile?.dislikedMovements || [];
   const liked = profile?.likedMovements || [];
   const exclude = [...recentIds, ...disliked];
-  return pickMovements(emotions, 2, { exclude, boost: liked, environment: env, equipment: equip });
+  return pickMovements(emotions, 8, { exclude, boost: liked, environment: env, equipment: equip });
 }
 
 async function selectFuelItems(ownerId, emotions, profile) {
@@ -161,14 +161,15 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const disliked = profile?.dislikedNourishments || [];
   const liked = profile?.likedNourishments || [];
   const exclude = [...recentIds, ...disliked];
-  return pickNourishments(emotions, 2, { exclude, boost: liked, diet, cuisine });
+  return pickNourishments(emotions, 10, { exclude, boost: liked, diet, cuisine });
 }
 
 // ── Prompt builders ────────────────────────────────────────────────────
 
 function buildMovePrompt(items, context, lang) {
   const hi = lang === "hi";
-  const itemBlock = items.map((m) => {
+  const top = items.slice(0, 3);
+  const itemBlock = top.map((m) => {
     const name = hi ? m.nameHi : m.name;
     const desc = hi ? m.descriptionHi : m.description;
     return `- ${name}: ${desc} (${m.intensity}, ~${m.durationMin} min)`;
@@ -178,22 +179,23 @@ function buildMovePrompt(items, context, lang) {
     ? `उपयोगकर्ता की हालिया भावनात्मक स्थिति:
 ${context}
 
-ये दो शारीरिक गतिविधियां चुनी गई हैं:
+ये शारीरिक गतिविधियां चुनी गई हैं:
 ${itemBlock}
 
-इन दोनों गतिविधियों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए क्यों उपयुक्त हैं। सीधे और गर्म स्वर में लिखें। तकनीकी शब्द न इस्तेमाल करें। कोई नई गतिविधि न जोड़ें।`
+इन गतिविधियों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए क्यों उपयुक्त हैं। सीधे और गर्म स्वर में लिखें। तकनीकी शब्द न इस्तेमाल करें। कोई नई गतिविधि न जोड़ें।`
     : `User's recent emotional context:
 ${context}
 
-These two movement activities were selected:
+These movement activities were selected for the user:
 ${itemBlock}
 
-In 3-4 sentences, explain why these two activities suit the user's current emotional state. Be warm, direct, and specific. Do not use technical jargon. Do not suggest additional activities beyond the two listed.`;
+In 3-4 sentences, explain why these activities suit the user's current emotional state. Be warm, direct, and specific. Do not use technical jargon. Do not suggest additional activities beyond those listed.`;
 }
 
 function buildFuelPrompt(items, context, lang) {
   const hi = lang === "hi";
-  const itemBlock = items.map((n) => {
+  const top = items.slice(0, 3);
+  const itemBlock = top.map((n) => {
     const name = hi ? n.nameHi : n.name;
     const desc = hi ? n.descriptionHi : n.description;
     return `- ${name}: ${desc} (${n.nutrientFocus})`;
@@ -203,17 +205,17 @@ function buildFuelPrompt(items, context, lang) {
     ? `उपयोगकर्ता की हालिया भावनात्मक स्थिति:
 ${context}
 
-ये दो पोषण सुझाव चुने गए हैं:
+ये पोषण सुझाव चुने गए हैं:
 ${itemBlock}
 
-इन दोनों सुझावों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए कैसे मदद कर सकते हैं। सरल और गर्म भाषा में लिखें। नया खाना न जोड़ें।`
+इन सुझावों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए कैसे मदद कर सकते हैं। सरल और गर्म भाषा में लिखें। नया खाना न जोड़ें।`
     : `User's recent emotional context:
 ${context}
 
-These two nourishment suggestions were selected:
+These nourishment suggestions were selected for the user:
 ${itemBlock}
 
-In 3-4 sentences, explain why these two suggestions suit the user's current emotional state. Be warm, direct, and specific. Focus on how they connect to mood and energy, not clinical nutrition facts. Do not suggest additional items beyond the two listed.`;
+In 3-4 sentences, explain why these suggestions suit the user's current emotional state. Be warm, direct, and specific. Focus on how they connect to mood and energy, not clinical nutrition facts. Do not suggest additional items beyond those listed.`;
 }
 
 function buildPerspectivePrompt(context, lang) {

@@ -1583,15 +1583,22 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     return [dominantEmotion];
   }, [dominantEmotion]);
 
-  // Move suggestions — filtered by duration range, scored by emotional state + feedback
+  // Move suggestions — use server-picked items when available (adaptive + feedback-aware),
+  // fall back to full client library otherwise. Duration filter + emotion sort applied on top.
   const moveSuggestions = useMemo(() => {
-    let filtered = filterMovements({});
+    let pool;
+    if (mode === "move" && data?.items?.length > 0) {
+      const movementMap = Object.fromEntries(MOVEMENTS.map((m) => [m.id, m]));
+      pool = data.items.map((si) => movementMap[si.id]).filter(Boolean);
+    } else {
+      pool = filterMovements({});
+    }
     if (moveDuration) {
       const [lo, hi] = moveDuration;
-      filtered = filtered.filter((m) => m.durationMin >= lo && m.durationMin <= hi);
+      pool = pool.filter((m) => m.durationMin >= lo && m.durationMin <= hi);
     }
     // Sort by: liked first, then emotion relevance, disliked last
-    return [...filtered].sort((a, b) => {
+    return [...pool].sort((a, b) => {
       const aFb = feedbackGiven[a.id];
       const bFb = feedbackGiven[b.id];
       const aLiked = aFb === "helpful" ? 1 : aFb === "not_helpful" ? -1 : 0;
@@ -1601,13 +1608,23 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [moveDuration, emotions, feedbackGiven]);
+  }, [mode, data, moveDuration, emotions, feedbackGiven]);
 
-  // Fuel suggestions — filtered by diet, scored by emotional state + feedback
+  // Fuel suggestions — use server-picked items when available (adaptive + feedback-aware),
+  // fall back to full client library otherwise. Diet filter + emotion sort applied on top.
   const fuelSuggestions = useMemo(() => {
-    const filtered = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
+    let pool;
+    if (mode === "fuel" && data?.items?.length > 0) {
+      const nourishMap = Object.fromEntries(NOURISHMENTS.map((n) => [n.id, n]));
+      pool = data.items.map((si) => nourishMap[si.id]).filter(Boolean);
+    } else {
+      pool = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
+    }
+    if (fuelDiet) {
+      pool = pool.filter((n) => n.diets?.includes(fuelDiet));
+    }
     // Sort by: liked first, then emotion relevance, disliked last
-    return [...filtered].sort((a, b) => {
+    return [...pool].sort((a, b) => {
       const aFb = feedbackGiven[a.id];
       const bFb = feedbackGiven[b.id];
       const aLiked = aFb === "helpful" ? 1 : aFb === "not_helpful" ? -1 : 0;
@@ -1617,7 +1634,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [fuelDiet, emotions, feedbackGiven]);
+  }, [mode, data, fuelDiet, emotions, feedbackGiven]);
 
   // Fuel day plan - one item per meal slot, prioritized by emotion relevance
   const fuelPlan = useMemo(() => {
@@ -1642,7 +1659,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
-  // Only perspective mode requires server data; move/fuel are client-side
+  // Perspective mode has no client-side fallback; move/fuel fall back to library when no server data
   if (mode === "perspective" && (!data || (!data.items?.length && !data.narrative))) {
     return (
       <View style={s.modeContent}>
