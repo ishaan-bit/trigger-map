@@ -453,9 +453,36 @@ server.listen(PORT, '127.0.0.1', async () => {
   console.log(`    POST /run-freepass`);
   console.log(`    POST /rewrite-summaries`);
   console.log(`    POST /cancel-job`);
-  console.log(`  Auth: Bearer token required\n`);
+  console.log(`  Auth: Bearer token required`);
+  console.log();
 
   await ensureOllama();
+
+  // ── Push-cron scheduler (every 30 minutes) ──
+  const BACKEND_URL = process.env.BACKEND_URL;
+  const BACKEND_INTERNAL_KEY = process.env.BACKEND_INTERNAL_KEY;
+  if (BACKEND_URL && BACKEND_INTERNAL_KEY) {
+    const pushCronTick = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/internal/control/push-cron`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Internal-Key': BACKEND_INTERNAL_KEY },
+          signal: AbortSignal.timeout(30000),
+        });
+        const data = await res.json().catch(() => null);
+        const sent = data?.results?.length || 0;
+        if (sent > 0) console.log(`[push-cron] Sent ${sent} scheduled notification batch(es)`);
+      } catch (err) {
+        console.error('[push-cron] Error:', err.message);
+      }
+    };
+    // Run once on startup, then every 30 minutes
+    pushCronTick();
+    setInterval(pushCronTick, 30 * 60 * 1000);
+    console.log('  Push-cron scheduler: active (every 30 min)\n');
+  } else {
+    console.log('  Push-cron scheduler: DISABLED (set BACKEND_URL & BACKEND_INTERNAL_KEY)\n');
+  }
 });
 
 // Cleanup Ollama on worker shutdown

@@ -547,6 +547,8 @@ export default function ControlPage() {
   const [pushUsersLoading, setPushUsersLoading] = useState(false);
   const [pushSelected, setPushSelected] = useState(new Set());
   const [pushSearch, setPushSearch] = useState('');
+  const [schedule, setSchedule] = useState(null);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
   const [backfillWeeks, setBackfillWeeks] = useState(3);
   const [backfillPersonality, setBackfillPersonality] = useState('steady-achiever');
   const [backfillRunning, setBackfillRunning] = useState(false);
@@ -639,6 +641,36 @@ export default function ControlPage() {
       setResults(prev => [{ timestamp: ts, action: 'send-push', target: 'push', ok: false, data: { error: err.message }, status: 0 }, ...prev].slice(0, 50));
     } finally {
       setPushSending(false);
+    }
+  }, []);
+
+  // Fetch push schedule config
+  const fetchSchedule = useCallback(async () => {
+    try {
+      const res = await fetch('/api/control/push-schedule');
+      const data = await res.json();
+      if (data.ok !== false && data.schedule) setSchedule(data.schedule);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchSchedule(); }, [fetchSchedule]);
+
+  const saveSchedule = useCallback(async (updated) => {
+    setScheduleSaving(true);
+    const ts = new Date().toISOString();
+    try {
+      const res = await fetch('/api/control/push-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      const data = await res.json();
+      if (data.ok !== false) setSchedule(updated);
+      setResults(prev => [{ timestamp: ts, action: 'save-push-schedule', target: 'schedule', ok: res.ok, data, status: res.status }, ...prev].slice(0, 50));
+    } catch (err) {
+      setResults(prev => [{ timestamp: ts, action: 'save-push-schedule', target: 'schedule', ok: false, data: { error: err.message }, status: 0 }, ...prev].slice(0, 50));
+    } finally {
+      setScheduleSaving(false);
     }
   }, []);
 
@@ -1464,6 +1496,115 @@ export default function ControlPage() {
           >
             {pushSending ? 'Sending...' : `Send ${PUSH_TRIGGERS.find(t => t.id === pushType)?.label || 'Custom'} to ${pushSelected.size} user(s)`}
           </button>
+        </div>
+      </div>
+
+      {/* Auto-Scheduled Notifications */}
+      <div className="panel">
+        <div className="panel-header">
+          <h3>Auto-Scheduled Notifications</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Server-side push schedule (IST times)</span>
+        </div>
+        <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!schedule ? (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading schedule…</div>
+          ) : (
+            <>
+              {/* Master toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={schedule.enabled} onChange={e => setSchedule(s => ({ ...s, enabled: e.target.checked }))} />
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Enable auto-scheduling</span>
+              </label>
+
+              {/* Daily Check-in */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={schedule.daily?.enabled || false}
+                    onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, enabled: e.target.checked } }))} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>📝 Daily Check-in</span>
+                </label>
+                <div style={{ display: 'flex', gap: 16, marginLeft: 24, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    AM time (IST):
+                    <input type="time" value={schedule.daily?.amTime || '08:00'}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'inherit', fontSize: 12 }}
+                      onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, amTime: e.target.value } }))} />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    PM time (IST):
+                    <input type="time" value={schedule.daily?.pmTime || '20:00'}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'inherit', fontSize: 12 }}
+                      onChange={e => setSchedule(s => ({ ...s, daily: { ...s.daily, pmTime: e.target.value } }))} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Weekly Insights */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={schedule.weekly?.enabled || false}
+                    onChange={e => setSchedule(s => ({ ...s, weekly: { ...s.weekly, enabled: e.target.checked } }))} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>📊 Weekly Insights</span>
+                </label>
+                <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => {
+                      const days = schedule.weekly?.days || [0, 3];
+                      const active = days.includes(i);
+                      return (
+                        <button key={i}
+                          style={{
+                            padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                            background: active ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                            color: active ? '#fff' : 'var(--text-muted)',
+                            border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                          }}
+                          onClick={() => {
+                            const next = active ? days.filter(x => x !== i) : [...days, i].sort();
+                            setSchedule(s => ({ ...s, weekly: { ...s.weekly, days: next } }));
+                          }}
+                        >
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    Send time (IST):
+                    <input type="time" value={schedule.weekly?.time || '19:00'}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'inherit', fontSize: 12 }}
+                      onChange={e => setSchedule(s => ({ ...s, weekly: { ...s.weekly, time: e.target.value } }))} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Gentle Nudge */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={schedule.nudge?.enabled || false}
+                    onChange={e => setSchedule(s => ({ ...s, nudge: { ...s.nudge, enabled: e.target.checked } }))} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>👋 Gentle Nudge</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginLeft: 24 }}>
+                  After
+                  <input type="number" min={1} max={14} value={schedule.nudge?.inactiveDays || 3}
+                    style={{ width: 48, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'inherit', fontSize: 12, textAlign: 'center' }}
+                    onChange={e => setSchedule(s => ({ ...s, nudge: { ...s.nudge, inactiveDays: parseInt(e.target.value) || 3 } }))} />
+                  days of inactivity
+                </label>
+              </div>
+
+              {/* Save button */}
+              <button
+                className="btn btn-primary"
+                style={{ padding: '10px 0', fontSize: 14 }}
+                disabled={scheduleSaving}
+                onClick={() => saveSchedule(schedule)}
+              >
+                {scheduleSaving ? 'Saving…' : 'Save Schedule'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

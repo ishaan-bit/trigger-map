@@ -61,3 +61,14 @@ export async function sendPush({ userIds, title, body, type }) {
 export async function fetchPilotMetrics() {
   return backendRequest('/api/internal/control/pilot-metrics', { method: 'GET' });
 }
+
+export async function getPushSchedule() {
+  return backendRequest('/api/internal/control/push-schedule', { method: 'GET' });
+}
+
+export async function savePushSchedule(config) {
+  return backendRequest('/api/internal/control/push-schedule', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
