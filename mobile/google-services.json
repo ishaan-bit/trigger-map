@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "221240123707",
+    "project_id": "trigger-map-83fa5",
+    "storage_bucket": "trigger-map-83fa5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:221240123707:android:089e54a57c6daddd1f171e",
+        "android_client_info": {
+          "package_name": "com.triggermap.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCEe8ig4yc4nuK3s0UA00ZbzlxqSR8lKg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
