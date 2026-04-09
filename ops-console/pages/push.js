@@ -80,6 +80,7 @@ export default function PushPage() {
           userIds: Array.from(selected),
           title: title.trim(),
           body: body.trim(),
+          type: 'custom',
         }),
       });
       const result = await res.json();

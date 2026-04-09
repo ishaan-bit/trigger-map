@@ -51,10 +51,10 @@ export async function manageUser(action, params = {}) {
   });
 }
 
-export async function sendPush({ userIds, title, body }) {
+export async function sendPush({ userIds, title, body, type }) {
   return backendRequest('/api/internal/control/send-push', {
     method: 'POST',
-    body: JSON.stringify({ userIds, title, body }),
+    body: JSON.stringify({ userIds, title, body, type }),
   });
 }
 

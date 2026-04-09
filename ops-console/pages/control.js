@@ -1,6 +1,7 @@
 import Head from 'next/head';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import ConfirmAction from '../components/ConfirmAction';
+import { timeAgo } from '../lib/utils';
 
 const LLM_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
@@ -29,6 +30,12 @@ const BACKFILL_PERSONALITIES = [
   { id: 'false-recovery',        label: '🔁 False Recovery',        desc: 'Passive rest feels like recovery but next-day baseline drops' },
   { id: 'context-split',         label: '🎭 Context Split',         desc: 'Same trigger, opposite emotions depending on context' },
   { id: 'silent-drift',          label: '📉 Silent Drift',          desc: 'No obvious trigger but baseline gradually declining' },
+];
+
+const PUSH_TRIGGERS = [
+  { id: 'checkin', type: 'reflection_reminder', label: 'Daily Check-in', icon: '📝', title: 'Time to reflect', body: 'How did today feel? A quick log helps your pattern map stay current.' },
+  { id: 'insights', type: 'weekly_insight', label: 'Weekly Insights', icon: '📊', title: 'Your weekly patterns are ready', body: 'See what stood out this week — your patterns tell a story.' },
+  { id: 'nudge', type: 'inactivity_nudge', label: 'Gentle Nudge', icon: '👋', title: 'How has your day been?', body: 'Log a moment to keep your pattern map current.' },
 ];
 
 const JOBS = [
@@ -535,6 +542,11 @@ export default function ControlPage() {
   const [pushTitle, setPushTitle] = useState('TriggerMap');
   const [pushBody, setPushBody] = useState('');
   const [pushSending, setPushSending] = useState(false);
+  const [pushType, setPushType] = useState('custom');
+  const [pushUsers, setPushUsers] = useState([]);
+  const [pushUsersLoading, setPushUsersLoading] = useState(false);
+  const [pushSelected, setPushSelected] = useState(new Set());
+  const [pushSearch, setPushSearch] = useState('');
   const [backfillWeeks, setBackfillWeeks] = useState(3);
   const [backfillPersonality, setBackfillPersonality] = useState('steady-achiever');
   const [backfillRunning, setBackfillRunning] = useState(false);
@@ -586,6 +598,50 @@ export default function ControlPage() {
     return () => clearInterval(interval);
   }, [checkWorker]);
 
+  // Fetch users for push notifications panel
+  const fetchPushUsers = useCallback(async () => {
+    setPushUsersLoading(true);
+    try {
+      const res = await fetch('/api/metrics/users');
+      const data = await res.json();
+      setPushUsers(data.users || []);
+    } catch {
+      setPushUsers([]);
+    } finally {
+      setPushUsersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchPushUsers(); }, [fetchPushUsers]);
+
+  const filteredPushUsers = useMemo(() => {
+    if (!pushSearch.trim()) return pushUsers;
+    const q = pushSearch.toLowerCase();
+    return pushUsers.filter(u =>
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.ownerId && u.ownerId.toLowerCase().includes(q)) ||
+      (u.name && u.name.toLowerCase().includes(q))
+    );
+  }, [pushUsers, pushSearch]);
+
+  const sendPushNotification = useCallback(async (title, body, type, userIds) => {
+    setPushSending(true);
+    const ts = new Date().toISOString();
+    try {
+      const res = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds, title, body, type }),
+      });
+      const data = await res.json();
+      setResults(prev => [{ timestamp: ts, action: 'send-push', target: `${userIds.length} user(s)`, ok: res.ok, data, status: res.status }, ...prev].slice(0, 50));
+    } catch (err) {
+      setResults(prev => [{ timestamp: ts, action: 'send-push', target: 'push', ok: false, data: { error: err.message }, status: 0 }, ...prev].slice(0, 50));
+    } finally {
+      setPushSending(false);
+    }
+  }, []);
+
   // Fetch model availability from Ollama via worker
   const fetchModels = useCallback(async () => {
     try {
@@ -595,7 +651,9 @@ export default function ControlPage() {
         body: JSON.stringify({ action: 'list-models', target: 'models' }),
       });
       const data = await res.json();
-      if (data.ok !== false && data.data?.models) {
+      if (data.ok !== false && data.result?.models) {
+        setModelStatus(data.result.models);
+      } else if (data.ok !== false && data.data?.models) {
         setModelStatus(data.data.models);
       } else if (Array.isArray(data.models)) {
         setModelStatus(data.models);
@@ -1249,91 +1307,162 @@ export default function ControlPage() {
       {/* Push Notifications */}
       <div className="panel">
         <div className="panel-header">
-          <h3>Send Test Notification</h3>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expo push via registered tokens</span>
+          <h3>Push Notifications</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {pushUsers.filter(u => u.hasDevices).length}/{pushUsers.length} reachable
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={fetchPushUsers} disabled={pushUsersLoading}>↻</button>
+          </div>
         </div>
-        <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
+        <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Quick Triggers */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Quick Triggers</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {PUSH_TRIGGERS.map(trigger => (
+                <button
+                  key={trigger.id}
+                  className="btn btn-ghost btn-sm"
+                  style={{
+                    padding: '8px 14px', fontSize: 13,
+                    border: pushType === trigger.id ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: pushType === trigger.id ? 'rgba(123,201,216,0.08)' : 'transparent',
+                  }}
+                  onClick={() => {
+                    setPushType(trigger.id);
+                    setPushTitle(trigger.title);
+                    setPushBody(trigger.body);
+                  }}
+                >
+                  {trigger.icon} {trigger.label}
+                </button>
+              ))}
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{
+                  padding: '8px 14px', fontSize: 13,
+                  border: pushType === 'custom' ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: pushType === 'custom' ? 'rgba(123,201,216,0.08)' : 'transparent',
+                }}
+                onClick={() => {
+                  setPushType('custom');
+                  setPushTitle('');
+                  setPushBody('');
+                }}
+              >
+                ✏️ Custom
+              </button>
+            </div>
+          </div>
+
+          {/* Message fields */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="text"
+                value={pushTitle}
+                onChange={(e) => setPushTitle(e.target.value)}
+                placeholder="Notification title"
+                style={{ width: '100%', fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
+              <textarea
+                value={pushBody}
+                onChange={(e) => setPushBody(e.target.value)}
+                placeholder="Notification body text..."
+                rows={2}
+                style={{ width: '100%', fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+          </div>
+
+          {/* User selection */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Recipients — {pushSelected.size} selected
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => {
+                  setPushSelected(new Set(filteredPushUsers.filter(u => u.hasDevices).map(u => u.ownerId)));
+                }}>Reachable</button>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => {
+                  setPushSelected(new Set(filteredPushUsers.map(u => u.ownerId)));
+                }}>All</button>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => setPushSelected(new Set())}>None</button>
+              </div>
+            </div>
             <input
               type="text"
-              value={pushTitle}
-              onChange={(e) => setPushTitle(e.target.value)}
-              placeholder="Notification title"
-              style={{ flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)' }}
+              placeholder="Search by email, userId, or name..."
+              value={pushSearch}
+              onChange={(e) => setPushSearch(e.target.value)}
+              style={{ width: '100%', fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', marginBottom: 8 }}
             />
-          </div>
-          <textarea
-            value={pushBody}
-            onChange={(e) => setPushBody(e.target.value)}
-            placeholder="Notification body text..."
-            rows={2}
-            style={{ fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', resize: 'vertical' }}
-          />
-          {/* User picker: reuse the existing eligible users infrastructure */}
-          {!userPickerOpen['push'] ? (
-            <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => {
-              setUserPickerOpen(p => ({ ...p, push: true }));
-              if (!eligibleUsers['push']?.length) fetchEligibleUsers('push');
-            }}>
-              Select users...
-            </button>
-          ) : (
-            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>Recipients</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => {
-                    const all = (eligibleUsers['push'] || []).map(u => u.ownerId);
-                    setSelectedUsers(p => ({ ...p, push: new Set(all) }));
-                  }}>All</button>
-                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => setSelectedUsers(p => ({ ...p, push: new Set() }))}>None</button>
-                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => setUserPickerOpen(p => ({ ...p, push: false }))}>Close</button>
+            <div style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 6, border: '1px solid var(--border)' }}>
+              {pushUsersLoading ? (
+                <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>Loading users...</div>
+              ) : filteredPushUsers.length === 0 ? (
+                <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+                  {pushSearch ? 'No users match search' : 'No users found'}
                 </div>
-              </div>
-              {eligibleLoading['push'] ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading users...</div> : (
-                (eligibleUsers['push'] || []).map(u => (
-                  <label key={u.ownerId} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, padding: '2px 0', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={selectedUsers['push']?.has(u.ownerId) || false} onChange={() => {
-                      setSelectedUsers(p => {
-                        const s = new Set(p['push'] || []);
-                        s.has(u.ownerId) ? s.delete(u.ownerId) : s.add(u.ownerId);
-                        return { ...p, push: s };
-                      });
-                    }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{u.ownerId.slice(0, 8)}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{u.email || ''} — {u.moments} moments</span>
+              ) : (
+                filteredPushUsers.map(u => (
+                  <label
+                    key={u.ownerId}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                      borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                      background: pushSelected.has(u.ownerId) ? 'rgba(59,130,246,0.06)' : 'transparent',
+                      opacity: u.hasDevices ? 1 : 0.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pushSelected.has(u.ownerId)}
+                      onChange={() => {
+                        setPushSelected(prev => {
+                          const next = new Set(prev);
+                          next.has(u.ownerId) ? next.delete(u.ownerId) : next.add(u.ownerId);
+                          return next;
+                        });
+                      }}
+                      style={{ accentColor: 'var(--blue, #3b82f6)', flexShrink: 0 }}
+                    />
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                      background: u.hasDevices ? '#34c759' : '#6b7280',
+                    }} title={u.hasDevices ? 'Has push token' : 'No push token'} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>
+                        {u.email || `anon_${u.ownerId.slice(0, 8)}`}
+                        {u.name ? ` · ${u.name}` : ''}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', gap: 8, marginTop: 1 }}>
+                        <span>{u.momentCount} moments</span>
+                        {u.createdAt && <span>joined {timeAgo(u.createdAt)}</span>}
+                        {!u.hasDevices && <span style={{ color: 'var(--red)', fontStyle: 'italic' }}>no device</span>}
+                      </div>
+                    </div>
                   </label>
                 ))
               )}
             </div>
-          )}
+          </div>
+
+          {/* Send button */}
           <button
-            className="btn btn-primary btn-sm"
-            disabled={pushSending || !pushTitle.trim() || !pushBody.trim()}
-            style={{ alignSelf: 'flex-start' }}
-            onClick={async () => {
-              const sel = selectedUsers['push'];
-              const all = (eligibleUsers['push'] || []).map(u => u.ownerId);
-              const userIds = sel && sel.size > 0 ? [...sel] : all;
-              if (!userIds.length) { alert('No users selected'); return; }
-              setPushSending(true);
-              const ts = new Date().toISOString();
-              try {
-                const res = await fetch('/api/push/send', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ userIds, title: pushTitle.trim(), body: pushBody.trim() }),
-                });
-                const data = await res.json();
-                setResults(prev => [{ timestamp: ts, action: 'send-push', target: `${userIds.length} users`, ok: res.ok, data, status: res.status }, ...prev].slice(0, 50));
-              } catch (err) {
-                setResults(prev => [{ timestamp: ts, action: 'send-push', target: 'push', ok: false, data: { error: err.message }, status: 0 }, ...prev].slice(0, 50));
-              } finally {
-                setPushSending(false);
-              }
+            className="btn btn-primary"
+            style={{ padding: '10px 0', fontSize: 14 }}
+            disabled={pushSending || !pushTitle.trim() || !pushBody.trim() || pushSelected.size === 0}
+            onClick={() => {
+              const activeTrigger = PUSH_TRIGGERS.find(t => t.id === pushType);
+              const type = activeTrigger ? activeTrigger.type : 'custom';
+              sendPushNotification(pushTitle.trim(), pushBody.trim(), type, [...pushSelected]);
             }}
           >
-            {pushSending ? 'Sending...' : 'Send Notification'}
+            {pushSending ? 'Sending...' : `Send ${PUSH_TRIGGERS.find(t => t.id === pushType)?.label || 'Custom'} to ${pushSelected.size} user(s)`}
           </button>
         </div>
       </div>

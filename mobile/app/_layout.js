@@ -36,7 +36,28 @@ if (Platform.OS === "android") {
   }).catch(() => null);
 }
 
+function handleNotificationTap(router, type) {
+  console.info("[NOTIF] Navigating for type:", type);
+  switch (type) {
+    case "reflection_reminder":
+    case "inactivity_nudge":
+      router.replace("/(tabs)/log");
+      break;
+    case "weekly_insight":
+    case "report_ready":
+    case "ai_insight_ready":
+    case "pattern_alert":
+      router.replace("/(tabs)/report");
+      break;
+    default:
+      // Unknown type or custom push — just open the app
+      router.replace("/(tabs)/log");
+      break;
+  }
+}
+
 export default function RootLayout() {
+  const router = useRouter();
   const notificationListener = useRef(null);
   const responseListener = useRef(null);
 
@@ -65,6 +86,15 @@ export default function RootLayout() {
 
     validateStartup();
 
+    // Handle cold-start: app was killed, user tapped notification to open it
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response && active) {
+        const type = response.notification.request.content.data?.type;
+        console.info("[NOTIF] Cold-start tap:", type);
+        handleNotificationTap(router, type);
+      }
+    });
+
     // Listen for incoming notifications while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
       const type = notification.request.content.data?.type;
@@ -75,6 +105,7 @@ export default function RootLayout() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const type = response.notification.request.content.data?.type;
       console.info("[NOTIF] Tapped:", type);
+      handleNotificationTap(router, type);
     });
 
     return () => {
@@ -86,7 +117,7 @@ export default function RootLayout() {
         Notifications.removeNotificationSubscription(responseListener.current);
       }
     };
-  }, []);
+  }, [router]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

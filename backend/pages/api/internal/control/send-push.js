@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireInternalAuth(req, res)) return;
 
-  const { userIds, title, body } = req.body || {};
+  const { userIds, title, body, type } = req.body || {};
 
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: 'title is required' });
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
               title: title.trim(),
               body: body.trim(),
               sound: 'default',
-              data: { userId: uid },
+              data: { userId: uid, type: type || 'custom' },
             });
             devices.push({ deviceId: deviceId.slice(0, 8), platform: entry.platform });
           }
