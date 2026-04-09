@@ -313,9 +313,6 @@ async function handleRunJob(req, res, scriptName, jobName) {
 }
 
 // ── Ollama model management ──
-const OLLAMA_BASE = process.env.LLM_API_URL
-  ? process.env.LLM_API_URL.replace(/\/v1\/?$/, '')
-  : 'http://localhost:11434';
 
 const ALLOWED_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
@@ -379,13 +376,71 @@ async function handlePullModel(req, res) {
   }
 }
 
+// ── Ollama auto-start ──
+const OLLAMA_BASE = process.env.LLM_API_URL
+  ? process.env.LLM_API_URL.replace(/\/v1\/?$/, '')
+  : 'http://localhost:11434';
+
+let ollamaProcess = null;
+
+async function isOllamaRunning() {
+  try {
+    const r = await fetch(`${OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(2000) });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureOllama() {
+  if (await isOllamaRunning()) {
+    console.log('[worker] Ollama already running');
+    return;
+  }
+
+  console.log('[worker] Starting Ollama...');
+  ollamaProcess = spawn('ollama', ['serve'], {
+    env: { ...process.env, OLLAMA_INTEL_GPU: 'true', OLLAMA_VULKAN: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+    detached: false,
+  });
+
+  ollamaProcess.stdout.on('data', (d) => {
+    const line = d.toString().trim();
+    if (line) console.log(`[ollama] ${line}`);
+  });
+  ollamaProcess.stderr.on('data', (d) => {
+    const line = d.toString().trim();
+    if (line) console.log(`[ollama] ${line}`);
+  });
+  ollamaProcess.on('close', (code) => {
+    console.log(`[ollama] Process exited (code=${code})`);
+    ollamaProcess = null;
+  });
+  ollamaProcess.on('error', (err) => {
+    console.error(`[ollama] Failed to start: ${err.message}`);
+    ollamaProcess = null;
+  });
+
+  // Wait for Ollama to become ready (up to 15s)
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    if (await isOllamaRunning()) {
+      console.log('[worker] Ollama is ready');
+      return;
+    }
+  }
+  console.warn('[worker] Ollama started but not responding after 15s — may still be loading');
+}
+
 // ── Start ──
 const server = http.createServer(handleRequest);
 // LLM jobs can take 10+ minutes — disable Node's default 300s request timeout
 server.requestTimeout = 0;
 server.headersTimeout = 0;
 server.timeout = 0;
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, '127.0.0.1', async () => {
   console.log(`\n  TriggerMap Local Worker`);
   console.log(`  ─────────────────────`);
   console.log(`  Listening on http://127.0.0.1:${PORT}`);
@@ -399,4 +454,17 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`    POST /rewrite-summaries`);
   console.log(`    POST /cancel-job`);
   console.log(`  Auth: Bearer token required\n`);
+
+  await ensureOllama();
 });
+
+// Cleanup Ollama on worker shutdown
+function cleanup() {
+  if (ollamaProcess && !ollamaProcess.killed) {
+    console.log('[worker] Stopping Ollama...');
+    ollamaProcess.kill('SIGTERM');
+  }
+  process.exit(0);
+}
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
