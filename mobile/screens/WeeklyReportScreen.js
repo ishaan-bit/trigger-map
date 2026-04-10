@@ -1589,7 +1589,12 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     let pool;
     if (mode === "move" && data?.items?.length > 0) {
       const movementMap = Object.fromEntries(MOVEMENTS.map((m) => [m.id, m]));
-      pool = data.items.map((si) => movementMap[si.id]).filter(Boolean);
+      // Merge server reason with client catalogue data
+      const serverReasons = Object.fromEntries(data.items.map((si) => [si.id, si.reason]));
+      pool = data.items.map((si) => {
+        const mv = movementMap[si.id];
+        return mv ? { ...mv, reason: serverReasons[si.id] || null } : null;
+      }).filter(Boolean);
     } else {
       pool = filterMovements({});
     }
@@ -1616,12 +1621,17 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     let pool;
     if (mode === "fuel" && data?.items?.length > 0) {
       const nourishMap = Object.fromEntries(NOURISHMENTS.map((n) => [n.id, n]));
-      pool = data.items.map((si) => nourishMap[si.id]).filter(Boolean);
+      // Merge server reason with client catalogue data
+      const serverReasons = Object.fromEntries(data.items.map((si) => [si.id, si.reason]));
+      pool = data.items.map((si) => {
+        const nItem = nourishMap[si.id];
+        return nItem ? { ...nItem, reason: serverReasons[si.id] || null } : null;
+      }).filter(Boolean);
     } else {
       pool = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
     }
     if (fuelDiet) {
-      pool = pool.filter((n) => n.diets?.includes(fuelDiet));
+      pool = pool.filter((n) => n.diet?.includes(fuelDiet));
     }
     // Sort by: liked first, then emotion relevance, disliked last
     return [...pool].sort((a, b) => {
@@ -1704,7 +1714,10 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
               {moveSuggestions.slice(0, 8).map((mv) => (
                 <View key={mv.id} style={s.suggestionCard}>
                   <Text style={s.suggestionTitle}>{hi ? mv.nameHi : mv.name}</Text>
-                  <Text style={s.suggestionDesc}>{hi ? mv.descriptionHi : mv.description}</Text>
+                  {mv.reason ? (
+                    <Text style={s.suggestionReason}>{mv.reason}</Text>
+                  ) : null}
+                  <Text style={[s.suggestionDesc, mv.reason ? s.suggestionDescSecondary : null]}>{hi ? mv.descriptionHi : mv.description}</Text>
                   <View style={s.suggestionMeta}>
                     <Text style={s.suggestionMetaText}>{mv.intensity} · ~{mv.durationMin} min · {mv.equipment}</Text>
                   </View>
@@ -1752,7 +1765,10 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
               <View key={key} style={s.suggestionCard}>
                 <Text style={s.fuelSlotLabel}>{icon} {label}</Text>
                 <Text style={s.suggestionTitle}>{hi ? item.nameHi : item.name}</Text>
-                <Text style={s.suggestionDesc}>{hi ? item.descriptionHi : item.description}</Text>
+                {item.reason ? (
+                  <Text style={s.suggestionReason}>{item.reason}</Text>
+                ) : null}
+                <Text style={[s.suggestionDesc, item.reason ? s.suggestionDescSecondary : null]}>{hi ? item.descriptionHi : item.description}</Text>
                 <View style={s.suggestionMeta}>
                   <Text style={s.suggestionMetaText}>{item.nutrientFocus}{item.prepLevel ? ` · ${item.prepLevel} prep` : ""}</Text>
                 </View>
@@ -2212,17 +2228,9 @@ export function WeeklyReportScreen() {
     if (t) rs().catch(() => null);
     trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
 
-    // FTUE: show insights guide when arriving from second log
-    if (obState === "second_log_done") {
-      const timer = setTimeout(() => setShowInsightsGuide(true), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [load, obState]));
-
-  // Load adaptive modes for premium users
-  useEffect(() => {
-    if (isPremium && token) {
-      fetchModes(token)
+    // Refresh adaptive modes every time screen gains focus
+    if (p && t) {
+      fetchModes(t)
         .then((data) => {
           const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
           console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
@@ -2230,7 +2238,13 @@ export function WeeklyReportScreen() {
         })
         .catch((err) => console.error("Modes fetch failed:", err?.message || err));
     }
-  }, [isPremium, token]);
+
+    // FTUE: show insights guide when arriving from second log
+    if (obState === "second_log_done") {
+      const timer = setTimeout(() => setShowInsightsGuide(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [load, obState]));
 
   // Load progress metrics
   useEffect(() => {
@@ -3097,6 +3111,8 @@ const s = StyleSheet.create({
   rotateBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, backgroundColor: "rgba(94,230,160,0.12)" },
   rotateBtnText: { color: "#5ee6a0", fontSize: 12, fontWeight: "700" },
   suggestionDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
+  suggestionDescSecondary: { color: palette.muted, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  suggestionReason: { color: palette.text, fontSize: 13, lineHeight: 19, fontStyle: "italic", marginBottom: 2 },
   suggestionMeta: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
   suggestionMetaText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
   suggestionMatch: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },

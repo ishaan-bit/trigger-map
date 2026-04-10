@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
+import { startBatch, getBatchStatus, cancelBatch, rerunPairs, estimateRuntime } from './batchOrchestrator.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BACKEND_DIR = resolve(__dirname, '..', 'backend');
@@ -220,6 +221,61 @@ async function handleRequest(req, res) {
     }
 
     return json(res, 404, { status: 'unknown', job: jobName });
+  }
+
+  // ── LLM Batch routes ──
+
+  // POST /llm-batch/estimate — estimate runtime for a set of pairs
+  if (path === '/llm-batch/estimate' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { pairs, config } = body;
+    if (!Array.isArray(pairs) || !config) {
+      return json(res, 400, { error: 'pairs (array) and config (object) required' });
+    }
+    const estimate = estimateRuntime(pairs, config);
+    return json(res, 200, { ok: true, ...estimate });
+  }
+
+  // POST /llm-batch/run — start a new batch
+  if (path === '/llm-batch/run' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { pairs, config, maxRuntimeMinutes } = body;
+    if (!Array.isArray(pairs) || !pairs.length || !config || !maxRuntimeMinutes) {
+      return json(res, 400, { error: 'pairs, config, and maxRuntimeMinutes required' });
+    }
+    try {
+      const result = await startBatch(pairs, config, maxRuntimeMinutes);
+      return json(res, 202, { ok: true, ...result });
+    } catch (err) {
+      return json(res, 409, { ok: false, error: err.message });
+    }
+  }
+
+  // GET /llm-batch/status — get current batch status
+  if (path === '/llm-batch/status' && req.method === 'GET') {
+    const status = await getBatchStatus();
+    return json(res, 200, { ok: true, ...status });
+  }
+
+  // POST /llm-batch/cancel — cancel running batch
+  if (path === '/llm-batch/cancel' && req.method === 'POST') {
+    const result = cancelBatch();
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  // POST /llm-batch/rerun — re-run specific pairs
+  if (path === '/llm-batch/rerun' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { pairIds, maxRuntimeMinutes } = body;
+    if (!Array.isArray(pairIds) || !pairIds.length) {
+      return json(res, 400, { error: 'pairIds (array) required' });
+    }
+    try {
+      const result = await rerunPairs(pairIds, maxRuntimeMinutes || 120);
+      return json(res, 202, { ok: true, ...result });
+    } catch (err) {
+      return json(res, 409, { ok: false, error: err.message });
+    }
   }
 
   return json(res, 404, { error: 'Not found' });

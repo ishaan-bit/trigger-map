@@ -40,6 +40,92 @@ async function storeLlmInsight(ownerId, payload) {
   return payload;
 }
 
+/**
+ * Generate LLM insight for a single user. Used by batch orchestrator.
+ * Skips eligibility checks — caller is responsible for filtering.
+ */
+export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWords } = {}) {
+  const user = await getUserById(ownerId);
+  if (!user) throw new Error("user not found");
+
+  const aggregates = await getWeeklyAggregates(ownerId, 45);
+
+  const sevenDayAgg = aggregates.slice(-7);
+  const weeklyTotal = sevenDayAgg.reduce((s, a) => s + Number(a.total || 0), 0);
+  const lifetimeTotal = aggregates.reduce((s, a) => s + Number(a.total || 0), 0);
+  const isSilent = weeklyTotal === 0 && lifetimeTotal >= 3;
+
+  let silenceWindow = null;
+  let effectiveAggregates = aggregates;
+
+  if (isSilent) {
+    const activeDays = aggregates.filter(a => Number(a.total || 0) > 0);
+    const lastActiveDate = activeDays[activeDays.length - 1]?.date;
+    const daysSinceLastLog = lastActiveDate
+      ? Math.floor((Date.now() - new Date(lastActiveDate).getTime()) / 86400000)
+      : null;
+    silenceWindow = { isSilent: true, daysSinceLastLog, lastLogDate: lastActiveDate, totalLifetimeMoments: lifetimeTotal };
+    effectiveAggregates = activeDays.slice(-7);
+  }
+
+  const weeklyReport = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates: aggregates, silenceWindow });
+
+  if (!weeklyReport.totalMoments && !isSilent) {
+    throw new Error("no-data");
+  }
+  if (weeklyReport.totalMoments < minMoments && !isSilent) {
+    throw new Error(`below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})`);
+  }
+
+  const allMoments = await getTimeline(ownerId);
+  const recentNotes = allMoments
+    .filter(m => m.note && m.note.trim())
+    .slice(0, 15)
+    .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
+
+  const actionFeedback = await getActionFeedback(ownerId);
+
+  let insight;
+  let bestSoFar = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, maxWords });
+      if (insight.sectionCount >= 3) break;
+      bestSoFar = bestSoFar || insight;
+      if (attempt >= 5) break;
+    } catch (retryErr) {
+      if (attempt < 5) {
+        /* retry */
+      } else if (bestSoFar) {
+        insight = bestSoFar;
+        break;
+      } else {
+        throw retryErr;
+      }
+    }
+  }
+
+  if (insight.narrative) {
+    const sections = insight.narrative.split(/\n\n/);
+    const phrased = [];
+    for (const section of sections) {
+      const headerMatch = section.match(/^(What stood out|What may be contributing|One thing to try)\n/i);
+      if (headerMatch) {
+        const header = headerMatch[1];
+        const body = section.slice(header.length).trim();
+        const polished = await phraseText(body);
+        phrased.push(`${header}\n${polished}`);
+      } else {
+        phrased.push(section);
+      }
+    }
+    insight.narrative = phrased.join("\n\n");
+  }
+
+  await storeLlmInsight(ownerId, insight);
+  return { ok: true, model: insight.model, sectionCount: insight.sectionCount };
+}
+
 export async function runGenerateLlmInsights({ force = false, minMoments = 1, ownerIds } = {}) {
   const envIds = process.env.LLM_OWNER_IDS;
   const owners = Array.isArray(ownerIds) && ownerIds.length > 0

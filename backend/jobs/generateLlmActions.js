@@ -195,7 +195,7 @@ function computeLikedTriggers(feedback) {
   return [...triedTriggers];
 }
 
-async function generateForOwner(ownerId, { model, apiUrl, force }) {
+export async function generateForOwner(ownerId, { model, apiUrl, force }) {
   const user = await getUserById(ownerId).catch(() => null);
   const firstName = extractFirstName(user?.name);
 

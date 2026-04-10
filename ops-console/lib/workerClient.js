@@ -100,3 +100,34 @@ export async function pullModel(model) {
     body: JSON.stringify({ model }),
   });
 }
+
+// ── LLM Batch endpoints ──
+
+export async function estimateLlmBatch({ pairs, config }) {
+  return workerRequest('/llm-batch/estimate', {
+    method: 'POST',
+    body: JSON.stringify({ pairs, config }),
+  });
+}
+
+export async function runLlmBatch({ pairs, config, maxRuntimeMinutes }) {
+  return workerRequest('/llm-batch/run', {
+    method: 'POST',
+    body: JSON.stringify({ pairs, config, maxRuntimeMinutes }),
+  });
+}
+
+export async function getLlmBatchStatus() {
+  return workerRequest('/llm-batch/status', { method: 'GET' });
+}
+
+export async function cancelLlmBatch() {
+  return workerRequest('/llm-batch/cancel', { method: 'POST', body: '{}' });
+}
+
+export async function rerunLlmBatch({ pairIds, maxRuntimeMinutes }) {
+  return workerRequest('/llm-batch/rerun', {
+    method: 'POST',
+    body: JSON.stringify({ pairIds, maxRuntimeMinutes }),
+  });
+}

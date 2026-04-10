@@ -95,15 +95,51 @@ function extractBriefContext(report) {
   const bm = report?.baselineMetrics;
   if (bm?.baseline?.reliable) {
     lines.push(`Baseline: ${bm.baseline.score.toFixed(1)}/5 (${bm.baseline.label}).`);
-    if (bm.drift) lines.push(`Drift: ${bm.drift.label}.`);
+    if (bm.drift) {
+      const dir = bm.drift.value > 0.15 ? "improving" : bm.drift.value < -0.15 ? "declining" : "stable";
+      lines.push(`Trend: ${dir} (drift ${bm.drift.label}).`);
+    }
     if (bm.stateOfMind) lines.push(`State: ${bm.stateOfMind}.`);
   }
   if (report?.topEmotion) lines.push(`Dominant emotion: ${report.topEmotion}.`);
   if (report?.topTrigger) lines.push(`Top trigger: ${report.topTrigger}.`);
+
+  // Emotional trajectory direction (this week)
+  const traj = report?.weeklyEmotionTrajectory || [];
+  if (traj.length >= 3) {
+    const recent = traj.slice(-7);
+    const diff = recent[recent.length - 1].score - recent[0].score;
+    if (diff <= -0.5) lines.push("This week's trajectory: declining — they've been sliding downward.");
+    else if (diff >= 0.5) lines.push("This week's trajectory: rising — things are getting better for them.");
+    else lines.push("This week's trajectory: steady.");
+  }
+
   if (report?.volatilityScore != null) {
     const v = report.volatilityScore;
-    lines.push(`Volatility: ${v < 0.5 ? "steady" : v < 1.5 ? "moderate" : "high"}.`);
+    lines.push(`Volatility: ${v < 0.5 ? "steady" : v < 1.5 ? "moderate swings" : "high emotional swings"}.`);
   }
+
+  // Recurring emotion patterns for deeper personalisation
+  const freq = report?.emotionFrequency || {};
+  const topEmotions = Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 3);
+  if (topEmotions.length > 1) {
+    lines.push(`Recurring emotions: ${topEmotions.map(([e, c]) => `${e} (${c}x)`).join(", ")}.`);
+  }
+
+  // Friction zones — what triggers negative patterns
+  const friction = report?.frictionZones || [];
+  if (friction.length > 0) {
+    const topFric = friction.slice(0, 2).map((f) => `${f.trigger}→${f.emotion}`);
+    lines.push(`Pain points: ${topFric.join(", ")}.`);
+  }
+
+  // Regulators — what helps them feel better
+  const regs = report?.regulators || [];
+  if (regs.length > 0) {
+    const topRegs = regs.slice(0, 2).map((r) => `${r.trigger}→${r.emotion}`);
+    lines.push(`What helps them: ${topRegs.join(", ")}.`);
+  }
+
   return lines.join(" ");
 }
 
@@ -158,7 +194,7 @@ async function selectMoveItems(ownerId, emotions, profile) {
   const disliked = profile?.dislikedMovements || [];
   const liked = profile?.likedMovements || [];
   const exclude = [...recentIds, ...disliked];
-  return pickMovements(emotions, 8, { exclude, boost: liked, environment: env, equipment: equip });
+  return pickMovements(emotions, 12, { exclude, boost: liked, environment: env, equipment: equip });
 }
 
 async function selectFuelItems(ownerId, emotions, profile) {
@@ -168,61 +204,77 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const disliked = profile?.dislikedNourishments || [];
   const liked = profile?.likedNourishments || [];
   const exclude = [...recentIds, ...disliked];
-  return pickNourishments(emotions, 10, { exclude, boost: liked, diet, cuisine });
+  return pickNourishments(emotions, 15, { exclude, boost: liked, diet, cuisine });
 }
 
 // ── Prompt builders ────────────────────────────────────────────────────
 
 function buildMovePrompt(items, context, lang) {
   const hi = lang === "hi";
-  const top = items.slice(0, 3);
-  const itemBlock = top.map((m) => {
+  const itemBlock = items.slice(0, 8).map((m, i) => {
     const name = hi ? m.nameHi : m.name;
-    const desc = hi ? m.descriptionHi : m.description;
-    return `- ${name}: ${desc} (${m.intensity}, ~${m.durationMin} min)`;
+    return `${i + 1}. ${name} (${m.intensity}, ~${m.durationMin} min)`;
   }).join("\n");
 
   return hi
-    ? `उपयोगकर्ता की हालिया भावनात्मक स्थिति:
+    ? `उपयोगकर्ता का भावनात्मक संदर्भ:
 ${context}
 
-ये शारीरिक गतिविधियां चुनी गई हैं:
+इनके लिए चुनी गई गतिविधियां:
 ${itemBlock}
 
-इन गतिविधियों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए क्यों उपयुक्त हैं। सीधे और गर्म स्वर में लिखें। तकनीकी शब्द न इस्तेमाल करें। कोई नई गतिविधि न जोड़ें।`
-    : `User's recent emotional context:
+इस प्रारूप में JSON लौटाएं (कोई अतिरिक्त पाठ नहीं):
+{
+  "opening": "2-3 वाक्य — उपयोगकर्ता से सीधे बात करें ('तुम/आप'), उनकी भावनात्मक स्थिति को स्वीकार करें, बताएं कि आज का चयन उनके लिए क्यों खास है",
+  "reasons": ["गतिविधि 1 के लिए 1 वाक्य — तुम्हारे लिए यह क्यों, सामान्य व्याख्या नहीं", "गतिविधि 2 ...", ...]
+}
+reasons उसी क्रम में हों। हर reason व्यक्तिगत हो — 'इससे आपको X में मदद मिलेगी क्योंकि आप Y महसूस कर रहे हैं'। कोई नई गतिविधि न जोड़ें।`
+    : `User's emotional context:
 ${context}
 
-These movement activities were selected for the user:
+Activities selected for them:
 ${itemBlock}
 
-In 3-4 sentences, explain why these activities suit the user's current emotional state. Be warm, direct, and specific. Do not use technical jargon. Do not suggest additional activities beyond those listed.`;
+Return JSON in this exact format (no extra text):
+{
+  "opening": "2-3 sentences — speak directly to the user ('you/your'), acknowledge what they're going through, explain why today's selection is tailored for them specifically",
+  "reasons": ["1 sentence for activity 1 — why THIS for YOU right now, not a generic explanation", "activity 2 ...", ...]
+}
+reasons must be in the same order as activities above. Each reason must feel personal — 'This will help you with X because you've been feeling Y'. Do not add new activities. Do not explain what the exercise is — explain why it's right for THIS person right now.`;
 }
 
 function buildFuelPrompt(items, context, lang) {
   const hi = lang === "hi";
-  const top = items.slice(0, 3);
-  const itemBlock = top.map((n) => {
+  const itemBlock = items.slice(0, 8).map((n, i) => {
     const name = hi ? n.nameHi : n.name;
-    const desc = hi ? n.descriptionHi : n.description;
-    return `- ${name}: ${desc} (${n.nutrientFocus})`;
+    return `${i + 1}. ${name} (${n.type}, ${n.nutrientFocus})`;
   }).join("\n");
 
   return hi
-    ? `उपयोगकर्ता की हालिया भावनात्मक स्थिति:
+    ? `उपयोगकर्ता का भावनात्मक संदर्भ:
 ${context}
 
-ये पोषण सुझाव चुने गए हैं:
+इनके लिए चुने गए भोजन/पेय:
 ${itemBlock}
 
-इन सुझावों को 3-4 वाक्यों में समझाएं। बताएं कि ये भावनात्मक स्थिति के लिए कैसे मदद कर सकते हैं। सरल और गर्म भाषा में लिखें। नया खाना न जोड़ें।`
-    : `User's recent emotional context:
+इस प्रारूप में JSON लौटाएं (कोई अतिरिक्त पाठ नहीं):
+{
+  "opening": "2-3 वाक्य — उपयोगकर्ता से सीधे बात करें ('तुम/आप'), बताएं कि आज का भोजन चयन उनकी भावनात्मक स्थिति से कैसे जुड़ा है",
+  "reasons": ["भोजन 1 के लिए 1 वाक्य — तुम्हारे शरीर को अभी यह क्यों चाहिए", "भोजन 2 ...", ...]
+}
+reasons उसी क्रम में हों। हर reason व्यक्तिगत हो — 'यह तुम्हारे X को ठीक करेगा क्योंकि Y'। पोषण विज्ञान मत बताओ — बताओ कि यह इस व्यक्ति को अभी कैसे ठीक करेगा।`
+    : `User's emotional context:
 ${context}
 
-These nourishment suggestions were selected for the user:
+Foods/drinks selected for them:
 ${itemBlock}
 
-In 3-4 sentences, explain why these suggestions suit the user's current emotional state. Be warm, direct, and specific. Focus on how they connect to mood and energy, not clinical nutrition facts. Do not suggest additional items beyond those listed.`;
+Return JSON in this exact format (no extra text):
+{
+  "opening": "2-3 sentences — speak directly to the user ('you/your'), connect today's nourishment choices to what their body and mind need right now based on their emotional state",
+  "reasons": ["1 sentence for item 1 — why your body needs THIS right now, not nutrition facts", "item 2 ...", ...]
+}
+reasons must be in the same order as items above. Each reason must feel personal — 'Your body is asking for X because you've been feeling Y'. Do not list nutrition science — explain how each choice will support THIS person right now.`;
 }
 
 function buildPerspectivePrompt(context, lang) {
@@ -245,11 +297,11 @@ function getSystemPrompt(mode, lang) {
 
   const base = {
     move: hi
-      ? "आप एक शांत, सहानुभूतिपूर्ण शारीरिक गतिविधि मार्गदर्शक हैं। आप भावनात्मक डेटा के आधार पर गतिविधि की सिफारिश समझाते हैं। सीधे, गर्म और संक्षिप्त रहें।"
-      : "You are a calm, empathetic movement guide. You explain why specific physical activities suit someone's current emotional state. Be direct, warm, and brief.",
+      ? "आप एक व्यक्तिगत मूवमेंट गाइड हैं जो इस विशेष व्यक्ति को उनकी भावनात्मक यात्रा के आधार पर जानते हैं। आप सीधे उनसे बात करते हैं ('तुम/आप')। आप JSON प्रारूप में जवाब देते हैं। गर्म, संक्षिप्त, और व्यक्तिगत रहें — जैसे कोई जानकार मार्गदर्शक बात कर रहा हो।"
+      : "You are a personal movement guide who knows THIS specific person through their emotional patterns. You speak directly to them ('you/your'). You respond in JSON format. Be warm, brief, and deeply personal — like a trusted guide who understands their journey, not a fitness app.",
     fuel: hi
-      ? "आप एक शांत, सहानुभूतिपूर्ण पोषण मार्गदर्शक हैं। आप भावनात्मक डेटा के आधार पर खाने के सुझाव समझाते हैं। सरल भाषा में, बिना चिकित्सकीय शब्दों के।"
-      : "You are a calm, empathetic nourishment guide. You explain why specific food suggestions suit someone's emotional state. Use simple language, avoid clinical nutrition terms.",
+      ? "आप एक व्यक्तिगत पोषण मार्गदर्शक हैं जो इस व्यक्ति को उनकी भावनात्मक यात्रा के आधार पर जानते हैं। आप सीधे उनसे बात करते हैं ('तुम/आप')। आप JSON प्रारूप में जवाब देते हैं। गर्म और व्यक्तिगत — यह डाइट प्लान नहीं, भावनात्मक पोषण है।"
+      : "You are a personal nourishment guide who knows THIS specific person through their emotional patterns. You speak directly to them ('you/your'). You respond in JSON format. Be warm and personal — this is emotional nourishment, not a diet plan.",
     perspective: hi
       ? "आप एक सौम्य, विचारशील दृष्टिकोण देने वाले हैं। आप भावनात्मक पैटर्न को नई नज़र से देखने में मदद करते हैं। निदान मत करें, सलाह मत दें — बस एक अलग नज़रिया दें।"
       : "You are a gentle, thoughtful perspective-giver. You help people see emotional patterns from a different angle. Do not diagnose, do not advise action — just offer a different way of seeing.",
@@ -312,7 +364,9 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   }
 
   const tokenMultiplier = lang === "hi" ? 3.5 : 2.5;
-  const maxTokens = Math.max(200, Math.round(maxWords * tokenMultiplier));
+  // More tokens needed for JSON with per-item reasons
+  const reasonBudget = (mode === "move" || mode === "fuel") ? Math.max(items.length * 25, 120) : maxWords;
+  const maxTokens = Math.max(300, Math.round(reasonBudget * tokenMultiplier));
 
   const chatMessages = [
     { role: "system", content: getSystemPrompt(mode, lang) },
@@ -339,15 +393,7 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
       let narrative = result.content;
       if (!narrative) throw new Error("LLM returned empty response for mode " + mode);
 
-      // Trim incomplete sentence if token-limited
-      if (result.finishReason === "length") {
-        const match = narrative.match(/^([\s\S]*[.!?])(?:\s|$)/);
-        if (match) narrative = match[1].trim();
-      }
-
       // ── Post-processing: fix common LLM garbling ──
-      // phi3 consistently misspells words and produces broken contractions.
-      // Fix known garbles before storing.
       const garbleMap = [
         [/\boverwhinely\b/gi, "overwhelmed"],
         [/\boverwhselming\b/gi, "overwhelming"],
@@ -355,7 +401,6 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         [/\boverwhinished\b/gi, "overwhelmed"],
         [/\boverwhelmfully\b/gi, "overwhelmingly"],
         [/\boverwhfully\b/gi, "overwhelmingly"],
-        [/\boverwhinely\b/gi, "overwhelmed"],
         [/\boverwh[a-z]*ly\b/gi, "overwhelmingly"],
         [/\bexercuries\b/gi, "exercises"],
         [/\bstayring\b/gi, "staying"],
@@ -368,23 +413,52 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         [/\bt'these\b/gi, "these"],
         [/\b[a-z]'[a-z]{4,}\b/gi, (m) => m.replace(/'/, "")],
       ];
-      for (const [pattern, fix] of garbleMap) {
-        narrative = narrative.replace(pattern, fix);
+
+      const cleanLlmText = (text) => {
+        let t = text;
+        for (const [pattern, fix] of garbleMap) { t = t.replace(pattern, fix); }
+        return t
+          .replace(/\*\*/g, "")
+          .replace(/#{1,3}\s+/g, "")
+          .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+          .replace(/[\u200b-\u200f\ufeff]/g, "")
+          .replace(/ {2,}/g, " ")
+          .trim();
+      };
+
+      // ── Parse structured JSON for move/fuel, plain text for perspective ──
+      let parsedReasons = [];
+      let parsedOpening = "";
+
+      if (mode === "move" || mode === "fuel") {
+        try {
+          // Extract JSON from LLM response (may have wrapping text)
+          const jsonMatch = narrative.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            parsedOpening = cleanLlmText(parsed.opening || "");
+            parsedReasons = (parsed.reasons || []).map((r) => cleanLlmText(r));
+          }
+        } catch (e) {
+          console.warn(`[modeComposer] JSON parse failed for ${mode}, using raw narrative: ${e.message}`);
+          parsedOpening = cleanLlmText(narrative);
+        }
+        narrative = parsedOpening || cleanLlmText(narrative);
+      } else {
+        // Trim incomplete sentence if token-limited
+        if (result.finishReason === "length") {
+          const match = narrative.match(/^([\s\S]*[.!?])(?:\s|$)/);
+          if (match) narrative = match[1].trim();
+        }
+        narrative = cleanLlmText(narrative);
       }
-      // Strip markdown artifacts, control chars, excessive whitespace
-      narrative = narrative
-        .replace(/\*\*/g, "")
-        .replace(/#{1,3}\s+/g, "")
-        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
-        .replace(/[\u200b-\u200f\ufeff]/g, "")
-        .replace(/ {2,}/g, " ")
-        .trim();
 
       const itemIds = items.map((i) => i.id);
-      const itemSummaries = items.map((i) => ({
+      const itemSummaries = items.map((i, idx) => ({
         id: i.id,
         name: lang === "hi" ? i.nameHi : i.name,
         description: lang === "hi" ? i.descriptionHi : i.description,
+        ...(parsedReasons[idx] ? { reason: parsedReasons[idx] } : {}),
         ...(i.intensity ? { intensity: i.intensity } : {}),
         ...(i.durationMin ? { durationMin: i.durationMin } : {}),
         ...(i.type ? { type: i.type } : {}),

@@ -13,6 +13,7 @@ const NAV = [
     group: 'Operations',
     items: [
       { label: 'Control Panel', href: '/control', icon: '⚡' },
+      { label: 'LLM', href: '/llm', icon: '◎' },
       { label: 'Push Notifications', href: '/push', icon: '◈' },
       { label: 'Diagnostics', href: '/diagnostics', icon: '⚙' },
     ],
