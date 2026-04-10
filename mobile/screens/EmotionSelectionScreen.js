@@ -56,6 +56,7 @@ export function EmotionSelectionScreen() {
   const [emotionHintDismissed, setEmotionHintDismissed] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
+  const savingRef = useRef(false);
   const tagSectionAnim = useRef(new Animated.Value(0)).current;
   const saveButtonScale = useRef(new Animated.Value(1)).current;
   const orbScale = useRef(new Animated.Value(0)).current;
@@ -148,7 +149,8 @@ export function EmotionSelectionScreen() {
   }
 
   async function handleSave() {
-    if (!hasInteracted || saving || saved) return;
+    if (!hasInteracted || savingRef.current || saved) return;
+    savingRef.current = true;
 
     try {
       setSaving(true);
@@ -196,6 +198,7 @@ export function EmotionSelectionScreen() {
     } catch {
       showError(t("emotion.saveFailed"), t("emotion.saveFailedMessage"));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }

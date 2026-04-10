@@ -52,10 +52,10 @@ async function fetchJson(path, options = {}) {
     throw new Error("API URL is not configured");
   }
 
-  // Deduplicate concurrent identical GET requests
+  // Deduplicate concurrent identical requests (GET always, POST /logMoment)
   const method = options.method || "GET";
-  const dedup = method === "GET";
-  const dedupKey = dedup ? `${path}:${options.token || ""}` : null;
+  const dedup = method === "GET" || (method === "POST" && path === "/logMoment");
+  const dedupKey = dedup ? `${method}:${path}:${options.token || ""}` : null;
 
   if (dedup && dedupKey) {
     const pending = inflight.get(dedupKey);

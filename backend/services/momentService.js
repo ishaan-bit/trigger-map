@@ -27,11 +27,11 @@ export function getMomentsKey(ownerId) {
 export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
 
-  // Continuous model: valence/arousal provided → derive label from circumplex region
-  // Legacy model: emotion string provided → map to coordinates
+  // Continuous model: valence/arousal provided → map to legacy 5-label for aggregation/insights
+  // Legacy model: emotion string provided → validate against known set
   const hasContinuous = typeof valence === "number" && typeof arousal === "number";
   const finalEmotion = hasContinuous
-    ? derivedEmotionLabel(valence, arousal)
+    ? coordinatesToLegacy(valence, arousal)
     : (EMOTIONS.includes(emotion) ? emotion : "neutral");
   const coords = hasContinuous
     ? { valence, arousal }
@@ -42,7 +42,7 @@ export function createMomentPayload({ ownerId, trigger, emotion, valence, arousa
     ownerId,
     trigger: finalTrigger,
     emotion: finalEmotion,
-    emotion_legacy: hasContinuous ? coordinatesToLegacy(valence, arousal) : finalEmotion,
+    emotion_legacy: finalEmotion,
     valence: coords.valence,
     arousal: coords.arousal,
     intensity: typeof intensity === "number" ? intensity : Math.sqrt(coords.valence ** 2 + coords.arousal ** 2),
@@ -55,6 +55,12 @@ export function createMomentPayload({ ownerId, trigger, emotion, valence, arousa
 }
 
 export async function appendMoment(moment) {
+  // Dedup guard: prevent identical moment within 10s window
+  const dedupKey = redisKey("dedup", moment.ownerId,
+    `${moment.timestamp}|${moment.trigger}|${moment.valence}|${moment.arousal}`);
+  const isNew = await redis(["SET", dedupKey, "1", "NX", "EX", "10"]);
+  if (!isNew) return moment;
+
   await pipeline([
     ["RPUSH", getMomentsKey(moment.ownerId), JSON.stringify(moment)],
     ["INCR", redisKey("counter", "moments_logged")],

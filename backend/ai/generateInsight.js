@@ -236,7 +236,10 @@ function buildModerateSummary(report, firstName) {
     // Anchor present but tone not improving
     else if (ranked.anchor && sp.drift !== 'positive') {
       const a = ranked.anchor.data || {};
-      s2 = `Although ${triggerLabel(a.trigger || report.regulators?.[0]?.trigger)} tends to help, your overall tone hasn't lifted this week.`;
+      const anchorTrigger = a.trigger || report.regulators?.[0]?.trigger;
+      s2 = anchorTrigger
+        ? `Although ${triggerLabel(anchorTrigger)} tends to help, your overall tone hasn't lifted this week.`
+        : "There are positive signals, but your overall tone hasn't lifted this week.";
     }
     // Frequent trigger + neutral emotion
     else if (report.topTrigger && sp.dominantEmotion === 'neutral') {

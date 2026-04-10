@@ -12,6 +12,19 @@ export const EMOTION_SCORE = {
   neutral: 3,
   calm: 4,
   energized: 5,
+  // Derived label mappings (safety net for moments stored with derived labels)
+  overwhelmed: 1,
+  heavy: 1,
+  uneasy: 2,
+  low: 2,
+  restless: 2,
+  alert: 3,
+  flat: 2,
+  disconnected: 1,
+  content: 4,
+  grateful: 5,
+  peaceful: 5,
+  excited: 5,
 };
 
 export const ENERGY_MAP = {
@@ -20,6 +33,19 @@ export const ENERGY_MAP = {
   anxious: "tense",
   frustrated: "drained",
   energized: "uplifted",
+  // Derived label mappings (safety net for moments stored with derived labels)
+  overwhelmed: "tense",
+  heavy: "drained",
+  uneasy: "tense",
+  low: "drained",
+  restless: "tense",
+  alert: "tense",
+  flat: "drained",
+  disconnected: "drained",
+  content: "steady",
+  grateful: "uplifted",
+  peaceful: "steady",
+  excited: "uplifted",
 };
 
 // ── Two-Slider Emotion Model (valence × arousal) ──
