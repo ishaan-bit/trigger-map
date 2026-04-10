@@ -672,7 +672,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }
         <View style={s.card}>
           <Text style={s.aiSummary}>{getConfidenceLabel(confidence, t)}</Text>
           <Text style={{ color: palette.muted, fontSize: 11 }}>
-            {t("report.basedOnMoments", { moments: dq.totalMoments || 0, days: dq.daysLogged || 0 })}
+            {t("report.basedOnMoments", { moments: report?.mirror?.totalMoments || dq.totalMoments || 0, days: report?.mirror?.daysLogged || dq.daysLogged || 0 })}
           </Text>
         </View>
       </AnimatedSection>

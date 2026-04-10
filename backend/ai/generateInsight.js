@@ -514,8 +514,9 @@ export async function generateInsight(report, opts = {}) {
 }
 
 function buildWhatWorking(report) {
+  const m = report.mirror || report;
   const items = [];
-  for (const r of (report.regulators || []).slice(0, 3)) {
+  for (const r of (m.regulators || []).slice(0, 3)) {
     items.push({
       text: `${cap(triggerLabel(r.trigger))} tends to leave you feeling ${r.emotion}`,
       trigger: r.trigger,
@@ -547,9 +548,11 @@ function buildWhatWorking(report) {
 }
 
 function buildWhereToFocus(report) {
+  const m = report.mirror || report;
   const items = [];
   const spWf = buildSignalProfile(report);
-  for (const f of (report.frictionZones || []).slice(0, 3)) {
+  // Use longitudinal (mirror) friction zones for pattern-level items
+  for (const f of (m.frictionZones || []).slice(0, 3)) {
     const freq = f.count <= 2 ? 'sometimes' : 'often';
     items.push({
       text: `${cap(triggerLabel(f.trigger))} ${freq} leaves you feeling ${f.emotion} - worth noticing`,
@@ -588,13 +591,14 @@ function buildWhereToFocus(report) {
 }
 
 function buildDrivers(report) {
-  const triggers = Object.entries(report.triggerFrequency || {})
+  const m = report.mirror || report;
+  const triggers = Object.entries(m.triggerFrequency || {})
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3);
   if (!triggers.length) return null;
   return triggers.map(([trigger, count]) => {
-    const friction = (report.frictionZones || []).find(f => f.trigger === trigger);
-    const regulator = (report.regulators || []).find(r => r.trigger === trigger);
+    const friction = (m.frictionZones || []).find(f => f.trigger === trigger);
+    const regulator = (m.regulators || []).find(r => r.trigger === trigger);
     return {
       trigger,
       count,
@@ -605,8 +609,9 @@ function buildDrivers(report) {
 }
 
 function buildBehavioralLoop(report) {
-  const friction = report.frictionZones?.[0];
-  const regulator = report.regulators?.[0];
+  const m = report.mirror || report;
+  const friction = m.frictionZones?.[0];
+  const regulator = m.regulators?.[0];
   if (!friction && !regulator) return null;
 
   const loops = [];
@@ -643,8 +648,9 @@ function buildActionableDirection(report) {
   if (sp.crashRisk) return ragIntervention || "Your surface metrics look stable but deeper signals are diverging. Prioritize rest and check in with yourself.";
   if (sp.falseRecovery) return ragIntervention || "Your scores bounced back but the underlying pattern hasn't resolved. Ease back into demanding situations gradually.";
   if (sp.maskingLevel === "high") return ragIntervention || "There's more going on than your logged emotions suggest. Try logging more freely without filtering.";
-  if (bm?.drift?.direction === "declining") return ragIntervention || `Your baseline has been dipping. Lean into what helps: ${report.regulators?.[0] ? triggerLabel(report.regulators[0].trigger) : "your regulators"}.`;
+  const m = report.mirror || report;
+  if (bm?.drift?.direction === "declining") return ragIntervention || `Your baseline has been dipping. Lean into what helps: ${m.regulators?.[0] ? triggerLabel(m.regulators[0].trigger) : "your regulators"}.`;
   if (sp.isFlattening) return ragIntervention || "Your emotional range is narrowing. Try something outside your routine to see what shifts.";
-  if (report.regulators?.length && bm?.stability?.score >= 0.6) return `Things are steady. Keep ${triggerLabel(report.regulators[0].trigger)} in your week.`;
+  if (m.regulators?.length && bm?.stability?.score >= 0.6) return `Things are steady. Keep ${triggerLabel(m.regulators[0].trigger)} in your week.`;
   return ragIntervention || null;
 }

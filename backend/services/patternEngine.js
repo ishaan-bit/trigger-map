@@ -78,6 +78,47 @@ function computeConfidence(totalMoments, daysLogged, { isSilent } = {}) {
   return "strong";
 }
 
+// --- Mirror data: compute longitudinal (45d) frequency/classification ---
+
+function computeMirrorData(allAggregates) {
+  if (!allAggregates || !allAggregates.length) return null;
+  const filled = allAggregates.filter(s => s && s.date && Number(s.total || 0) > 0);
+  if (filled.length < 2) return null;
+
+  const triggerFrequency = {};
+  const emotionFrequency = {};
+  const correlations = {};
+  const pairFrequency = {};
+  let totalMoments = 0;
+
+  for (const snapshot of filled) {
+    totalMoments += Number(snapshot.total || 0);
+    mergeCounts(triggerFrequency, snapshot.triggers);
+    mergeCounts(emotionFrequency, snapshot.emotions);
+    mergeCounts(pairFrequency, snapshot.pairs);
+    for (const [pairKey, count] of Object.entries(snapshot.pairs || {})) {
+      const { trigger, emotion } = pairFromKey(pairKey);
+      if (!correlations[trigger]) correlations[trigger] = {};
+      correlations[trigger][emotion] = (correlations[trigger][emotion] || 0) + Number(count || 0);
+    }
+  }
+
+  const { regulators, frictionZones, pairings } = classifyPairings(correlations);
+  const daysLogged = filled.length;
+
+  return {
+    triggerFrequency,
+    emotionFrequency,
+    correlations,
+    pairFrequency,
+    regulators,
+    frictionZones,
+    pairings,
+    totalMoments,
+    daysLogged,
+  };
+}
+
 // --- Regulators & friction detection ---
 
 function classifyPairings(correlations) {
@@ -502,6 +543,7 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     baselineContext,
     invokedMetrics,
     compoundPatterns,
+    mirror: computeMirrorData(allAggregates),
     aiInsight,
   };
 }
