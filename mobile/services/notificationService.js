@@ -16,13 +16,16 @@ Notifications.setNotificationHandler({
 });
 
 /** Cancel only scheduled notifications matching a specific type */
-async function cancelNotificationsByType(targetType) {
+export async function cancelNotificationsByType(targetType) {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const toCancel = scheduled.filter((n) => n.content.data?.type === targetType);
   for (const n of toCancel) {
     await Notifications.cancelScheduledNotificationAsync(n.identifier);
   }
 }
+
+/** Public alias used by _layout.js to dedup server push vs local schedule */
+export const cancelScheduledByType = cancelNotificationsByType;
 
 export async function enableWeeklyReminder() {
   await ensureNotificationAccess();

@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
 import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
+import { cancelScheduledByType } from "@/services/notificationService";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { SessionProvider } from "@/hooks/useAppSession";
 import { OnboardingProvider } from "@/hooks/useOnboarding";
@@ -99,6 +100,11 @@ export default function RootLayout() {
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
       const type = notification.request.content.data?.type;
       console.info("[NOTIF] Received in foreground:", type);
+      // When a server push arrives, cancel any pending local notification of the same type
+      // to prevent duplicates (local schedule acts as offline fallback only)
+      if (type && notification.request.trigger?.type === "push") {
+        cancelScheduledByType(type).catch(() => null);
+      }
     });
 
     // Listen for notification taps — navigate to relevant screen
