@@ -251,10 +251,17 @@ async function executePair(pair, config) {
   const rowConfig = config[pair.process] || {};
   const model = rowConfig.model || process.env.LLM_MODEL || "phi3";
   const apiUrl = process.env.LLM_API_URL || "http://localhost:11434/v1";
+  const style = config._style || "default";
 
-  // Set model env for the duration of this call
+  // Set model + style env for the duration of this call
   const prevModel = process.env.LLM_MODEL;
+  const prevStyle = process.env.LLM_STYLE;
   process.env.LLM_MODEL = model;
+  if (style && style !== "default") {
+    process.env.LLM_STYLE = style;
+  } else {
+    delete process.env.LLM_STYLE;
+  }
 
   try {
     switch (pair.process) {
@@ -304,6 +311,11 @@ async function executePair(pair, config) {
       process.env.LLM_MODEL = prevModel;
     } else {
       delete process.env.LLM_MODEL;
+    }
+    if (prevStyle !== undefined) {
+      process.env.LLM_STYLE = prevStyle;
+    } else {
+      delete process.env.LLM_STYLE;
     }
   }
 }

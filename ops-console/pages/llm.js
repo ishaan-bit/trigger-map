@@ -3,6 +3,21 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 const LLM_MODELS = ['phi3', 'gemma3', 'gemma4', 'mistral', 'llama3', 'llama2', 'gemma', 'qwen2'];
 
+const LLM_STYLES = [
+  { id: 'default',      label: 'Default (System Voice)' },
+  { id: 'dostoevsky',   label: '🔥 Dostoevsky' },
+  { id: 'camus',        label: '🪨 Camus' },
+  { id: 'pessoa',       label: '🌫 Pessoa' },
+  { id: 'krishnamurti', label: '🧘 Krishnamurti' },
+  { id: 'vivekananda',  label: '🔱 Vivekananda' },
+  { id: 'fleabag',      label: '🎭 Fleabag' },
+  { id: 'seinfeld',     label: '😂 Seinfeld / Curb' },
+  { id: 'carlin',       label: '🔥 George Carlin' },
+  { id: 'sloss',        label: '🎤 Daniel Sloss' },
+  { id: 'kenny',        label: '🇮🇳 Kenny Sebastian' },
+  { id: 'virdas',       label: '🇮🇳 Vir Das' },
+];
+
 const PROCESS_ROWS = [
   {
     id: 'insights',
@@ -422,6 +437,12 @@ export default function LlmPage() {
   const [pairs, setPairs] = useState([]);
   const [estimate, setEstimate] = useState(null);
   const [maxRuntime, setMaxRuntime] = useState(60);
+  const [style, setStyle] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try { return localStorage.getItem('ops_llm_style') || 'default'; } catch {}
+    }
+    return 'default';
+  });
   const [batchStatus, setBatchStatus] = useState(null);
   const [running, setRunning] = useState(false);
   const [workerOnline, setWorkerOnline] = useState(null);
@@ -429,10 +450,13 @@ export default function LlmPage() {
   const [incompleteSelected, setIncompleteSelected] = useState(new Set());
   const pollerRef = useRef(null);
 
-  // Persist config
+  // Persist config + style
   useEffect(() => {
     try { localStorage.setItem('ops_llm_config', JSON.stringify(config)); } catch {}
   }, [config]);
+  useEffect(() => {
+    try { localStorage.setItem('ops_llm_style', style); } catch {}
+  }, [style]);
 
   // Check worker on mount
   useEffect(() => {
@@ -559,7 +583,7 @@ export default function LlmPage() {
       const res = await fetch('/api/llm/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pairs, config, maxRuntimeMinutes: maxRuntime }),
+        body: JSON.stringify({ pairs, config: { ...config, _style: style }, maxRuntimeMinutes: maxRuntime }),
       });
       const data = await res.json();
       if (data.ok || res.status === 202) {
@@ -641,6 +665,30 @@ export default function LlmPage() {
           <span style={{ fontWeight: 600 }}>Local Worker</span>
           <span style={{ color: 'var(--text-muted)' }}>
             {workerOnline ? 'Online' : workerOnline === false ? 'Offline' : 'Checking...'}
+          </span>
+        </div>
+
+        {/* Voice / Style selector — prominent, above config table */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px', marginBottom: 20,
+          background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>🎙 Voice</span>
+          <select
+            value={style}
+            onChange={(e) => setStyle(e.target.value)}
+            style={{
+              flex: 1, maxWidth: 260, padding: '6px 10px', fontSize: 13,
+              background: 'var(--bg-primary)', color: 'var(--text-primary)',
+              border: '1px solid var(--border)', borderRadius: 6,
+            }}
+          >
+            {LLM_STYLES.map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            Applies to all LLM processes in this batch
           </span>
         </div>
 

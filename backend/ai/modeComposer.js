@@ -24,6 +24,7 @@ import {
   appendModeHistory,
 } from "../services/modeStore.js";
 import { getStoredWeeklyInsight } from "../services/reportStore.js";
+import { getStylePrompt } from "./styleProfiles.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -313,7 +314,7 @@ function getSystemPrompt(mode, lang) {
     ? " पूरी तरह हिंदी (देवनागरी) में लिखें। कोई अंग्रेज़ी शब्द नहीं।"
     : "";
 
-  return (base[mode] || base.perspective) + langRule;
+  return (base[mode] || base.perspective) + langRule + getStylePrompt(process.env.LLM_STYLE);
 }
 
 // ── Main generation function ───────────────────────────────────────────
