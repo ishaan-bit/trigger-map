@@ -32,9 +32,11 @@ export const PREP_LEVELS = ["none", "minimal", "moderate"];
 export const NOURISHMENTS = CATALOGUE_NOURISHMENTS;
 
 export function filterNourishments({ types, diets, cuisines, prepLevel, emotions } = {}) {
+  // nonVeg users can eat everything — skip diet filter when only diet is nonVeg
+  const effectiveDiets = diets?.length === 1 && diets[0] === "nonVeg" ? null : diets;
   return NOURISHMENTS.filter((n) => {
     if (types?.length && !types.includes(n.type)) return false;
-    if (diets?.length && !diets.some((d) => n.diet.includes(d))) return false;
+    if (effectiveDiets?.length && !effectiveDiets.some((d) => n.diet.includes(d))) return false;
     if (cuisines?.length && !cuisines.some((c) => n.cuisine.includes(c))) return false;
     if (prepLevel && n.prepLevel !== prepLevel) return false;
     if (emotions?.length && !emotions.some((e) => n.emotionTags.includes(e))) return false;

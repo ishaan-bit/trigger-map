@@ -148,7 +148,9 @@ function extractBriefContext(report) {
 function buildFeedbackContext(feedback, mode, items, lang) {
   if (!feedback || feedback.length === 0) return "";
 
-  const modeFb = feedback.filter((f) => f.mode === mode);
+  // Only consider recent feedback (last 30 days) — preferences change over time
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const modeFb = feedback.filter((f) => f.mode === mode && (f.timestamp || 0) >= thirtyDaysAgo);
   if (modeFb.length === 0) return "";
 
   // Build liked / disliked item ID lists from recent feedback

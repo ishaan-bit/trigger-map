@@ -45,11 +45,26 @@ export default async function handler(req, res) {
     }
 
     // Include feedback state so the client can restore thumbs
+    // Only return feedback given AFTER the current generation — don't treat old feedback as eternal
     const feedbackEntries = await getModeFeedback(ownerId);
     const feedbackMap = {};
+    // Collect per-mode generatedAt so we can filter stale feedback
+    const generatedAtMap = {};
+    for (const mode of VALID_MODES) {
+      if (results[mode]?.generatedAt) generatedAtMap[mode] = new Date(results[mode].generatedAt).getTime();
+    }
+    // Build set of current item IDs per mode for fast lookup
+    const currentItemsByMode = {};
+    for (const mode of VALID_MODES) {
+      currentItemsByMode[mode] = new Set((results[mode]?.items || []).map((i) => i.id));
+    }
     for (const entry of feedbackEntries) {
-      // Last feedback per item wins (user may change their mind)
-      feedbackMap[entry.itemId] = entry.response;
+      const genAt = generatedAtMap[entry.mode];
+      // Only include feedback that was given after the current output was generated
+      // AND the item is in the current output (not a stale reappearance)
+      if (genAt && entry.timestamp >= genAt && currentItemsByMode[entry.mode]?.has(entry.itemId)) {
+        feedbackMap[entry.itemId] = entry.response;
+      }
     }
     results.feedback = feedbackMap;
 

@@ -1569,7 +1569,19 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 /* ── Mode Cards (adaptive modes content) ── */
 
 function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion, savedFeedback }) {
-  const [feedbackGiven, setFeedbackGiven] = useState(savedFeedback || {});
+  // Only restore feedback for items in the CURRENT output — don't carry stale feedback from previous generations
+  const currentItemIds = useMemo(() => new Set((data?.items || []).map((i) => i.id)), [data]);
+  const freshFeedback = useMemo(() => {
+    if (!savedFeedback) return {};
+    const filtered = {};
+    for (const [id, resp] of Object.entries(savedFeedback)) {
+      if (currentItemIds.has(id)) filtered[id] = resp;
+    }
+    return filtered;
+  }, [savedFeedback, currentItemIds]);
+  const [feedbackGiven, setFeedbackGiven] = useState(freshFeedback);
+  // Reset when generation changes
+  useEffect(() => { setFeedbackGiven(freshFeedback); }, [freshFeedback]);
 
   // Move state
   const [moveDuration, setMoveDuration] = useState(null); // null | [min,max]
@@ -1630,7 +1642,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     } else {
       pool = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
     }
-    if (fuelDiet) {
+    if (fuelDiet && fuelDiet !== "nonVeg") {
+      // nonVeg users can eat everything — no filtering needed
       pool = pool.filter((n) => n.diet?.includes(fuelDiet));
     }
     // Sort by: liked first, then emotion relevance, disliked last
@@ -1647,6 +1660,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   }, [mode, data, fuelDiet, emotions, feedbackGiven]);
 
   // Fuel day plan - one item per meal slot, prioritized by emotion relevance
+  // Backfills from full library when server items don't cover all slots for the active diet
   const fuelPlan = useMemo(() => {
     const isHi = lang === "hi";
     const SLOTS = [
@@ -1658,14 +1672,24 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       { key: "dinner", label: isHi ? "रात का खाना" : "Dinner", icon: "🍽️", types: ["meal"] },
       { key: "ritual", label: isHi ? "भोजन रिचुअल" : "Food Ritual", icon: "🧘", types: ["ritual"] },
     ];
+    // Full library pool for backfill (diet-filtered, diet=nonVeg includes all items)
+    const allLibrary = fuelDiet && fuelDiet !== "nonVeg"
+      ? NOURISHMENTS.filter((n) => n.diet?.includes(fuelDiet))
+      : NOURISHMENTS;
     const used = new Set();
     return SLOTS.map((slot) => {
-      const pool = fuelSuggestions.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
-      const pick = pool[0] || null;
+      // Try server suggestions first
+      let pool = fuelSuggestions.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
+      let pick = pool[0] || null;
+      // Backfill from full library if server items can't fill this slot
+      if (!pick) {
+        const backfill = allLibrary.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
+        pick = backfill[0] || null;
+      }
       if (pick) used.add(pick.id);
       return { ...slot, item: pick };
     }).filter((slot) => slot.item);
-  }, [fuelSuggestions, lang]);
+  }, [fuelSuggestions, lang, fuelDiet]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
 
@@ -1683,8 +1707,21 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   }
 
   const items = data?.items || [];
-  const narrative = data?.narrative || "";
+  const rawNarrative = data?.narrative || "";
   const hi = lang === "hi";
+
+  // Guard: if backend stored raw JSON as narrative, extract the opening
+  const narrative = useMemo(() => {
+    const trimmed = rawNarrative.trim();
+    if (!trimmed.startsWith("{")) return rawNarrative;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed.opening || rawNarrative;
+    } catch {
+      const m = trimmed.match(/"opening"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+      return m ? m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"') : rawNarrative;
+    }
+  }, [rawNarrative]);
 
   function handleFeedback(itemId, response) {
     tap();
@@ -1700,7 +1737,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       {mode === "move" && (
         <>
           <View style={s.filterRow}>
-            {[{ label: "< 5 min", val: [0, 4] }, { label: "5-10 min", val: [5, 10] }, { label: "10+ min", val: [10, 999] }].map((opt) => {
+            {[{ label: "⏱ < 5 min each", val: [0, 4] }, { label: "⏱ 5-10 min each", val: [5, 10] }, { label: "⏱ 10+ min each", val: [10, 999] }].map((opt) => {
               const active = moveDuration && moveDuration[0] === opt.val[0] && moveDuration[1] === opt.val[1];
               return (
                 <Pressable key={opt.label} onPress={() => { tap(); setMoveDuration(active ? null : opt.val); }} style={[s.filterChip, active && s.filterChipActive]}>
