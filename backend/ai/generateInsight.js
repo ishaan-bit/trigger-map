@@ -517,6 +517,9 @@ function buildWhatWorking(report) {
   const m = report.mirror || report;
   const items = [];
   for (const r of (m.regulators || []).slice(0, 3)) {
+    // Skip regulators outweighed by friction for the same trigger
+    const frictionForSame = (m.frictionZones || []).find(f => f.trigger === r.trigger);
+    if (frictionForSame && frictionForSame.count >= r.count) continue;
     items.push({
       text: `${cap(triggerLabel(r.trigger))} tends to leave you feeling ${r.emotion}`,
       trigger: r.trigger,
@@ -633,14 +636,18 @@ function buildBehavioralLoop(report) {
       count: friction.count,
     });
   }
+  // Only show regulator if it isn't outweighed by friction for the same trigger
   if (regulator) {
-    loops.push({
-      type: "regulator",
-      trigger: regulator.trigger,
-      emotion: regulator.emotion,
-      recovery: null,
-      count: regulator.count,
-    });
+    const frictionForSame = (m.frictionZones || []).find(f => f.trigger === regulator.trigger);
+    if (!frictionForSame || regulator.count > frictionForSame.count) {
+      loops.push({
+        type: "regulator",
+        trigger: regulator.trigger,
+        emotion: regulator.emotion,
+        recovery: null,
+        count: regulator.count,
+      });
+    }
   }
   return loops;
 }
