@@ -124,13 +124,17 @@ export function coordinatesToLegacy(valence, arousal) {
   const mag = Math.sqrt(valence * valence + arousal * arousal);
   // Near center → neutral
   if (mag < 0.25) return "neutral";
-  // Negative valence → must be anxious or frustrated, never neutral
+  // Clearly negative valence → anxious or frustrated
   if (valence < -0.2) return arousal >= 0.7 ? "anxious" : "frustrated";
-  // Positive valence → must be energized or calm, never neutral
+  // Clearly positive valence → energized or calm
   if (valence > 0.2)  return arousal >= 0   ? "energized" : "calm";
-  // Ambiguous valence band — decide by arousal direction
-  if (arousal > 0) return "energized";
-  if (arousal < 0) return "calm";
+  // Ambiguous valence band (-0.2 to 0.2)
+  // Positive emotions (energized/calm) require meaningful positive valence
+  // to avoid labelling near-zero or negative valence as maximum positivity
+  if (valence > 0.1) return arousal >= 0 ? "energized" : "calm";
+  // Near-zero or negative valence: map by arousal direction
+  if (arousal > 0) return "anxious";
+  if (arousal < 0) return "frustrated";
   return "neutral";
 }
 

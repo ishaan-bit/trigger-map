@@ -284,6 +284,7 @@ async function executePair(pair, config) {
           mode: "move",
           model,
           maxWords: rowConfig.maxWords || 100,
+          style,
         });
 
       case "fuel":
@@ -292,6 +293,7 @@ async function executePair(pair, config) {
           mode: "fuel",
           model,
           maxWords: rowConfig.maxWords || 100,
+          style,
         });
 
       case "perspective":
@@ -300,6 +302,7 @@ async function executePair(pair, config) {
           mode: "perspective",
           model,
           maxWords: rowConfig.maxWords || 100,
+          style,
         });
 
       default:

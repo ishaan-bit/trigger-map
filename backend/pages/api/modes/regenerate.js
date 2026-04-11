@@ -3,11 +3,11 @@ import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession, getSubscription } from "@/services/authService.js";
 import { generateAllModes } from "@/ai/modeComposer.js";
+import { STYLE_IDS } from "@/ai/styleProfiles.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { enforceRateLimit } from "@/services/rateLimitService.js";
 
 const ALLOWED_MODELS = ["phi3", "mistral", "llama3", "llama2", "gemma", "gemma4", "qwen2"];
-const ALLOWED_STYLES = ["warm", "direct", "poetic"];
 
 /**
  * POST /api/modes/regenerate
@@ -44,12 +44,14 @@ export default async function handler(req, res) {
     const safeLang = (typeof lang === "string" && ["en", "hi"].includes(lang)) ? lang : "en";
     const safeModel = (typeof model === "string" && ALLOWED_MODELS.includes(model)) ? model : undefined;
     const safeMaxWords = (typeof maxWords === "number" && maxWords >= 50 && maxWords <= 300) ? maxWords : 100;
+    const safeStyle = (typeof style === "string" && STYLE_IDS.includes(style)) ? style : undefined;
 
     const results = await generateAllModes({
       ownerId: user.id,
       lang: safeLang,
       model: safeModel,
       maxWords: safeMaxWords,
+      style: safeStyle,
     });
 
     return sendSuccess(res, results);

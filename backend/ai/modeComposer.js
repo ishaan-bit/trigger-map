@@ -305,7 +305,7 @@ Rules:
 
 // ── System prompts (mode-specific) ─────────────────────────────────────
 
-function getSystemPrompt(mode, lang) {
+function getSystemPrompt(mode, lang, style) {
   const hi = lang === "hi";
 
   const base = {
@@ -324,7 +324,7 @@ function getSystemPrompt(mode, lang) {
     ? " पूरी तरह हिंदी (देवनागरी) में लिखें। कोई अंग्रेज़ी शब्द नहीं।"
     : "";
 
-  return (base[mode] || base.perspective) + langRule + getStylePrompt(process.env.LLM_STYLE);
+  return (base[mode] || base.perspective) + langRule + getStylePrompt(style || process.env.LLM_STYLE);
 }
 
 // ── Main generation function ───────────────────────────────────────────
@@ -340,7 +340,7 @@ function getSystemPrompt(mode, lang) {
  * @param {number} [options.maxWords=100] – word budget
  * @returns {Promise<{mode, items, narrative, generatedAt, model}>}
  */
-export async function generateModeOutput({ ownerId, mode, lang = "en", model: modelOverride, maxWords = 100 }) {
+export async function generateModeOutput({ ownerId, mode, lang = "en", model: modelOverride, maxWords = 100, style }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = modelOverride || process.env.LLM_MODEL || DEFAULT_MODEL;
 
@@ -382,7 +382,7 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   const maxTokens = Math.max(300, Math.round(reasonBudget * tokenMultiplier));
 
   const chatMessages = [
-    { role: "system", content: getSystemPrompt(mode, lang) },
+    { role: "system", content: getSystemPrompt(mode, lang, style) },
     { role: "user", content: prompt },
   ];
 
@@ -425,6 +425,18 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         [/\bIt'd\b/g, "It would"],
         [/\bt'these\b/gi, "these"],
         [/\b[a-z]'[a-z]{4,}\b/gi, (m) => m.replace(/'/, "")],
+        // Technical / AI jargon that leaks into move/fuel
+        [/\bexergy\b/gi, "energy"],
+        [/\bentropy\b/gi, "balance"],
+        [/\bmodulate\b/gi, "adjust"],
+        [/\bameliorate\b/gi, "improve"],
+        [/\boptimize\b/gi, "improve"],
+        [/\bsynergy\b/gi, "combination"],
+        [/\bcatalyze\b/gi, "trigger"],
+        [/\bcatalyse\b/gi, "trigger"],
+        [/\bparadigm\b/gi, "pattern"],
+        [/\btrajectory\b/gi, "direction"],
+        [/\bholistic\b/gi, "overall"],
       ];
 
       const cleanLlmText = (text) => {
@@ -433,6 +445,7 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         return t
           .replace(/\*\*/g, "")
           .replace(/#{1,3}\s+/g, "")
+          .replace(/^\d+[.):]\s*/gm, "")  // strip numbered prefixes (1. 2) 3:)
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
           .replace(/[\u200b-\u200f\ufeff]/g, "")
           .replace(/ {2,}/g, " ")
@@ -534,7 +547,7 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
       }));
 
       // ── Style validation: strip anti-pattern words, log adherence ──
-      const activeStyle = process.env.LLM_STYLE || "default";
+      const activeStyle = style || process.env.LLM_STYLE || "default";
       const styleResult = validateStyle(narrative, activeStyle);
       narrative = styleResult.text;
       if (styleResult.warnings.length > 0) {
@@ -566,12 +579,12 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
  * Generate all three modes at once for a user.
  * Returns { move, fuel, perspective } — each a mode output or null on error.
  */
-export async function generateAllModes({ ownerId, lang = "en", model, maxWords = 100 }) {
+export async function generateAllModes({ ownerId, lang = "en", model, maxWords = 100, style }) {
   const modes = ["move", "fuel", "perspective"];
   const results = {};
   for (const mode of modes) {
     try {
-      results[mode] = await generateModeOutput({ ownerId, mode, lang, model, maxWords });
+      results[mode] = await generateModeOutput({ ownerId, mode, lang, model, maxWords, style });
     } catch (err) {
       console.error(`Mode ${mode} generation failed for ${ownerId}:`, err.message);
       results[mode] = null;
