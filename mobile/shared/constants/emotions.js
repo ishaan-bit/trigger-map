@@ -95,15 +95,17 @@ export function legacyToCoordinates(emotion) {
 
 /** Map continuous coordinates to the nearest legacy emotion (for backward compat) */
 export function coordinatesToLegacy(valence, arousal) {
-  let best = "neutral";
-  let bestDist = Infinity;
-  for (const [emotion, coords] of Object.entries(EMOTION_COORDINATES)) {
-    const dist = Math.sqrt(
-      (valence - coords.valence) ** 2 + (arousal - coords.arousal) ** 2
-    );
-    if (dist < bestDist) { bestDist = dist; best = emotion; }
-  }
-  return best;
+  const mag = Math.sqrt(valence * valence + arousal * arousal);
+  // Near center → neutral
+  if (mag < 0.25) return "neutral";
+  // Negative valence → must be anxious or frustrated, never neutral
+  if (valence < -0.2) return arousal >= 0.7 ? "anxious" : "frustrated";
+  // Positive valence → must be energized or calm, never neutral
+  if (valence > 0.2)  return arousal >= 0   ? "energized" : "calm";
+  // Ambiguous valence band — decide by arousal direction
+  if (arousal > 0) return "energized";
+  if (arousal < 0) return "calm";
+  return "neutral";
 }
 
 /** Return emotion-signal keywords for LLM/mode composition based on region */
