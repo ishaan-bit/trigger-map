@@ -62,13 +62,14 @@ async function processOwner(ownerId, force, { personalize = true } = {}) {
     return { ownerId, skipped: true, reason: "no-data" };
   }
 
-  // Fetch user for name personalization
+  // Fetch user for name personalization + language
   const user = personalize ? await getUserById(ownerId).catch(() => null) : null;
   const firstName = personalize ? extractFirstName(user?.name) : null;
+  const userLang = user?.lang || "en";
 
   let insight;
   try {
-    insight = await generateInsight(report, { firstName });
+    insight = await generateInsight(report, { firstName, lang: userLang });
   } catch (aiError) {
     return { ownerId, skipped: true, reason: `ai-failed: ${aiError.message}` };
   }
@@ -78,12 +79,14 @@ async function processOwner(ownerId, force, { personalize = true } = {}) {
     getActionFeedback(ownerId),
     getActionPrefs(ownerId),
   ]);
-  const actions = generateActions(report, actionFeedback || [], actionPrefs);
+  const actions = generateActions(report, actionFeedback || [], actionPrefs, userLang);
 
-  // Polish text: local deterministic cleanup
-  insight.summary = await phraseText(insight.summary, { firstName });
-  for (const a of actions) {
-    a.reason = await phraseText(a.reason, { firstName });
+  // Polish text: local deterministic cleanup (skip for Hindi — text is pre-composed)
+  if (userLang !== "hi") {
+    insight.summary = await phraseText(insight.summary, { firstName });
+    for (const a of actions) {
+      a.reason = await phraseText(a.reason, { firstName });
+    }
   }
 
   const bm = report.baselineMetrics;

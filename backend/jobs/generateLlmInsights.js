@@ -47,6 +47,7 @@ async function storeLlmInsight(ownerId, payload) {
 export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWords } = {}) {
   const user = await getUserById(ownerId);
   if (!user) throw new Error("user not found");
+  const userLang = user.lang || "en";
 
   const aggregates = await getWeeklyAggregates(ownerId, 45);
 
@@ -89,7 +90,7 @@ export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWo
   let bestSoFar = null;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, maxWords });
+      insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, maxWords, lang: userLang });
       if (insight.sectionCount >= 3) break;
       bestSoFar = bestSoFar || insight;
       if (attempt >= 5) break;
@@ -105,7 +106,7 @@ export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWo
     }
   }
 
-  if (insight.narrative) {
+  if (insight.narrative && userLang !== "hi") {
     const sections = insight.narrative.split(/\n\n/);
     const phrased = [];
     for (const section of sections) {
@@ -149,6 +150,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
         skipped++;
         continue;
       }
+      const userLang = user.lang || "en";
 
       if (!force) {
         const existing = await getStoredLlmInsight(ownerId);
@@ -218,7 +220,7 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       let bestSoFar = null;
       for (let attempt = 1; attempt <= 5; attempt++) {
         try {
-          insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback });
+          insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, lang: userLang });
           if (insight.sectionCount >= 3) break;
           bestSoFar = bestSoFar || insight;
           console.log(`  Attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying...`);
@@ -239,7 +241,8 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       // Skip firstName personalization for LLM output — the LLM writes in 2nd
       // person ("you"/"your") and replacing "Your" → "Name's" creates a jarring
       // 3rd-person switch that reads like a clinical report.
-      if (insight.narrative) {
+      // Skip phraseText for Hindi — Hindi text is pre-composed by the LLM.
+      if (insight.narrative && userLang !== "hi") {
         const sections = insight.narrative.split(/\n\n/);
         const phrased = [];
         for (const section of sections) {

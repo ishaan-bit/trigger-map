@@ -159,6 +159,13 @@ export async function runRewriteSummaries({ force = false, ownerIds, model } = {
       const user = await getUserById(ownerId).catch(() => null);
       const firstName = extractFirstName(user?.name);
 
+      // Skip Hindi users — Hindi text is pre-composed and doesn't need LLM rewriting
+      if (user?.lang === "hi") {
+        results.push({ ownerId, skipped: true, reason: "hindi-user" });
+        skipped++;
+        continue;
+      }
+
       console.log(`  Rewriting for ${ownerId.slice(0, 8)}...`);
 
       // Rewrite summary

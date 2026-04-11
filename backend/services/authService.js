@@ -44,6 +44,7 @@ function serializeUser(record) {
     name: record.name || "QuietDen User",
     provider: record.provider || "email",
     createdAt: record.createdAt,
+    lang: record.lang || null,
   };
 }
 

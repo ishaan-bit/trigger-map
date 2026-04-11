@@ -145,14 +145,14 @@ export default async function handler(req, res) {
       } else if (isAuthenticated) {
         // Teaser: extract first section ("What stood out") for curiosity-driven preview
         const narrative = llmInsight.narrative || "";
-        const headerRe = /(?:what stood out|what may be contributing|one thing to try)/gi;
+        const headerRe = /(?:what stood out|what may be contributing|one thing to try|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)/gi;
         const hits = [];
         let hm;
         while ((hm = headerRe.exec(narrative)) !== null) hits.push(hm.index);
         // Take text between first and second header, or first 2 sentences
         let teaser;
         if (hits.length >= 2) {
-          teaser = narrative.slice(hits[0], hits[1]).replace(/^what stood out[:\s-]*/i, "").trim();
+          teaser = narrative.slice(hits[0], hits[1]).replace(/^(?:what stood out|क्या ख़ास रहा)[:\s-]*/i, "").trim();
         } else {
           const sentences = narrative.split(/(?<=[.!?])\s+/).filter(Boolean);
           teaser = sentences.slice(0, 2).join(" ");

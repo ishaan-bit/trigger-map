@@ -113,9 +113,9 @@
     "tooltip": "Pick the area of life this moment is about",
     "bottomStrongGeneral": "Your patterns are getting clearer",
     "bottomStrong": "{trigger} often brings up {emotion}",
-    "bottom3Today": "Three moments today – nice consistency",
+    "bottom3Today": "Three moments today, nice consistency",
     "bottomGoodWeek": "Solid week of awareness",
-    "bottomMoreToday": "{count} more today – deep awareness",
+    "bottomMoreToday": "{count} more today, deep awareness",
     "bottomDefault": "Every entry helps you see more clearly",
     "prompts": {
       "returning": "Welcome back. What's on your mind?",
@@ -123,10 +123,10 @@
       "default1": "How are things right now?",
       "default2": "Take a moment to notice.",
       "calm": "You've been calm lately.",
-      "neutral": "Staying neutral – notice what's steady.",
-      "anxious": "Anxiety's been around – let's log it.",
+      "neutral": "Staying neutral. Notice what's steady.",
+      "anxious": "Anxiety's been around. Let's log it.",
       "frustrated": "Frustration noted. What's behind it?",
-      "energized": "Riding some energy – capture it."
+      "energized": "Riding some energy. Capture it."
     }
   },
   "timeline": {
@@ -202,7 +202,7 @@
       "neutral2": "Just being.",
       "neutral3": "Noted.",
       "anxious1": "Tension registered.",
-      "anxious2": "Anxiety present – you saw it.",
+      "anxious2": "Anxiety present. You saw it.",
       "anxious3": "Tightness acknowledged.",
       "frustrated1": "Frustration captured.",
       "frustrated2": "That friction is real.",
@@ -278,21 +278,21 @@
     "continue": "Continue"
   },
   "ftue": {
-    "framingMessage": "Each moment you log adds a data-point. Over time, patterns emerge — and that's where the insight lives.",
+    "framingMessage": "Each moment you log adds a data-point. Over time, patterns emerge, and that's where the insight lives.",
     "logFirstMoment": "Log your first moment",
     "skipGuide": "Skip guide",
     "whatHappened": "What happened? Tap the area of life it touched.",
     "howAffected": "How did it affect you? Slide to where it feels right.",
     "firstDataPoint": "First data-point captured",
-    "firstDataPointSub": "One moment logged — your timeline just started.",
+    "firstDataPointSub": "One moment logged. Your timeline just started.",
     "patternsForming": "Patterns forming",
     "patternsFormingSub": "Another data-point. Patterns are starting to take shape.",
     "seeTimeline": "See your timeline",
     "seeInsights": "See your insights",
     "timelineExplain": "Each moment shows up here as it happens.",
-    "patternsOverTime": "Over time, patterns start forming — that's where insights come from.",
+    "patternsOverTime": "Over time, patterns start forming. That's where insights come from.",
     "insightsExplain": "This is where your patterns show up. The more you log, the clearer they get.",
-    "actionsExplain": "Small things you can try — based on what your data says.",
+    "actionsExplain": "Small things you can try, based on what your data says.",
     "closeLoop": "Log moments when they happen. The patterns will follow."
   },
   "nudge": {
@@ -316,7 +316,7 @@
     "newHere": "New here?",
     "alreadyHaveAccount": "Already have an account?",
     "continueAnonymously": "Continue anonymously",
-    "anonHint": "No account needed – data stays on this device",
+    "anonHint": "No account needed, data stays on this device",
     "privacyHint": "We never share or sell your data",
     "signOutFailed": "Sign out failed"
   },

@@ -33,7 +33,8 @@ function parseCliFlags(argv) {
   return flags;
 }
 
-function buildActionSignals(report, feedback, prefs, firstName) {
+function buildActionSignals(report, feedback, prefs, firstName, lang) {
+  const hi = lang === "hi";
   const lines = [];
 
   if (firstName) lines.push(`User's first name: ${firstName}.`);
@@ -96,7 +97,39 @@ function buildActionSignals(report, feedback, prefs, firstName) {
   return lines.join("\n");
 }
 
-function buildPrompt(signals) {
+function buildPrompt(signals, lang) {
+  const hi = lang === "hi";
+  if (hi) {
+    return `आप एक भावनात्मक ट्रैकिंग ऐप के लिए बिहेवियरल एक्शन डिज़ाइनर हैं। यूज़र के भावनात्मक डेटा और पिछले एक्शन्स पर उनकी प्रतिक्रिया के आधार पर ठीक 3 व्यक्तिगत एक्शन्स बनाएँ।
+
+नियम:
+- हर एक्शन सप्ताह में करने योग्य हो।
+- जो यूज़र ने पहले आज़माया (पसंद किया): उसे और गहरा करें।
+- जो यूज़र ने छोड़ा (नापसंद): पूरी तरह अलग तरीके से एक्शन दें।
+- पहले से जनरेट किए एक्शन्स दोहराएँ नहीं।
+- टाइप: "regulate", "awareness", "experiment"
+- लहज़ा: सीधा, गर्म, ज़मीनी। कोई मार्कडाउन या em dash नहीं।
+- पूरी तरह हिंदी (देवनागरी) में लिखें। कोई अंग्रेज़ी शब्द नहीं।
+
+डेटा:
+---
+${signals}
+---
+
+ठीक 3 एक्शन्स इस JSON फॉर्मेट में दें (कोई और टेक्स्ट नहीं):
+[
+  {
+    "id": "llm-unique-id",
+    "type": "regulate",
+    "title": "छोटा शीर्षक (10 शब्दों से कम)",
+    "reason": "एक वाक्य में बताएँ ये क्यों ज़रूरी है।",
+    "trigger": "trigger-or-null",
+    "emotion": "emotion-or-null"
+  }
+]
+
+सिर्फ JSON array दें। कोई व्याख्या या markdown नहीं।`;
+  }
   return `You are a behavioral action designer for an emotional tracking app. Based on the user's emotional data and their feedback on previous actions, generate exactly 3 personalized actions.
 
 RULES:
@@ -129,7 +162,7 @@ Respond with EXACTLY 3 actions in this JSON format (no other text before or afte
 Output ONLY the JSON array. No explanations, no markdown code fences.`;
 }
 
-function parseActions(raw) {
+function parseActions(raw, lang) {
   // Strip markdown code fences if present
   let text = raw.trim();
   text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -165,11 +198,12 @@ function parseActions(raw) {
     throw new Error("LLM returned empty or non-array response");
   }
 
+  const hi = lang === "hi";
   return parsed.slice(0, 4).map(a => ({
     id: String(a.id || `llm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
     type: ["regulate", "awareness", "experiment"].includes(a.type) ? a.type : "awareness",
-    title: lintText(String(a.title || "").slice(0, 100)),
-    reason: lintText(String(a.reason || "").slice(0, 300)),
+    title: hi ? String(a.title || "").slice(0, 100) : lintText(String(a.title || "").slice(0, 100)),
+    reason: hi ? String(a.reason || "").slice(0, 300) : lintText(String(a.reason || "").slice(0, 300)),
     trigger: a.trigger || null,
     emotion: a.emotion || null,
   }));
@@ -198,6 +232,8 @@ function computeLikedTriggers(feedback) {
 export async function generateForOwner(ownerId, { model, apiUrl, force }) {
   const user = await getUserById(ownerId).catch(() => null);
   const firstName = extractFirstName(user?.name);
+  const userLang = user?.lang || "en";
+  const hi = userLang === "hi";
 
   const [aggregates, allAggregates, feedback, prefs] = await Promise.all([
     getWeeklyAggregates(ownerId),
@@ -217,8 +253,8 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
     return { skipped: true, reason: "insufficient-data" };
   }
 
-  const signals = buildActionSignals(report, feedback, prefs, firstName);
-  const prompt = buildPrompt(signals);
+  const signals = buildActionSignals(report, feedback, prefs, firstName, userLang);
+  const prompt = buildPrompt(signals, userLang);
 
   const MAX_ATTEMPTS = 3;
   let lastError;
@@ -229,7 +265,9 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
         apiUrl,
         model,
         messages: [
-          { role: "system", content: "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
+          { role: "system", content: hi
+            ? "आप एक संक्षिप्त बिहेवियरल एक्शन डिज़ाइनर हैं। सिर्फ valid JSON arrays दें। पूरी तरह हिंदी (देवनागरी) में, कोई अंग्रेज़ी शब्द नहीं।"
+            : "You are a concise behavioral action designer. Output only valid JSON arrays. No prose, no markdown, no explanations." },
           { role: "user", content: prompt },
         ],
         temperature: 0.65,
@@ -241,7 +279,7 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
       if (!content) throw new Error("LLM returned empty response");
 
       try {
-        var actions = parseActions(content);
+        var actions = parseActions(content, userLang);
       } catch (parseErr) {
         console.log(`    Raw LLM output (attempt ${attempt}): ${content.slice(0, 500)}`);
         throw parseErr;
