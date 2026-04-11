@@ -599,12 +599,20 @@ function buildDrivers(report) {
   return triggers.map(([trigger, count]) => {
     const friction = (m.frictionZones || []).find(f => f.trigger === trigger);
     const regulator = (m.regulators || []).find(r => r.trigger === trigger);
-    return {
-      trigger,
-      count,
-      effect: regulator ? "regulator" : friction ? "friction" : "neutral",
-      emotion: regulator?.emotion || friction?.emotion || null,
-    };
+    // Determine effect by whichever pairing is stronger, not just existence
+    let effect = "neutral", emotion = null, effectCount = count;
+    if (friction && regulator) {
+      if (friction.count >= regulator.count) {
+        effect = "friction"; emotion = friction.emotion; effectCount = friction.count;
+      } else {
+        effect = "regulator"; emotion = regulator.emotion; effectCount = regulator.count;
+      }
+    } else if (friction) {
+      effect = "friction"; emotion = friction.emotion; effectCount = friction.count;
+    } else if (regulator) {
+      effect = "regulator"; emotion = regulator.emotion; effectCount = regulator.count;
+    }
+    return { trigger, count, effectCount, effect, emotion };
   });
 }
 

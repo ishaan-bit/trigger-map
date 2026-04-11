@@ -502,7 +502,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }
                 <View key={i} style={[s.driverRow, i < drivers.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.glassBorder }]}>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger, t)}</Text>
-                    {d.emotion ? <Text style={s.driverEmotion}>{t("emotions." + d.emotion) || d.emotion} · {d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
+                    {d.emotion ? <Text style={s.driverEmotion}>{t("emotions." + d.emotion) || d.emotion} · {d.effectCount ?? d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
                   </View>
                   <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
                     <Text style={[s.effectBadgeText, { color: effectColor }]}>{effectLabel}</Text>
