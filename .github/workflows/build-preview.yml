@@ -5,6 +5,10 @@ on:
     branches: [feature/ui-adaptive-tags-revamp]
   workflow_dispatch:
 
+concurrency:
+  group: preview-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
