@@ -24,7 +24,7 @@ import {
   appendModeHistory,
 } from "../services/modeStore.js";
 import { getStoredWeeklyInsight } from "../services/reportStore.js";
-import { getStylePrompt } from "./styleProfiles.js";
+import { getStylePrompt, validateStyle } from "./styleProfiles.js";
 
 const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
@@ -286,11 +286,21 @@ function buildPerspectivePrompt(context, lang) {
     ? `उपयोगकर्ता की हालिया भावनात्मक स्थिति:
 ${context}
 
-इस स्थिति को देखने का एक नया नज़रिया 3-4 वाक्यों में दें। यह सुझाव या सलाह नहीं — बस एक अलग तरीके से देखने का तरीका। शांत, सौम्य और ज़मीनी स्वर में लिखें। कोई निदान या मनोवैज्ञानिक शब्दावली न इस्तेमाल करें।`
+इस स्थिति को देखने का एक नया नज़रिया 3-4 वाक्यों में दें। यह सुझाव या सलाह नहीं — बस एक अलग तरीके से देखने का तरीका। शांत, सौम्य और ज़मीनी स्वर में लिखें। कोई निदान या मनोवैज्ञानिक शब्दावली न इस्तेमाल करें। कविता या अलंकार मत लिखें।`
     : `User's recent emotional context:
 ${context}
 
-Offer one fresh perspective on this emotional pattern in 3-4 sentences. This is not advice or a suggestion to act — it is a different way of seeing what is happening. Be calm, gentle, and grounded. Do not diagnose or use psychological terminology.`;
+Offer one fresh perspective on this emotional pattern in 3-4 sentences. This is not advice or a suggestion to act. It is a different way of seeing what is happening.
+
+Rules:
+- Write like you are talking to a friend over coffee, not writing poetry
+- No metaphors about storms, oceans, gardens, light, darkness, waves, seasons, or journeys
+- No words like: tapestry, landscape, navigate, embrace, unfold, resonate, profound, sacred, beacon, vessel, harbor, anchor, compass
+- No rhetorical questions
+- No em dashes
+- Say what you actually see in the pattern data. Be specific, not vague
+- If the data is mostly positive or neutral, say so. Do not manufacture depth or drama
+- Do not reference specific days unless they appear in the context above`;
 }
 
 // ── System prompts (mode-specific) ─────────────────────────────────────
@@ -306,8 +316,8 @@ function getSystemPrompt(mode, lang) {
       ? "आप एक व्यक्तिगत पोषण मार्गदर्शक हैं जो इस व्यक्ति को उनकी भावनात्मक यात्रा के आधार पर जानते हैं। आप सीधे उनसे बात करते हैं ('तुम/आप')। आप JSON प्रारूप में जवाब देते हैं। गर्म और व्यक्तिगत — यह डाइट प्लान नहीं, भावनात्मक पोषण है।"
       : "You are a personal nourishment guide who knows THIS specific person through their emotional patterns. You speak directly to them ('you/your'). You respond in JSON format. Be warm and personal — this is emotional nourishment, not a diet plan.",
     perspective: hi
-      ? "आप एक सौम्य, विचारशील दृष्टिकोण देने वाले हैं। आप भावनात्मक पैटर्न को नई नज़र से देखने में मदद करते हैं। निदान मत करें, सलाह मत दें — बस एक अलग नज़रिया दें।"
-      : "You are a gentle, thoughtful perspective-giver. You help people see emotional patterns from a different angle. Do not diagnose, do not advise action — just offer a different way of seeing.",
+      ? "आप एक सौम्य, विचारशील दृष्टिकोण देने वाले हैं। आप भावनात्मक पैटर्न को नई नज़र से देखने में मदद करते हैं। निदान मत करें, सलाह मत दें — बस एक अलग नज़रिया दें। साधारण बोलचाल की हिंदी में लिखें। कविता, अलंकार, या अति-दार्शनिक भाषा मत लिखें।"
+      : "You are a thoughtful friend who notices things others miss. You help people see emotional patterns from a different angle. Write like a real person talking — not like a poet, therapist, or AI. Do not diagnose or advise action. Do not use flowery language, purple prose, metaphors about oceans/storms/gardens/light/darkness, or any phrasing that reads like a greeting card or motivational poster. Use plain, direct, conversational English. Short sentences. No em dashes. No rhetorical questions. No 'perhaps' or 'it seems' hedging. Say what you see, simply. CRITICAL: Do not fabricate negative emotions, struggles, or problems not present in the data. If the data shows neutral or positive patterns, reflect that honestly. Never speculate about the user's psychology or personality.",
   };
 
   const langRule = hi
@@ -448,10 +458,65 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         }
         narrative = parsedOpening || cleanLlmText(narrative);
       } else {
+        // ── Perspective post-processing: hallucination guards + AI-word stripping ──
+
         // Trim incomplete sentence if token-limited
         if (result.finishReason === "length") {
           const match = narrative.match(/^([\s\S]*[.!?])(?:\s|$)/);
           if (match) narrative = match[1].trim();
+        }
+
+        narrative = cleanLlmText(narrative);
+
+        // Strip AI-typical purple prose words that make output feel generated
+        const AI_WORDS = /\b(tapestry|landscape|navigate|embrace|unfold|resonate|profound|sacred|beacon|vessel|harbor|harbour|anchor|compass|journey|symphony|orchestra|kaleidoscope|mosaic|labyrinth|constellation|metamorphosis|chrysalis|crucible|alchemy|paradox|dichotomy|juxtaposition|modulate|ameliorate|paradigm|trajectory|catalyze|catalyse|synergy|curate|cultivate|holistic|nurture|empower|transcend|illuminate|awaken|blossom|flourish|radiance|luminous|ethereal|serenity|celestial|enigmatic|ephemeral|quintessential)\b/gi;
+        narrative = narrative.replace(AI_WORDS, (m) => {
+          // Replace with plainer alternatives where possible
+          const plain = {
+            tapestry: "mix", landscape: "picture", navigate: "handle", embrace: "accept",
+            unfold: "happen", resonate: "connect", profound: "deep", sacred: "important",
+            beacon: "signal", vessel: "container", harbor: "hold", harbour: "hold",
+            anchor: "ground", compass: "guide", journey: "process", symphony: "mix",
+            orchestra: "mix", kaleidoscope: "mix", mosaic: "mix", nurture: "support",
+            empower: "strengthen", transcend: "move past", illuminate: "show",
+            awaken: "notice", blossom: "grow", flourish: "grow", cultivate: "build",
+            holistic: "overall", curate: "choose", catalyze: "trigger", catalyse: "trigger",
+          };
+          return plain[m.toLowerCase()] || "";
+        }).replace(/ {2,}/g, " ").replace(/ ([.,;:])/g, "$1").trim();
+
+        // Strip nature/weather metaphors that LLMs love
+        narrative = narrative
+          .replace(/\b(storm|ocean|wave|tide|current|river|sea|flame|fire|garden|seed|root|soil|bloom|flower|petal|leaf|branch|tree|forest|mountain|valley|sunrise|sunset|dawn|dusk|horizon|shore|cloud|rain|rainbow|sunshine|shadow|mirror|bridge|path|road|door|window|wall|cage|wings?|flight|soar)\b(?:\s+(?:of|in|through|within|across)\s+(?:your|the)\s+\w+)?/gi, (match, word) => {
+          // Only strip when used figuratively (followed by emotional/abstract nouns)
+          if (/\b(of|in|through|within|across)\s+(your|the)\s+(emotions?|feelings?|mind|heart|soul|spirit|life|self|being|psyche|inner|patterns?)/i.test(match)) {
+            return "";
+          }
+          return match;
+        }).replace(/ {2,}/g, " ").replace(/ ([.,;:])/g, "$1").trim();
+
+        // Strip fabricated day-of-week references not present in source context
+        narrative = narrative.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi, (match) => {
+          return context.toLowerCase().includes(match.toLowerCase()) ? match : "";
+        }).replace(/ {2,}/g, " ").replace(/ ([.,;:])/g, "$1").trim();
+
+        // Strip garbled tokens (letters+digits mix)
+        narrative = narrative
+          .replace(/\b[a-zA-Z]+\d+[a-zA-Z]+\b/g, "")
+          .replace(/\b[a-zA-Z]{2,}\d{3,}\b/g, "")
+          .replace(/\bYou's\b/g, "Your")
+          .replace(/\byou's\b/g, "your")
+          .replace(/([a-z,;:)'"] )You(r?)\b/g, "$1you$2")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+
+        // Hard word-count cap for perspective
+        const perspWords = narrative.split(/\s+/).filter(w => w.length > 0);
+        const perspCap = Math.round(maxWords * 1.3);
+        if (perspWords.length > perspCap) {
+          const trimmed = perspWords.slice(0, perspCap).join(" ");
+          const sentEnd = trimmed.match(/^([\s\S]*[.!?])(?:\s|$)/);
+          narrative = sentEnd ? sentEnd[1].trim() : trimmed;
         }
         narrative = cleanLlmText(narrative);
       }
@@ -467,6 +532,20 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         ...(i.type ? { type: i.type } : {}),
         ...(i.nutrientFocus ? { nutrientFocus: i.nutrientFocus } : {}),
       }));
+
+      // ── Style validation: strip anti-pattern words, log adherence ──
+      const activeStyle = process.env.LLM_STYLE || "default";
+      const styleResult = validateStyle(narrative, activeStyle);
+      narrative = styleResult.text;
+      if (styleResult.warnings.length > 0) {
+        console.log(`[modeComposer] Style "${activeStyle}" warnings for ${mode}/${ownerId.slice(0, 8)}: ${styleResult.warnings.join("; ")}`);
+      }
+
+      // Also validate opening (for move/fuel JSON modes)
+      if (parsedOpening && activeStyle !== "default") {
+        const openingResult = validateStyle(parsedOpening, activeStyle);
+        parsedOpening = openingResult.text;
+      }
 
       // Persist
       const output = { mode, items: itemSummaries, narrative, model };

@@ -8,7 +8,7 @@
  * Tone: calm, observant, grounded. No essays, no fake-therapeutic language.
  */
 
-import { getStylePrompt } from "./styleProfiles.js";
+import { getStylePrompt, validateStyle } from "./styleProfiles.js";
 import { buildSignalProfile, buildSignalConstraints, rankSignals, detectRelationship } from "./signalProfile.js";
 import { retrieveForLLM } from "../knowledge/ragEngine.js";
 import { ollamaChat } from "./ollamaChat.js";
@@ -562,6 +562,14 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
     content = content.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi, (match) => {
       return notesText.includes(match.toLowerCase()) ? match : "";
     }).replace(/ {2,}/g, " ").replace(/ ([.,;:])/g, "$1").trim();
+
+    // Style validation: strip anti-pattern words if a voice style is active
+    const activeStyle = process.env.LLM_STYLE || "default";
+    const styleResult = validateStyle(content, activeStyle);
+    content = styleResult.text;
+    if (styleResult.warnings.length > 0) {
+      console.log(`[LLM Insight] Style "${activeStyle}" warnings: ${styleResult.warnings.join("; ")}`);
+    }
 
     return {
       narrative: content,
