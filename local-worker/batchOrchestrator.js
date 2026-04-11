@@ -251,7 +251,7 @@ async function executePair(pair, config) {
   const rowConfig = config[pair.process] || {};
   const model = rowConfig.model || process.env.LLM_MODEL || "phi3";
   const apiUrl = process.env.LLM_API_URL || "http://localhost:11434/v1";
-  const style = config._style || "default";
+  const style = rowConfig.style || "default";
 
   // Set model + style env for the duration of this call
   const prevModel = process.env.LLM_MODEL;

@@ -30,7 +30,7 @@ const PROCESS_ROWS = [
     hasLoggedMoment: true,
     hasMarkedFeedback: false,
     defaults: {
-      enabled: true, model: 'phi3', maxWords: 100, minMoments: 5,
+      enabled: true, model: 'phi3', style: 'default', maxWords: 100, minMoments: 5,
       premium: true, nonPremium: false, timeSinceLastRun: 6, loggedMoment: 'all',
     },
   },
@@ -46,7 +46,7 @@ const PROCESS_ROWS = [
     hasMarkedFeedback: true,
     markedFeedbackOnly: true,
     defaults: {
-      enabled: true, model: 'phi3', minMoments: 3,
+      enabled: true, model: 'phi3', style: 'default', minMoments: 3,
       premium: true, nonPremium: true, timeSinceLastRun: 3,
       hasMarked: true,
     },
@@ -63,7 +63,7 @@ const PROCESS_ROWS = [
     hasMarkedFeedback: true,
     hasMinMarked: true,
     defaults: {
-      enabled: true, model: 'phi3', minMoments: 3,
+      enabled: true, model: 'phi3', style: 'default', minMoments: 3,
       premium: true, hasMarked: true, minMarked: 1, timeSinceLastRun: 3,
     },
   },
@@ -79,7 +79,7 @@ const PROCESS_ROWS = [
     hasMarkedFeedback: true,
     hasMinMarked: true,
     defaults: {
-      enabled: true, model: 'phi3', minMoments: 3,
+      enabled: true, model: 'phi3', style: 'default', minMoments: 3,
       premium: true, hasMarked: true, minMarked: 1, timeSinceLastRun: 3,
     },
   },
@@ -94,7 +94,7 @@ const PROCESS_ROWS = [
     hasLoggedMoment: true,
     hasMarkedFeedback: false,
     defaults: {
-      enabled: true, model: 'phi3', maxWords: 100, minMoments: 5,
+      enabled: true, model: 'phi3', style: 'default', maxWords: 100, minMoments: 5,
       premium: true, timeSinceLastRun: 6, loggedMoment: 'all',
     },
   },
@@ -437,12 +437,6 @@ export default function LlmPage() {
   const [pairs, setPairs] = useState([]);
   const [estimate, setEstimate] = useState(null);
   const [maxRuntime, setMaxRuntime] = useState(60);
-  const [style, setStyle] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try { return localStorage.getItem('ops_llm_style') || 'default'; } catch {}
-    }
-    return 'default';
-  });
   const [batchStatus, setBatchStatus] = useState(null);
   const [running, setRunning] = useState(false);
   const [workerOnline, setWorkerOnline] = useState(null);
@@ -450,13 +444,10 @@ export default function LlmPage() {
   const [incompleteSelected, setIncompleteSelected] = useState(new Set());
   const pollerRef = useRef(null);
 
-  // Persist config + style
+  // Persist config
   useEffect(() => {
     try { localStorage.setItem('ops_llm_config', JSON.stringify(config)); } catch {}
   }, [config]);
-  useEffect(() => {
-    try { localStorage.setItem('ops_llm_style', style); } catch {}
-  }, [style]);
 
   // Check worker on mount
   useEffect(() => {
@@ -583,7 +574,7 @@ export default function LlmPage() {
       const res = await fetch('/api/llm/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pairs, config: { ...config, _style: style }, maxRuntimeMinutes: maxRuntime }),
+        body: JSON.stringify({ pairs, config, maxRuntimeMinutes: maxRuntime }),
       });
       const data = await res.json();
       if (data.ok || res.status === 202) {
@@ -668,30 +659,6 @@ export default function LlmPage() {
           </span>
         </div>
 
-        {/* Voice / Style selector — prominent, above config table */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px', marginBottom: 20,
-          background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10,
-        }}>
-          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>🎙 Voice</span>
-          <select
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
-            style={{
-              flex: 1, maxWidth: 260, padding: '6px 10px', fontSize: 13,
-              background: 'var(--bg-primary)', color: 'var(--text-primary)',
-              border: '1px solid var(--border)', borderRadius: 6,
-            }}
-          >
-            {LLM_STYLES.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-          </select>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            Applies to all LLM processes in this batch
-          </span>
-        </div>
-
         {/* Config table */}
         <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', marginBottom: 24 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -700,6 +667,7 @@ export default function LlmPage() {
                 <th style={thStyle}>Process</th>
                 <th style={thStyle}>On</th>
                 <th style={thStyle}>Model</th>
+                <th style={thStyle}>Voice</th>
                 <th style={thStyle}>Max Words</th>
                 <th style={thStyle}>Min Moments</th>
                 <th style={thStyle}>Premium</th>
@@ -726,6 +694,12 @@ export default function LlmPage() {
                       <select value={c.model || 'phi3'} onChange={(e) => updateConfig(row.id, 'model', e.target.value)}
                         style={selectStyle} disabled={!c.enabled}>
                         {LLM_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </td>
+                    <td style={tdStyle}>
+                      <select value={c.style || 'default'} onChange={(e) => updateConfig(row.id, 'style', e.target.value)}
+                        style={selectStyle} disabled={!c.enabled}>
+                        {LLM_STYLES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
                     </td>
                     <td style={tdStyle}>
