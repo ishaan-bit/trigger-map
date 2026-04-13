@@ -32,14 +32,7 @@
           "android": {
             "minSdkVersion": 24,
             "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "useLegacyPackaging": false,
-            "extraMavenRepos": [],
-            "packagingOptions": {
-              "jniLibs": {
-                "useLegacyPackaging": false
-              }
-            }
+            "targetSdkVersion": 35
           }
         }
       ],
@@ -49,7 +42,7 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 135,
+      "versionCode": 136,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_NETWORK_STATE"
