@@ -155,27 +155,41 @@ describe("generateActions", () => {
 
   // --- Feedback filtering ---
 
-  it("filters out actions the user already responded to", () => {
+  it("filters out not_helpful actions but keeps helped actions", () => {
     const report = makeReport();
     const feedback = [
-      { actionId: "reg-work-exercise", response: "tried" },
+      { actionId: "reg-work-exercise", response: "not_helpful" },
     ];
     const actions = generateActions(report, feedback);
-    // The reg-work-exercise action should be filtered out (or enhanced)
+    // not_helpful should be filtered out
+    const hasOriginal = actions.some(a => a.id.replace(/-r\d+$/, "") === "reg-work-exercise");
+    expect(hasOriginal).toBe(false);
     expect(actions).toHaveLength(3);
   });
 
-  it("enhances helped actions into deeper follow-ups", () => {
+  it("keeps helped actions visible (not filtered out)", () => {
     const report = makeReport();
     const feedback = [
       { actionId: "reg-work-exercise", response: "helped" },
     ];
     const actions = generateActions(report, feedback);
-    // Should have an "enhance-" prefixed action
-    const enhanced = actions.filter(a => a.id.includes("enhance"));
-    expect(enhanced.length).toBeGreaterThanOrEqual(0);
-    // Still returns exactly 3
+    // Helped action should still be in the results (not filtered, not replaced)
+    const original = actions.find(a => a.id.replace(/-r\d+$/, "") === "reg-work-exercise");
+    expect(original).toBeDefined();
+    expect(original.title).not.toContain("Build on this");
     expect(actions).toHaveLength(3);
+  });
+
+  it("never produces 'Build on this:' prefix in action titles", () => {
+    const report = makeReport();
+    const feedback = [
+      { actionId: "reg-work-exercise", response: "helped" },
+      { actionId: "reinforce-exercise", response: "helped" },
+    ];
+    const actions = generateActions(report, feedback);
+    for (const a of actions) {
+      expect(a.title).not.toContain("Build on this");
+    }
   });
 
   it("suppresses triggers from not_helpful feedback", () => {
@@ -312,5 +326,52 @@ describe("generateActions", () => {
     expect(actions[0].order).toBe(0);
     expect(actions[1].order).toBe(1);
     expect(actions[2].order).toBe(2);
+  });
+
+  // --- Rule-based + LLM coexistence ---
+
+  it("LLM actions are prioritized over rule-based when both exist", () => {
+    const report = makeReport();
+    const prefs = {
+      llmActions: [
+        { id: "llm-action-1", type: "regulate", title: "Try a new routine", reason: "Change helps.", trigger: "routine" },
+      ],
+    };
+    const actions = generateActions(report, [], prefs);
+    expect(actions).toHaveLength(3);
+    // LLM action should be first (highest priority)
+    expect(actions[0].id).toContain("llm-action-1");
+  });
+
+  it("LLM actions coexist with rule-based after feedback", () => {
+    const report = makeReport();
+    const feedback = [
+      { actionId: "reg-work-exercise", response: "helped" },
+    ];
+    const prefs = {
+      llmActions: [
+        { id: "llm-action-1", type: "experiment", title: "Journal before bed", reason: "Writing helps.", trigger: "sleep" },
+      ],
+    };
+    const actions = generateActions(report, feedback, prefs);
+    expect(actions).toHaveLength(3);
+    const hasLlm = actions.some(a => a.id.includes("llm-action"));
+    const hasRuleBased = actions.some(a => !a.id.includes("llm-"));
+    expect(hasLlm).toBe(true);
+    expect(hasRuleBased).toBe(true);
+  });
+
+  it("normalized feedback labels (helped/not_helpful) work same as legacy (tried/skipped)", () => {
+    const report = makeReport();
+    // "helped" = normalized version of "tried"
+    const feedbackNew = [{ actionId: "friction-work-frustrated", response: "not_helpful" }];
+    const feedbackLegacy = [{ actionId: "friction-work-frustrated", response: "skipped" }];
+    const actionsNew = generateActions(report, feedbackNew);
+    const actionsLegacy = generateActions(report, feedbackLegacy);
+    // Both should suppress work-trigger actions
+    const workNew = actionsNew.filter(a => a.trigger?.toLowerCase() === "work");
+    const workLegacy = actionsLegacy.filter(a => a.trigger?.toLowerCase() === "work");
+    expect(workNew).toHaveLength(0);
+    expect(workLegacy).toHaveLength(0);
   });
 });
