@@ -930,11 +930,33 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
 function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   const actions = report?.actions || [];
   const feedback = report?.actionFeedback || [];
-  const [responded, setResponded] = useState(() => {
+
+  // Build responded map from backend feedback, matching by base ID
+  // (strips epoch suffix -rN so feedback persists across rotations)
+  const backendResponded = useMemo(() => {
     const map = {};
-    for (const f of feedback) { map[f.actionId] = f.response; }
+    const feedbackByBase = {};
+    for (const f of feedback) {
+      map[f.actionId] = f.response;
+      const base = f.actionId.replace(/-r\d+$/, "");
+      feedbackByBase[base] = f.response;
+    }
+    // Match current actions to feedback by base ID
+    for (const action of actions) {
+      if (!map[action.id]) {
+        const actionBase = action.id.replace(/-r\d+$/, "");
+        if (feedbackByBase[actionBase]) {
+          map[action.id] = feedbackByBase[actionBase];
+        }
+      }
+    }
     return map;
-  });
+  }, [report]);
+
+  // Local optimistic overrides (for in-flight feedback submissions)
+  const [localResponded, setLocalResponded] = useState({});
+  const responded = { ...backendResponded, ...localResponded };
+
   const [submitting, setSubmitting] = useState(null);
   const [feedbackAck, setFeedbackAck] = useState({});
   const [errorId, setErrorId] = useState(null);
@@ -948,7 +970,7 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
     tap();
     try {
       await submitActionFeedback(actionId, response, deviceId, token);
-      setResponded((prev) => ({ ...prev, [actionId]: response }));
+      setLocalResponded((prev) => ({ ...prev, [actionId]: response }));
       setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? t("report.markedHelpful") : t("report.adjustThis") }));
       trackEvent("action_feedback", { actionId, response });
       if (onFeedback) onFeedback(actionId, response);

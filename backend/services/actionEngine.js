@@ -404,44 +404,23 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     }
   }
 
-  // 2. Enhance "helped" candidates — transform into deeper follow-ups
-  //    instead of filtering them out. The user liked this approach, so build on it.
-  const enhanced = [];
-  for (const c of candidates) {
-    const baseId = c.id.replace(/-r\d+$/, "");
-    if (fb.helpedBases.has(baseId)) {
-      enhanced.push({
-        ...c,
-        id: `enhance-${baseId}${eid}`,
-        title: hi
-          ? `${c.title} — इसे और आगे ले जाएँ`
-          : `Build on this: ${c.title.charAt(0).toLowerCase() + c.title.slice(1)}`,
-        reason: hi
-          ? `इस तरीके ने पहले आपकी मदद की। अगला कदम उठाएँ और इस प्रयास को और गहरा करें।`
-          : `This approach helped you before. Take the next step and deepen the practice.`,
-      });
-    }
-  }
-
-  // 3. Apply rotation epoch to candidate IDs
+  // 2. Apply rotation epoch to candidate IDs
   if (eid) {
     for (const c of candidates) { c.id = c.id + eid; }
   }
 
-  // 4. Filter candidates:
-  //    - Remove actions the user already responded to (any epoch)
+  // 3. Filter candidates:
+  //    - Remove actions the user rejected (not_helpful/skipped)
+  //    - Keep actions the user liked (helped) so they stay marked in UI
   //    - Suppress triggers the user said "not helpful" to
   let filtered = candidates.filter(a => {
     const aBase = a.id.replace(/-r\d+$/, "");
-    if (fb.allBases.has(aBase)) return false;
+    if (fb.notHelpfulBases.has(aBase)) return false;
     if (a.trigger && notHelpfulTriggers.has(a.trigger.toLowerCase())) return false;
     return true;
   });
 
-  // 5. Merge: enhanced actions (from "helped" feedback) first, then fresh candidates
-  filtered = [...enhanced, ...filtered];
-
-  // Deduplicate by trigger (enhanced actions get priority)
+  // Deduplicate by trigger
   const seenTriggers = new Set();
   filtered = filtered.filter(a => {
     if (!a.trigger) return true;
@@ -451,7 +430,7 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     return true;
   });
 
-  // 6. Rank: LLM actions first, then boost helped triggers
+  // 4. Rank: LLM actions first, then boost helped triggers
   const helpedTriggers = new Set();
   for (const [id, c] of Object.entries(fb.counters)) {
     if (c.helped > 0) {
@@ -472,7 +451,7 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
     return (bLlm + bBoost) - (aLlm + aBoost);
   });
 
-  // 7. Guarantee exactly 3 — post-filter safety net
+  // 5. Guarantee exactly 3 — post-filter safety net
   if (filtered.length < 3) {
     const fillers = hi
       ? [

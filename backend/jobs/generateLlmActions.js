@@ -69,9 +69,9 @@ function buildActionSignals(report, feedback, prefs, firstName, lang) {
     lines.push(`Slider drift this week: valence ${report.centroidDrift.valence > 0 ? "+" : ""}${report.centroidDrift.valence.toFixed(2)}, arousal ${report.centroidDrift.arousal > 0 ? "+" : ""}${report.centroidDrift.arousal.toFixed(2)}.`);
   }
 
-  // Feedback signals
-  const tried = feedback.filter(f => f.response === "tried");
-  const skipped = feedback.filter(f => f.response === "skipped");
+  // Feedback signals (support both normalized + legacy labels)
+  const tried = feedback.filter(f => f.response === "helped" || f.response === "tried");
+  const skipped = feedback.filter(f => f.response === "not_helpful" || f.response === "skipped");
 
   if (tried.length) {
     lines.push(`\nActions the user TRIED (liked — enhance these approaches):`);

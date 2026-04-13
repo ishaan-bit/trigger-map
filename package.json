@@ -8,6 +8,11 @@
     "build:mobile": "npm --prefix mobile run build:aab",
     "build:backend": "npm --prefix backend run build",
     "build:web": "npm --prefix web run build",
-    "lint": "npm --prefix mobile run lint && npm --prefix backend run lint && npm --prefix web run lint"
+    "lint": "npm --prefix mobile run lint && npm --prefix backend run lint && npm --prefix web run lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
   }
 }

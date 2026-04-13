@@ -16,6 +16,7 @@ const NAV = [
       { label: 'LLM', href: '/llm', icon: '◎' },
       { label: 'Push Notifications', href: '/push', icon: '◈' },
       { label: 'Diagnostics', href: '/diagnostics', icon: '⚙' },
+      { label: 'Unit Tests', href: '/tests', icon: '◇' },
     ],
   },
   {

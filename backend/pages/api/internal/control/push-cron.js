@@ -62,21 +62,19 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Gentle Nudge ──
-    if (config.nudge?.enabled) {
-      const inactiveDays = config.nudge.inactiveDays || 3;
-      const nudgeTitle = config.nudge.title || 'How has your day been?';
-      const nudgeBody = config.nudge.body || 'Log a moment to keep your pattern map current.';
-      // Only evaluate nudges once per day (at AM time, or 11:00 IST default)
-      const nudgeTime = config.daily?.amTime || '11:00';
-      if (isTimeMatch(istTime, nudgeTime) && lastRun[`nudge_${istDateKey}`] !== true) {
-        actions.push({ key: `nudge_${istDateKey}`, type: 'inactivity_nudge', inactiveDays, title: nudgeTitle, body: nudgeBody });
-      }
-    }
+    // ── Gentle Nudge ── (disabled: generic nudges without meaningful subject are not sent)
+    // To re-enable, set config.nudge.enabled=true AND provide a real title+body in the schedule config.
+    // if (config.nudge?.enabled) { ... }
 
     if (actions.length === 0) {
       return res.status(200).json({ ok: true, action: 'none', reason: 'No actions due', istTime, istDay });
     }
+
+    // ── Per-user throttle: max 1 notification per cron tick ──
+    // Priority order: weekly_insight > reflection_reminder > inactivity_nudge
+    // If multiple actions fire in the same window, each user only gets the highest-priority one.
+    const ACTION_PRIORITY = { weekly_insight: 3, reflection_reminder: 2, inactivity_nudge: 1 };
+    actions.sort((a, b) => (ACTION_PRIORITY[b.type] || 0) - (ACTION_PRIORITY[a.type] || 0));
 
     // Get all users with push tokens
     const ownerIds = await redis(['SMEMBERS', redisKey('owners')]);
@@ -128,6 +126,9 @@ export default async function handler(req, res) {
     // Map action types to pref keys
     const prefKeyFor = { reflection_reminder: 'daily', weekly_insight: 'weekly', inactivity_nudge: 'nudge' };
 
+    // Track which users have already been sent a notification this tick
+    const notifiedUsers = new Set();
+
     for (const action of actions) {
       // Filter by user notification preferences
       const prefKey = prefKeyFor[action.type];
@@ -143,6 +144,9 @@ export default async function handler(req, res) {
           return new Date(u.lastMomentAt).getTime() < threshold;
         });
       }
+
+      // ── Throttle: skip users who already received a higher-priority notification this tick ──
+      targetUsers = targetUsers.filter(u => !notifiedUsers.has(u.ownerId));
 
       if (targetUsers.length === 0) {
         summary.push({ action: action.key, sent: 0, reason: 'no eligible users' });
@@ -186,6 +190,9 @@ export default async function handler(req, res) {
           errors += batch.length;
         }
       }
+
+      // Mark all targeted users as notified so lower-priority actions skip them
+      for (const user of targetUsers) notifiedUsers.add(user.ownerId);
 
       lastRun[action.key] = true;
       summary.push({ action: action.key, type: action.type, users: targetUsers.length, messages: messages.length, delivered, errors });
