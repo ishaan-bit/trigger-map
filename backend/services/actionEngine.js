@@ -410,12 +410,12 @@ export function generateActions(report, feedback = [], prefs = null, lang = "en"
   }
 
   // 3. Filter candidates:
-  //    - Remove actions the user rejected (not_helpful/skipped)
-  //    - Keep actions the user liked (helped) so they stay marked in UI
+  //    - Remove actions the user already responded to (helped or not_helpful)
+  //    - This frees slots for fresh rule-based candidates
   //    - Suppress triggers the user said "not helpful" to
   let filtered = candidates.filter(a => {
     const aBase = a.id.replace(/-r\d+$/, "");
-    if (fb.notHelpfulBases.has(aBase)) return false;
+    if (fb.allBases.has(aBase)) return false;
     if (a.trigger && notHelpfulTriggers.has(a.trigger.toLowerCase())) return false;
     return true;
   });

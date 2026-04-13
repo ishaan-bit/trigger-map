@@ -155,29 +155,32 @@ describe("generateActions", () => {
 
   // --- Feedback filtering ---
 
-  it("filters out not_helpful actions but keeps helped actions", () => {
+  it("filters out not_helpful actions and suppresses their triggers", () => {
     const report = makeReport();
     const feedback = [
       { actionId: "reg-work-exercise", response: "not_helpful" },
     ];
     const actions = generateActions(report, feedback);
-    // not_helpful should be filtered out
     const hasOriginal = actions.some(a => a.id.replace(/-r\d+$/, "") === "reg-work-exercise");
     expect(hasOriginal).toBe(false);
     expect(actions).toHaveLength(3);
   });
 
-  it("keeps helped actions visible (not filtered out)", () => {
+  it("filters out helped actions so new rule-based actions replace them", () => {
     const report = makeReport();
     const feedback = [
       { actionId: "reg-work-exercise", response: "helped" },
     ];
     const actions = generateActions(report, feedback);
-    // Helped action should still be in the results (not filtered, not replaced)
-    const original = actions.find(a => a.id.replace(/-r\d+$/, "") === "reg-work-exercise");
-    expect(original).toBeDefined();
-    expect(original.title).not.toContain("Build on this");
+    // Helped action should be removed, replaced by fresh candidates
+    const hasOriginal = actions.some(a => a.id.replace(/-r\d+$/, "") === "reg-work-exercise");
+    expect(hasOriginal).toBe(false);
+    // Should still have 3 new actions
     expect(actions).toHaveLength(3);
+    // None should have "Build on this" prefix
+    for (const a of actions) {
+      expect(a.title).not.toContain("Build on this");
+    }
   });
 
   it("never produces 'Build on this:' prefix in action titles", () => {
