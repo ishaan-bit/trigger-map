@@ -2293,9 +2293,12 @@ export function WeeklyReportScreen() {
         .then((data) => {
           const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
           console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
-          setModes(data);
+          setModes(data || {});
         })
-        .catch((err) => console.error("Modes fetch failed:", err?.message || err));
+        .catch((err) => {
+          console.error("Modes fetch failed:", err?.message || err);
+          setModes((prev) => prev || {});
+        });
     }
 
     // FTUE: show insights guide when arriving from second log
@@ -2351,6 +2354,8 @@ export function WeeklyReportScreen() {
       setPurchasing(true);
       await subscribe();
       load();
+      // Fetch adaptive modes now that the user is premium
+      if (token) fetchModes(token).then((m) => setModes(m || {})).catch(() => setModes({}));
     } catch (err) {
       const msg = err?.message || "";
       if (err?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) return;
@@ -2514,7 +2519,7 @@ export function WeeklyReportScreen() {
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
                   purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
-                  token={token} onModesRefresh={async () => { const m = await fetchModes(token); setModes(m); }}
+                  token={token} onModesRefresh={async () => { try { const m = await fetchModes(token); setModes(m || {}); } catch { setModes((prev) => prev || {}); } }}
                   dominantEmotion={dominantEmotion}
                 />
               )}
