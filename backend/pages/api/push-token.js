@@ -48,7 +48,14 @@ export default async function handler(req, res) {
         updatedAt: new Date().toISOString(),
       });
 
-      await redis(["HSET", key, deviceId, entry]);
+      const cmds = [["HSET", key, deviceId, entry]];
+
+      // For anonymous users, add to owners set so push cron and pilot metrics can discover them
+      if (!user) {
+        cmds.push(["SADD", redisKey("owners"), ownerId]);
+      }
+
+      await Promise.all(cmds.map((cmd) => redis(cmd)));
 
       console.log(`[push-token] registered device=${deviceId.slice(0, 8)}… owner=${ownerId.slice(0, 8)}…`);
       return sendSuccess(res, { registered: true });
