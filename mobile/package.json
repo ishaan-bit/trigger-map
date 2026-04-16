@@ -27,7 +27,7 @@
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
-    "@sentry/react-native": "~6.14.0",
+    "@sentry/react-native": "~8.7.0",
     "@triggermap/shared": "file:./shared",
     "expo": "^53.0.27",
     "expo-asset": "~11.1.7",

@@ -40,7 +40,8 @@
       ],
       "./plugins/withReactNativeIapPlayStore",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "@sentry/react-native"
     ],
     "android": {
       "package": "com.triggermap.app",
