@@ -33,17 +33,18 @@
             "minSdkVersion": 24,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "useLegacyPackaging": true
+            "useLegacyPackaging": false
           }
         }
       ],
       "./plugins/withReactNativeIapPlayStore",
+      "./plugins/withNdkR28",
       "expo-asset",
       "expo-font"
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 139,
+      "versionCode": 140,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_NETWORK_STATE"

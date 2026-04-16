@@ -30,6 +30,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android NDK r28
+        run: sdkmanager --install "ndk;28.0.12433566"
+
       - name: Install dependencies
         run: cd mobile && npm ci
 
