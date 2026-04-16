@@ -13,10 +13,24 @@ export default async function handler(req, res) {
   if (!(await requireAuth(req, res))) return;
 
   try {
+    const includeAnon = req.query.includeAnon !== 'false'; // default true
     const ownerIds = await sMembers(redisKey('owners'));
-    const sample = ownerIds.slice(0, 200);
+    const allSample = ownerIds.slice(0, 200);
     const today = todayKey();
     const now = Date.now();
+
+    // Pre-fetch user info to determine anon vs auth
+    const userInfoPipe = allSample.map(oid => ['HGETALL', redisKey('user', oid)]);
+    const userInfoResults = userInfoPipe.length > 0 ? await pipeline(userInfoPipe) : [];
+    const userInfoMap = {};
+    for (let i = 0; i < allSample.length; i++) {
+      userInfoMap[allSample[i]] = flatArr(userInfoResults[i]);
+    }
+
+    // Filter sample based on includeAnon toggle
+    const sample = includeAnon
+      ? allSample
+      : allSample.filter(oid => !!userInfoMap[oid].email);
 
     // Build KPI pipeline: per-user 7-day history + insights + subscriptions
     const pipeCommands = [];
@@ -250,6 +264,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
+      includeAnon,
       kpis: {
         totalUsers: ownerIds.length,
         sampled: n,

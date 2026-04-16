@@ -24,7 +24,7 @@ export function getMomentsKey(ownerId) {
   return redisKey("moments", ownerId);
 }
 
-export function createMomentPayload({ ownerId, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
+export function createMomentPayload({ ownerId, id, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
 
   // Continuous model: valence/arousal provided → map to legacy 5-label for aggregation/insights
@@ -38,7 +38,7 @@ export function createMomentPayload({ ownerId, trigger, emotion, valence, arousa
     : (EMOTION_COORDINATES[finalEmotion] || EMOTION_COORDINATES.neutral);
 
   return {
-    id: randomUUID(),
+    id: id || randomUUID(),
     ownerId,
     trigger: finalTrigger,
     emotion: finalEmotion,
@@ -60,6 +60,11 @@ export async function appendMoment(moment) {
     `${moment.timestamp}|${moment.trigger}|${moment.valence}|${moment.arousal}`);
   const isNew = await redis(["SET", dedupKey, "1", "NX", "EX", "10"]);
   if (!isNew) return moment;
+
+  // ID-based dedup: prevent duplicate writes during anonymous→auth migration
+  const idDedupKey = redisKey("moment_seen", moment.id);
+  const idIsNew = await redis(["SET", idDedupKey, "1", "NX", "EX", String(90 * 86400)]);
+  if (!idIsNew) return moment;
 
   await pipeline([
     ["RPUSH", getMomentsKey(moment.ownerId), JSON.stringify(moment)],

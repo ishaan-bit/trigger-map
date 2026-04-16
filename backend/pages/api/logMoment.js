@@ -5,6 +5,7 @@ import { trackServerEvent } from "@/services/analyticsService.js";
 import { generateImmediateFeedback } from "@/services/feedbackService.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { enforceRateLimit, incrementCounter, touchDailyActive } from "@/services/rateLimitService.js";
+import { redis, redisKey } from "@/services/redisClient.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken, getClientIp } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
@@ -15,6 +16,7 @@ import { storeWeeklyInsight } from "@/services/reportStore.js";
 
 const schema = z.object({
   deviceId: z.string().min(1).optional(),
+  momentId: z.string().uuid().optional(),
   trigger: z.string().min(1).optional(),
   emotion: z.string().min(1).optional(),
   valence: z.number().min(-1).max(1).optional(),
@@ -76,6 +78,7 @@ export default async function handler(req, res) {
 
     const moment = createMomentPayload({
       ownerId,
+      id: result.data.momentId,
       trigger: result.data.trigger,
       emotion: result.data.emotion,
       valence: result.data.valence,
@@ -88,6 +91,12 @@ export default async function handler(req, res) {
     });
 
     await appendMoment(moment);
+
+    // Ensure anonymous owners have a user hash with createdAt for ops tracking
+    if (!user) {
+      await redis(["HSETNX", redisKey("user", ownerId), "createdAt", new Date().toISOString()]);
+    }
+
     const feedback = await generateImmediateFeedback(ownerId, moment, result.data.lang);
     await Promise.all([
       touchDailyActive(ownerId),

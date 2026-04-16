@@ -75,6 +75,7 @@ export async function migrateLocalMoments(token, deviceId) {
       await logMoment(
         {
           deviceId,
+          momentId: m.id,
           trigger: m.trigger,
           emotion: m.emotion,
           ...(typeof m.valence === "number" ? { valence: m.valence } : {}),

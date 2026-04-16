@@ -209,7 +209,7 @@ export function registerPushToken({ deviceId, token, platform }, authToken) {
   return fetchJson("/push-token", {
     method: "POST",
     body: { action: "register", deviceId, token, platform },
-    token: authToken,
+    ...(authToken ? { token: authToken } : {}),
   });
 }
 
@@ -217,7 +217,7 @@ export function unregisterPushToken({ deviceId }, authToken) {
   return fetchJson("/push-token", {
     method: "POST",
     body: { action: "unregister", deviceId },
-    token: authToken,
+    ...(authToken ? { token: authToken } : {}),
   });
 }
 

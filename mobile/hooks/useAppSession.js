@@ -166,6 +166,13 @@ export function SessionProvider({ children }) {
           });
           // Sync local notification prefs to server
           saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, storedToken).catch(() => null);
+        } else {
+          // Anonymous user — still register push token so ops console can reach them
+          getExpoPushToken().then(pushInfo => {
+            if (pushInfo) {
+              registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, null).catch(() => null);
+            }
+          });
         }
       } catch (error) {
         captureMobileError(error, { source: "bootstrap" });
@@ -336,6 +343,23 @@ export function SessionProvider({ children }) {
           });
           await setLastLoggedAt(timestamp);
           trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
+
+          // Also send to backend so anonymous users are tracked in ops console
+          logMoment(
+            {
+              deviceId: activeDeviceId,
+              momentId: localMoment.id,
+              trigger: payload.trigger,
+              ...emotionFields,
+              note: notes,
+              notes,
+              timestamp,
+              ...(payload.tags?.length ? { tags: payload.tags } : {}),
+            },
+            null,
+            payload.lang
+          ).catch(() => {});
+
           return { moment: localMoment };
         }
 

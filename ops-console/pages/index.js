@@ -70,6 +70,16 @@ export default function DashboardPage() {
               color={overview.users?.activeToday > 0 ? 'var(--green)' : 'var(--text-muted)'}
             />
             <MetricCard
+              label="Authenticated"
+              value={overview.users?.authenticated}
+              color="var(--cyan)"
+            />
+            <MetricCard
+              label="Anonymous"
+              value={overview.users?.anonymous}
+              color="var(--text-muted)"
+            />
+            <MetricCard
               label="Moments Today"
               value={overview.moments?.today}
               delta={overview.moments?.deltaPercent}

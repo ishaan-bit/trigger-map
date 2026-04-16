@@ -12,8 +12,22 @@ export default async function handler(req, res) {
   if (!(await requireAuth(req, res))) return;
 
   try {
+    const includeAnon = req.query.includeAnon !== 'false'; // default true
     const ownerIds = await sMembers(redisKey('owners'));
-    const sample = ownerIds.slice(0, 200);
+    const allSample = ownerIds.slice(0, 200);
+
+    // Pre-fetch user info to determine anon vs auth before main pipeline
+    const userInfoPipe = allSample.map(oid => ['HGETALL', redisKey('user', oid)]);
+    const userInfoResults = userInfoPipe.length > 0 ? await pipeline(userInfoPipe) : [];
+    const userInfoMap = {};
+    for (let i = 0; i < allSample.length; i++) {
+      userInfoMap[allSample[i]] = flatArr(userInfoResults[i]);
+    }
+
+    // Filter sample based on includeAnon toggle
+    const sample = includeAnon
+      ? allSample
+      : allSample.filter(oid => !!userInfoMap[oid].email);
 
     // Per-user pipeline: 14-day aggregates + report + llm + modes + progress + moments/actions
     const pipeCommands = [];
@@ -91,7 +105,8 @@ export default async function handler(req, res) {
       const llm = safeJson(results[base + 15]);
       const modes = safeJson(results[base + 16]);
       const feedbackCount = parseInt(results[base + 17] || '0', 10);
-      const userInfo = flatArr(results[base + 18]);
+      const userInfo = userInfoMap[oid] || flatArr(results[base + 18]);
+      const isAnonymous = !userInfo.email;
       const sub = flatArr(results[base + 20]);
 
       if (report) usersWithReport++;
@@ -109,6 +124,7 @@ export default async function handler(req, res) {
         id: oid.slice(0, 8),
         name: userInfo.name || null,
         email: userInfo.email || null,
+        isAnonymous,
         moments,
         week1Moments,
         week2Moments,
@@ -145,9 +161,15 @@ export default async function handler(req, res) {
       { label: 'Retained from last week', value: activeLastWeek, total: totalUsers, target: 30 },
     ];
 
+    const authenticatedCount = users.filter(u => !u.isAnonymous).length;
+    const anonymousCount = users.filter(u => u.isAnonymous).length;
+
     res.status(200).json({
       timestamp: new Date().toISOString(),
       totalUsers,
+      authenticatedUsers: authenticatedCount,
+      anonymousUsers: anonymousCount,
+      includeAnon,
       totalMoments,
       avgMoments: parseFloat(avgMoments),
       medianWeeklyMoments: medianWeekly,

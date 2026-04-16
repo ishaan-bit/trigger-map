@@ -1,11 +1,13 @@
 import Head from 'next/head';
+import { useState } from 'react';
 import { useFetch } from '../hooks/useData';
 import MetricCard from '../components/MetricCard';
 import DistributionBar from '../components/DistributionBar';
 import TrendChart from '../components/TrendChart';
 
 export default function IntelligencePage() {
-  const { data, loading, error, refetch } = useFetch('/api/intelligence/kpis');
+  const [includeAnon, setIncludeAnon] = useState(true);
+  const { data, loading, error, refetch } = useFetch(`/api/intelligence/kpis?includeAnon=${includeAnon}`);
 
   return (
     <>
@@ -13,7 +15,22 @@ export default function IntelligencePage() {
 
       <div className="ops-page-header">
         <h2>KPIs & Product Signals</h2>
-        <button className="btn btn-ghost btn-sm" onClick={refetch} disabled={loading}>Refresh</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+            color: includeAnon ? 'var(--accent)' : 'var(--text-muted)',
+            cursor: 'pointer', userSelect: 'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={includeAnon}
+              onChange={(e) => setIncludeAnon(e.target.checked)}
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            Include anonymous
+          </label>
+          <button className="btn btn-ghost btn-sm" onClick={refetch} disabled={loading}>Refresh</button>
+        </div>
       </div>
 
       {loading && !data && <div className="spinner">Loading intelligence...</div>}

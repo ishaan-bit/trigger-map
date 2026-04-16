@@ -481,6 +481,14 @@ export default async function handler(req, res) {
 
   for (const ownerId of ownerIds) {
     try {
+      // Check if owner is anonymous (no email in user hash)
+      const userRaw = await redis(['HGETALL', redisKey('user', ownerId)]);
+      const userHash = {};
+      if (Array.isArray(userRaw)) {
+        for (let i = 0; i < userRaw.length; i += 2) userHash[userRaw[i]] = userRaw[i + 1];
+      }
+      const isAnonymous = !userHash.email;
+
       // ── Clear existing moment + aggregate data for this user ──
       // Delete the moments list (timeline)
       await redis(['DEL', redisKey('moments', ownerId)]);
@@ -547,7 +555,7 @@ export default async function handler(req, res) {
             emotion: m.emotion,
             note: m.note || '',
             timestamp: m.date.toISOString(),
-            isAnonymous: false,
+            isAnonymous,
             ...(m.tags && m.tags.length ? { tags: m.tags } : {}),
           };
           cmds.push(['RPUSH', redisKey('moments', ownerId), JSON.stringify(momentObj)]);

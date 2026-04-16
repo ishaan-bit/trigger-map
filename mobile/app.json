@@ -43,7 +43,7 @@
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 137,
+      "versionCode": 138,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_NETWORK_STATE"

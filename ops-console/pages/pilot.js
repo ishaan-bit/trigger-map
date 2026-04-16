@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import { useState } from 'react';
 import { useFetch } from '../hooks/useData';
 import MetricCard from '../components/MetricCard';
 import TrendChart from '../components/TrendChart';
@@ -75,8 +76,10 @@ function VerdictBanner({ score, passing, total }) {
 /* ── Main Page ────────────────────────────────────────────── */
 
 export default function PilotPage() {
-  const { data: pilot, loading: l1, error: e1, refetch: r1 } = useFetch('/api/pilot/validation');
-  const { data: intel, loading: l2, error: e2, refetch: r2 } = useFetch('/api/intelligence/kpis');
+  const [includeAnon, setIncludeAnon] = useState(true);
+  const qs = `?includeAnon=${includeAnon}`;
+  const { data: pilot, loading: l1, error: e1, refetch: r1 } = useFetch(`/api/pilot/validation${qs}`);
+  const { data: intel, loading: l2, error: e2, refetch: r2 } = useFetch(`/api/intelligence/kpis${qs}`);
 
   const loading = (l1 && !pilot) || (l2 && !intel);
   const error = e1 || e2;
@@ -105,7 +108,25 @@ export default function PilotPage() {
             {reportDate} · 14-day analysis window
           </div>
         </div>
-        <div className="no-print" style={{ display: 'flex', gap: 8 }}>
+        <div className="no-print" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+            color: includeAnon ? 'var(--accent)' : 'var(--text-muted)',
+            cursor: 'pointer', userSelect: 'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={includeAnon}
+              onChange={(e) => setIncludeAnon(e.target.checked)}
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            Include anonymous
+          </label>
+          {pilot && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginRight: 4 }}>
+              {pilot.authenticatedUsers ?? '?'} auth · {pilot.anonymousUsers ?? '?'} anon
+            </span>
+          )}
           <button className="btn btn-ghost btn-sm" onClick={refetch} disabled={l1 || l2}>Refresh</button>
           <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Export PDF</button>
         </div>
@@ -452,6 +473,7 @@ export default function PilotPage() {
                     <tr>
                       <th>User ID</th>
                       <th>Name</th>
+                      <th>Type</th>
                       <th style={{ textAlign: 'right' }}>Moments</th>
                       <th style={{ textAlign: 'right' }}>This Wk</th>
                       <th style={{ textAlign: 'right' }}>Last Wk</th>
@@ -469,6 +491,11 @@ export default function PilotPage() {
                       <tr key={user.id}>
                         <td className="mono">{user.id}</td>
                         <td>{user.name || '—'}</td>
+                        <td>
+                          {user.isAnonymous
+                            ? <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(148,163,184,0.15)', color: 'var(--text-muted)' }}>anon</span>
+                            : <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>auth</span>}
+                        </td>
                         <td style={{ textAlign: 'right' }} className="mono">{user.moments}</td>
                         <td style={{ textAlign: 'right' }} className="mono">{user.week1Moments}</td>
                         <td style={{ textAlign: 'right' }} className="mono">{user.week2Moments}</td>

@@ -36,6 +36,7 @@ export default async function handler(req, res) {
     for (const oid of sampleOwners) {
       pipeCommands.push(['HGETALL', redisKey('daily', oid, today)]);
       pipeCommands.push(['LLEN', redisKey('moments', oid)]);
+      pipeCommands.push(['HGETALL', redisKey('user', oid)]);
     }
 
     // Day-over-day: also fetch yesterday
@@ -52,21 +53,29 @@ export default async function handler(req, res) {
     let activeToday = 0;
     let yesterdayMoments = 0;
     let activeYesterday = 0;
+    let authenticated = 0;
+    let anonymous = 0;
 
     const n = sampleOwners.length;
+    const perOwner = 3; // today agg, moment count, user hash
     for (let i = 0; i < n; i++) {
       // Today aggregate
-      const todayAgg = flatArr(pipeResults[i * 2]);
+      const todayAgg = flatArr(pipeResults[i * perOwner]);
       const todayTotal = parseInt(todayAgg.total || '0', 10);
       todayMoments += todayTotal;
       if (todayTotal > 0) activeToday++;
 
       // Total moments
-      const momentCount = pipeResults[i * 2 + 1] || 0;
+      const momentCount = pipeResults[i * perOwner + 1] || 0;
       totalMoments += momentCount;
 
+      // User hash — check if anonymous
+      const userHash = flatArr(pipeResults[i * perOwner + 2]);
+      if (userHash.email) authenticated++;
+      else anonymous++;
+
       // Yesterday aggregate
-      const yesterdayAgg = flatArr(pipeResults[n * 2 + i]);
+      const yesterdayAgg = flatArr(pipeResults[n * perOwner + i]);
       const yTotal = parseInt(yesterdayAgg.total || '0', 10);
       yesterdayMoments += yTotal;
       if (yTotal > 0) activeYesterday++;
@@ -104,6 +113,8 @@ export default async function handler(req, res) {
         sampled: sampleOwners.length,
         activeToday,
         activeYesterday,
+        authenticated,
+        anonymous,
       },
       moments: {
         total: totalMoments,
