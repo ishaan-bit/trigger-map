@@ -33,18 +33,18 @@
             "minSdkVersion": 24,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "useLegacyPackaging": false
+            "useLegacyPackaging": false,
+            "newArchEnabled": false
           }
         }
       ],
       "./plugins/withReactNativeIapPlayStore",
-      "./plugins/withNdkR28",
       "expo-asset",
       "expo-font"
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 140,
+      "versionCode": 141,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_NETWORK_STATE"
@@ -54,6 +54,7 @@
         "backgroundColor": "#0b1220"
       }
     },
+    "newArchEnabled": false,
     "experiments": {
       "typedRoutes": false
     },
