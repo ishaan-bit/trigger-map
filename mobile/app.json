@@ -41,11 +41,16 @@
       "./plugins/withReactNativeIapPlayStore",
       "expo-asset",
       "expo-font",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native",
+        {
+          "uploadSourceMapsToSentry": false
+        }
+      ]
     ],
     "android": {
       "package": "com.triggermap.app",
-      "versionCode": 142,
+      "versionCode": 143,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_NETWORK_STATE"
