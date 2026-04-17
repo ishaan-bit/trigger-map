@@ -40,6 +40,9 @@ import {
   migrateLocalMoments,
   buildLocalReport,
   clearLocalMoments,
+  queuePendingSync,
+  getPendingSyncs,
+  removePendingSync,
 } from "@/services/localStore";
 import { trackEvent } from "@/services/analyticsService";
 import { captureMobileError } from "@/services/crashService";
@@ -167,7 +170,17 @@ export function SessionProvider({ children }) {
           // Sync local notification prefs to server
           saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, storedToken).catch(() => null);
         } else {
-          // Anonymous user — still register push token so ops console can reach them
+          // Anonymous user — retry any pending syncs from previous failed attempts
+          getPendingSyncs().then((pendingSyncs) => {
+            for (const pendingPayload of pendingSyncs) {
+              const { queuedAt: _q, lang, ...momentPayload } = pendingPayload;
+              logMoment(momentPayload, null, lang)
+                .then(() => removePendingSync(pendingPayload.momentId))
+                .catch(() => {}); // still fire-and-forget; will retry on next open
+            }
+          }).catch(() => null);
+
+          // Still register push token so ops console can reach anonymous users
           getExpoPushToken().then(pushInfo => {
             if (pushInfo) {
               registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, null).catch(() => null);
@@ -345,20 +358,20 @@ export function SessionProvider({ children }) {
           trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
 
           // Also send to backend so anonymous users are tracked in ops console
-          logMoment(
-            {
-              deviceId: activeDeviceId,
-              momentId: localMoment.id,
-              trigger: payload.trigger,
-              ...emotionFields,
-              note: notes,
-              notes,
-              timestamp,
-              ...(payload.tags?.length ? { tags: payload.tags } : {}),
-            },
-            null,
-            payload.lang
-          ).catch(() => {});
+          const anonSyncPayload = {
+            deviceId: activeDeviceId,
+            momentId: localMoment.id,
+            trigger: payload.trigger,
+            ...emotionFields,
+            note: notes,
+            notes,
+            timestamp,
+            ...(payload.tags?.length ? { tags: payload.tags } : {}),
+          };
+          logMoment(anonSyncPayload, null, payload.lang).catch((err) => {
+            console.warn("[TriggerMap] Anon sync failed, queued for retry:", err.message);
+            queuePendingSync({ ...anonSyncPayload, lang: payload.lang }).catch(() => null);
+          });
 
           return { moment: localMoment };
         }

@@ -5,6 +5,7 @@ import { logMoment } from "@/services/api";
 import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 
 const STORAGE_KEY = "triggermap.local-moments";
+const PENDING_SYNC_KEY = "triggermap.pending-anon-sync";
 
 /**
  * Get all locally stored moments, sorted newest first.
@@ -98,6 +99,43 @@ export async function migrateLocalMoments(token, deviceId) {
 
 export async function clearLocalMoments() {
   await AsyncStorage.removeItem(STORAGE_KEY);
+}
+
+// ---------------------------------------------------------------------------
+// Pending anonymous sync queue
+// Stores logMoment payloads that failed to reach the backend so they can be
+// retried on the next app open.  Capped at 50 entries to bound storage use.
+// ---------------------------------------------------------------------------
+export async function queuePendingSync(payload) {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SYNC_KEY);
+    const queue = raw ? JSON.parse(raw) : [];
+    if (queue.some((p) => p.momentId === payload.momentId)) return; // already queued
+    queue.push({ ...payload, queuedAt: new Date().toISOString() });
+    await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(queue.slice(-50)));
+  } catch {
+    // storage failure — drop silently; moment is already saved locally
+  }
+}
+
+export async function getPendingSyncs() {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SYNC_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function removePendingSync(momentId) {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SYNC_KEY);
+    if (!raw) return;
+    const queue = JSON.parse(raw).filter((p) => p.momentId !== momentId);
+    await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(queue));
+  } catch {
+    // ignore
+  }
 }
 
 /**

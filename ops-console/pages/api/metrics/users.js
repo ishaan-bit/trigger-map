@@ -18,8 +18,10 @@ export default async function handler(req, res) {
     const today = todayKey();
 
     // For each user: get today's aggregate, moment count, user hash, subscription, push tokens
+    // Cap at 500 to stay within Upstash pipeline limits (5 cmds × 500 = 2500)
+    const CAP = 500;
     const pipeCommands = [];
-    for (const oid of ownerIds.slice(0, 200)) {
+    for (const oid of ownerIds.slice(0, CAP)) {
       pipeCommands.push(['HGETALL', redisKey('daily', oid, today)]);
       pipeCommands.push(['LLEN', redisKey('moments', oid)]);
       pipeCommands.push(['HGETALL', redisKey('user', oid)]);
@@ -28,7 +30,7 @@ export default async function handler(req, res) {
     }
 
     const results = pipeCommands.length > 0 ? await pipeline(pipeCommands) : [];
-    const n = Math.min(ownerIds.length, 200);
+    const n = Math.min(ownerIds.length, CAP);
     const users = [];
 
     for (let i = 0; i < n; i++) {
@@ -70,8 +72,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Sort by recent activity
-    users.sort((a, b) => b.todayMoments - a.todayMoments || b.momentCount - a.momentCount);
+    // Sort newest-first: today's active users first, then by total moments, then by createdAt
+    users.sort((a, b) =>
+      b.todayMoments - a.todayMoments ||
+      b.momentCount - a.momentCount ||
+      new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
 
     const authenticated = users.filter((u) => !u.isAnonymous).length;
     const anonymous = users.filter((u) => u.isAnonymous).length;
