@@ -1,6 +1,7 @@
 import { requireAuth } from '../../../lib/auth.js';
 import {
   sMembers,
+  sCard,
   hgetallObject,
   lRange,
   redisKey,
@@ -14,7 +15,10 @@ export default async function handler(req, res) {
   if (!(await requireAuth(req, res))) return;
 
   try {
-    const ownerIds = await sMembers(redisKey('owners'));
+    const [ownerIds, authCount] = await Promise.all([
+      sMembers(redisKey('owners')),
+      sCard(redisKey('owners:auth')),
+    ]);
     const today = todayKey();
 
     // For each user: get today's aggregate, moment count, user hash, subscription, push tokens
@@ -79,18 +83,22 @@ export default async function handler(req, res) {
       new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     );
 
-    const authenticated = users.filter((u) => !u.isAnonymous).length;
-    const anonymous = users.filter((u) => u.isAnonymous).length;
+    // Accurate counts: authCount from dedicated owners:auth set (written at register/login)
+    // anonymous = total installs minus authenticated accounts
+    const totalOwners = ownerIds.length;
+    const authenticatedTotal = authCount || 0;
+    const anonymousTotal = Math.max(0, totalOwners - authenticatedTotal);
+
     const googleUsers = users.filter((u) => u.provider === 'google').length;
     const emailUsers = users.filter((u) => u.provider === 'email').length;
     const premium = users.filter((u) => u.subscription === 'active' || u.subscription === 'grace_period').length;
 
     return res.status(200).json({
       summary: {
-        total: ownerIds.length,
+        total: totalOwners,
         sampled: n,
-        authenticated,
-        anonymous,
+        authenticated: authenticatedTotal,
+        anonymous: anonymousTotal,
         google: googleUsers,
         email: emailUsers,
         premium,

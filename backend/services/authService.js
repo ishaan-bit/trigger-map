@@ -100,6 +100,7 @@ export async function registerEmailUser({ email, password, name }) {
     ],
     ["SET", emailLookupKey(normalizedEmail), userId],
     ["SADD", getOwnerIndexKey(), userId],
+    ["SADD", redisKey("owners:auth"), userId],
   ]);
 
   return getUserById(userId);
@@ -191,6 +192,7 @@ export async function loginGoogleUser({ idToken }) {
     ["SET", emailLookupKey(email), userId],
     ["SET", googleLookupKey(googleSub), userId],
     ["SADD", getOwnerIndexKey(), userId],
+    ["SADD", redisKey("owners:auth"), userId],
   ]);
 
   return getUserById(userId);

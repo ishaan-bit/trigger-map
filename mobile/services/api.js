@@ -213,6 +213,10 @@ export function registerPushToken({ deviceId, token, platform }, authToken) {
   });
 }
 
+export function registerDevice(deviceId) {
+  return fetchJson("/register-device", { method: "POST", body: { deviceId } });
+}
+
 export function unregisterPushToken({ deviceId }, authToken) {
   return fetchJson("/push-token", {
     method: "POST",

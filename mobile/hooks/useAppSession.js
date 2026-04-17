@@ -28,6 +28,7 @@ import {
   login,
   logMoment,
   register,
+  registerDevice,
   registerPushToken,
   unregisterPushToken,
   saveNotificationPrefs,
@@ -170,7 +171,11 @@ export function SessionProvider({ children }) {
           // Sync local notification prefs to server
           saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, storedToken).catch(() => null);
         } else {
-          // Anonymous user — retry any pending syncs from previous failed attempts
+          // Anonymous user — register device immediately so the install is visible
+          // in ops console regardless of push permission or moment logging.
+          registerDevice(storedDeviceId).catch(() => null);
+
+          // Retry any pending syncs from previous failed attempts
           getPendingSyncs().then((pendingSyncs) => {
             for (const pendingPayload of pendingSyncs) {
               const { queuedAt: _q, lang, ...momentPayload } = pendingPayload;
