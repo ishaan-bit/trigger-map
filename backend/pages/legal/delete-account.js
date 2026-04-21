@@ -69,8 +69,8 @@ export default function DeleteAccountPage() {
         <h2>Option 2 — Request deletion by email</h2>
         <p style={{ color: "#afbdd1" }}>
           If you cannot access the app, email us at{" "}
-          <a href="mailto:support@triggermap.app" style={{ color: "#85a9ff" }}>
-            support@triggermap.app
+          <a href="mailto:qdenxp@gmail.com" style={{ color: "#85a9ff" }}>
+            qdenxp@gmail.com
           </a>{" "}
           with the subject line <strong>&quot;Account Deletion Request&quot;</strong> and include the
           email address associated with your account (or your anonymous device ID if you never signed
@@ -131,8 +131,8 @@ export default function DeleteAccountPage() {
         <h2>Contact</h2>
         <p style={{ color: "#afbdd1" }}>
           Privacy and deletion enquiries:{" "}
-          <a href="mailto:support@triggermap.app" style={{ color: "#85a9ff" }}>
-            support@triggermap.app
+          <a href="mailto:qdenxp@gmail.com" style={{ color: "#85a9ff" }}>
+            qdenxp@gmail.com
           </a>
         </p>
         <p style={{ color: "#4a5d7a", fontSize: 13 }}>Last updated: April 20, 2026.</p>

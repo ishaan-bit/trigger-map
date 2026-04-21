@@ -2375,7 +2375,8 @@ export function WeeklyReportScreen() {
       const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "").replace(/\/$/, "");
       const url = `${webBase}/share/${shareToken}`;
       await Share.share({
-        message: `Here's my emotional snapshot for this week on TriggerMap: ${url}`,
+        // URL on its own line so WhatsApp/iMessage auto-render it as a link preview
+        message: `Here's my emotional snapshot for this week on TriggerMap 📊\n\n${url}`,
         url,
       });
       trackEvent("report_share_created", {});
