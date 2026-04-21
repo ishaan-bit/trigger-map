@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  Dimensions,
   Easing,
   Image,
   Pressable,
@@ -14,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { LineChart, BarChart } from "react-native-chart-kit";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { GuidedTooltip } from "@/components/SpotlightOverlay";
@@ -1224,43 +1222,40 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </AnimatedSection>
       ) : null}
 
-      {/* ── 2. SCORE TREND CHART ── */}
+      {/* ── 2. SCORE TREND ── */}
       {weeklySnapshots?.length >= 2 ? (() => {
-        const chartW = Dimensions.get("window").width - 64;
-        const labels = weeklySnapshots.map(w => w.weekLabel?.replace(/^W/, "") || "");
         const scores = weeklySnapshots.map(w => w.score ?? 0);
         const latest = scores[scores.length - 1];
         const previous = scores[scores.length - 2];
         const trendUp = latest > previous + 0.1;
         const trendDown = latest < previous - 0.1;
-        const trendLabel = trendUp ? "Trending up" : trendDown ? "Easing down" : "Holding steady";
+        const trendLabel = trendUp ? "Trending up ↑" : trendDown ? "Easing down ↓" : "Holding steady →";
         const trendColor = trendUp ? palette.success : trendDown ? palette.warning : palette.textSecondary;
         return (
           <AnimatedSection index={1} style={s.section}>
             <SectionHeader label={t("report.progress.scoreTrend") || "Score trend"} badge="live" t={t} />
-            <View style={s.chartContainer}>
-              <Text style={{ color: trendColor, fontSize: 13, fontWeight: "700", marginBottom: 8 }}>{trendLabel}</Text>
-              <LineChart
-                data={{ labels, datasets: [{ data: scores }] }}
-                width={chartW}
-                height={160}
-                yAxisSuffix=""
-                fromZero
-                yAxisInterval={1}
-                withHorizontalLabels={false}
-                withVerticalLabels
-                chartConfig={{
-                  backgroundGradientFrom: palette.glass,
-                  backgroundGradientTo: palette.glass,
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(120, 180, 255, ${opacity})`,
-                  labelColor: () => palette.textSecondary,
-                  propsForDots: { r: "4", strokeWidth: "2", stroke: palette.accent },
-                  propsForBackgroundLines: { stroke: palette.glassBorder || "rgba(255,255,255,0.08)" },
-                }}
-                bezier
-                style={{ borderRadius: 12 }}
-              />
+            <View style={s.card}>
+              <Text style={{ color: trendColor, fontSize: 13, fontWeight: "700", marginBottom: 12 }}>{trendLabel}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
+                {weeklySnapshots.map((w, i) => {
+                  const tone = scoreTone(w.score ?? 0, t);
+                  const prev = weeklySnapshots[i - 1];
+                  const arrow = prev == null ? null
+                    : (w.score - (prev.score ?? 0) > 0.1 ? "↑"
+                    : w.score - (prev.score ?? 0) < -0.1 ? "↓" : "→");
+                  const arrowColor = arrow === "↑" ? palette.success : arrow === "↓" ? palette.warning : palette.textSecondary;
+                  return (
+                    <View key={w.weekLabel || i} style={{ alignItems: "center", marginHorizontal: 4 }}>
+                      {arrow ? <Text style={{ color: arrowColor, fontSize: 11, fontWeight: "700", marginBottom: 2 }}>{arrow}</Text> : null}
+                      <View style={[s.trajectoryDay, { borderColor: tone.color + "30" }]}>
+                        <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
+                        <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
+                        <Text style={s.trajectoryDate}>{w.weekLabel || "–"}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
             </View>
           </AnimatedSection>
         );
@@ -2372,7 +2367,7 @@ export function WeeklyReportScreen() {
     try {
       setSharing(true);
       const { token: shareToken } = await createShareSnapshot(token);
-      const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "").replace(/\/$/, "");
+      const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://web-ashy-kappa-14.vercel.app").replace(/\/$/, "");
       const url = `${webBase}/share/${shareToken}`;
       await Share.share({
         // URL on its own line so WhatsApp/iMessage auto-render it as a link preview

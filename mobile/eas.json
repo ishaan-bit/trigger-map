@@ -12,6 +12,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://backend-five-nu-92.vercel.app",
+        "EXPO_PUBLIC_WEB_BASE_URL": "https://web-ashy-kappa-14.vercel.app",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com",
           "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "773449945543-u7gu5657v31uqe2ikplib7osns09vfrb.apps.googleusercontent.com"
@@ -23,6 +24,7 @@
     "production": {
       "env": {
         "EXPO_PUBLIC_API_URL": "https://backend-five-nu-92.vercel.app",
+        "EXPO_PUBLIC_WEB_BASE_URL": "https://web-ashy-kappa-14.vercel.app",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": "773449945543-l5vsde1f22nplkj2jhq4jmjfjp5qj0j5.apps.googleusercontent.com",
           "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "773449945543-u7gu5657v31uqe2ikplib7osns09vfrb.apps.googleusercontent.com"

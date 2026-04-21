@@ -340,7 +340,7 @@ export function EmotionSelectionScreen() {
         </Animated.View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={80}>
         <View style={styles.noteCard}>
           <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
           <TextInput
@@ -354,21 +354,21 @@ export function EmotionSelectionScreen() {
             maxFontSizeMultiplier={1.2}
           />
         </View>
-      </KeyboardAvoidingView>
 
-      <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Save moment"
-          disabled={!canSave}
-          onPress={handleSave}
-          style={({ pressed }) => [styles.saveButton, !canSave && styles.saveButtonDisabled, pressed && canSave && styles.saveButtonPressed, canSave && { backgroundColor: accentColor }]}
-        >
-          <Text style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}>
-            {saving ? t("emotion.saving") : t("emotion.saveMoment")}
-          </Text>
-        </Pressable>
-      </Animated.View>
+        <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Save moment"
+            disabled={!canSave}
+            onPress={handleSave}
+            style={({ pressed }) => [styles.saveButton, !canSave && styles.saveButtonDisabled, pressed && canSave && styles.saveButtonPressed, canSave && { backgroundColor: accentColor }]}
+          >
+            <Text style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}>
+              {saving ? t("emotion.saving") : t("emotion.saveMoment")}
+            </Text>
+          </Pressable>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </ScreenShell>
   );
 }
