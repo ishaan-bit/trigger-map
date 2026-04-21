@@ -102,6 +102,7 @@ function createEmptyReport() {
 
 export function SessionProvider({ children }) {
   const [ready, setReady] = useState(false);
+  const readyRef = useRef(false);
   const [deviceId, setDeviceId] = useState(null);
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -131,6 +132,14 @@ export function SessionProvider({ children }) {
   }
 
   useEffect(() => {
+    // Hard safety net: if bootstrap takes more than 10s for any reason, unblock the app.
+    const safetyTimer = setTimeout(() => {
+      if (!readyRef.current) {
+        console.warn("[QuietDen] bootstrap safety timeout fired — forcing ready");
+        setReady(true);
+      }
+    }, 10_000);
+
     async function bootstrap() {
       let enabledReminder = false;
       let enabledReflection = false;
@@ -199,6 +208,7 @@ export function SessionProvider({ children }) {
         setUser(null);
         setSubscription(null);
       } finally {
+        readyRef.current = true;
         setReady(true);
         // Re-register recurring notifications on each app start (they can be lost after updates/restarts)
         if (enabledReminder) {
@@ -213,7 +223,8 @@ export function SessionProvider({ children }) {
       }
     }
 
-    bootstrap();
+    bootstrap().finally(() => clearTimeout(safetyTimer));
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const ensureDeviceIdentity = useCallback(async () => {

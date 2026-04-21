@@ -23,12 +23,18 @@ export function LanguageProvider({ children }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    getLanguage().then((stored) => {
-      if (stored && SUPPORTED_LANGS.includes(stored)) {
-        setLangState(stored);
-      }
-      setReady(true);
-    });
+    getLanguage()
+      .then((stored) => {
+        if (stored && SUPPORTED_LANGS.includes(stored)) {
+          setLangState(stored);
+        }
+      })
+      .catch(() => {
+        // Ignore — fall back to default language
+      })
+      .finally(() => {
+        setReady(true);
+      });
   }, []);
 
   const setLang = useCallback(async (newLang) => {

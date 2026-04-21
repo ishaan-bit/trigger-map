@@ -62,6 +62,15 @@ export default function RootLayout() {
   const notificationListener = useRef(null);
   const responseListener = useRef(null);
 
+  // Absolute splash failsafe: if nothing calls hideAsync within 12s (e.g. provider
+  // chain hangs), force hide so the user can at least see an error rather than a frozen splash.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => null);
+    }, 12_000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -87,12 +96,15 @@ export default function RootLayout() {
 
     validateStartup();
 
-    // Handle cold-start: app was killed, user tapped notification to open it
+    // Handle cold-start: app was killed, user tapped notification to open it.
+    // Delay by 1.5s so the router is fully initialised before we navigate.
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response && active) {
         const type = response.notification.request.content.data?.type;
         console.info("[NOTIF] Cold-start tap:", type);
-        handleNotificationTap(router, type);
+        setTimeout(() => {
+          if (active) handleNotificationTap(router, type);
+        }, 1500);
       }
     });
 
