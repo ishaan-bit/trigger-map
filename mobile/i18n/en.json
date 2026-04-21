@@ -262,7 +262,8 @@
     "aboutFooter": "Built with care.",
     "version": "Version",
     "developer": "Developer",
-    "website": "Website"
+    "website": "Website",
+    "userGuide": "How to use TriggerMap"
   },
   "onboarding": {
     "brand": "TriggerMap",
@@ -272,6 +273,8 @@
     "slide2Body": "Weekly insights reveal what's really going on beneath the surface.",
     "slide3Title": "Shift with clarity",
     "slide3Body": "Use your patterns to make better decisions about where to invest energy.",
+    "slide4Title": "How the scale works",
+    "slide4Body": "You log two things: how pleasant it feels (bad → good) and your energy level (drained → charged). Together they pinpoint your emotional state. Your baseline is your personal average — a shift means something changed.",
     "skip": "Skip",
     "starting": "Starting…",
     "startLogging": "Start logging",

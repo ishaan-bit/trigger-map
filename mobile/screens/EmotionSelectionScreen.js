@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Alert, Animated, BackHandler, Easing, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View, Platform } from "react-native";
+import { Alert, Animated, BackHandler, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -340,7 +340,8 @@ export function EmotionSelectionScreen() {
         </Animated.View>
       )}
 
-      <View style={styles.noteCard}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <View style={styles.noteCard}>
           <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
           <TextInput
             multiline
@@ -353,6 +354,7 @@ export function EmotionSelectionScreen() {
             maxFontSizeMultiplier={1.2}
           />
         </View>
+      </KeyboardAvoidingView>
 
       <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
         <Pressable

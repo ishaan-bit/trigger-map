@@ -46,6 +46,7 @@ export function OnboardingScreen() {
     { icon: "🎯", title: t("onboarding.slide1Title"), body: t("onboarding.slide1Body") },
     { icon: "📊", title: t("onboarding.slide2Title"), body: t("onboarding.slide2Body") },
     { icon: "🔒", title: t("onboarding.slide3Title"), body: t("onboarding.slide3Body") },
+    { icon: "🧭", title: t("onboarding.slide4Title"), body: t("onboarding.slide4Body") },
   ];
 
   const isLast = currentIndex === slides.length - 1;

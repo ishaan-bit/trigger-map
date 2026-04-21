@@ -217,6 +217,14 @@ export function registerDevice(deviceId) {
   return fetchJson("/register-device", { method: "POST", body: { deviceId } });
 }
 
+export function createShareSnapshot(token) {
+  return fetchJson("/share", { method: "POST", token });
+}
+
+export function fetchShareSnapshot(shareToken) {
+  return fetchJson(`/share?token=${encodeURIComponent(shareToken)}`);
+}
+
 export function unregisterPushToken({ deviceId }, authToken) {
   return fetchJson("/push-token", {
     method: "POST",

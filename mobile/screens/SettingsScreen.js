@@ -9,6 +9,7 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
+import { GuideModal } from "@/components/GuideModal";
 import { selection, warning, tap } from "@/utils/haptics";
 import { STAGGER_DELAY } from "@/utils/designSystem";
 
@@ -59,6 +60,7 @@ export function SettingsScreen() {
   const { t, lang, setLang } = useLanguage();
   const baseUrl = getWebBaseUrl();
   const [permissionStatus, setPermissionStatus] = useState("undetermined");
+  const [showGuide, setShowGuide] = useState(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -264,6 +266,7 @@ export function SettingsScreen() {
 
       {/* ── About ── */}
       <Section icon="ℹ️" title={t("settings.about")} index={7}>
+        <PrimaryButton label={t("settings.userGuide")} onPress={() => setShowGuide(true)} secondary />
         <Text style={styles.aboutName}>{t("settings.aboutName")}</Text>
         <Text style={styles.aboutBody}>
           {t("settings.aboutBody")}
@@ -276,6 +279,7 @@ export function SettingsScreen() {
         <Text style={styles.aboutFooter}>{t("settings.aboutFooter")}</Text>
       </Section>
 
+      <GuideModal visible={showGuide} onClose={() => setShowGuide(false)} />
     </ScreenShell>
   );
 }

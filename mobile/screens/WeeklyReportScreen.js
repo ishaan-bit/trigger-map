@@ -8,6 +8,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -19,7 +20,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
-import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress, createShareSnapshot } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection } from "@/utils/haptics";
@@ -786,7 +787,7 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
                 <Text style={{ color: palette.text, fontSize: 13, lineHeight: 19, flex: 1 }}>{signalText}</Text>
               </View>
               <Text style={{ color: palette.muted, fontSize: 11, marginTop: 4 }}>
-                {t("report.invokedAvgLabel", { value: (avg > 0 ? "+" : "") + avg.toFixed(2) })}
+                {avg > 0.3 ? "Mostly driven from within" : avg < -0.3 ? "Mostly driven by outside events" : "A mix of internal and external"}
               </Text>
             </View>
           </AnimatedSection>
@@ -834,9 +835,10 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
               {bm.dailyDrift.map((day) => {
                 const color = day.deviation >= 0.2 ? palette.success : day.deviation <= -0.2 ? palette.danger : palette.muted;
+                const icon = day.deviation >= 0.4 ? "↑↑" : day.deviation >= 0.2 ? "↑" : day.deviation <= -0.4 ? "↓↓" : day.deviation <= -0.2 ? "↓" : "—";
                 return (
                   <View style={[s.driftDay, { borderColor: color + "40" }]} key={day.date}>
-                    <Text style={[s.driftBar, { color }]}>{day.deviation > 0 ? "+" : ""}{day.deviation.toFixed(1)}</Text>
+                    <Text style={[s.driftBar, { color }]}>{icon}</Text>
                     <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { weekday: "short" })}</Text>
                   </View>
                 );
@@ -1227,21 +1229,30 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         const chartW = Dimensions.get("window").width - 64;
         const labels = weeklySnapshots.map(w => w.weekLabel?.replace(/^W/, "") || "");
         const scores = weeklySnapshots.map(w => w.score ?? 0);
+        const latest = scores[scores.length - 1];
+        const previous = scores[scores.length - 2];
+        const trendUp = latest > previous + 0.1;
+        const trendDown = latest < previous - 0.1;
+        const trendLabel = trendUp ? "Trending up" : trendDown ? "Easing down" : "Holding steady";
+        const trendColor = trendUp ? palette.success : trendDown ? palette.warning : palette.textSecondary;
         return (
           <AnimatedSection index={1} style={s.section}>
             <SectionHeader label={t("report.progress.scoreTrend") || "Score trend"} badge="live" t={t} />
             <View style={s.chartContainer}>
+              <Text style={{ color: trendColor, fontSize: 13, fontWeight: "700", marginBottom: 8 }}>{trendLabel}</Text>
               <LineChart
                 data={{ labels, datasets: [{ data: scores }] }}
                 width={chartW}
-                height={180}
+                height={160}
                 yAxisSuffix=""
                 fromZero
                 yAxisInterval={1}
+                withHorizontalLabels={false}
+                withVerticalLabels
                 chartConfig={{
                   backgroundGradientFrom: palette.glass,
                   backgroundGradientTo: palette.glass,
-                  decimalPlaces: 1,
+                  decimalPlaces: 0,
                   color: (opacity = 1) => `rgba(120, 180, 255, ${opacity})`,
                   labelColor: () => palette.textSecondary,
                   propsForDots: { r: "4", strokeWidth: "2", stroke: palette.accent },
@@ -2261,6 +2272,7 @@ export function WeeklyReportScreen() {
   const [showInsightsGuide, setShowInsightsGuide] = useState(false);
   const [showActionsGuide, setShowActionsGuide] = useState(false);
   const [showCloseLoop, setShowCloseLoop] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const isSignedIn = Boolean(user && token);
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
@@ -2347,6 +2359,33 @@ export function WeeklyReportScreen() {
   const showTabs = confidence !== "too_early" || isHistoricalUser;
 
   function handleSignIn() { tap(); trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
+
+  async function handleShare() {
+    if (!token) {
+      Alert.alert("Sign in required", "Sign in to create a shareable link for your weekly snapshot.");
+      return;
+    }
+    if (!report?.totalMoments) {
+      Alert.alert("Nothing to share yet", "Log a few moments first to build your weekly snapshot.");
+      return;
+    }
+    try {
+      setSharing(true);
+      const { token: shareToken } = await createShareSnapshot(token);
+      const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "").replace(/\/$/, "");
+      const url = `${webBase}/share/${shareToken}`;
+      await Share.share({
+        message: `Here's my emotional snapshot for this week on TriggerMap: ${url}`,
+        url,
+      });
+      trackEvent("report_share_created", {});
+    } catch (err) {
+      if (err?.message?.includes("cancel")) return;
+      Alert.alert("Could not create link", err?.message || "Please try again.");
+    } finally {
+      setSharing(false);
+    }
+  }
   async function handleUpgrade() {
     tap();
     trackEvent("report_upgrade_tapped", {});
@@ -2411,6 +2450,15 @@ export function WeeklyReportScreen() {
                   <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
                 </View>
               </View>
+              {/* Share button */}
+              <Pressable
+                onPress={handleShare}
+                disabled={sharing}
+                accessibilityRole="button"
+                style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
+              </Pressable>
             ) : null}
           </View>
 
@@ -2560,6 +2608,14 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
   },
   confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
+  shareButton: {
+    alignSelf: "flex-start", marginTop: 10,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1,
+    borderColor: palette.glassBorder,
+    backgroundColor: "rgba(120,180,255,0.08)",
+  },
+  shareButtonText: { color: palette.accent, fontSize: 13, fontWeight: "600" },
   heroPillEmoji: { fontSize: 14 },
   heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
 

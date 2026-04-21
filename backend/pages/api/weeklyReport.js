@@ -127,6 +127,18 @@ export default async function handler(req, res) {
       if (report.aiInsight && storedReport?.rewrittenBy && storedReport.summary) {
         report.aiInsight.summary = storedReport.summary;
       }
+    } else if (!isAuthenticated && report.totalMoments >= 3) {
+      // Anonymous preview: give users a taste of their personalised insight
+      // (summary sentence + top driver) so they have a reason to sign in.
+      // generateInsight is pure computation — no I/O, safe to call here.
+      // Revert: remove this else-if block to restore previous behaviour.
+      const anonInsight = await generateInsight(report, { firstName: null, lang });
+      report.aiInsight = {
+        summary: anonInsight.summary,
+        drivers: anonInsight.drivers?.slice(0, 1),
+        confidence: anonInsight.confidence,
+        _anonymousPreview: true,
+      };
     }
 
     // Attach LLM insight for premium users, first-free eligible, OR free-pass holders
