@@ -2433,32 +2433,33 @@ export function WeeklyReportScreen() {
               </Text>
             ) : null}
             {report?.totalMoments ? (
-              <View style={s.heroRow}>
-                <View style={s.heroPill}>
-                  <Text style={s.heroPillEmoji}>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</Text>
-                  <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
-                    {report.topEmotion ? (t("emotions." + report.topEmotion) || report.topEmotion) : t("report.mixedEmotion")}
-                  </Text>
+              <>
+                <View style={s.heroRow}>
+                  <View style={s.heroPill}>
+                    <Text style={s.heroPillEmoji}>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</Text>
+                    <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
+                      {report.topEmotion ? (t("emotions." + report.topEmotion) || report.topEmotion) : t("report.mixedEmotion")}
+                    </Text>
+                  </View>
+                  <View style={s.heroPill}>
+                    <Text style={s.heroPillEmoji}>🎯</Text>
+                    <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
+                      {report.topTrigger ? triggerDisplay(report.topTrigger, t) : (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
+                    </Text>
+                  </View>
+                  <View style={[s.heroPill, s.confidencePill]}>
+                    <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
+                  </View>
                 </View>
-                <View style={s.heroPill}>
-                  <Text style={s.heroPillEmoji}>🎯</Text>
-                  <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
-                    {report.topTrigger ? triggerDisplay(report.topTrigger, t) : (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
-                  </Text>
-                </View>
-                <View style={[s.heroPill, s.confidencePill]}>
-                  <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
-                </View>
-              </View>
-              {/* Share button */}
-              <Pressable
-                onPress={handleShare}
-                disabled={sharing}
-                accessibilityRole="button"
-                style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
-              </Pressable>
+                <Pressable
+                  onPress={handleShare}
+                  disabled={sharing}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
+                </Pressable>
+              </>
             ) : null}
           </View>
 
