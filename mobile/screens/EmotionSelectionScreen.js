@@ -16,7 +16,7 @@ import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { getRelevantTags, recordTagUsage } from "@/utils/adaptiveTags";
+import { getRelevantTagsSync, recordTagUsage } from "@/utils/adaptiveTags";
 import { emotionColor } from "@/utils/emotionModel";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection, success as hapticSuccess } from "@/utils/haptics";
@@ -111,29 +111,22 @@ export function EmotionSelectionScreen() {
       return;
     }
 
-    let active = true;
-    getRelevantTags(trigger, contextForTags).then((tags) => {
-      if (!active) return;
-      const wasEmpty = adaptiveTags.length === 0;
-      setAdaptiveTags(tags);
-      // Preserve any user-selected tags that still exist in the new pool;
-      // drop ones no longer relevant to the current emotion region.
-      setSelectedTags((prev) => prev.filter((s) => tags.includes(s)));
-      // Only animate the section in on first appearance, not on every refresh.
-      if (wasEmpty) {
-        tagSectionAnim.setValue(0);
-        Animated.spring(tagSectionAnim, {
-          toValue: 1,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }).start();
-      }
-    });
-
-    return () => {
-      active = false;
-    };
+    const tags = getRelevantTagsSync(trigger, contextForTags);
+    const wasEmpty = adaptiveTags.length === 0;
+    setAdaptiveTags(tags);
+    // Preserve any user-selected tags that still exist in the new pool;
+    // drop ones no longer relevant to the current emotion region.
+    setSelectedTags((prev) => prev.filter((s) => tags.includes(s)));
+    // Only animate the section in on first appearance, not on every refresh.
+    if (wasEmpty) {
+      tagSectionAnim.setValue(0);
+      Animated.spring(tagSectionAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    }
     // Intentionally depend on regionKey (not raw coords) so the pool only
     // refreshes when the user crosses an emotion region boundary, not on
     // every micro-pixel of drag movement.

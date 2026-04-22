@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedReaction,
   withSpring,
   withTiming,
   runOnJS,
@@ -13,6 +14,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { palette, radius } from "@/utils/theme";
+import { derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
 
 const CURSOR_SIZE = 40;
 const CURSOR_HALF = CURSOR_SIZE / 2;
@@ -79,11 +81,57 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
   // gestures and cause the cursor to spring back along the drag path.
   const userTouchedRef = useRef(false);
 
+  // Live coords mirrored from the UI thread. We drive the heading/summary
+  // text from these (NOT from the parent-prop `value`) so the labels stay
+  // in lockstep with the cursor even when React re-renders coalesce or the
+  // parent's tag/state work makes the JS thread briefly busy.
+  const [liveCoords, setLiveCoords] = useState({
+    valence: value.valence,
+    arousal: value.arousal,
+  });
+  const liveCoordsRef = useRef(liveCoords);
+  const updateLiveCoords = useCallback((v, a) => {
+    // Skip duplicate updates so React doesn't re-render needlessly.
+    if (liveCoordsRef.current.valence === v && liveCoordsRef.current.arousal === a) return;
+    liveCoordsRef.current = { valence: v, arousal: a };
+    setLiveCoords(liveCoordsRef.current);
+  }, []);
+
+  // Watch the cursor on the UI thread; quantise to 0.05 so we throttle the
+  // JS-side state updates to a manageable rate (~20 distinct values per
+  // axis) while still feeling fully reactive to the slide.
+  useAnimatedReaction(
+    () => {
+      const s = padSize.value;
+      if (!s) return null;
+      const v = (cursorX.value / s) * 2 - 1;
+      const a = -((cursorY.value / s) * 2 - 1);
+      return {
+        v: Math.round(v * 20) / 20,
+        a: Math.round(a * 20) / 20,
+      };
+    },
+    (cur, prev) => {
+      "worklet";
+      if (!cur) return;
+      if (!prev || cur.v !== prev.v || cur.a !== prev.a) {
+        runOnJS(updateLiveCoords)(cur.v, cur.a);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (prevLabelRef.current !== derivedLabel) {
       prevLabelRef.current = derivedLabel;
-      labelScale.value = 0.88;
-      labelScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+      // Prop-driven label change is now only used as the seed before first
+      // touch; the live UI-thread reaction handles the pop animation while
+      // dragging. We still keep this effect so a programmatic reset (parent
+      // sets value back to neutral) gives a small confirmation pop.
+      if (!userTouchedRef.current) {
+        labelScale.value = 0.88;
+        labelScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+      }
     }
   }, [derivedLabel]);
 
@@ -322,11 +370,37 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     opacity: interpolate(labelScale.value, [0.88, 1], [0.5, 1], Extrapolation.CLAMP),
   }));
 
-  const labelLive = derivedLabel || "neutral";
-  const summary = useMemo(
-    () => humanSummary(value.valence, value.arousal, t),
-    [value.valence, value.arousal, t]
+  // Heading + summary are driven from the UI-thread mirror so they track
+  // the cursor even when the parent is mid-render. Fall back to the prop
+  // until the user has touched the pad (so the first render is identical).
+  const sourceCoords = userTouchedRef.current
+    ? liveCoords
+    : { valence: value.valence, arousal: value.arousal };
+  const liveLabelKey = useMemo(
+    () => derivedEmotionLabel(sourceCoords.valence, sourceCoords.arousal),
+    [sourceCoords.valence, sourceCoords.arousal]
   );
+  const labelLive = userTouchedRef.current
+    ? (t(`emotions.${liveLabelKey}`) !== `emotions.${liveLabelKey}`
+        ? t(`emotions.${liveLabelKey}`)
+        : liveLabelKey.replace(/_/g, " "))
+    : (derivedLabel || "neutral");
+  const summary = useMemo(
+    () => humanSummary(sourceCoords.valence, sourceCoords.arousal, t),
+    [sourceCoords.valence, sourceCoords.arousal, t]
+  );
+
+  // Animate the label scale whenever the live label key changes (UI-thread
+  // sourced). This replaces the previous prop-driven animation effect so it
+  // pops every time the cursor crosses a region boundary mid-drag.
+  const prevLiveLabelRef = useRef(liveLabelKey);
+  useEffect(() => {
+    if (prevLiveLabelRef.current !== liveLabelKey) {
+      prevLiveLabelRef.current = liveLabelKey;
+      labelScale.value = 0.88;
+      labelScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+    }
+  }, [liveLabelKey]);
 
   return (
     <View style={styles.container}>
