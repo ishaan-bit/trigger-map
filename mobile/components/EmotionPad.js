@@ -74,6 +74,10 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
   // Label animation
   const labelScale = useSharedValue(1);
   const prevLabelRef = useRef(derivedLabel);
+  // Once user has touched the pad, the gesture worklet is the source of truth
+  // for the cursor position. JS-state→cursor sync would race with finishing
+  // gestures and cause the cursor to spring back along the drag path.
+  const userTouchedRef = useRef(false);
 
   useEffect(() => {
     if (prevLabelRef.current !== derivedLabel) {
@@ -83,14 +87,22 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     }
   }, [derivedLabel]);
 
-  // Sync cursor to external value when not dragging
+  // Sync cursor to external value ONLY before the user has touched the pad
+  // (e.g. initial mount, or programmatic reset). After the first touch, the
+  // gesture worklet drives the cursor directly — re-syncing from JS state
+  // would cause the cursor to spring back along the drag path on release.
   useEffect(() => {
+    if (userTouchedRef.current) return;
     if (isDragging.value) return;
     const x = ((value.valence + 1) / 2) * padSize.value;
     const y = ((1 - (value.arousal + 1) / 2)) * padSize.value;
     cursorX.value = withSpring(x, SPRING_CURSOR);
     cursorY.value = withSpring(y, SPRING_CURSOR);
   }, [value.valence, value.arousal]);
+
+  const markTouched = useCallback(() => {
+    userTouchedRef.current = true;
+  }, []);
 
   const fireHaptic = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
@@ -170,6 +182,7 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
       prevSideV.value = x < s / 2 ? 0 : 1;
       const valence = (x / s) * 2 - 1;
       const arousal = -((y / s) * 2 - 1);
+      runOnJS(markTouched)();
       runOnJS(emitChange)(valence, arousal);
       runOnJS(fireHaptic)();
     })

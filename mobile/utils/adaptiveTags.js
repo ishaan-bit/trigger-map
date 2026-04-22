@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { REGION_TAGS } from "@triggermap/shared/constants/tags";
 
 const TAG_USAGE_KEY = "adaptive_tag_usage";
-const MAX_SUGGESTED = 6;
+const MAX_SUGGESTED = 10;
 
 /**
  * Return up to MAX_SUGGESTED tags for the current emotion region.

@@ -114,21 +114,31 @@ export function EmotionSelectionScreen() {
     let active = true;
     getRelevantTags(trigger, contextForTags).then((tags) => {
       if (!active) return;
+      const wasEmpty = adaptiveTags.length === 0;
       setAdaptiveTags(tags);
-      setSelectedTags([]);
-      tagSectionAnim.setValue(0);
-      Animated.spring(tagSectionAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start();
+      // Preserve any user-selected tags that still exist in the new pool;
+      // drop ones no longer relevant to the current emotion region.
+      setSelectedTags((prev) => prev.filter((s) => tags.includes(s)));
+      // Only animate the section in on first appearance, not on every refresh.
+      if (wasEmpty) {
+        tagSectionAnim.setValue(0);
+        Animated.spring(tagSectionAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }).start();
+      }
     });
 
     return () => {
       active = false;
     };
-  }, [contextForTags, hasInteracted, tagSectionAnim, trigger]);
+    // Intentionally depend on regionKey (not raw coords) so the pool only
+    // refreshes when the user crosses an emotion region boundary, not on
+    // every micro-pixel of drag movement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionKey, hasInteracted, trigger]);
 
   useEffect(() => {
     if (!saved) return;
