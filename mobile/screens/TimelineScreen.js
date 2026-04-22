@@ -29,13 +29,64 @@ const EMOTION_COLORS = {
 };
 
 const MERGE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
-const TRAJECTORY_SIZE = 260;
+const TRAJECTORY_SIZE = 280;
+const TRAJECTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-/** 2D Emotional Trajectory — plots moments as dots on valence/arousal field */
+// 9 emotion zones laid out on the valence(x)-arousal(y) circumplex.
+// Coordinates are in -1..1 space; rendered at the centre of each region.
+const TRAJECTORY_ZONES = [
+  { key: "stressed",  label: "Stressed",  v: -0.6, a:  0.6 },
+  { key: "alert",     label: "Alert",     v:  0.0, a:  0.7 },
+  { key: "energized", label: "Energized", v:  0.6, a:  0.6 },
+  { key: "uneasy",    label: "Uneasy",    v: -0.7, a:  0.0 },
+  { key: "neutral",   label: "Neutral",   v:  0.0, a:  0.0 },
+  { key: "engaged",   label: "Engaged",   v:  0.7, a:  0.0 },
+  { key: "low",       label: "Low",       v: -0.6, a: -0.6 },
+  { key: "flat",      label: "Flat",      v:  0.0, a: -0.7 },
+  { key: "calm",      label: "Calm",      v:  0.6, a: -0.6 },
+];
+
+function dominantZone(points) {
+  if (!points.length) return null;
+  let best = null; let bestDist = Infinity;
+  // For each point, find nearest zone, tally
+  const tally = {};
+  for (const pt of points) {
+    let near = null; let nd = Infinity;
+    for (const z of TRAJECTORY_ZONES) {
+      const dx = pt.valence - z.v;
+      const dy = pt.arousal - z.a;
+      const d = dx * dx + dy * dy;
+      if (d < nd) { nd = d; near = z; }
+    }
+    if (near) tally[near.key] = (tally[near.key] || 0) + 1;
+  }
+  for (const z of TRAJECTORY_ZONES) {
+    const c = tally[z.key] || 0;
+    if (c > 0 && (1 / c) < bestDist) { bestDist = 1 / c; best = { ...z, count: c }; }
+  }
+  return best;
+}
+
+/** 2D Emotional Trajectory — last 30 days plotted on valence/arousal field
+ *  with labelled zones, recency-coloured dots, baseline ring, pulsing current
+ *  point and a one-line summary below. */
 function EmotionTrajectory({ moments, onTapPoint }) {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
   const points = useMemo(() => {
+    const cutoff = Date.now() - TRAJECTORY_WINDOW_MS;
     return moments
-      .filter((m) => m.timestamp)
+      .filter((m) => m.timestamp && new Date(m.timestamp).getTime() >= cutoff)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       .map((m) => {
         const v = typeof m.valence === "number" ? m.valence : (legacyToCoordinates(m.emotion)?.valence || 0);
@@ -44,26 +95,75 @@ function EmotionTrajectory({ moments, onTapPoint }) {
       });
   }, [moments]);
 
+  const baseline = useMemo(() => {
+    if (points.length < 3) return null;
+    const v = points.reduce((s, p) => s + p.valence, 0) / points.length;
+    const a = points.reduce((s, p) => s + p.arousal, 0) / points.length;
+    return { v, a };
+  }, [points]);
+
+  const dominant = useMemo(() => dominantZone(points), [points]);
+
   if (points.length < 2) return null;
 
   const cx = TRAJECTORY_SIZE / 2;
   const cy = TRAJECTORY_SIZE / 2;
-  const toX = (v) => cx + v * (cx - 20);
-  const toY = (a) => cy - a * (cy - 20);
+  const PAD = 24;
+  const toX = (v) => cx + v * (cx - PAD);
+  const toY = (a) => cy - a * (cy - PAD);
+
+  const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] });
+  const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
+
+  const last = points[points.length - 1];
+
+  // Drift summary: how far is current vs baseline
+  let driftLabel = null;
+  if (baseline) {
+    const dv = last.valence - baseline.v;
+    const da = last.arousal - baseline.a;
+    const mag = Math.sqrt(dv * dv + da * da);
+    if (mag < 0.15) driftLabel = "near your usual";
+    else if (dv > 0.2) driftLabel = "above usual";
+    else if (dv < -0.2) driftLabel = "below usual";
+    else if (da > 0.2) driftLabel = "more activated than usual";
+    else if (da < -0.2) driftLabel = "calmer than usual";
+    else driftLabel = "shifted from usual";
+  }
 
   return (
     <View style={ts.container}>
-      <Text style={ts.heading}>Emotional Trajectory</Text>
+      <Text style={ts.heading}>Emotional Trajectory · last 30 days</Text>
       <View style={ts.field}>
-        {/* Axis labels */}
-        <Text style={[ts.axisLabel, ts.axisTop]}>↑ energized</Text>
-        <Text style={[ts.axisLabel, ts.axisBottom]}>↓ low</Text>
-        <Text style={[ts.axisLabel, ts.axisLeft]}>← tense</Text>
-        <Text style={[ts.axisLabel, ts.axisRight]}>calm →</Text>
-        {/* Grid lines */}
+        {/* Axis edge labels */}
+        <Text style={[ts.axisLabel, ts.axisTop]}>↑ activated</Text>
+        <Text style={[ts.axisLabel, ts.axisBottom]}>↓ low energy</Text>
+        <Text style={[ts.axisLabel, ts.axisLeft]}>← unpleasant</Text>
+        <Text style={[ts.axisLabel, ts.axisRight]}>pleasant →</Text>
+        {/* Grid quadrant lines */}
         <View style={[ts.gridH, { top: cy }]} />
         <View style={[ts.gridV, { left: cx }]} />
-        {/* Connecting lines (trail) */}
+
+        {/* Zone labels (9 named regions) */}
+        {TRAJECTORY_ZONES.map((z) => (
+          <Text
+            key={z.key}
+            style={[ts.zoneLabel, {
+              left: toX(z.v) - 30, top: toY(z.a) - 7, width: 60,
+              opacity: dominant && dominant.key === z.key ? 0.85 : 0.32,
+              fontWeight: dominant && dominant.key === z.key ? "800" : "600",
+            }]}
+          >{z.label}</Text>
+        ))}
+
+        {/* Baseline ring — your emotional "home" */}
+        {baseline ? (
+          <View style={[ts.baselineRing, {
+            left: toX(baseline.v) - 26, top: toY(baseline.a) - 26,
+          }]} pointerEvents="none" />
+        ) : null}
+
+        {/* Connecting trail (older→newer) — fades by recency */}
         {points.map((pt, idx) => {
           if (idx === 0) return null;
           const prev = points[idx - 1];
@@ -75,38 +175,65 @@ function EmotionTrajectory({ moments, onTapPoint }) {
           const dy = y2 - y1;
           const length = Math.sqrt(dx * dx + dy * dy);
           const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          const opacity = 0.15 + (idx / points.length) * 0.35;
+          const recency = idx / points.length; // 0=oldest, 1=newest
+          const opacity = 0.08 + recency * 0.32;
           return (
             <View key={`line-${idx}`} style={{
               position: "absolute", left: x1, top: y1, width: length, height: 1.5,
               backgroundColor: palette.accent, opacity,
               transform: [{ rotate: `${angle}deg` }], transformOrigin: "0 0",
-            }} />
+            }} pointerEvents="none" />
           );
         })}
-        {/* Dots */}
+
+        {/* Dots — recency-coloured + sized */}
         {points.map((pt, idx) => {
           const isLast = idx === points.length - 1;
+          const recency = idx / Math.max(1, points.length - 1); // 0=oldest, 1=newest
           const color = getEmotionColor(pt.valence, pt.arousal);
-          const size = isLast ? 14 : 8;
-          const opacity = 0.3 + (idx / points.length) * 0.7;
+          const size = isLast ? 16 : 6 + Math.round(recency * 4);
+          const opacity = 0.25 + recency * 0.7;
           return (
             <Pressable
               key={pt.id}
               onPress={() => onTapPoint?.(pt)}
+              hitSlop={6}
               style={{
                 position: "absolute",
                 left: toX(pt.valence) - size / 2,
                 top: toY(pt.arousal) - size / 2,
                 width: size, height: size, borderRadius: size / 2,
                 backgroundColor: color, opacity,
-                borderWidth: isLast ? 2 : 0, borderColor: "rgba(255,255,255,0.5)",
-                shadowColor: color, shadowOpacity: isLast ? 0.6 : 0, shadowRadius: 6, elevation: isLast ? 4 : 0,
+                borderWidth: isLast ? 2 : 0, borderColor: "rgba(255,255,255,0.7)",
+                shadowColor: color, shadowOpacity: isLast ? 0.7 : 0, shadowRadius: 8, elevation: isLast ? 5 : 0,
               }}
             />
           );
         })}
+
+        {/* Pulsing halo on most-recent point */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: toX(last.valence) - 18,
+            top: toY(last.arousal) - 18,
+            width: 36, height: 36, borderRadius: 18,
+            borderWidth: 1.5, borderColor: getEmotionColor(last.valence, last.arousal),
+            opacity: pulseOpacity,
+            transform: [{ scale: pulseScale }],
+          }}
+        />
       </View>
+      {/* Micro summary */}
+      <Text style={ts.summary}>
+        {points.length} moments
+        {dominant ? ` · mostly ${dominant.label.toLowerCase()}` : ""}
+        {driftLabel ? ` · now ${driftLabel}` : ""}
+      </Text>
+      <Text style={ts.legend}>
+        Bright dot = newest · faded = older · ring = your usual centre
+      </Text>
     </View>
   );
 }
@@ -126,6 +253,23 @@ const ts = StyleSheet.create({
   axisRight: { right: 4, top: TRAJECTORY_SIZE / 2 - 6, textAlign: "right" },
   gridH: { position: "absolute", left: 20, right: 20, height: 1, backgroundColor: "rgba(148,180,224,0.08)" },
   gridV: { position: "absolute", top: 20, bottom: 20, width: 1, backgroundColor: "rgba(148,180,224,0.08)" },
+  zoneLabel: {
+    position: "absolute", color: palette.textSecondary, fontSize: 9.5,
+    textAlign: "center", letterSpacing: 0.3,
+  },
+  baselineRing: {
+    position: "absolute", width: 52, height: 52, borderRadius: 26,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.35)",
+    borderStyle: "dashed",
+  },
+  summary: {
+    color: palette.text, fontSize: 12, textAlign: "center",
+    fontWeight: "600", marginTop: 4,
+  },
+  legend: {
+    color: palette.muted, fontSize: 10, textAlign: "center",
+    opacity: 0.65,
+  },
 });
 
 /**
