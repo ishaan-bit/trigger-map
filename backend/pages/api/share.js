@@ -62,6 +62,28 @@ function buildSnapshot(report, user) {
   const dq = report.dataQuality || {};
   const bm = report.baselineMetrics || {};
   const insight = report.aiInsight || {};
+  const llm = report.llmInsight || {};
+
+  // Signature loop: most repeated trigger → emotion combo
+  const signatureLoop = report.topPair
+    ? { trigger: report.topPair.trigger, emotion: report.topPair.emotion, count: report.topPair.count }
+    : null;
+
+  // Top regulator (what helped this week)
+  const helped = (report.regulators || [])[0]
+    ? {
+        trigger: report.regulators[0].trigger,
+        emotion: report.regulators[0].emotion,
+      }
+    : null;
+
+  // Top friction zone (what added strain)
+  const friction = (report.frictionZones || [])[0]
+    ? {
+        trigger: report.frictionZones[0].trigger,
+        emotion: report.frictionZones[0].emotion,
+      }
+    : null;
 
   return {
     sharedAt: new Date().toISOString(),
@@ -74,13 +96,20 @@ function buildSnapshot(report, user) {
     confidence: dq.confidence || "too_early",
     stateOfMind: bm.stateOfMind || null,
     drift: bm.drift?.label || null,
+    stability: bm.stability?.label || null,
     weeklyEmotionTrajectory: (report.weeklyEmotionTrajectory || []).map((d) => ({
       date: d.date,
       score: d.score,
     })),
-    // Only the "stood out" section of LLM insight — not the full narrative
-    llmHighlight: report.llmInsight?.sections?.stoodOut || null,
-    // Action recommendations without personalised detail
+    // Signature behavioural loop
+    signatureLoop,
+    // What helped vs added friction
+    helped,
+    friction,
+    // Insight headline (short summary if present, otherwise the "stood out" section)
+    insightSummary: insight.summary || null,
+    llmHighlight: llm.sections?.stoodOut || null,
+    // Top action (just one — the page is a teaser, not the full report)
     topActions: (report.actions || []).slice(0, 2).map((a) => ({
       text: a.text,
       trigger: a.trigger,

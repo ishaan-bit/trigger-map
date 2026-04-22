@@ -2381,9 +2381,12 @@ export function WeeklyReportScreen() {
       const { token: shareToken } = await createShareSnapshot(token);
       const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://web-ashy-kappa-14.vercel.app").replace(/\/$/, "");
       const url = `${webBase}/share/${shareToken}`;
+      const teaser = report?.topEmotion
+        ? `Mostly ${report.topEmotion} this week — ${report.totalMoments} moments, ${dq.daysLogged || 0} days logged.`
+        : `${report?.totalMoments || 0} moments logged this week.`;
       await Share.share({
-        // URL on its own line so WhatsApp/iMessage auto-render it as a link preview
-        message: `Here's my emotional snapshot for this week on TriggerMap 📊\n\n${url}`,
+        // URL on its own line so WhatsApp / iMessage auto-render it as a link preview.
+        message: `My week on TriggerMap 📊\n\n${teaser}\n\nTop trigger, signature pattern, what helped vs. what added friction — full snapshot here:\n\n${url}`,
         url,
       });
       trackEvent("report_share_created", {});
@@ -2463,8 +2466,10 @@ export function WeeklyReportScreen() {
                   onPress={handleShare}
                   disabled={sharing}
                   accessibilityRole="button"
-                  style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.7 }]}
+                  accessibilityLabel="Share my week"
+                  style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
                 >
+                  <Text style={s.shareButtonIcon}>📤</Text>
                   <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
                 </Pressable>
               </>
@@ -2618,13 +2623,19 @@ const s = StyleSheet.create({
   },
   confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
   shareButton: {
-    alignSelf: "flex-start", marginTop: 10,
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 1,
-    borderColor: palette.glassBorder,
-    backgroundColor: "rgba(120,180,255,0.08)",
+    alignSelf: "stretch", marginTop: 14,
+    paddingHorizontal: 18, paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: palette.accent,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    shadowColor: palette.accent,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  shareButtonText: { color: palette.accent, fontSize: 13, fontWeight: "600" },
+  shareButtonIcon: { fontSize: 16 },
+  shareButtonText: { color: "#0b1220", fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
   heroPillEmoji: { fontSize: 14 },
   heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
 

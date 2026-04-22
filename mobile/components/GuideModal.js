@@ -84,49 +84,51 @@ export function GuideModal({ visible, onClose }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
-          <View style={styles.header}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+    >
+      <View style={[styles.fullSheet, { paddingTop: insets.top + 12, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
             <Text style={styles.title}>How TriggerMap works</Text>
-            <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close guide">
-              <Text style={styles.close}>✕</Text>
-            </Pressable>
+            <Text style={styles.subtitle}>A guide to every module in the app</Text>
           </View>
-          <Text style={styles.subtitle}>A guide to every module in the app</Text>
-
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator contentContainerStyle={styles.body}>
-            {SECTIONS.map((sec) => (
-              <View key={sec.title} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionIcon}>{sec.icon}</Text>
-                  <Text style={styles.sectionTitle}>{sec.title}</Text>
-                </View>
-                <Text style={styles.sectionBody}>{sec.body}</Text>
-              </View>
-            ))}
-          </ScrollView>
+          <Pressable onPress={onClose} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close guide" style={styles.closeBtn}>
+            <Text style={styles.close}>✕</Text>
+          </Pressable>
         </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator
+          bounces
+          alwaysBounceVertical
+        >
+          {SECTIONS.map((sec) => (
+            <View key={sec.title} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionIcon}>{sec.icon}</Text>
+                <Text style={styles.sectionTitle}>{sec.title}</Text>
+              </View>
+              <Text style={styles.sectionBody}>{sec.body}</Text>
+            </View>
+          ))}
+          <View style={{ height: 40 }} />
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  fullSheet: {
     flex: 1,
-    backgroundColor: "rgba(4,7,16,0.7)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
     backgroundColor: "#0d1424",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(120,180,255,0.12)",
-    maxHeight: "92%",
-    flex: 1,
-    paddingTop: 20,
     paddingHorizontal: 20,
   },
   scrollView: {
@@ -135,50 +137,60 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   title: {
     color: palette.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
   },
   close: {
-    color: palette.textSecondary,
-    fontSize: 18,
-    fontWeight: "600",
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
   },
   subtitle: {
     color: palette.textSecondary,
     fontSize: 13,
-    marginBottom: 20,
+    marginTop: 4,
   },
   body: {
-    gap: 20,
-    paddingBottom: 48,
+    paddingTop: 4,
+    paddingBottom: 60,
   },
   section: {
     gap: 6,
-    paddingBottom: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    marginBottom: 4,
   },
   sectionIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
   sectionTitle: {
     color: palette.text,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
+    flex: 1,
   },
   sectionBody: {
     color: palette.textSecondary,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
   },
 });
