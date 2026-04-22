@@ -1273,12 +1273,28 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               { key: "recoveryDays", label: t("report.progress.metricRecovery"), data: metrics.recoveryDays, icon: "⏱", invertDisplay: true },
             ].filter((m) => m.data).map((m) => {
               const { data: md } = m;
+              // Display value (kept as a small caption — primary signal is now visual)
               const displayCurrent = m.invertDisplay
-                ? (md.current <= 0 ? "-" : (m.key === "recoveryDays" ? `~${md.current}d` : md.current.toFixed(1)))
-                : (md.current === null ? "-" : (m.key === "stability" ? `${Math.round(md.current * 100)}%` : md.current.toFixed(1)));
-              const displayPrev = m.invertDisplay
-                ? (md.previous <= 0 ? "-" : (m.key === "recoveryDays" ? `~${md.previous}d` : md.previous.toFixed(1)))
-                : (md.previous === null ? "-" : (m.key === "stability" ? `${Math.round(md.previous * 100)}%` : md.previous.toFixed(1)));
+                ? (md.current <= 0 ? "—" : (m.key === "recoveryDays" ? `~${md.current}d` : md.current.toFixed(1)))
+                : (md.current === null ? "—" : (m.key === "stability" ? `${Math.round(md.current * 100)}%` : md.current.toFixed(1)));
+
+              // Normalize current + previous to 0..1 fill where 1 = best.
+              // For "invertDisplay" metrics (lower=better), invert.
+              const RANGE = { stability: 1, volatility: 2, drift: 1.5, recoveryDays: 5 };
+              const norm = (v) => {
+                if (v === null || v === undefined || v < 0) return 0;
+                if (m.key === "stability") return Math.max(0, Math.min(1, v));
+                const r = RANGE[m.key] || 1;
+                const raw = Math.max(0, Math.min(1, v / r));
+                return m.invertDisplay ? 1 - raw : raw;
+              };
+              const fillNow = norm(md.current);
+              const fillPrev = md.previous == null ? null : norm(md.previous);
+
+              // Color the bar by status (high fill = good)
+              const barColor = fillNow >= 0.66 ? palette.success
+                             : fillNow >= 0.33 ? palette.warning
+                             : palette.danger;
 
               return (
                 <View key={m.key} style={s.progressMetricCard}>
@@ -1286,16 +1302,12 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     <Text style={s.progressMetricIcon}>{m.icon}</Text>
                     <Text style={s.progressMetricLabel}>{m.label}</Text>
                   </View>
-                  <View style={s.progressThenNow}>
-                    <View style={s.progressThenNowItem}>
-                      <Text style={s.progressThenNowLabel}>{t("report.progress.thenLabel")}</Text>
-                      <Text style={s.progressThenNowValue}>{displayPrev}</Text>
-                    </View>
-                    <Text style={s.progressThenNowArrow}>→</Text>
-                    <View style={s.progressThenNowItem}>
-                      <Text style={s.progressThenNowLabel}>{t("report.progress.nowLabel")}</Text>
-                      <Text style={[s.progressThenNowValue, { fontWeight: "700" }]}>{displayCurrent}</Text>
-                    </View>
+                  <Text style={[s.progressMetricBigValue, { color: barColor }]}>{displayCurrent}</Text>
+                  <View style={s.progressMetricBarTrack}>
+                    <View style={[s.progressMetricBarFill, { width: `${Math.round(fillNow * 100)}%`, backgroundColor: barColor }]} />
+                    {fillPrev !== null && Math.abs(fillPrev - fillNow) > 0.02 ? (
+                      <View style={[s.progressMetricBarPrev, { left: `${Math.round(fillPrev * 100)}%` }]} />
+                    ) : null}
                   </View>
                   <TrendBadge trend={md.trend} t={t} />
                 </View>
@@ -3178,6 +3190,18 @@ const s = StyleSheet.create({
   progressMetricHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   progressMetricIcon: { fontSize: 16 },
   progressMetricLabel: { color: palette.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  progressMetricBigValue: { fontSize: 22, fontWeight: "800", marginTop: 2 },
+  progressMetricBarTrack: {
+    height: 8, borderRadius: 4, marginTop: 4, marginBottom: 2,
+    backgroundColor: "rgba(255,255,255,0.06)", overflow: "hidden", position: "relative",
+  },
+  progressMetricBarFill: {
+    position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 4,
+  },
+  progressMetricBarPrev: {
+    position: "absolute", top: -2, bottom: -2, width: 2,
+    backgroundColor: "rgba(255,255,255,0.45)", borderRadius: 1,
+  },
   progressThenNow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   progressThenNowItem: { alignItems: "center", gap: 1 },
   progressThenNowLabel: { color: palette.muted, fontSize: 8, fontWeight: "700", textTransform: "uppercase" },
