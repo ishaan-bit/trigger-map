@@ -156,8 +156,13 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
   }, []);
 
-  const emitChange = useCallback((valence, arousal) => {
-    // Soft magnetic pull toward center
+  // Throttle onChange so the parent screen doesn't re-render on every gesture
+  // frame (60+/sec). The parent's setState cascade (region effect, haptic
+  // effect, tag swap, color recompute) was the real source of UI jank — even
+  // though our internal label is fed by useAnimatedReaction, the parent
+  // re-renders compete with those updates and starve the JS thread.
+  const lastEmittedRef = useRef({ v: 0, a: 0 });
+  const emitChange = useCallback((valence, arousal, opts = {}) => {
     let v = valence;
     let a = arousal;
     const mag = Math.sqrt(v * v + a * a);
@@ -165,8 +170,15 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
       v = 0;
       a = 0;
     }
-    v = Math.round(v * 100) / 100;
-    a = Math.round(a * 100) / 100;
+    // Quantise to 0.05 — same granularity as liveCoords reaction. The parent
+    // only needs to know about region changes (every 0.15-0.3) and final
+    // value, so 0.05 is plenty. ~20 distinct values per axis instead of 60+.
+    v = Math.round(v * 20) / 20;
+    a = Math.round(a * 20) / 20;
+    if (!opts.force && v === lastEmittedRef.current.v && a === lastEmittedRef.current.a) {
+      return;
+    }
+    lastEmittedRef.current = { v, a };
     const intensity = Math.min(1, Math.round(Math.sqrt(v * v + a * a) * 100) / 100);
     onChange(v, a, intensity);
   }, [onChange]);
@@ -258,6 +270,12 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
       cursorPop.value = withSpring(1.2, { damping: 8, stiffness: 400 }, () => {
         cursorPop.value = withSpring(1, { damping: 12, stiffness: 200 });
       });
+      // Final commit — force a precise emit so the parent has the exact
+      // resting position even if it equals the last quantised value.
+      const s = padSize.value;
+      const valence = (cursorX.value / s) * 2 - 1;
+      const arousal = -((cursorY.value / s) * 2 - 1);
+      runOnJS(emitChange)(valence, arousal, { force: true });
     })
     .onFinalize(() => {
       "worklet";

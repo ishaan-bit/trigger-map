@@ -1,5 +1,5 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { palette, radius } from "@/utils/theme";
 
 const SECTIONS = [
@@ -81,17 +81,13 @@ const SECTIONS = [
 ];
 
 export function GuideModal({ visible, onClose }) {
-  const insets = useSafeAreaInsets();
-
   return (
     <Modal
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
-      presentationStyle="fullScreen"
-      statusBarTranslucent
     >
-      <View style={[styles.fullSheet, { paddingTop: insets.top + 12, paddingBottom: insets.bottom }]}>
+      <SafeAreaView style={styles.fullSheet} edges={["top", "left", "right", "bottom"]}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>How TriggerMap works</Text>
@@ -105,9 +101,9 @@ export function GuideModal({ visible, onClose }) {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.body}
-          showsVerticalScrollIndicator
-          bounces
-          alwaysBounceVertical
+          showsVerticalScrollIndicator={true}
+          persistentScrollbar={true}
+          nestedScrollEnabled={true}
         >
           {SECTIONS.map((sec) => (
             <View key={sec.title} style={styles.section}>
@@ -118,9 +114,9 @@ export function GuideModal({ visible, onClose }) {
               <Text style={styles.sectionBody}>{sec.body}</Text>
             </View>
           ))}
-          <View style={{ height: 40 }} />
+          <View style={{ height: 60 }} />
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -129,7 +125,6 @@ const styles = StyleSheet.create({
   fullSheet: {
     flex: 1,
     backgroundColor: "#0d1424",
-    paddingHorizontal: 20,
   },
   scrollView: {
     flex: 1,
@@ -138,7 +133,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
@@ -164,8 +160,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   body: {
-    paddingTop: 4,
-    paddingBottom: 60,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 80,
   },
   section: {
     gap: 6,

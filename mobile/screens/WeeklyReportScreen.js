@@ -2382,11 +2382,11 @@ export function WeeklyReportScreen() {
       const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://web-ashy-kappa-14.vercel.app").replace(/\/$/, "");
       const url = `${webBase}/share/${shareToken}`;
       const teaser = report?.topEmotion
-        ? `Mostly ${report.topEmotion} this week — ${report.totalMoments} moments, ${dq.daysLogged || 0} days logged.`
+        ? `Mostly ${report.topEmotion} this week. ${report.totalMoments} moments across ${dq.daysLogged || 0} days.`
         : `${report?.totalMoments || 0} moments logged this week.`;
       await Share.share({
         // URL on its own line so WhatsApp / iMessage auto-render it as a link preview.
-        message: `My week on TriggerMap 📊\n\n${teaser}\n\nTop trigger, signature pattern, what helped vs. what added friction — full snapshot here:\n\n${url}`,
+        message: `My week on TriggerMap 📊\n\n${teaser}\n\nTop trigger, signature pattern, plus what helped vs. what added friction. Full snapshot:\n\n${url}`,
         url,
       });
       trackEvent("report_share_created", {});
@@ -2467,10 +2467,23 @@ export function WeeklyReportScreen() {
                   disabled={sharing}
                   accessibilityRole="button"
                   accessibilityLabel="Share my week"
-                  style={({ pressed }) => [s.shareButton, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                  style={({ pressed }) => [s.shareButtonWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
                 >
-                  <Text style={s.shareButtonIcon}>📤</Text>
-                  <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
+                  <LinearGradient
+                    colors={["#5fd3e0", "#7e9cff"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={s.shareButton}
+                  >
+                    <View style={s.shareButtonIconWrap}>
+                      <Text style={s.shareButtonIcon}>📤</Text>
+                    </View>
+                    <View style={s.shareButtonTextWrap}>
+                      <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
+                      <Text style={s.shareButtonSubtext}>Send a snapshot to anyone</Text>
+                    </View>
+                    <Text style={s.shareButtonArrow}>›</Text>
+                  </LinearGradient>
                 </Pressable>
               </>
             ) : null}
@@ -2622,20 +2635,30 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
   },
   confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
-  shareButton: {
+  shareButtonWrap: {
     alignSelf: "stretch", marginTop: 14,
-    paddingHorizontal: 18, paddingVertical: 13,
-    borderRadius: 14,
-    backgroundColor: palette.accent,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    shadowColor: palette.accent,
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    borderRadius: 16,
+    shadowColor: "#5fd3e0",
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
-  shareButtonIcon: { fontSize: 16 },
+  shareButton: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderRadius: 16,
+  },
+  shareButtonIconWrap: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    alignItems: "center", justifyContent: "center",
+  },
+  shareButtonIcon: { fontSize: 18 },
+  shareButtonTextWrap: { flex: 1 },
   shareButtonText: { color: "#0b1220", fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
+  shareButtonSubtext: { color: "rgba(11,18,32,0.72)", fontSize: 11.5, fontWeight: "600", marginTop: 1 },
+  shareButtonArrow: { color: "#0b1220", fontSize: 26, fontWeight: "300", marginLeft: 4, marginTop: -4 },
   heroPillEmoji: { fontSize: 14 },
   heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
 

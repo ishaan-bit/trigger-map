@@ -29,11 +29,19 @@ const EMOTION_COLORS = {
 };
 
 const MERGE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
-const TRAJECTORY_SIZE = 280;
+const TRAJECTORY_SIZE = 300;
 const TRAJECTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// 9 emotion zones laid out on the valence(x)-arousal(y) circumplex.
-// Coordinates are in -1..1 space; rendered at the centre of each region.
+// 4 corner labels only — keeps the field readable. The axis labels at the
+// mid-edges (↑ activated, ↓ low energy, etc.) handle the cardinal directions.
+const TRAJECTORY_CORNERS = [
+  { key: "stressed",  label: "Stressed",  pos: "tl" },
+  { key: "energized", label: "Energized", pos: "tr" },
+  { key: "low",       label: "Low",       pos: "bl" },
+  { key: "calm",      label: "Calm",      pos: "br" },
+];
+
+// All 9 zones are still used for "dominant zone" computation.
 const TRAJECTORY_ZONES = [
   { key: "stressed",  label: "Stressed",  v: -0.6, a:  0.6 },
   { key: "alert",     label: "Alert",     v:  0.0, a:  0.7 },
@@ -144,17 +152,21 @@ function EmotionTrajectory({ moments, onTapPoint }) {
         <View style={[ts.gridH, { top: cy }]} />
         <View style={[ts.gridV, { left: cx }]} />
 
-        {/* Zone labels (9 named regions) */}
-        {TRAJECTORY_ZONES.map((z) => (
-          <Text
-            key={z.key}
-            style={[ts.zoneLabel, {
-              left: toX(z.v) - 30, top: toY(z.a) - 7, width: 60,
-              opacity: dominant && dominant.key === z.key ? 0.85 : 0.32,
-              fontWeight: dominant && dominant.key === z.key ? "800" : "600",
-            }]}
-          >{z.label}</Text>
-        ))}
+        {/* Corner labels — 4 only, tucked into the corners so they never overlap data */}
+        {TRAJECTORY_CORNERS.map((c) => {
+          const isDom = dominant && dominant.key === c.key;
+          const base = {
+            position: "absolute", width: 64,
+            opacity: isDom ? 0.95 : 0.4,
+            fontWeight: isDom ? "800" : "700",
+          };
+          const pos =
+            c.pos === "tl" ? { left: 6,  top: 6 } :
+            c.pos === "tr" ? { right: 6, top: 6, textAlign: "right" } :
+            c.pos === "bl" ? { left: 6,  bottom: 6 } :
+                             { right: 6, bottom: 6, textAlign: "right" };
+          return <Text key={c.key} style={[ts.zoneLabel, base, pos]}>{c.label}</Text>;
+        })}
 
         {/* Baseline ring — your emotional "home" */}
         {baseline ? (
@@ -254,8 +266,8 @@ const ts = StyleSheet.create({
   gridH: { position: "absolute", left: 20, right: 20, height: 1, backgroundColor: "rgba(148,180,224,0.08)" },
   gridV: { position: "absolute", top: 20, bottom: 20, width: 1, backgroundColor: "rgba(148,180,224,0.08)" },
   zoneLabel: {
-    position: "absolute", color: palette.textSecondary, fontSize: 9.5,
-    textAlign: "center", letterSpacing: 0.3,
+    position: "absolute", color: palette.textSecondary, fontSize: 10,
+    letterSpacing: 0.4, textTransform: "uppercase",
   },
   baselineRing: {
     position: "absolute", width: 52, height: 52, borderRadius: 26,

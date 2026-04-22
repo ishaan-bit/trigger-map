@@ -92,7 +92,13 @@ export function EmotionSelectionScreen() {
 
   const handleEmotionChange = useCallback((valence, arousal, intensity) => {
     setHasInteracted(true);
-    setEmotionCoords({ valence, arousal, intensity });
+    setEmotionCoords((prev) => {
+      // Bail if unchanged so we don't trigger downstream effects unnecessarily.
+      if (prev.valence === valence && prev.arousal === arousal && prev.intensity === intensity) {
+        return prev;
+      }
+      return { valence, arousal, intensity };
+    });
   }, []);
 
   useEffect(() => {
