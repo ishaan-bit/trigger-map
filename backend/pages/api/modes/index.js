@@ -4,6 +4,7 @@ import { getBearerToken } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
 import { getStoredModeOutput, getModeFeedback } from "@/services/modeStore.js";
 import { captureServerError } from "@/services/monitoringService.js";
+import { generateRuleBasedModeOutput } from "@/ai/modeComposer.js";
 
 const VALID_MODES = ["move", "fuel", "perspective"];
 
@@ -11,7 +12,7 @@ const VALID_MODES = ["move", "fuel", "perspective"];
  * GET /api/modes?mode=move — fetch latest cached mode output
  * GET /api/modes — fetch all three modes
  *
- * Premium-only endpoint.
+ * Returns cached LLM/HITL output when available, with rule-based fallback.
  */
 export default async function handler(req, res) {
   if (enableCors(req, res)) return;
@@ -23,25 +24,28 @@ export default async function handler(req, res) {
   try {
     const token = getBearerToken(req);
     const user = token ? await validateSession(token).catch(() => null) : null;
-    if (!user) {
-      return sendError(res, 401, "AUTH_REQUIRED", "Sign in to access adaptive modes");
+    const ownerId = user?.id || req.query.deviceId;
+    if (!ownerId || typeof ownerId !== "string") {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
     }
 
-    const ownerId = user.id;
+    const lang = typeof req.query.lang === "string" ? req.query.lang : "en";
     const requestedMode = req.query.mode;
 
     if (requestedMode) {
       if (!VALID_MODES.includes(requestedMode)) {
         return sendError(res, 400, "INVALID_MODE", `mode must be one of: ${VALID_MODES.join(", ")}`);
       }
-      const output = await getStoredModeOutput(ownerId, requestedMode);
+      const output = await getStoredModeOutput(ownerId, requestedMode)
+        || await generateRuleBasedModeOutput({ ownerId, mode: requestedMode, lang, persist: false, reason: "empty_cache" });
       return sendSuccess(res, { [requestedMode]: output });
     }
 
     // Return all three modes + feedback map
     const results = {};
     for (const mode of VALID_MODES) {
-      results[mode] = await getStoredModeOutput(ownerId, mode);
+      results[mode] = await getStoredModeOutput(ownerId, mode)
+        || await generateRuleBasedModeOutput({ ownerId, mode, lang, persist: false, reason: "empty_cache" });
     }
 
     // Include feedback state so the client can restore thumbs

@@ -263,18 +263,25 @@ export function fetchProgress(token, deviceId) {
 
 // ── Adaptive Modes ──
 
-export function fetchModes(token) {
-  return fetchJson("/modes", { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
+export function fetchModes(token, deviceId, lang) {
+  const params = [];
+  if (!token && deviceId) params.push(`deviceId=${encodeURIComponent(deviceId)}`);
+  if (lang) params.push(`lang=${encodeURIComponent(lang)}`);
+  const query = params.length ? `?${params.join("&")}` : "";
+  return fetchJson(`/modes${query}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 
-export function fetchModeOutput(mode, token) {
-  return fetchJson(`/modes?mode=${encodeURIComponent(mode)}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
+export function fetchModeOutput(mode, token, deviceId, lang) {
+  const params = [`mode=${encodeURIComponent(mode)}`];
+  if (!token && deviceId) params.push(`deviceId=${encodeURIComponent(deviceId)}`);
+  if (lang) params.push(`lang=${encodeURIComponent(lang)}`);
+  return fetchJson(`/modes?${params.join("&")}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 
-export function submitModeFeedback(mode, itemId, response, token) {
+export function submitModeFeedback(mode, itemId, response, token, deviceId, source) {
   return fetchJson("/modes/feedback", {
     method: "POST",
-    body: { mode, itemId, response },
+    body: { mode, itemId, response, deviceId, source },
     token,
   });
 }

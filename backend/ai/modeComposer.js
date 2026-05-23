@@ -303,6 +303,167 @@ Rules:
 - Do not reference specific days unless they appear in the context above`;
 }
 
+function buildPerspectiveFallback(report, lang = "en") {
+  const hi = lang === "hi";
+  const total = Number(report?.totalMoments || 0);
+  const topEmotion = report?.topEmotion;
+  const topTrigger = report?.topTrigger;
+  const regs = report?.regulators || [];
+  const friction = report?.frictionZones || [];
+  const drift = report?.baselineMetrics?.drift?.value;
+
+  if (total < 3 && !report?.dataQuality?.isSilent) {
+    return {
+      narrative: hi
+        ? "अभी पैटर्न बनने की शुरुआत है। कुछ और पल लॉग करें ताकि Move, Fuel और Perspective आपकी असली लय से जुड़ सकें।"
+        : "Your pattern is still forming. Log a few more moments and this space will start reflecting what is actually showing up for you.",
+      items: [
+        {
+          id: "perspective_beginner",
+          name: hi ? "अभी के लिए" : "For now",
+          description: hi
+            ? "बस ध्यान दें कि कौन-सी स्थिति आपकी भावना बदलती है। यही पहला उपयोगी संकेत है।"
+            : "Notice which situation changes your emotional state. That is the first useful signal.",
+        },
+      ],
+    };
+  }
+
+  if (regs.length > 0) {
+    const r = regs[0];
+    return {
+      narrative: hi
+        ? `आपके डेटा में ${r.trigger} के आसपास बेहतर भावनाएं दिख रही हैं। इसे बड़े बदलाव की तरह नहीं, बल्कि एक छोटे भरोसेमंद संकेत की तरह देखें।`
+        : `Your data shows better moments around ${r.trigger}. Treat that less like a big fix and more like a reliable signal you can trust.`,
+      items: [
+        {
+          id: `perspective_regulator_${r.trigger || "pattern"}`,
+          name: hi ? "जो काम कर रहा है" : "What is working",
+          description: hi
+            ? `${r.trigger} अक्सर ${r.emotion} से जुड़ रहा है। यह आपके लिए सहारा बन सकता है।`
+            : `${r.trigger} is often linked with feeling ${r.emotion}. That is worth noticing before you chase something new.`,
+        },
+      ],
+    };
+  }
+
+  if (friction.length > 0) {
+    const f = friction[0];
+    return {
+      narrative: hi
+        ? `${f.trigger} बार-बार भारी भावनाओं से जुड़ रहा है। इसका मतलब यह नहीं कि आप गलत कर रहे हैं। इसका मतलब है कि यह जगह आपकी ऊर्जा मांगती है।`
+        : `${f.trigger} keeps pairing with heavier feelings. That does not mean you are handling it badly. It means this area asks more from you than it may look from the outside.`,
+      items: [
+        {
+          id: `perspective_friction_${f.trigger || "pattern"}`,
+          name: hi ? "दबाव की जगह" : "Pressure point",
+          description: hi
+            ? `${f.trigger} और ${f.emotion} का संबंध आपके अगले छोटे बदलाव के लिए उपयोगी संकेत है।`
+            : `The link between ${f.trigger} and feeling ${f.emotion} is a practical signal for where to be gentler with your expectations.`,
+        },
+      ],
+    };
+  }
+
+  const trendText = typeof drift === "number"
+    ? drift > 0.15
+      ? (hi ? "आपका भावनात्मक स्वर ऊपर जा रहा है।" : "Your emotional tone is moving upward.")
+      : drift < -0.15
+        ? (hi ? "आपका भावनात्मक स्वर थोड़ा नीचे जा रहा है।" : "Your emotional tone is dipping a bit.")
+        : (hi ? "आपका भावनात्मक स्वर स्थिर है।" : "Your emotional tone is holding steady.")
+    : "";
+  const contextText = topEmotion || topTrigger
+    ? hi
+      ? `${topTrigger || "आपके पैटर्न"} में ${topEmotion || "मिश्रित भावना"} बार-बार दिख रही है।`
+      : `${topEmotion || "Mixed feelings"} around ${topTrigger || "your recent patterns"} are showing up more than once.`
+    : hi
+      ? "आपके हाल के पल एक शांत, मिश्रित तस्वीर दिखा रहे हैं।"
+      : "Your recent moments show a mixed but readable picture.";
+
+  return {
+    narrative: [contextText, trendText].filter(Boolean).join(" "),
+    items: [
+      {
+        id: "perspective_pattern_read",
+        name: hi ? "अलग नजर" : "A different read",
+        description: hi
+          ? "इसे फैसले की तरह नहीं, सूचना की तरह देखें। आपका डेटा बता रहा है कि ध्यान कहां देना है।"
+          : "Read this as information, not a verdict. Your data is pointing to where your attention is being pulled.",
+      },
+    ],
+  };
+}
+
+export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", persist = true, reason = "fallback" }) {
+  const report = await getStoredWeeklyInsight(ownerId).catch(() => null);
+  const emotions = extractEmotions(report);
+  const profile = await getModeProfile(ownerId).catch(() => null);
+  let output;
+
+  if (mode === "move") {
+    const items = await selectMoveItems(ownerId, emotions, profile);
+    const itemSummaries = items.map((i) => ({
+      id: i.id,
+      name: lang === "hi" ? i.nameHi : i.name,
+      description: lang === "hi" ? i.descriptionHi : i.description,
+      intensity: i.intensity,
+      durationMin: i.durationMin,
+      reason: lang === "hi"
+        ? "आपकी हाल की भावनात्मक स्थिति और पिछली पसंद के आधार पर चुना गया।"
+        : "Picked from your recent emotional pattern and feedback history.",
+    }));
+    output = {
+      mode,
+      items: itemSummaries,
+      narrative: lang === "hi"
+        ? "LLM उपलब्ध न होने पर भी ये Move सुझाव आपकी हाल की भावनाओं और पसंद-नापसंद से चुने गए हैं।"
+        : "These Move ideas are selected from your recent emotions and feedback, with the rule-based library as backup.",
+      model: "rule-based",
+      source: "rule",
+      fallbackReason: reason,
+    };
+  } else if (mode === "fuel") {
+    const items = await selectFuelItems(ownerId, emotions, profile);
+    const itemSummaries = items.map((i) => ({
+      id: i.id,
+      name: lang === "hi" ? i.nameHi : i.name,
+      description: lang === "hi" ? i.descriptionHi : i.description,
+      type: i.type,
+      nutrientFocus: i.nutrientFocus,
+      reason: lang === "hi"
+        ? "आपकी हाल की भावनात्मक स्थिति और पिछली पसंद के आधार पर चुना गया।"
+        : "Picked from your recent emotional pattern and feedback history.",
+    }));
+    output = {
+      mode,
+      items: itemSummaries,
+      narrative: lang === "hi"
+        ? "LLM उपलब्ध न होने पर भी ये Fuel सुझाव आपकी हाल की भावनाओं और पसंद-नापसंद से चुने गए हैं।"
+        : "These Fuel ideas are selected from your recent emotions and feedback, with the rule-based library as backup.",
+      model: "rule-based",
+      source: "rule",
+      fallbackReason: reason,
+    };
+  } else {
+    const fallback = buildPerspectiveFallback(report, lang);
+    output = {
+      mode: "perspective",
+      items: fallback.items,
+      narrative: fallback.narrative,
+      model: "rule-based",
+      source: "rule",
+      fallbackReason: reason,
+    };
+  }
+
+  if (persist) {
+    await storeModeOutput(ownerId, mode, output);
+    if (output.items?.length) await appendModeHistory(ownerId, mode, output.items.map((i) => i.id));
+  }
+
+  return { ...output, generatedAt: new Date().toISOString() };
+}
+
 // ── System prompts (mode-specific) ─────────────────────────────────────
 
 function getSystemPrompt(mode, lang, style) {
@@ -587,7 +748,18 @@ export async function generateAllModes({ ownerId, lang = "en", model, maxWords =
       results[mode] = await generateModeOutput({ ownerId, mode, lang, model, maxWords, style });
     } catch (err) {
       console.error(`Mode ${mode} generation failed for ${ownerId}:`, err.message);
-      results[mode] = null;
+      try {
+        results[mode] = await generateRuleBasedModeOutput({
+          ownerId,
+          mode,
+          lang,
+          persist: true,
+          reason: "llm_failed",
+        });
+      } catch (fallbackErr) {
+        console.error(`Mode ${mode} fallback failed for ${ownerId}:`, fallbackErr.message);
+        results[mode] = null;
+      }
     }
   }
   return results;

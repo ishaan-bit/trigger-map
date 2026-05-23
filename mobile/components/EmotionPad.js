@@ -14,7 +14,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { palette, radius } from "@/utils/theme";
-import { derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
+import { derivedEmotionLabel, EMOTION_AXIS_STEPS } from "@triggermap/shared/constants/emotions";
 
 const CURSOR_SIZE = 40;
 const CURSOR_HALF = CURSOR_SIZE / 2;
@@ -23,6 +23,8 @@ const CENTER_MAGNETIC_RADIUS = 0.08; // snap threshold near center
 const SPRING_CURSOR = { damping: 28, stiffness: 400, mass: 0.8 };
 const TRAIL_SIZE = 6;
 const TRAIL_OPACITIES = [0.22, 0.15, 0.10, 0.06, 0.03];
+const AXIS_TICK_LABELS = ["Very low", "Low", "Slightly low", "Neutral", "Slightly high", "High", "Very high"];
+const AXIS_TICKS = EMOTION_AXIS_STEPS.filter((step) => step !== -0.75 && step !== 0.75);
 
 /**
  * Generate a human-readable intensity-qualified summary from coords.
@@ -435,6 +437,22 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
         <Text style={[styles.axisAnchor, styles.anchorBottom]}>{t("emotion.anchorCalm") || "Calm"}</Text>
         <Text style={[styles.axisAnchor, styles.anchorLeft]}>{t("emotion.anchorUnpleasant") || "Unpleasant"}</Text>
         <Text style={[styles.axisAnchor, styles.anchorRight]}>{t("emotion.anchorPleasant") || "Pleasant"}</Text>
+        <View style={styles.horizontalTicks} pointerEvents="none">
+          {AXIS_TICKS.map((step, idx) => (
+            <View key={`feel-${step}`} style={styles.tickItem}>
+              <View style={styles.tickMark} />
+              <Text style={styles.tickLabel} numberOfLines={1}>{AXIS_TICK_LABELS[idx]}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.verticalTicks} pointerEvents="none">
+          {AXIS_TICKS.map((step, idx) => (
+            <View key={`energy-${step}`} style={styles.verticalTickItem}>
+              <Text style={styles.verticalTickLabel} numberOfLines={1}>{AXIS_TICK_LABELS[AXIS_TICK_LABELS.length - 1 - idx]}</Text>
+              <View style={styles.verticalTickMark} />
+            </View>
+          ))}
+        </View>
 
         <GestureDetector gesture={gesture}>
           <Animated.View
@@ -714,5 +732,59 @@ const styles = StyleSheet.create({
     top: "50%",
     right: -2,
     transform: [{ rotate: "90deg" }, { translateX: 24 }],
+  },
+  horizontalTicks: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: -6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  tickItem: {
+    width: 42,
+    alignItems: "center",
+    gap: 3,
+  },
+  tickMark: {
+    width: 1,
+    height: 6,
+    borderRadius: 1,
+    backgroundColor: "rgba(148, 180, 224, 0.26)",
+  },
+  tickLabel: {
+    color: palette.muted,
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  verticalTicks: {
+    position: "absolute",
+    top: 30,
+    bottom: 30,
+    right: -4,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  verticalTickItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  verticalTickMark: {
+    width: 6,
+    height: 1,
+    borderRadius: 1,
+    backgroundColor: "rgba(148, 180, 224, 0.26)",
+  },
+  verticalTickLabel: {
+    color: palette.muted,
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "600",
+    textAlign: "right",
+    width: 54,
   },
 });

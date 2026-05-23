@@ -1620,8 +1620,14 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     return filtered;
   }, [savedFeedback, currentItemIds]);
   const [feedbackGiven, setFeedbackGiven] = useState(freshFeedback);
+  const [feedbackPending, setFeedbackPending] = useState({});
+  const [feedbackError, setFeedbackError] = useState({});
   // Reset when generation changes
-  useEffect(() => { setFeedbackGiven(freshFeedback); }, [freshFeedback]);
+  useEffect(() => {
+    setFeedbackGiven(freshFeedback);
+    setFeedbackPending({});
+    setFeedbackError({});
+  }, [freshFeedback]);
 
   // Move state
   const [moveDuration, setMoveDuration] = useState(null); // null | [min,max]
@@ -1732,6 +1738,15 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   }, [fuelSuggestions, lang, fuelDiet]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
+  const modeHint = (key, fallback) => {
+    const value = t(`report.prem.mode.${key}`);
+    return value === `report.prem.mode.${key}` ? fallback : value;
+  };
+  const MODE_HINTS = {
+    move: modeHint("moveHint", "Small physical resets matched to your current state."),
+    fuel: modeHint("fuelHint", "Nourishment ideas that fit your energy and preferences."),
+    perspective: modeHint("perspectiveHint", "A calmer way to read the pattern in front of you."),
+  };
 
   // Perspective mode has no client-side fallback; move/fuel fall back to library when no server data
   if (mode === "perspective" && (!data || (!data.items?.length && !data.narrative))) {
@@ -1751,7 +1766,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   const hi = lang === "hi";
 
   // Guard: if backend stored raw JSON as narrative, extract the opening
-  const narrative = useMemo(() => {
+  const narrative = (() => {
     const trimmed = rawNarrative.trim();
     if (!trimmed.startsWith("{")) return rawNarrative;
     try {
@@ -1761,16 +1776,70 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const m = trimmed.match(/"opening"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
       return m ? m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"') : rawNarrative;
     }
-  }, [rawNarrative]);
+  })();
 
-  function handleFeedback(itemId, response) {
+  async function handleFeedback(itemId, response, source) {
+    if (feedbackPending[itemId]) return;
     tap();
-    setFeedbackGiven((prev) => ({ ...prev, [itemId]: response }));
-    if (onFeedback) onFeedback(mode, itemId, response);
+    setFeedbackError((prev) => ({ ...prev, [itemId]: null }));
+    setFeedbackPending((prev) => ({ ...prev, [itemId]: response }));
+    try {
+      if (onFeedback) await onFeedback(mode, itemId, response, source || data?.source || data?.model);
+      setFeedbackGiven((prev) => ({ ...prev, [itemId]: response }));
+    } catch (err) {
+      setFeedbackError((prev) => ({ ...prev, [itemId]: err?.message || t("common.retryError") }));
+    } finally {
+      setFeedbackPending((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    }
+  }
+
+  function renderFeedbackControls(itemId, source) {
+    const pending = feedbackPending[itemId];
+    const given = feedbackGiven[itemId];
+    const error = feedbackError[itemId];
+
+    if (given) {
+      return (
+        <View style={s.modeFeedbackDone}>
+          <Text style={s.modeFeedbackDoneText}>{given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+        </View>
+      );
+    }
+
+    if (!isPremium) return null;
+
+    return (
+      <>
+        <View style={s.modeFeedbackRow}>
+          <Pressable
+            disabled={Boolean(pending)}
+            style={[s.modeFeedbackBtn, s.modeFeedbackHelpful, pending && s.modeFeedbackBtnDisabled]}
+            onPress={() => handleFeedback(itemId, "helpful", source)}
+            accessibilityRole="button"
+          >
+            <Text style={s.modeFeedbackHelpfulText}>{pending === "helpful" ? t("common.pleaseWait") : t("report.prem.mode.helpful")}</Text>
+          </Pressable>
+          <Pressable
+            disabled={Boolean(pending)}
+            style={[s.modeFeedbackBtn, s.modeFeedbackNot, pending && s.modeFeedbackBtnDisabled]}
+            onPress={() => handleFeedback(itemId, "not_helpful", source)}
+            accessibilityRole="button"
+          >
+            <Text style={s.modeFeedbackNotText}>{pending === "not_helpful" ? t("common.pleaseWait") : t("report.notHelpful")}</Text>
+          </Pressable>
+        </View>
+        {error ? <Text style={s.modeFeedbackError}>{error}</Text> : null}
+      </>
+    );
   }
 
   return (
     <View style={s.modeContent}>
+      <Text style={s.modeContentBody}>{MODE_HINTS[mode]}</Text>
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
       {/* ── Move: duration filter + exercise list ── */}
@@ -1803,20 +1872,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                       <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                     </View>
                   )}
-                  {isPremium && !feedbackGiven[mv.id] ? (
-                    <View style={s.modeFeedbackRow}>
-                      <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(mv.id, "helpful")} accessibilityRole="button">
-                        <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
-                      </Pressable>
-                      <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(mv.id, "not_helpful")} accessibilityRole="button">
-                        <Text style={s.modeFeedbackNotText}>👎</Text>
-                      </Pressable>
-                    </View>
-                  ) : feedbackGiven[mv.id] ? (
-                    <View style={s.modeFeedbackDone}>
-                      <Text style={s.modeFeedbackDoneText}>{feedbackGiven[mv.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
-                    </View>
-                  ) : null}
+                  {renderFeedbackControls(mv.id, data?.source || data?.model || "rule")}
                 </View>
               ))}
               <Text style={s.suggestionCounter}>{t("report.prem.mode.showing", { shown: Math.min(moveSuggestions.length, 8), total: moveSuggestions.length })}</Text>
@@ -1854,20 +1910,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                     <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                   </View>
                 )}
-                {isPremium && !feedbackGiven[item.id] ? (
-                  <View style={s.modeFeedbackRow}>
-                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(item.id, "helpful")} accessibilityRole="button">
-                      <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
-                    </Pressable>
-                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(item.id, "not_helpful")} accessibilityRole="button">
-                      <Text style={s.modeFeedbackNotText}>👎</Text>
-                    </Pressable>
-                  </View>
-                ) : feedbackGiven[item.id] ? (
-                  <View style={s.modeFeedbackDone}>
-                    <Text style={s.modeFeedbackDoneText}>{feedbackGiven[item.id] === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
-                  </View>
-                ) : null}
+                {renderFeedbackControls(item.id, data?.source || data?.model || "rule")}
               </View>
             ))
           ) : (
@@ -1880,25 +1923,11 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       {mode === "perspective" && items.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
           {items.map((item) => {
-            const given = feedbackGiven[item.id];
             return (
               <View key={item.id} style={s.modeCard}>
                 <Text style={s.modeCardTitle}>{item.name}</Text>
                 <Text style={s.modeCardDesc}>{item.description}</Text>
-                {isPremium && !given ? (
-                  <View style={s.modeFeedbackRow}>
-                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackHelpful]} onPress={() => handleFeedback(item.id, "helpful")} accessibilityRole="button">
-                      <Text style={s.modeFeedbackHelpfulText}>👍 {t("report.prem.mode.helpful")}</Text>
-                    </Pressable>
-                    <Pressable style={[s.modeFeedbackBtn, s.modeFeedbackNot]} onPress={() => handleFeedback(item.id, "not_helpful")} accessibilityRole="button">
-                      <Text style={s.modeFeedbackNotText}>👎</Text>
-                    </Pressable>
-                  </View>
-                ) : given ? (
-                  <View style={s.modeFeedbackDone}>
-                    <Text style={s.modeFeedbackDoneText}>{given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
-                  </View>
-                ) : null}
+                {renderFeedbackControls(item.id, data?.source || data?.model || "llm")}
               </View>
             );
           })}
@@ -2308,7 +2337,7 @@ export function WeeklyReportScreen() {
 
     // Refresh adaptive modes every time screen gains focus
     if (p && t) {
-      fetchModes(t)
+      fetchModes(t, deviceId, lang)
         .then((data) => {
           const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
           console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
@@ -2325,7 +2354,7 @@ export function WeeklyReportScreen() {
       const timer = setTimeout(() => setShowInsightsGuide(true), 800);
       return () => clearTimeout(timer);
     }
-  }, [load, obState]));
+  }, [load, obState, deviceId, lang]));
 
   // Load progress metrics
   useEffect(() => {
@@ -2339,14 +2368,12 @@ export function WeeklyReportScreen() {
     }
   }, [token, deviceId]);
 
-  const handleModeFeedback = useCallback((mode, itemId, response) => {
-    if (token) {
-      submitModeFeedback(mode, itemId, response, token).catch(() => null);
-      trackEvent("mode_feedback", { mode, itemId, response });
-      // Update local feedback cache so it persists across tab switches
-      setModes((prev) => prev ? { ...prev, feedback: { ...prev.feedback, [itemId]: response } } : prev);
-    }
-  }, [token]);
+  const handleModeFeedback = useCallback(async (mode, itemId, response, source) => {
+    await submitModeFeedback(mode, itemId, response, token, deviceId, source);
+    trackEvent("mode_feedback", { mode, itemId, response, source });
+    // Update local feedback cache so it persists across tab switches
+    setModes((prev) => prev ? { ...prev, feedback: { ...prev.feedback, [itemId]: response } } : prev);
+  }, [token, deviceId]);
 
   const handleActionFeedback = useCallback((actionId, response) => {
     trackEvent("action_feedback", { actionId, response });
@@ -2405,7 +2432,7 @@ export function WeeklyReportScreen() {
       await subscribe();
       load();
       // Fetch adaptive modes now that the user is premium
-      if (token) fetchModes(token).then((m) => setModes(m || {})).catch(() => setModes({}));
+      if (token) fetchModes(token, deviceId, lang).then((m) => setModes(m || {})).catch(() => setModes({}));
     } catch (err) {
       const msg = err?.message || "";
       if (err?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) return;
@@ -2594,7 +2621,7 @@ export function WeeklyReportScreen() {
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
                   purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
-                  token={token} onModesRefresh={async () => { try { const m = await fetchModes(token); setModes(m || {}); } catch { setModes((prev) => prev || {}); } }}
+                  token={token} onModesRefresh={async () => { try { const m = await fetchModes(token, deviceId, lang); setModes(m || {}); } catch { setModes((prev) => prev || {}); } }}
                   dominantEmotion={dominantEmotion}
                 />
               )}
@@ -3128,6 +3155,7 @@ const s = StyleSheet.create({
   modeFeedbackBtn: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5,
   },
+  modeFeedbackBtnDisabled: { opacity: 0.55 },
   modeFeedbackHelpful: {
     backgroundColor: "rgba(94, 230, 160, 0.12)", borderColor: "rgba(94, 230, 160, 0.35)",
   },
@@ -3138,6 +3166,7 @@ const s = StyleSheet.create({
   modeFeedbackNotText: { color: "#ffb347", fontSize: 12, fontWeight: "700" },
   modeFeedbackDone: { paddingVertical: 6, marginTop: 2 },
   modeFeedbackDoneText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
+  modeFeedbackError: { color: palette.warning, fontSize: 11, lineHeight: 15, marginTop: 2 },
   modeFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
 
   /* ── Mode filter chips ── */

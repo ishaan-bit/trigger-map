@@ -50,8 +50,8 @@ export const ENERGY_MAP = {
 
 // ── Two-Slider Emotion Model (valence × arousal) ──
 
-/** Snap positions for the 5-band slider (-1 to +1) */
-export const EMOTION_AXIS_STEPS = [-1, -0.5, 0, 0.5, 1];
+/** Snap positions for a 9-band slider (-1 to +1), kept on the same numeric range for analytics compatibility. */
+export const EMOTION_AXIS_STEPS = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1];
 
 /** Snap a raw slider value to the nearest axis step */
 function snapToStep(raw) {

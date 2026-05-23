@@ -55,8 +55,8 @@ describe('ENERGY_MAP', () => {
 // ── EMOTION_AXIS_STEPS ──────────────────────────────────────────────────────
 
 describe('EMOTION_AXIS_STEPS', () => {
-  it('has exactly 5 steps from -1 to 1', () => {
-    expect(EMOTION_AXIS_STEPS).toEqual([-1, -0.5, 0, 0.5, 1]);
+  it('has 9 compatible steps from -1 to 1', () => {
+    expect(EMOTION_AXIS_STEPS).toEqual([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]);
   });
 });
 
@@ -65,8 +65,8 @@ describe('EMOTION_AXIS_STEPS', () => {
 describe('createEmotionCoordinates', () => {
   it('snaps feel and energy to nearest axis steps', () => {
     const result = createEmotionCoordinates(0.3, -0.7);
-    expect(result.valence).toBe(0.5);
-    expect(result.arousal).toBe(-0.5);
+    expect(result.valence).toBe(0.25);
+    expect(result.arousal).toBe(-0.75);
   });
 
   it('returns exact steps when input is already on a step', () => {

@@ -121,11 +121,19 @@ export function getModeFeedbackKey(ownerId) {
 }
 
 /**
- * Each feedback entry: { mode, itemId, response: "helpful"|"not_helpful", timestamp }
+ * Each feedback entry keeps the original contract:
+ * { mode, itemId, response: "helpful"|"not_helpful", timestamp }
+ * Extra metadata is additive and optional.
  */
-export async function storeModeFeedback(ownerId, mode, itemId, response) {
+export async function storeModeFeedback(ownerId, mode, itemId, response, metadata = {}) {
   const key = getModeFeedbackKey(ownerId);
-  const entry = JSON.stringify({ mode, itemId, response, timestamp: Date.now() });
+  const entry = JSON.stringify({
+    mode,
+    itemId,
+    response,
+    timestamp: Date.now(),
+    ...metadata,
+  });
   await redis(["RPUSH", key, entry]);
   await redis(["EXPIRE", key, TTL_90D]);
 }
