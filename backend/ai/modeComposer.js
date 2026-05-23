@@ -20,9 +20,11 @@ import {
   getModeProfile,
   getModeFeedback,
   getRecentItemIds,
+  getStoredModeOutput,
   storeModeOutput,
   appendModeHistory,
 } from "../services/modeStore.js";
+import { isRuleBasedModeOutput } from "../services/modeFeedbackState.js";
 import { getStoredWeeklyInsight } from "../services/reportStore.js";
 import { getStylePrompt, validateStyle } from "./styleProfiles.js";
 
@@ -722,7 +724,7 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
       }
 
       // Persist
-      const output = { mode, items: itemSummaries, narrative, model };
+      const output = { mode, items: itemSummaries, narrative, model, source: "llm" };
       await storeModeOutput(ownerId, mode, output);
       await appendModeHistory(ownerId, mode, itemIds);
 
@@ -749,6 +751,11 @@ export async function generateAllModes({ ownerId, lang = "en", model, maxWords =
     } catch (err) {
       console.error(`Mode ${mode} generation failed for ${ownerId}:`, err.message);
       try {
+        const existing = await getStoredModeOutput(ownerId, mode).catch(() => null);
+        if (existing && !isRuleBasedModeOutput(existing)) {
+          results[mode] = existing;
+          continue;
+        }
         results[mode] = await generateRuleBasedModeOutput({
           ownerId,
           mode,

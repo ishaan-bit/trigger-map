@@ -1621,7 +1621,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     if (!savedFeedback) return {};
     const filtered = {};
     for (const [id, resp] of Object.entries(savedFeedback)) {
-      if (currentItemIds.has(id)) filtered[id] = resp;
+      if (currentItemIds.has(id) || resp === "not_helpful") filtered[id] = resp;
     }
     return filtered;
   }, [savedFeedback, currentItemIds]);
@@ -1646,6 +1646,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     if (!dominantEmotion) return [];
     return [dominantEmotion];
   }, [dominantEmotion]);
+  const dismissedItemIds = useMemo(() => {
+    const ids = new Set();
+    for (const [id, resp] of Object.entries(feedbackGiven)) {
+      if (resp === "not_helpful") ids.add(id);
+    }
+    return ids;
+  }, [feedbackGiven]);
 
   // Move suggestions — use server-picked items when available (adaptive + feedback-aware),
   // fall back to full client library otherwise. Duration filter + emotion sort applied on top.
@@ -1666,6 +1673,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const [lo, hi] = moveDuration;
       pool = pool.filter((m) => m.durationMin >= lo && m.durationMin <= hi);
     }
+    pool = pool.filter((m) => !dismissedItemIds.has(m.id));
     // Sort by: liked first, then emotion relevance, disliked last
     return [...pool].sort((a, b) => {
       const aFb = feedbackGiven[a.id];
@@ -1677,7 +1685,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [mode, safeItems, moveDuration, emotions, feedbackGiven]);
+  }, [mode, safeItems, moveDuration, emotions, feedbackGiven, dismissedItemIds]);
 
   // Fuel suggestions — use server-picked items when available (adaptive + feedback-aware),
   // fall back to full client library otherwise. Diet filter + emotion sort applied on top.
@@ -1698,6 +1706,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       // nonVeg users can eat everything — no filtering needed
       pool = pool.filter((n) => n.diet?.includes(fuelDiet));
     }
+    pool = pool.filter((n) => !dismissedItemIds.has(n.id));
     // Sort by: liked first, then emotion relevance, disliked last
     return [...pool].sort((a, b) => {
       const aFb = feedbackGiven[a.id];
@@ -1709,7 +1718,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [mode, safeItems, fuelDiet, emotions, feedbackGiven]);
+  }, [mode, safeItems, fuelDiet, emotions, feedbackGiven, dismissedItemIds]);
 
   // Fuel day plan - one item per meal slot, prioritized by emotion relevance
   // Backfills from full library when server items don't cover all slots for the active diet
@@ -1728,6 +1737,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     const allLibrary = fuelDiet && fuelDiet !== "nonVeg"
       ? NOURISHMENTS.filter((n) => n.diet?.includes(fuelDiet))
       : NOURISHMENTS;
+    const backfillLibrary = allLibrary.filter((n) => !dismissedItemIds.has(n.id));
     const used = new Set();
     return SLOTS.map((slot) => {
       // Try server suggestions first
@@ -1735,13 +1745,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       let pick = pool[0] || null;
       // Backfill from full library if server items can't fill this slot
       if (!pick) {
-        const backfill = allLibrary.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
+        const backfill = backfillLibrary.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
         pick = backfill[0] || null;
       }
       if (pick) used.add(pick.id);
       return { ...slot, item: pick };
     }).filter((slot) => slot.item);
-  }, [fuelSuggestions, lang, fuelDiet]);
+  }, [fuelSuggestions, lang, fuelDiet, dismissedItemIds]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
   const modeHint = (key, fallback) => {
