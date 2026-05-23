@@ -1608,9 +1608,15 @@ function sortRegulatorsByFeedback(regulators, feedback) {
 
 /* ── Mode Cards (adaptive modes content) ── */
 
-function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion, savedFeedback }) {
+function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion, savedFeedback, onLogMoment }) {
+  const safeItems = useMemo(
+    () => (Array.isArray(data?.items) ? data.items.filter((item) => item && typeof item === "object") : []),
+    [data]
+  );
+  const dataSource = typeof data?.source === "string" ? data.source : typeof data?.model === "string" ? data.model : null;
+  const hasNarrative = typeof data?.narrative === "string" && data.narrative.trim().length > 0;
   // Only restore feedback for items in the CURRENT output — don't carry stale feedback from previous generations
-  const currentItemIds = useMemo(() => new Set((data?.items || []).map((i) => i.id)), [data]);
+  const currentItemIds = useMemo(() => new Set(safeItems.map((i) => i.id).filter(Boolean)), [safeItems]);
   const freshFeedback = useMemo(() => {
     if (!savedFeedback) return {};
     const filtered = {};
@@ -1645,11 +1651,11 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   // fall back to full client library otherwise. Duration filter + emotion sort applied on top.
   const moveSuggestions = useMemo(() => {
     let pool;
-    if (mode === "move" && data?.items?.length > 0) {
+    if (mode === "move" && safeItems.length > 0) {
       const movementMap = Object.fromEntries(MOVEMENTS.map((m) => [m.id, m]));
       // Merge server reason with client catalogue data
-      const serverReasons = Object.fromEntries(data.items.map((si) => [si.id, si.reason]));
-      pool = data.items.map((si) => {
+      const serverReasons = Object.fromEntries(safeItems.map((si) => [si.id, si.reason]));
+      pool = safeItems.map((si) => {
         const mv = movementMap[si.id];
         return mv ? { ...mv, reason: serverReasons[si.id] || null } : null;
       }).filter(Boolean);
@@ -1671,17 +1677,17 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [mode, data, moveDuration, emotions, feedbackGiven]);
+  }, [mode, safeItems, moveDuration, emotions, feedbackGiven]);
 
   // Fuel suggestions — use server-picked items when available (adaptive + feedback-aware),
   // fall back to full client library otherwise. Diet filter + emotion sort applied on top.
   const fuelSuggestions = useMemo(() => {
     let pool;
-    if (mode === "fuel" && data?.items?.length > 0) {
+    if (mode === "fuel" && safeItems.length > 0) {
       const nourishMap = Object.fromEntries(NOURISHMENTS.map((n) => [n.id, n]));
       // Merge server reason with client catalogue data
-      const serverReasons = Object.fromEntries(data.items.map((si) => [si.id, si.reason]));
-      pool = data.items.map((si) => {
+      const serverReasons = Object.fromEntries(safeItems.map((si) => [si.id, si.reason]));
+      pool = safeItems.map((si) => {
         const nItem = nourishMap[si.id];
         return nItem ? { ...nItem, reason: serverReasons[si.id] || null } : null;
       }).filter(Boolean);
@@ -1703,7 +1709,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
       return bScore - aScore;
     });
-  }, [mode, data, fuelDiet, emotions, feedbackGiven]);
+  }, [mode, safeItems, fuelDiet, emotions, feedbackGiven]);
 
   // Fuel day plan - one item per meal slot, prioritized by emotion relevance
   // Backfills from full library when server items don't cover all slots for the active diet
@@ -1745,24 +1751,31 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   const MODE_HINTS = {
     move: modeHint("moveHint", "Small physical resets matched to your current state."),
     fuel: modeHint("fuelHint", "Nourishment ideas that fit your energy and preferences."),
-    perspective: modeHint("perspectiveHint", "A calmer way to read the pattern in front of you."),
+    perspective: modeHint("perspectiveHint", "A plain-language read on how your triggers, emotions, and recovery connect."),
   };
 
   // Perspective mode has no client-side fallback; move/fuel fall back to library when no server data
-  if (mode === "perspective" && (!data || (!data.items?.length && !data.narrative))) {
+  if (mode === "perspective" && (!safeItems.length && !hasNarrative)) {
     return (
       <View style={s.modeContent}>
         <View style={[s.insightStateCard, { paddingVertical: 20, borderLeftWidth: 3, borderLeftColor: palette.accent }]}>
           <Text style={s.insightStateIcon}>{MODE_ICONS[mode] || "✨"}</Text>
-          <Text style={s.insightStateTitle}>{t(`report.prem.mode.${mode}`)} {t("report.prem.mode.warmTitle")}</Text>
-          <Text style={s.insightStateBody}>{t("report.prem.mode.warmBody")}</Text>
+          <Text style={s.insightStateTitle}>Perspective needs a little more signal</Text>
+          <Text style={s.insightStateBody}>
+            Log a few moments and this screen will start showing patterns in how triggers, emotions, and recovery connect.
+          </Text>
+          {onLogMoment ? (
+            <Pressable style={s.modeEmptyCta} onPress={onLogMoment} accessibilityRole="button">
+              <Text style={s.modeEmptyCtaText}>Log a moment</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     );
   }
 
-  const items = data?.items || [];
-  const rawNarrative = data?.narrative || "";
+  const items = safeItems;
+  const rawNarrative = typeof data?.narrative === "string" ? data.narrative : "";
   const hi = lang === "hi";
 
   // Guard: if backend stored raw JSON as narrative, extract the opening
@@ -1784,7 +1797,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     setFeedbackError((prev) => ({ ...prev, [itemId]: null }));
     setFeedbackPending((prev) => ({ ...prev, [itemId]: response }));
     try {
-      if (onFeedback) await onFeedback(mode, itemId, response, source || data?.source || data?.model);
+      if (onFeedback) await onFeedback(mode, itemId, response, source || dataSource);
       setFeedbackGiven((prev) => ({ ...prev, [itemId]: response }));
     } catch (err) {
       setFeedbackError((prev) => ({ ...prev, [itemId]: err?.message || t("common.retryError") }));
@@ -1872,7 +1885,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                       <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                     </View>
                   )}
-                  {renderFeedbackControls(mv.id, data?.source || data?.model || "rule")}
+                  {renderFeedbackControls(mv.id, dataSource || "rule")}
                 </View>
               ))}
               <Text style={s.suggestionCounter}>{t("report.prem.mode.showing", { shown: Math.min(moveSuggestions.length, 8), total: moveSuggestions.length })}</Text>
@@ -1910,7 +1923,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                     <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                   </View>
                 )}
-                {renderFeedbackControls(item.id, data?.source || data?.model || "rule")}
+                {renderFeedbackControls(item.id, dataSource || "rule")}
               </View>
             ))
           ) : (
@@ -1927,7 +1940,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
               <View key={item.id} style={s.modeCard}>
                 <Text style={s.modeCardTitle}>{item.name}</Text>
                 <Text style={s.modeCardDesc}>{item.description}</Text>
-                {renderFeedbackControls(item.id, data?.source || data?.model || "llm")}
+                {renderFeedbackControls(item.id, dataSource || "llm")}
               </View>
             );
           })}
@@ -1943,7 +1956,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   );
 }
 
-function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, token, onModesRefresh, dominantEmotion }) {
+function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, dominantEmotion, onLogMoment }) {
   const [activeMode, setActiveMode] = useState("core");
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
@@ -2109,7 +2122,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
               </View>
             ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedback} />
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedback} onLogMoment={onLogMoment} />
             )}
 
 
@@ -2621,8 +2634,8 @@ export function WeeklyReportScreen() {
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
                   purchasing={purchasing} subscription={subscription} t={t} lang={lang}
                   modes={modes} onModeFeedback={handleModeFeedback}
-                  token={token} onModesRefresh={async () => { try { const m = await fetchModes(token, deviceId, lang); setModes(m || {}); } catch { setModes((prev) => prev || {}); } }}
                   dominantEmotion={dominantEmotion}
+                  onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
                 />
               )}
             </>
@@ -3142,6 +3155,15 @@ const s = StyleSheet.create({
   modeContent: { gap: 10, backgroundColor: "rgba(6, 10, 18, 0.70)", borderRadius: radius.md, padding: 12 },
   modeContentBody: { color: palette.text, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  modeEmptyCta: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+    backgroundColor: palette.accent,
+  },
+  modeEmptyCtaText: { color: palette.bg, fontSize: 13, fontWeight: "800" },
   modeCardsScroll: { gap: 10, paddingVertical: 4 },
   modeCard: {
     width: 260, borderRadius: radius.md, padding: 16, gap: 8,

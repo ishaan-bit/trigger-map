@@ -23,7 +23,8 @@ const CENTER_MAGNETIC_RADIUS = 0.08; // snap threshold near center
 const SPRING_CURSOR = { damping: 28, stiffness: 400, mass: 0.8 };
 const TRAIL_SIZE = 6;
 const TRAIL_OPACITIES = [0.22, 0.15, 0.10, 0.06, 0.03];
-const AXIS_TICK_LABELS = ["Very low", "Low", "Slightly low", "Neutral", "Slightly high", "High", "Very high"];
+const FEEL_TICK_LABELS = ["Very bad", "Bad", "Off", "Neutral", "Okay", "Good", "Great"];
+const ENERGY_TICK_LABELS = ["Very low", "Low", "Soft", "Neutral", "Active", "High", "Very high"];
 const AXIS_TICKS = EMOTION_AXIS_STEPS.filter((step) => step !== -0.75 && step !== 0.75);
 
 /**
@@ -441,14 +442,14 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
           {AXIS_TICKS.map((step, idx) => (
             <View key={`feel-${step}`} style={styles.tickItem}>
               <View style={styles.tickMark} />
-              <Text style={styles.tickLabel} numberOfLines={1}>{AXIS_TICK_LABELS[idx]}</Text>
+              <Text style={styles.tickLabel} numberOfLines={1}>{FEEL_TICK_LABELS[idx]}</Text>
             </View>
           ))}
         </View>
         <View style={styles.verticalTicks} pointerEvents="none">
           {AXIS_TICKS.map((step, idx) => (
             <View key={`energy-${step}`} style={styles.verticalTickItem}>
-              <Text style={styles.verticalTickLabel} numberOfLines={1}>{AXIS_TICK_LABELS[AXIS_TICK_LABELS.length - 1 - idx]}</Text>
+              <Text style={styles.verticalTickLabel} numberOfLines={1}>{ENERGY_TICK_LABELS[ENERGY_TICK_LABELS.length - 1 - idx]}</Text>
               <View style={styles.verticalTickMark} />
             </View>
           ))}
