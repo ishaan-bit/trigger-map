@@ -37,12 +37,47 @@ export const PREP_LEVELS = ["none", "minimal", "moderate"];
 /** Nourishment primitives - sourced from nourishmentCatalogue.js */
 export const NOURISHMENTS = CATALOGUE_NOURISHMENTS;
 
+export function normalizeDietId(value) {
+  if (!value) return null;
+  const key = String(value).trim().toLowerCase().replace(/[\s_-]/g, "");
+  if (!key || key === "all") return null;
+  if (key === "veg" || key === "vegetarian") return "vegetarian";
+  if (key === "vegan") return "vegan";
+  if (key === "nonveg" || key === "nonvegetarian" || key === "nonvegeterian") return "nonVeg";
+  if (key === "glutenfree") return "glutenFree";
+  return value;
+}
+
+export function getDietaryTags(item) {
+  const diets = Array.isArray(item?.diet) ? item.diet.map(normalizeDietId) : [];
+  const tags = new Set(["all"]);
+  if (diets.includes("vegetarian")) tags.add("veg");
+  if (diets.includes("vegan")) {
+    tags.add("vegan");
+    tags.add("veg");
+  }
+  if (diets.includes("nonVeg")) tags.add("non_veg");
+  return [...tags];
+}
+
+export function matchesDietFilter(item, filter) {
+  const normalized = normalizeDietId(filter);
+  if (!normalized) return true;
+  const tags = getDietaryTags(item);
+  if (normalized === "vegetarian") return tags.includes("veg") && !tags.includes("non_veg");
+  if (normalized === "vegan") return tags.includes("vegan");
+  if (normalized === "nonVeg") return tags.includes("non_veg");
+  if (normalized === "glutenFree") return Array.isArray(item?.diet) && item.diet.includes("glutenFree");
+  return Array.isArray(item?.diet) && item.diet.includes(normalized);
+}
+
 /**
  * Filter nourishments matching criteria.
  */
 export function filterNourishments({ types, diets, cuisines, prepLevel, emotions } = {}) {
   // nonVeg users can eat everything — skip diet filter when only diet is nonVeg
-  const effectiveDiets = diets?.length === 1 && diets[0] === "nonVeg" ? null : diets;
+  const normalizedDiets = Array.isArray(diets) ? diets.map(normalizeDietId).filter(Boolean) : diets;
+  const effectiveDiets = normalizedDiets?.length === 1 && normalizedDiets[0] === "nonVeg" ? null : normalizedDiets;
   return NOURISHMENTS.filter((n) => {
     if (types?.length && !types.includes(n.type)) return false;
     if (effectiveDiets?.length && !effectiveDiets.some((d) => n.diet.includes(d))) return false;

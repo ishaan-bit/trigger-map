@@ -9,6 +9,46 @@ import { generateRuleBasedModeOutput } from "@/ai/modeComposer.js";
 
 const VALID_MODES = ["move", "fuel", "perspective"];
 
+function hasUsableItems(output) {
+  return output && Array.isArray(output.items) && output.items.some((item) => item?.id);
+}
+
+async function readModeOrRuleFallback({ ownerId, mode, lang }) {
+  const stored = await getStoredModeOutput(ownerId, mode);
+  if (hasUsableItems(stored) || (mode === "perspective" && stored?.narrative)) {
+    console.log(`[modes] selected ${mode} source=${stored.source || stored.model || "unknown"} owner=${ownerId.slice(0, 8)} items=${stored.items?.length || 0}`);
+    return stored;
+  }
+
+  const fallback = await generateRuleBasedModeOutput({ ownerId, mode, lang, persist: false, reason: stored ? "invalid_cache" : "empty_cache" });
+  console.log(`[modes] selected ${mode} source=${fallback.source || "rule"} owner=${ownerId.slice(0, 8)} reason=${fallback.fallbackReason}`);
+  return fallback;
+}
+
+async function ensureVisibleFallbacks({ ownerId, lang, results, feedbackEntries, modes }) {
+  const filtered = applyModeFeedbackToResults(results, feedbackEntries, modes);
+
+  for (const mode of modes) {
+    if (mode !== "move" && mode !== "fuel") continue;
+    if (filtered[mode]?.items?.length) continue;
+
+    const fallback = await generateRuleBasedModeOutput({
+      ownerId,
+      mode,
+      lang,
+      persist: false,
+      reason: "feedback_filtered",
+    });
+    fallback.source = "fallback";
+
+    const filteredFallback = applyModeFeedbackToResults({ [mode]: fallback }, feedbackEntries, [mode])[mode];
+    filtered[mode] = filteredFallback?.items?.length ? filteredFallback : fallback;
+    console.log(`[modes] ${mode} visible list backfilled owner=${ownerId.slice(0, 8)} items=${filtered[mode]?.items?.length || 0}`);
+  }
+
+  return filtered;
+}
+
 /**
  * GET /api/modes?mode=move — fetch latest cached mode output
  * GET /api/modes — fetch all three modes
@@ -37,29 +77,29 @@ export default async function handler(req, res) {
       if (!VALID_MODES.includes(requestedMode)) {
         return sendError(res, 400, "INVALID_MODE", `mode must be one of: ${VALID_MODES.join(", ")}`);
       }
-      const output = await getStoredModeOutput(ownerId, requestedMode)
-        || await generateRuleBasedModeOutput({ ownerId, mode: requestedMode, lang, persist: false, reason: "empty_cache" });
+      const output = await readModeOrRuleFallback({ ownerId, mode: requestedMode, lang });
       const feedbackEntries = await getModeFeedback(ownerId);
-      const filtered = applyModeFeedbackToResults({ [requestedMode]: output }, feedbackEntries, [requestedMode]);
+      const filtered = await ensureVisibleFallbacks({ ownerId, lang, results: { [requestedMode]: output }, feedbackEntries, modes: [requestedMode] });
       filtered.feedback = buildModeFeedbackMap(filtered, feedbackEntries, [requestedMode]);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       return sendSuccess(res, filtered);
     }
 
     // Return all three modes + feedback map
     const results = {};
     for (const mode of VALID_MODES) {
-      results[mode] = await getStoredModeOutput(ownerId, mode)
-        || await generateRuleBasedModeOutput({ ownerId, mode, lang, persist: false, reason: "empty_cache" });
+      results[mode] = await readModeOrRuleFallback({ ownerId, mode, lang });
     }
 
     const feedbackEntries = await getModeFeedback(ownerId);
-    const filteredResults = applyModeFeedbackToResults(results, feedbackEntries);
+    const filteredResults = await ensureVisibleFallbacks({ ownerId, lang, results, feedbackEntries, modes: VALID_MODES });
     filteredResults.feedback = buildModeFeedbackMap(filteredResults, feedbackEntries, VALID_MODES);
 
     const populated = VALID_MODES.filter((m) => filteredResults[m] != null);
     if (!populated.length) {
       console.log(`[modes] All modes empty for ${ownerId.slice(0, 8)}. Run generateAdaptiveModes job.`);
     }
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return sendSuccess(res, filteredResults);
   } catch (error) {
     captureServerError(error, { path: "/api/modes" });

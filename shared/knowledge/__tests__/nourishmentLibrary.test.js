@@ -6,6 +6,9 @@ import {
   CUISINES,
   PREP_LEVELS,
   filterNourishments,
+  getDietaryTags,
+  matchesDietFilter,
+  normalizeDietId,
   pickNourishments,
 } from '../nourishmentLibrary.js';
 
@@ -64,6 +67,27 @@ describe('filterNourishments', () => {
     const all = filterNourishments();
     const nonVeg = filterNourishments({ diets: ['nonVeg'] });
     expect(nonVeg.length).toBe(all.length);
+  });
+
+  it('normalizes public diet filter names', () => {
+    expect(normalizeDietId('Veg')).toBe('vegetarian');
+    expect(normalizeDietId('non_veg')).toBe('nonVeg');
+    expect(normalizeDietId('Non-Veg')).toBe('nonVeg');
+    expect(normalizeDietId('all')).toBe(null);
+  });
+
+  it('supports exact category matching for Fuel filters', () => {
+    const vegan = NOURISHMENTS.find(n => n.diet.includes('vegan'));
+    const nonVeg = NOURISHMENTS.find(n => n.diet.includes('nonVeg'));
+
+    expect(getDietaryTags(vegan)).toContain('vegan');
+    expect(getDietaryTags(vegan)).toContain('veg');
+    expect(matchesDietFilter(vegan, 'vegetarian')).toBe(true);
+    expect(matchesDietFilter(vegan, 'vegan')).toBe(true);
+
+    expect(getDietaryTags(nonVeg)).toContain('non_veg');
+    expect(matchesDietFilter(nonVeg, 'non_veg')).toBe(true);
+    expect(matchesDietFilter(nonVeg, 'vegetarian')).toBe(false);
   });
 
   it('filters by cuisine', () => {

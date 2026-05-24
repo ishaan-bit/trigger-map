@@ -264,7 +264,7 @@ export function fetchProgress(token, deviceId) {
 // ── Adaptive Modes ──
 
 export function fetchModes(token, deviceId, lang) {
-  const params = [];
+  const params = [`_t=${Date.now()}`];
   if (!token && deviceId) params.push(`deviceId=${encodeURIComponent(deviceId)}`);
   if (lang) params.push(`lang=${encodeURIComponent(lang)}`);
   const query = params.length ? `?${params.join("&")}` : "";
@@ -272,7 +272,7 @@ export function fetchModes(token, deviceId, lang) {
 }
 
 export function fetchModeOutput(mode, token, deviceId, lang) {
-  const params = [`mode=${encodeURIComponent(mode)}`];
+  const params = [`mode=${encodeURIComponent(mode)}`, `_t=${Date.now()}`];
   if (!token && deviceId) params.push(`deviceId=${encodeURIComponent(deviceId)}`);
   if (lang) params.push(`lang=${encodeURIComponent(lang)}`);
   return fetchJson(`/modes?${params.join("&")}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });

@@ -12,7 +12,13 @@
  */
 
 import { pickMovements, MOVEMENTS } from "../knowledge/movementLibrary.js";
-import { pickNourishments, NOURISHMENTS } from "../knowledge/nourishmentLibrary.js";
+import {
+  getDietaryTags,
+  matchesDietFilter,
+  normalizeDietId,
+  pickNourishments,
+  NOURISHMENTS,
+} from "../knowledge/nourishmentLibrary.js";
 import { retrieveForMode } from "../knowledge/ragEngine.js";
 import { emotionSignalKeywords } from "../shared/constants/emotions.js";
 import { ollamaChat } from "./ollamaChat.js";
@@ -202,18 +208,97 @@ async function selectMoveItems(ownerId, emotions, profile) {
   const equip = profile?.equipment || undefined;
   const disliked = profile?.dislikedMovements || [];
   const liked = profile?.likedMovements || [];
-  const exclude = [...recentIds, ...disliked];
-  return pickMovements(emotions, 12, { exclude, boost: liked, environment: env, equipment: equip });
+  const strict = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost: liked, environment: env, equipment: equip });
+  if (strict.length >= 6) return strict;
+
+  const relaxedRecent = pickMovements(emotions, 12, { exclude: disliked, boost: liked, environment: env, equipment: equip });
+  if (relaxedRecent.length) {
+    console.log(`[modeComposer] move selection relaxed recent history for ${ownerId.slice(0, 8)} (${strict.length}->${relaxedRecent.length})`);
+    return relaxedRecent;
+  }
+
+  console.warn(`[modeComposer] move selection had to include disliked items for ${ownerId.slice(0, 8)}; no clean alternatives available`);
+  return pickMovements(emotions, 12, { exclude: [], boost: liked, environment: env, equipment: equip });
+}
+
+function scoreNourishment(item, emotions = [], boostSet = new Set()) {
+  return (emotions.length ? emotions.filter((e) => item.emotionTags?.includes(e)).length : 0)
+    + (boostSet.has(item.id) ? 1.5 : 0)
+    + Math.random() * 0.5;
+}
+
+function pickNourishmentsForCategory(emotions, count, { exclude = [], boost = [], dietFilter, cuisine } = {}) {
+  const excludeSet = new Set(exclude);
+  const boostSet = new Set(boost);
+  const pool = NOURISHMENTS
+    .filter((item) => !excludeSet.has(item.id))
+    .filter((item) => matchesDietFilter(item, dietFilter))
+    .filter((item) => !cuisine || item.cuisine?.includes(cuisine));
+
+  const emotionalPool = emotions?.length
+    ? pool.filter((item) => emotions.some((emotion) => item.emotionTags?.includes(emotion)))
+    : pool;
+  const candidates = emotionalPool.length ? emotionalPool : pool;
+
+  return candidates
+    .map((item) => ({ ...item, _score: scoreNourishment(item, emotions, boostSet) }))
+    .sort((a, b) => b._score - a._score)
+    .slice(0, count);
+}
+
+function mergeUniqueItems(groups, limit) {
+  const seen = new Set();
+  const merged = [];
+  for (const group of groups) {
+    for (const item of group || []) {
+      if (!item?.id || seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+      if (merged.length >= limit) return merged;
+    }
+  }
+  return merged;
 }
 
 async function selectFuelItems(ownerId, emotions, profile) {
   const recentIds = await getRecentItemIds(ownerId, "fuel", 3);
-  const diet = profile?.diet || undefined;
+  const diet = normalizeDietId(profile?.diet) || undefined;
   const cuisine = profile?.cuisine || undefined;
   const disliked = profile?.dislikedNourishments || [];
   const liked = profile?.likedNourishments || [];
-  const exclude = [...recentIds, ...disliked];
-  return pickNourishments(emotions, 15, { exclude, boost: liked, diet, cuisine });
+  const strictExclude = [...recentIds, ...disliked];
+
+  const base = pickNourishments(emotions, 15, { exclude: strictExclude, boost: liked, diet, cuisine });
+  const categoryGroups = [];
+
+  if (!diet || diet === "nonVeg") {
+    categoryGroups.push(
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegetarian", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "nonVeg", cuisine }),
+    );
+  } else if (diet === "vegetarian") {
+    categoryGroups.push(
+      pickNourishmentsForCategory(emotions, 8, { exclude: strictExclude, boost: liked, dietFilter: "vegetarian", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
+    );
+  } else if (diet === "vegan") {
+    categoryGroups.push(
+      pickNourishmentsForCategory(emotions, 15, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
+    );
+  }
+
+  const strict = mergeUniqueItems([base, ...categoryGroups], 18);
+  if (strict.length >= 6) return strict;
+
+  const relaxedRecent = pickNourishments(emotions, 18, { exclude: disliked, boost: liked, diet, cuisine });
+  if (relaxedRecent.length) {
+    console.log(`[modeComposer] fuel selection relaxed recent history for ${ownerId.slice(0, 8)} (${strict.length}->${relaxedRecent.length})`);
+    return relaxedRecent;
+  }
+
+  console.warn(`[modeComposer] fuel selection had to include disliked items for ${ownerId.slice(0, 8)}; no clean alternatives available`);
+  return pickNourishments(emotions, 18, { exclude: [], boost: liked, diet, cuisine });
 }
 
 // ── Prompt builders ────────────────────────────────────────────────────
@@ -401,6 +486,7 @@ function buildPerspectiveFallback(report, lang = "en") {
 }
 
 export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", persist = true, reason = "fallback" }) {
+  console.log(`[modeComposer] ${mode} rule generation started for ${ownerId.slice(0, 8)} reason=${reason}`);
   const report = await getStoredWeeklyInsight(ownerId).catch(() => null);
   const emotions = extractEmotions(report);
   const profile = await getModeProfile(ownerId).catch(() => null);
@@ -414,6 +500,10 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
       description: lang === "hi" ? i.descriptionHi : i.description,
       intensity: i.intensity,
       durationMin: i.durationMin,
+      equipment: i.equipment,
+      environment: i.environment,
+      mechanism: i.mechanism,
+      emotionTags: i.emotionTags,
       reason: lang === "hi"
         ? "आपकी हाल की भावनात्मक स्थिति और पिछली पसंद के आधार पर चुना गया।"
         : "Picked from your recent emotional pattern and feedback history.",
@@ -435,7 +525,12 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
       name: lang === "hi" ? i.nameHi : i.name,
       description: lang === "hi" ? i.descriptionHi : i.description,
       type: i.type,
+      diet: i.diet,
+      dietaryTags: getDietaryTags(i),
+      cuisine: i.cuisine,
+      prepLevel: i.prepLevel,
       nutrientFocus: i.nutrientFocus,
+      emotionTags: i.emotionTags,
       reason: lang === "hi"
         ? "आपकी हाल की भावनात्मक स्थिति और पिछली पसंद के आधार पर चुना गया।"
         : "Picked from your recent emotional pattern and feedback history.",
@@ -467,6 +562,7 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
     if (output.items?.length) await appendModeHistory(ownerId, mode, output.items.map((i) => i.id));
   }
 
+  console.log(`[modeComposer] ${mode} rule generation completed for ${ownerId.slice(0, 8)} items=${output.items?.length || 0} persist=${persist}`);
   return { ...output, generatedAt: new Date().toISOString() };
 }
 
@@ -510,6 +606,7 @@ function getSystemPrompt(mode, lang, style) {
 export async function generateModeOutput({ ownerId, mode, lang = "en", model: modelOverride, maxWords = 100, style }) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = modelOverride || process.env.LLM_MODEL || DEFAULT_MODEL;
+  console.log(`[modeComposer] ${mode} generation started for ${ownerId.slice(0, 8)} model=${model}`);
 
   // Pre-check: ensure model is available in Ollama (auto-pull if missing)
   await ensureModelAvailable(apiUrl, model);
@@ -709,7 +806,14 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
         ...(parsedReasons[idx] ? { reason: parsedReasons[idx] } : {}),
         ...(i.intensity ? { intensity: i.intensity } : {}),
         ...(i.durationMin ? { durationMin: i.durationMin } : {}),
+        ...(i.equipment ? { equipment: i.equipment } : {}),
+        ...(i.environment ? { environment: i.environment } : {}),
+        ...(i.mechanism ? { mechanism: i.mechanism } : {}),
+        ...(i.emotionTags ? { emotionTags: i.emotionTags } : {}),
         ...(i.type ? { type: i.type } : {}),
+        ...(i.diet ? { diet: i.diet, dietaryTags: getDietaryTags(i) } : {}),
+        ...(i.cuisine ? { cuisine: i.cuisine } : {}),
+        ...(i.prepLevel ? { prepLevel: i.prepLevel } : {}),
         ...(i.nutrientFocus ? { nutrientFocus: i.nutrientFocus } : {}),
       }));
 
@@ -729,9 +833,12 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
 
       // Persist
       const output = { mode, items: itemSummaries, narrative, model, source: "llm" };
+      console.log(`[modeComposer] ${mode} LLM output parsed for ${ownerId.slice(0, 8)}: ${itemSummaries.length} items, model=${model}`);
       await storeModeOutput(ownerId, mode, output);
       await appendModeHistory(ownerId, mode, itemIds);
+      console.log(`[modeComposer] ${mode} wrote mode output key for ${ownerId.slice(0, 8)} (${itemIds.length} ids)`);
 
+      console.log(`[modeComposer] ${mode} generation completed for ${ownerId.slice(0, 8)} source=llm items=${itemSummaries.length}`);
       return output;
     } catch (err) {
       lastError = err;
@@ -767,6 +874,7 @@ export async function generateAllModes({ ownerId, lang = "en", model, maxWords =
           persist: true,
           reason: "llm_failed",
         });
+        console.log(`[modeComposer] ${mode} fallback completed for ${ownerId.slice(0, 8)} items=${results[mode]?.items?.length || 0}`);
       } catch (fallbackErr) {
         console.error(`Mode ${mode} fallback failed for ${ownerId}:`, fallbackErr.message);
         results[mode] = null;

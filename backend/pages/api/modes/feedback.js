@@ -55,6 +55,7 @@ export default async function handler(req, res) {
 
     const source = typeof body.source === "string" ? body.source : undefined;
     const reason = typeof body.reason === "string" ? body.reason : undefined;
+    console.log(`[modes/feedback] received ${mode}/${itemId}=${normalized} source=${source || "unknown"} owner=${ownerId.slice(0, 8)}`);
     await storeModeFeedback(ownerId, mode, itemId, normalized, {
       ...(response !== normalized ? { rawResponse: response } : {}),
       ...(source ? { source } : {}),
@@ -67,6 +68,7 @@ export default async function handler(req, res) {
       await applyModeFeedbackToProfile(ownerId, mode, itemId, normalized);
     }
 
+    console.log(`[modes/feedback] completed ${mode}/${itemId}=${normalized} owner=${ownerId.slice(0, 8)}`);
     return sendSuccess(res, { stored: true, response: normalized });
   } catch (error) {
     captureServerError(error, { path: "/api/modes/feedback" });

@@ -109,8 +109,10 @@ export async function getStoredModeOutput(ownerId, mode) {
 
 export async function storeModeOutput(ownerId, mode, output) {
   const payload = { ...output, mode, generatedAt: new Date().toISOString() };
-  await redis(["SET", getModeOutputKey(ownerId, mode), JSON.stringify(payload)]);
-  await redis(["EXPIRE", getModeOutputKey(ownerId, mode), TTL_7D]);
+  const key = getModeOutputKey(ownerId, mode);
+  await redis(["SET", key, JSON.stringify(payload)]);
+  await redis(["EXPIRE", key, TTL_7D]);
+  console.log(`[modeStore] wrote ${key} source=${payload.source || payload.model || "unknown"} items=${payload.items?.length || 0}`);
   return payload;
 }
 
@@ -136,6 +138,7 @@ export async function storeModeFeedback(ownerId, mode, itemId, response, metadat
   });
   await redis(["RPUSH", key, entry]);
   await redis(["EXPIRE", key, TTL_90D]);
+  console.log(`[modeStore] feedback stored ${key} ${mode}/${itemId}=${response}`);
 }
 
 export async function getModeFeedback(ownerId) {
@@ -165,6 +168,7 @@ export async function applyModeFeedbackToProfile(ownerId, mode, itemId, response
     liked.delete(itemId);
   }
 
+  console.log(`[modeStore] profile feedback applied ${ownerId.slice(0, 8)} ${mode}/${itemId}=${response}`);
   return storeModeProfile(ownerId, {
     ...profile,
     [likedKey]: [...liked],

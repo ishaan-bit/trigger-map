@@ -64,7 +64,7 @@ const PROCESS_ROWS = [
     hasMinMarked: true,
     defaults: {
       enabled: true, model: 'phi3', style: 'default', minMoments: 3,
-      premium: true, hasMarked: true, minMarked: 1, timeSinceLastRun: 3,
+      premium: true, hasMarked: false, minMarked: 1, timeSinceLastRun: 1,
     },
   },
   {
@@ -80,7 +80,7 @@ const PROCESS_ROWS = [
     hasMinMarked: true,
     defaults: {
       enabled: true, model: 'phi3', style: 'default', minMoments: 3,
-      premium: true, hasMarked: true, minMarked: 1, timeSinceLastRun: 3,
+      premium: true, hasMarked: false, minMarked: 1, timeSinceLastRun: 1,
     },
   },
   {

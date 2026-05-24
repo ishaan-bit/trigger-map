@@ -27,7 +27,7 @@ import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { emotionColor as getFieldColor } from "@/utils/emotionModel";
 import { MOVEMENTS, EQUIPMENT, filterMovements, pickMovements } from "@triggermap/shared";
-import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments } from "@triggermap/shared";
+import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments, getDietaryTags, matchesDietFilter } from "@triggermap/shared";
 
 /* ── Helpers ── */
 
@@ -1697,15 +1697,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       const serverReasons = Object.fromEntries(safeItems.map((si) => [si.id, si.reason]));
       pool = safeItems.map((si) => {
         const nItem = nourishMap[si.id];
-        return nItem ? { ...nItem, reason: serverReasons[si.id] || null } : null;
+        const merged = nItem ? { ...nItem, ...si, reason: serverReasons[si.id] || si.reason || null } : si;
+        return merged?.id ? { ...merged, dietaryTags: merged.dietaryTags || getDietaryTags(merged) } : null;
       }).filter(Boolean);
     } else {
       pool = filterNourishments({ diets: fuelDiet ? [fuelDiet] : undefined });
     }
-    if (fuelDiet && fuelDiet !== "nonVeg") {
-      // nonVeg users can eat everything — no filtering needed
-      pool = pool.filter((n) => n.diet?.includes(fuelDiet));
-    }
+    if (fuelDiet) pool = pool.filter((n) => matchesDietFilter(n, fuelDiet));
     pool = pool.filter((n) => !dismissedItemIds.has(n.id));
     // Sort by: liked first, then emotion relevance, disliked last
     return [...pool].sort((a, b) => {
@@ -1733,10 +1731,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       { key: "dinner", label: isHi ? "रात का खाना" : "Dinner", icon: "🍽️", types: ["meal"] },
       { key: "ritual", label: isHi ? "भोजन रिचुअल" : "Food Ritual", icon: "🧘", types: ["ritual"] },
     ];
-    // Full library pool for backfill (diet-filtered, diet=nonVeg includes all items)
-    const allLibrary = fuelDiet && fuelDiet !== "nonVeg"
-      ? NOURISHMENTS.filter((n) => n.diet?.includes(fuelDiet))
-      : NOURISHMENTS;
+    // Full library pool for backfill, using exact category semantics for filters.
+    const allLibrary = fuelDiet ? NOURISHMENTS.filter((n) => matchesDietFilter(n, fuelDiet)) : NOURISHMENTS;
     const backfillLibrary = allLibrary.filter((n) => !dismissedItemIds.has(n.id));
     const used = new Set();
     return SLOTS.map((slot) => {
@@ -2358,25 +2354,37 @@ export function WeeklyReportScreen() {
     if (t) rs().catch(() => null);
     trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
 
-    // Refresh adaptive modes every time screen gains focus
-    if (p && t) {
+    const refreshModes = () => {
       fetchModes(t, deviceId, lang)
         .then((data) => {
           const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
-          console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
+          if (__DEV__) console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
           setModes(data || {});
         })
         .catch((err) => {
           console.error("Modes fetch failed:", err?.message || err);
           setModes((prev) => prev || {});
         });
+    };
+
+    let modesTimer = null;
+    let guideTimer = null;
+
+    // Refresh adaptive modes every time screen gains focus
+    if (p && t) {
+      refreshModes();
+      modesTimer = globalThis.setInterval(refreshModes, 45000);
     }
 
     // FTUE: show insights guide when arriving from second log
     if (obState === "second_log_done") {
-      const timer = setTimeout(() => setShowInsightsGuide(true), 800);
-      return () => clearTimeout(timer);
+      guideTimer = setTimeout(() => setShowInsightsGuide(true), 800);
     }
+
+    return () => {
+      if (modesTimer) globalThis.clearInterval(modesTimer);
+      if (guideTimer) clearTimeout(guideTimer);
+    };
   }, [load, obState, deviceId, lang]));
 
   // Load progress metrics
@@ -2396,7 +2404,17 @@ export function WeeklyReportScreen() {
     trackEvent("mode_feedback", { mode, itemId, response, source });
     // Update local feedback cache so it persists across tab switches
     setModes((prev) => prev ? { ...prev, feedback: { ...prev.feedback, [itemId]: response } } : prev);
-  }, [token, deviceId]);
+    try {
+      const freshModes = await fetchModes(token, deviceId, lang);
+      if (__DEV__) {
+        const count = freshModes?.[mode]?.items?.length || 0;
+        console.log("Modes refreshed after feedback:", mode, count, freshModes?.[mode]?.source || freshModes?.[mode]?.model);
+      }
+      setModes(freshModes || {});
+    } catch (err) {
+      if (__DEV__) console.log("Mode feedback stored; refresh failed:", err?.message || err);
+    }
+  }, [token, deviceId, lang]);
 
   const handleActionFeedback = useCallback((actionId, response) => {
     trackEvent("action_feedback", { actionId, response });

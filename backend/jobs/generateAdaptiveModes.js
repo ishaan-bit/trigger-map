@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { generateAllModes } from "../ai/modeComposer.js";
 import { listOwnerIds } from "../services/aggregationService.js";
 import { getUserById, getSubscription } from "../services/authService.js";
-import { getStoredModeOutput } from "../services/modeStore.js";
+import { getModeFeedback, getStoredModeOutput } from "../services/modeStore.js";
 
 const MODE_WINDOW_MS = 24 * 60 * 60 * 1000; // 1 day cooldown
 
@@ -59,16 +59,20 @@ export async function runGenerateAdaptiveModes({ force = false, maxWords, ownerI
         continue;
       }
 
-      // Check cooldown
+      // Check cooldown. Feedback after the last generation should bypass the
+      // window so preferences are consumed on the next run.
       if (!force) {
-        const existing = await getStoredModeOutput(ownerId, "move");
-        if (existing?.generatedAt) {
-          const elapsed = Date.now() - new Date(existing.generatedAt).getTime();
-          if (elapsed < MODE_WINDOW_MS) {
-            results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
-            skipped++;
-            continue;
-          }
+        const outputs = await Promise.all(["move", "fuel", "perspective"].map((mode) => getStoredModeOutput(ownerId, mode).catch(() => null)));
+        const generatedTimes = outputs.map((output) => output?.generatedAt ? new Date(output.generatedAt).getTime() : 0);
+        const oldestGeneratedAt = Math.min(...generatedTimes);
+        const hasAllFresh = generatedTimes.every((ts) => ts && Date.now() - ts < MODE_WINDOW_MS);
+        const feedback = await getModeFeedback(ownerId).catch(() => []);
+        const hasNewModeFeedback = feedback.some((entry) => ["move", "fuel"].includes(entry?.mode) && Number(entry.timestamp || 0) > oldestGeneratedAt);
+
+        if (hasAllFresh && !hasNewModeFeedback) {
+          results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });
+          skipped++;
+          continue;
         }
       }
 

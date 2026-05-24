@@ -7,7 +7,7 @@ import { STYLE_IDS } from "@/ai/styleProfiles.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { enforceRateLimit } from "@/services/rateLimitService.js";
 
-const ALLOWED_MODELS = ["phi3", "mistral", "llama3", "llama2", "gemma", "gemma4", "qwen2"];
+const ALLOWED_MODELS = ["phi3", "gemma3", "mistral", "llama3", "llama2", "gemma", "gemma4", "qwen2"];
 
 /**
  * POST /api/modes/regenerate
@@ -46,6 +46,7 @@ export default async function handler(req, res) {
     const safeMaxWords = (typeof maxWords === "number" && maxWords >= 50 && maxWords <= 300) ? maxWords : 100;
     const safeStyle = (typeof style === "string" && STYLE_IDS.includes(style)) ? style : undefined;
 
+    console.log(`[modes/regenerate] started owner=${user.id.slice(0, 8)} model=${safeModel || process.env.LLM_MODEL || "default"}`);
     const results = await generateAllModes({
       ownerId: user.id,
       lang: safeLang,
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
       maxWords: safeMaxWords,
       style: safeStyle,
     });
+    console.log(`[modes/regenerate] completed owner=${user.id.slice(0, 8)} move=${results.move?.items?.length || 0} fuel=${results.fuel?.items?.length || 0}`);
 
     return sendSuccess(res, results);
   } catch (error) {
