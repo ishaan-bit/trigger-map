@@ -403,7 +403,7 @@ function buildStrongSummary(report, firstName) {
 }
 
 function appendTagContext(summary, report) {
-  const tagFreq = report.tagFrequency;
+  const tagFreq = report.contributionTagFrequency || report.tagFrequency;
   if (!tagFreq || !Object.keys(tagFreq).length) return summary;
 
   const sorted = Object.entries(tagFreq).sort(([, a], [, b]) => b - a);
@@ -411,6 +411,14 @@ function appendTagContext(summary, report) {
   if (!topTag || topTag[1] < 2) return summary;
 
   return `${summary} Notably, "${topTag[0]}" came up ${topTag[1]} times across your moments.`;
+}
+
+function topContribution(report, labels) {
+  const freq = report.contributionTagFrequency || report.tagFrequency || {};
+  return labels
+    .map((label) => [label, Number(freq[label] || freq[label.toLowerCase()] || 0)])
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])[0] || null;
 }
 
 export async function generateInsight(report, opts = {}) {
@@ -554,6 +562,18 @@ function buildWhereToFocus(report) {
   const m = report.mirror || report;
   const items = [];
   const spWf = buildSignalProfile(report);
+  const boundary = topContribution(report, ["Boundary crossed", "Tension at home", "Old pattern triggered", "Too many demands"]);
+  if (boundary && (report.triggerFrequency?.family || 0) >= 2) {
+    items.push({ text: `Family moments were often tagged with ${boundary[0].toLowerCase()} - worth noticing gently` });
+  }
+  const bodyLow = topContribution(report, ["Sleep debt", "Low fuel", "Heavy body", "Exhausted", "Poor sleep"]);
+  if (bodyLow && ((report.triggerFrequency?.health || 0) + (report.triggerFrequency?.sleep || 0) + (report.triggerFrequency?.exercise || 0)) >= 2) {
+    items.push({ text: `Body-related logs often included ${bodyLow[0].toLowerCase()}, which may be connected to lower energy` });
+  }
+  const switching = topContribution(report, ["Context switching", "Too many tasks", "Meeting stress", "Unclear expectations"]);
+  if (switching && (report.triggerFrequency?.work || 0) >= 2) {
+    items.push({ text: `Work moments were often tagged with ${switching[0].toLowerCase()}, so overload may be part of the pattern` });
+  }
   // Use longitudinal (mirror) friction zones for pattern-level items
   for (const f of (m.frictionZones || []).slice(0, 3)) {
     const freq = f.count <= 2 ? 'sometimes' : 'often';

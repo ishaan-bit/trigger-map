@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { REGION_TAGS } from "@triggermap/shared/constants/tags";
+import { getContributionSuggestions } from "@triggermap/shared/constants/contributions";
 
 const TAG_USAGE_KEY = "adaptive_tag_usage";
 const MAX_SUGGESTED = 6;
@@ -30,7 +30,17 @@ function loadUsageCache() {
 loadUsageCache();
 
 function rankTags(trigger, context) {
-  const pool = REGION_TAGS[context.regionKey] || REGION_TAGS.neutral_mid;
+  const suggestionSet = getContributionSuggestions({
+    domain: trigger,
+    valence: context.valence,
+    arousal: context.arousal,
+    intensity: context.intensity,
+    emotionLabel: context.emotionLabel,
+    emotionQuadrant: context.emotionQuadrant,
+    intensityBand: context.intensityBand,
+    limit: MAX_SUGGESTED + 3,
+  });
+  const pool = suggestionSet.all.map((item) => item.label);
   const key = `${trigger}:${context.regionKey}`;
   const history = _usageCache[key] || {};
   const scored = pool.map((tag, idx) => ({
@@ -45,6 +55,22 @@ function rankTags(trigger, context) {
 /** Synchronous — uses in-memory cache. Safe to call on every render. */
 export function getRelevantTagsSync(trigger, context) {
   return rankTags(trigger, context);
+}
+
+export function getRelevantContributionSuggestionsSync(trigger, context) {
+  const suggestionSet = getContributionSuggestions({
+    domain: trigger,
+    valence: context.valence,
+    arousal: context.arousal,
+    intensity: context.intensity,
+    emotionLabel: context.emotionLabel,
+    emotionQuadrant: context.emotionQuadrant,
+    intensityBand: context.intensityBand,
+    limit: MAX_SUGGESTED + 3,
+  });
+  const rankedLabels = rankTags(trigger, context);
+  const byLabel = new Map(suggestionSet.all.map((item) => [item.label, item]));
+  return rankedLabels.map((label) => byLabel.get(label)).filter(Boolean);
 }
 
 /**

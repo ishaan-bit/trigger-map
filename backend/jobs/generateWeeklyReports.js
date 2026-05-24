@@ -113,6 +113,9 @@ async function processOwner(ownerId, force, { personalize = true } = {}) {
     topRecurrence: report.recurrence?.[0] ? `${report.recurrence[0].trigger}+${report.recurrence[0].emotion} (${report.recurrence[0].count}x, ${report.recurrence[0].label})` : null,
     positiveStreakDays: report.positiveStreak?.days ?? null,
     negativeStreakDays: report.negativeStreak?.days ?? null,
+    contributionTagFrequency: report.contributionTagFrequency || report.tagFrequency || {},
+    tagFrequency: report.tagFrequency || {},
+    weeklyCentroid: report.weeklyCentroid || null,
   };
 
   await storeWeeklyInsight(ownerId, payload);

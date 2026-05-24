@@ -59,6 +59,10 @@ function buildActionSignals(report, feedback, prefs, firstName, lang) {
   if (bm?.stability) lines.push(`Stability: ${bm.stability.label}.`);
 
   if (report.volatilityLabel) lines.push(`Volatility: ${report.volatilityLabel}.`);
+  const tagEntries = Object.entries(report.contributionTagFrequency || report.tagFrequency || {}).sort(([, a], [, b]) => b - a);
+  if (tagEntries.length) {
+    lines.push(`Contribution tags the user marked: ${tagEntries.slice(0, 6).map(([tag, count]) => `${tag} (${count}x)`).join(", ")}.`);
+  }
 
   if (report.weeklyCentroid?.count) {
     const centroidKeywords = emotionSignalKeywords(report.weeklyCentroid.valence, report.weeklyCentroid.arousal);

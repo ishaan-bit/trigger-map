@@ -9,6 +9,10 @@ import {
   derivedEmotionLabel,
   emotionRegionKey,
 } from "@triggermap/shared/constants/emotions";
+import {
+  buildContributionTagMeta,
+  getContributionSuggestions,
+} from "@triggermap/shared/constants/contributions";
 import { ScreenShell } from "@/components/ScreenShell";
 import { EmotionPad } from "@/components/EmotionPad";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -16,7 +20,7 @@ import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { getRelevantTagsSync, recordTagUsage } from "@/utils/adaptiveTags";
+import { getRelevantContributionSuggestionsSync, recordTagUsage } from "@/utils/adaptiveTags";
 import { emotionColor } from "@/utils/emotionModel";
 import { palette, radius } from "@/utils/theme";
 import { tap, selection, success as hapticSuccess } from "@/utils/haptics";
@@ -86,8 +90,27 @@ export function EmotionSelectionScreen() {
       regionKey,
       valence: emotionCoords.valence,
       arousal: emotionCoords.arousal,
+      intensity: emotionCoords.intensity,
+      emotionLabel: derivedLabelKey,
     }),
-    [emotionCoords.valence, emotionCoords.arousal, legacyEmotion, regionKey]
+    [emotionCoords.valence, emotionCoords.arousal, emotionCoords.intensity, derivedLabelKey, legacyEmotion, regionKey]
+  );
+  const contributionSuggestionSet = useMemo(
+    () => getContributionSuggestions({
+      domain: trigger,
+      valence: emotionCoords.valence,
+      arousal: emotionCoords.arousal,
+      intensity: emotionCoords.intensity,
+      emotionLabel: derivedLabelKey,
+    }),
+    [trigger, emotionCoords.valence, emotionCoords.arousal, emotionCoords.intensity, derivedLabelKey]
+  );
+  const selectedContributionMeta = useMemo(
+    () => buildContributionTagMeta(selectedTags, [
+      ...adaptiveTags,
+      ...contributionSuggestionSet.all,
+    ]),
+    [selectedTags, adaptiveTags, contributionSuggestionSet.all]
   );
 
   const handleEmotionChange = useCallback((valence, arousal, intensity) => {
@@ -117,12 +140,11 @@ export function EmotionSelectionScreen() {
       return;
     }
 
-    const tags = getRelevantTagsSync(trigger, contextForTags);
+    const tags = getRelevantContributionSuggestionsSync(trigger, contextForTags);
     const wasEmpty = adaptiveTags.length === 0;
     setAdaptiveTags(tags);
-    // Preserve any user-selected tags that still exist in the new pool;
-    // drop ones no longer relevant to the current emotion region.
-    setSelectedTags((prev) => prev.filter((s) => tags.includes(s)));
+    // Preserve selected tags while dragging. If they leave the live pool, the
+    // UI pins them in a selected row so the user's intent is not wiped.
     // Only animate the section in on first appearance, not on every refresh.
     if (wasEmpty) {
       tagSectionAnim.setValue(0);
@@ -173,10 +195,22 @@ export function EmotionSelectionScreen() {
         valence: emotionCoords.valence,
         arousal: emotionCoords.arousal,
         intensity: emotionCoords.intensity,
+        emotionPoint: {
+          valence: emotionCoords.valence,
+          arousal: emotionCoords.arousal,
+          x: emotionCoords.valence,
+          y: emotionCoords.arousal,
+        },
+        emotionLabel: derivedLabelKey,
+        emotionSubtitle: derivedLabel,
+        emotionQuadrant: contributionSuggestionSet.emotionQuadrant,
+        emotionIntensity: contributionSuggestionSet.intensityBand,
         note,
         lang,
       };
-      if (selectedTags.length > 0) payload.tags = selectedTags;
+      payload.tags = selectedTags;
+      payload.contributionTags = selectedTags;
+      payload.contributionTagMeta = selectedContributionMeta;
 
       const response = await saveMoment(payload);
 
@@ -283,8 +317,6 @@ export function EmotionSelectionScreen() {
 
   const canSave = hasInteracted && !saving;
   const triggerLabel = t(`triggers.${trigger}`) !== `triggers.${trigger}` ? t(`triggers.${trigger}`) : trigger;
-  const tagHint = t("emotion.tagHint", { count: MAX_TAGS_PER_MOMENT });
-
   return (
     <ScreenShell scroll>
       <Pressable style={styles.backButton} onPress={() => { tap(); router.back(); }} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={12}>
@@ -295,7 +327,6 @@ export function EmotionSelectionScreen() {
       <View style={styles.header}>
         <Text style={styles.kicker}>{triggerLabel}</Text>
         <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
-        <Text style={styles.hint}>{t("emotion.padHint") !== "emotion.padHint" ? t("emotion.padHint") : "Tap or drag to place how you feel"}</Text>
       </View>
 
       <EmotionPad
@@ -329,8 +360,28 @@ export function EmotionSelectionScreen() {
               ))}
             </View>
           </View>
+          {selectedTags.some((tag) => !adaptiveTags.some((item) => item.label === tag)) ? (
+            <View style={styles.pinnedRow}>
+              <Text style={styles.pinnedLabel}>Selected</Text>
+              <View style={styles.tagWrap}>
+                {selectedTags
+                  .filter((tag) => !adaptiveTags.some((item) => item.label === tag))
+                  .map((tag) => (
+                    <Pressable
+                      key={`selected-${tag}`}
+                      onPress={() => toggleTag(tag)}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.tagChip, styles.tagChipActive, { borderColor: accentColor }, pressed && styles.tagChipPressed]}
+                    >
+                      <Text style={[styles.tagText, styles.tagTextActive]}>{tag}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            </View>
+          ) : null}
           <View style={styles.tagWrap}>
-            {adaptiveTags.map((tag) => {
+            {adaptiveTags.map((item) => {
+              const tag = item.label;
               const active = selectedTags.includes(tag);
               const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
               return (
@@ -403,6 +454,8 @@ const styles = StyleSheet.create({
   tagDots: { flexDirection: "row", gap: 6, alignItems: "center" },
   tagDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(148,180,224,0.25)" },
   tagDotActive: {},
+  pinnedRow: { gap: 6 },
+  pinnedLabel: { color: palette.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tagChip: {
     paddingHorizontal: 14,

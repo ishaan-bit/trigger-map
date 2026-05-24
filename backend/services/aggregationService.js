@@ -63,6 +63,9 @@ function parseAggregateHash(record, date) {
       snapshot.timeOfDay[field.replace("time:", "")] = value;
     } else if (field.startsWith("tag:")) {
       snapshot.tags[field.replace("tag:", "")] = value;
+    } else if (field.startsWith("contribution:")) {
+      snapshot.contributionTags = snapshot.contributionTags || {};
+      snapshot.contributionTags[field.replace("contribution:", "")] = value;
     }
   }
 
@@ -89,6 +92,14 @@ export async function appendDailyAggregate(moment) {
   if (Array.isArray(moment.tags)) {
     for (const tag of moment.tags) {
       cmds.push(["HINCRBY", key, `tag:${tag}`, "1"]);
+    }
+  }
+  if (Array.isArray(moment.contributionTags)) {
+    for (const tag of moment.contributionTags) {
+      if (!moment.tags?.includes(tag)) {
+        cmds.push(["HINCRBY", key, `tag:${tag}`, "1"]);
+      }
+      cmds.push(["HINCRBY", key, `contribution:${tag}`, "1"]);
     }
   }
 

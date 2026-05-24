@@ -27,6 +27,9 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   const displayEmotion = moment.derivedLabel || moment.emotion;
   const emotionLabel = t("emotions." + displayEmotion) || displayEmotion;
   const locale = lang === "hi" ? "hi-IN" : "en-IN";
+  const contributionTags = moment.contributionTags?.length ? moment.contributionTags : (moment.tags || []);
+  const visibleTags = contributionTags.slice(0, 3);
+  const extraTagCount = Math.max(0, contributionTags.length - visibleTags.length);
 
   function handleDelete() {
     warning();
@@ -61,13 +64,18 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
             )}
           </View>
           {moment.note ? <Text style={styles.note} numberOfLines={2}>{moment.note}</Text> : null}
-          {moment.tags?.length ? (
+          {visibleTags.length ? (
             <View style={styles.tagRow}>
-              {moment.tags.map((tag) => (
+              {visibleTags.map((tag) => (
                 <View key={tag} style={styles.tagPill}>
                   <Text style={styles.tagPillText}>{tag}</Text>
                 </View>
               ))}
+              {extraTagCount > 0 ? (
+                <View style={styles.tagPill}>
+                  <Text style={styles.tagPillText}>+{extraTagCount}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>

@@ -361,14 +361,24 @@ export function SessionProvider({ children }) {
           if (typeof payload.intensity === "number") emotionFields.intensity = payload.intensity;
         }
         if (payload.emotion) emotionFields.emotion = payload.emotion;
+        const contributionFields = {
+          ...(payload.emotionPoint ? { emotionPoint: payload.emotionPoint } : {}),
+          ...(payload.emotionLabel ? { emotionLabel: payload.emotionLabel } : {}),
+          ...(payload.emotionSubtitle ? { emotionSubtitle: payload.emotionSubtitle } : {}),
+          ...(payload.emotionQuadrant ? { emotionQuadrant: payload.emotionQuadrant } : {}),
+          ...(payload.emotionIntensity ? { emotionIntensity: payload.emotionIntensity } : {}),
+          contributionTags: payload.contributionTags || payload.tags || [],
+          contributionTagMeta: payload.contributionTagMeta || [],
+        };
 
         if (!token) {
           const localMoment = await saveLocalMoment({
             trigger: payload.trigger,
             ...emotionFields,
+            ...contributionFields,
             note: notes,
             timestamp,
-            ...(payload.tags?.length ? { tags: payload.tags } : {}),
+            tags: payload.tags || [],
           });
           await setLastLoggedAt(timestamp);
           trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
@@ -379,10 +389,11 @@ export function SessionProvider({ children }) {
             momentId: localMoment.id,
             trigger: payload.trigger,
             ...emotionFields,
+            ...contributionFields,
             note: notes,
             notes,
             timestamp,
-            ...(payload.tags?.length ? { tags: payload.tags } : {}),
+            tags: payload.tags || [],
           };
           logMoment(anonSyncPayload, null, payload.lang).catch((err) => {
             console.warn("[TriggerMap] Anon sync failed, queued for retry:", err.message);
@@ -397,10 +408,11 @@ export function SessionProvider({ children }) {
             deviceId: activeDeviceId,
             trigger: payload.trigger,
             ...emotionFields,
+            ...contributionFields,
             note: notes,
             notes,
             timestamp,
-            ...(payload.tags?.length ? { tags: payload.tags } : {}),
+            tags: payload.tags || [],
           },
           token,
           payload.lang

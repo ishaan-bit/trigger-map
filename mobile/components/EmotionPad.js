@@ -14,7 +14,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { palette, radius } from "@/utils/theme";
-import { derivedEmotionLabel, EMOTION_AXIS_STEPS } from "@triggermap/shared/constants/emotions";
+import { derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
 
 const CURSOR_SIZE = 40;
 const CURSOR_HALF = CURSOR_SIZE / 2;
@@ -23,9 +23,6 @@ const CENTER_MAGNETIC_RADIUS = 0.08; // snap threshold near center
 const SPRING_CURSOR = { damping: 28, stiffness: 400, mass: 0.8 };
 const TRAIL_SIZE = 6;
 const TRAIL_OPACITIES = [0.22, 0.15, 0.10, 0.06, 0.03];
-const FEEL_TICK_LABELS = ["Very bad", "Bad", "Off", "Neutral", "Okay", "Good", "Great"];
-const ENERGY_TICK_LABELS = ["Very low", "Low", "Soft", "Neutral", "Active", "High", "Very high"];
-const AXIS_TICKS = EMOTION_AXIS_STEPS.filter((step) => step !== -0.75 && step !== 0.75);
 
 /**
  * Generate a human-readable intensity-qualified summary from coords.
@@ -331,21 +328,6 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
     return { opacity };
   });
 
-  // Quadrant label opacity: brighten the one the cursor is in
-  const qOpacity = (qIdx) =>
-    useAnimatedStyle(() => {
-      const s = padSize.value;
-      const q = quadrantIndex(cursorX.value, cursorY.value, s);
-      const active = q === qIdx ? 1 : 0;
-      const opacity = interpolate(active, [0, 1], [0.2, 0.55], Extrapolation.CLAMP);
-      return { opacity };
-    });
-
-  const qTLStyle = qOpacity(0);
-  const qTRStyle = qOpacity(1);
-  const qBLStyle = qOpacity(2);
-  const qBRStyle = qOpacity(3);
-
   // Crosshair opacity fades when cursor is at center
   const crosshairHStyle = useAnimatedStyle(() => {
     const s = padSize.value;
@@ -371,7 +353,7 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
   }));
 
   // Trail dot styles
-  const trailStyle = (tx, ty, alpha) =>
+  const useTrailStyle = (tx, ty, alpha) =>
     useAnimatedStyle(() => ({
       opacity: isDragging.value * alpha,
       transform: [
@@ -379,11 +361,11 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
         { translateY: ty.value - TRAIL_SIZE / 2 },
       ],
     }));
-  const ts0 = trailStyle(t0x, t0y, TRAIL_OPACITIES[0]);
-  const ts1 = trailStyle(t1x, t1y, TRAIL_OPACITIES[1]);
-  const ts2 = trailStyle(t2x, t2y, TRAIL_OPACITIES[2]);
-  const ts3 = trailStyle(t3x, t3y, TRAIL_OPACITIES[3]);
-  const ts4 = trailStyle(t4x, t4y, TRAIL_OPACITIES[4]);
+  const ts0 = useTrailStyle(t0x, t0y, TRAIL_OPACITIES[0]);
+  const ts1 = useTrailStyle(t1x, t1y, TRAIL_OPACITIES[1]);
+  const ts2 = useTrailStyle(t2x, t2y, TRAIL_OPACITIES[2]);
+  const ts3 = useTrailStyle(t3x, t3y, TRAIL_OPACITIES[3]);
+  const ts4 = useTrailStyle(t4x, t4y, TRAIL_OPACITIES[4]);
 
   // Label animated style
   const labelAnimStyle = useAnimatedStyle(() => ({
@@ -425,11 +407,13 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
 
   return (
     <View style={styles.container}>
-      {/* Animated live state label */}
-      <Animated.View style={labelAnimStyle}>
-        <Text style={[styles.liveLabel, { color: accentColor }]}>{labelLive}</Text>
-      </Animated.View>
-      <Text style={styles.liveSummary}>{summary}</Text>
+      <View style={styles.stateRow}>
+        <Animated.View style={[styles.stateDot, { backgroundColor: accentColor }, labelAnimStyle]} />
+        <View style={styles.stateCopy}>
+          <Animated.Text style={[styles.liveLabel, { color: accentColor }, labelAnimStyle]}>{labelLive}</Animated.Text>
+          <Text style={styles.liveSummary}>{summary}</Text>
+        </View>
+      </View>
 
       {/* The 2D Pad */}
       <View style={styles.padOuter}>
@@ -438,22 +422,6 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
         <Text style={[styles.axisAnchor, styles.anchorBottom]}>{t("emotion.anchorCalm") || "Calm"}</Text>
         <Text style={[styles.axisAnchor, styles.anchorLeft]}>{t("emotion.anchorUnpleasant") || "Unpleasant"}</Text>
         <Text style={[styles.axisAnchor, styles.anchorRight]}>{t("emotion.anchorPleasant") || "Pleasant"}</Text>
-        <View style={styles.horizontalTicks} pointerEvents="none">
-          {AXIS_TICKS.map((step, idx) => (
-            <View key={`feel-${step}`} style={styles.tickItem}>
-              <View style={styles.tickMark} />
-              <Text style={styles.tickLabel} numberOfLines={1}>{FEEL_TICK_LABELS[idx]}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.verticalTicks} pointerEvents="none">
-          {AXIS_TICKS.map((step, idx) => (
-            <View key={`energy-${step}`} style={styles.verticalTickItem}>
-              <Text style={styles.verticalTickLabel} numberOfLines={1}>{ENERGY_TICK_LABELS[ENERGY_TICK_LABELS.length - 1 - idx]}</Text>
-              <View style={styles.verticalTickMark} />
-            </View>
-          ))}
-        </View>
 
         <GestureDetector gesture={gesture}>
           <Animated.View
@@ -470,8 +438,8 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             {/* Background gradient — four emotional quadrants */}
             <LinearGradient
               colors={[
-                "rgba(255, 107, 122, 0.18)",
-                "rgba(86, 208, 224, 0.18)",
+                "rgba(255, 107, 122, 0.12)",
+                "rgba(86, 208, 224, 0.12)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -479,8 +447,8 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             />
             <LinearGradient
               colors={[
-                "rgba(167, 139, 250, 0.18)",
-                "rgba(94, 230, 160, 0.18)",
+                "rgba(167, 139, 250, 0.12)",
+                "rgba(94, 230, 160, 0.12)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -514,20 +482,6 @@ export function EmotionPad({ value, onChange, accentColor, derivedLabel, regionL
             {/* Center neutral indicator */}
             <Animated.View style={[styles.centerDot, centerDotStyle]} />
 
-            {/* Quadrant emotion hints — opacity varies with proximity */}
-            <Animated.Text style={[styles.quadrantHint, styles.qTopLeft, qTLStyle]}>
-              {t("emotion.qAnxious") || "anxious"}
-            </Animated.Text>
-            <Animated.Text style={[styles.quadrantHint, styles.qTopRight, qTRStyle]}>
-              {t("emotion.qEnergized") || "energized"}
-            </Animated.Text>
-            <Animated.Text style={[styles.quadrantHint, styles.qBottomLeft, qBLStyle]}>
-              {t("emotion.qLow") || "low"}
-            </Animated.Text>
-            <Animated.Text style={[styles.quadrantHint, styles.qBottomRight, qBRStyle]}>
-              {t("emotion.qCalm") || "calm"}
-            </Animated.Text>
-
             {/* Dynamic crosshairs (subtle) */}
             <Animated.View style={[styles.crosshairH, crosshairHStyle]} />
             <Animated.View style={[styles.crosshairV, crosshairVStyle]} />
@@ -557,27 +511,41 @@ const GLOW_SIZE = CURSOR_SIZE * 3;
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 18,
-    padding: 18,
-    borderRadius: radius.lg,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: radius.md,
     backgroundColor: palette.glass,
     borderWidth: 1,
     borderColor: palette.glassBorder,
     gap: 8,
   },
   // ── Live label ──
+  stateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 2,
+  },
+  stateDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  stateCopy: {
+    flex: 1,
+    gap: 2,
+  },
   liveLabel: {
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: "800",
     textTransform: "capitalize",
   },
   liveSummary: {
     color: palette.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: "500",
-    marginBottom: 2,
   },
   // ── Pad container ──
   padOuter: {
@@ -589,9 +557,9 @@ const styles = StyleSheet.create({
   pad: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     overflow: "hidden",
-    backgroundColor: "rgba(6, 10, 18, 0.55)",
+    backgroundColor: "rgba(6, 10, 18, 0.64)",
     borderWidth: 1,
     borderColor: "rgba(148, 180, 224, 0.10)",
   },

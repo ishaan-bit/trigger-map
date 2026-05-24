@@ -230,6 +230,7 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
   const energyDistribution = { steady: 0, balanced: 0, tense: 0, drained: 0, uplifted: 0 };
   const pairFrequency = {};
   const tagFrequency = {};
+  const contributionTagFrequency = {};
   const weeklyEmotionTrajectory = [];
   const stableDayCandidates = [];
   let totalMoments = 0;
@@ -241,6 +242,7 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     mergeCounts(pairFrequency, snapshot.pairs);
     mergeCounts(timeOfDayPatterns, snapshot.timeOfDay);
     mergeCounts(tagFrequency, snapshot.tags);
+    mergeCounts(contributionTagFrequency, snapshot.contributionTags);
 
     for (const [emotion, count] of Object.entries(snapshot.emotions || {})) {
       energyDistribution[ENERGY_MAP[emotion] || "balanced"] += Number(count || 0);
@@ -520,6 +522,7 @@ export function generateWeeklyReport({ aggregates = [], allAggregates = null, pr
     timeOfDayPatterns,
     energyDistribution,
     tagFrequency,
+    contributionTagFrequency,
     regulators,
     frictionZones,
     pairings,

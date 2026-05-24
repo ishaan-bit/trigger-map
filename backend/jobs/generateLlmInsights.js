@@ -80,9 +80,16 @@ export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWo
 
   const allMoments = await getTimeline(ownerId);
   const recentNotes = allMoments
-    .filter(m => m.note && m.note.trim())
+    .filter(m => (m.note && m.note.trim()) || m.contributionTags?.length)
     .slice(0, 15)
-    .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
+    .map(m => ({
+      trigger: m.trigger,
+      emotion: m.derivedLabel || m.emotion,
+      valence: m.valence,
+      arousal: m.arousal,
+      contributionTags: m.contributionTags || m.tags || [],
+      note: (m.note || "").slice(0, 120),
+    }));
 
   const actionFeedback = await getActionFeedback(ownerId);
 
@@ -207,9 +214,16 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
       // Fetch recent notes for LLM context (all available, max 15, truncated)
       const allMoments = await getTimeline(ownerId);
       const recentNotes = allMoments
-        .filter(m => m.note && m.note.trim())
+        .filter(m => (m.note && m.note.trim()) || m.contributionTags?.length)
         .slice(0, 15)
-        .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
+        .map(m => ({
+          trigger: m.trigger,
+          emotion: m.derivedLabel || m.emotion,
+          valence: m.valence,
+          arousal: m.arousal,
+          contributionTags: m.contributionTags || m.tags || [],
+          note: (m.note || "").slice(0, 120),
+        }));
 
       // Fetch action feedback for HiTL-aware LLM personalization
       const actionFeedback = await getActionFeedback(ownerId);

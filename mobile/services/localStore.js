@@ -24,7 +24,22 @@ export async function getLocalMoments() {
 /**
  * Save a moment to local storage.
  */
-export async function saveLocalMoment({ trigger, emotion, valence, arousal, intensity, note, tags }) {
+export async function saveLocalMoment({
+  trigger,
+  emotion,
+  valence,
+  arousal,
+  intensity,
+  emotionPoint,
+  emotionLabel,
+  emotionSubtitle,
+  emotionQuadrant,
+  emotionIntensity,
+  note,
+  tags,
+  contributionTags,
+  contributionTagMeta,
+}) {
   const moments = await getLocalMoments();
   const moment = {
     id: Crypto.randomUUID(),
@@ -33,10 +48,17 @@ export async function saveLocalMoment({ trigger, emotion, valence, arousal, inte
     ...(typeof valence === "number" ? { valence } : {}),
     ...(typeof arousal === "number" ? { arousal } : {}),
     ...(typeof intensity === "number" ? { intensity } : {}),
+    ...(emotionPoint ? { emotionPoint } : {}),
+    ...(emotionLabel ? { emotionLabel } : {}),
+    ...(emotionSubtitle ? { emotionSubtitle } : {}),
+    ...(emotionQuadrant ? { emotionQuadrant } : {}),
+    ...(emotionIntensity ? { emotionIntensity } : {}),
     note: note || "",
     timestamp: new Date().toISOString(),
     isLocal: true,
-    ...(tags?.length ? { tags } : {}),
+    tags: tags || contributionTags || [],
+    contributionTags: contributionTags || tags || [],
+    contributionTagMeta: contributionTagMeta || [],
   };
   moments.unshift(moment);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(moments));
@@ -82,9 +104,16 @@ export async function migrateLocalMoments(token, deviceId) {
           ...(typeof m.valence === "number" ? { valence: m.valence } : {}),
           ...(typeof m.arousal === "number" ? { arousal: m.arousal } : {}),
           ...(typeof m.intensity === "number" ? { intensity: m.intensity } : {}),
+          ...(m.emotionPoint ? { emotionPoint: m.emotionPoint } : {}),
+          ...(m.emotionLabel ? { emotionLabel: m.emotionLabel } : {}),
+          ...(m.emotionSubtitle ? { emotionSubtitle: m.emotionSubtitle } : {}),
+          ...(m.emotionQuadrant ? { emotionQuadrant: m.emotionQuadrant } : {}),
+          ...(m.emotionIntensity ? { emotionIntensity: m.emotionIntensity } : {}),
           note: m.note || "",
           timestamp: m.timestamp,
-          ...(m.tags?.length ? { tags: m.tags } : {}),
+          tags: m.tags || [],
+          contributionTags: m.contributionTags || m.tags || [],
+          contributionTagMeta: m.contributionTagMeta || [],
         },
         token
       );
@@ -152,12 +181,16 @@ export function buildLocalReport(moments) {
 
   const triggerFrequency = {};
   const emotionFrequency = {};
+  const tagFrequency = {};
   const timeOfDayPatterns = { morning: 0, afternoon: 0, evening: 0, night: 0 };
 
   for (const m of weekMoments) {
     triggerFrequency[m.trigger] = (triggerFrequency[m.trigger] || 0) + 1;
     const emo = m.emotion || (typeof m.valence === "number" && typeof m.arousal === "number" ? coordinatesToLegacy(m.valence, m.arousal) : "neutral");
     emotionFrequency[emo] = (emotionFrequency[emo] || 0) + 1;
+    for (const tag of (m.contributionTags || m.tags || [])) {
+      tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
+    }
 
     const hour = new Date(m.timestamp).getHours();
     if (hour < 12) timeOfDayPatterns.morning++;
@@ -194,6 +227,8 @@ export function buildLocalReport(moments) {
     emotionFrequency,
     correlations: {},
     energyDistribution: {},
+    tagFrequency,
+    contributionTagFrequency: tagFrequency,
     regulators: [],
     frictionZones: [],
     pairings: [],

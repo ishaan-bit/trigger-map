@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TRIGGER_KEYWORDS, TRIGGERS } from "@triggermap/shared/constants/triggers";
-import { EMOTIONS, EMOTION_COORDINATES, coordinatesToLegacy, derivedEmotionLabel } from "@triggermap/shared/constants/emotions";
+import { EMOTIONS, EMOTION_COORDINATES, coordinatesToLegacy, derivedEmotionLabel, emotionRegionKey } from "@triggermap/shared/constants/emotions";
+import { buildContributionTagMeta, getContributionSuggestions } from "@triggermap/shared/constants/contributions";
 import { appendDailyAggregate, getOwnerIndexKey } from "./aggregationService.js";
 import { lrangeJson, pipeline, redis, redisKey } from "./redisClient.js";
 import { sanitizeText } from "./security.js";
@@ -24,7 +25,26 @@ export function getMomentsKey(ownerId) {
   return redisKey("moments", ownerId);
 }
 
-export function createMomentPayload({ ownerId, id, trigger, emotion, valence, arousal, intensity, note, occurredAt, isAnonymous, tags }) {
+export function createMomentPayload({
+  ownerId,
+  id,
+  trigger,
+  emotion,
+  valence,
+  arousal,
+  intensity,
+  emotionPoint,
+  emotionLabel,
+  emotionSubtitle,
+  emotionQuadrant,
+  emotionIntensity,
+  note,
+  occurredAt,
+  isAnonymous,
+  tags,
+  contributionTags,
+  contributionTagMeta,
+}) {
   const finalTrigger = TRIGGERS.includes(trigger) ? trigger : detectTriggerFromNote(note) || "work";
 
   // Continuous model: valence/arousal provided → map to legacy 5-label for aggregation/insights
@@ -36,6 +56,28 @@ export function createMomentPayload({ ownerId, id, trigger, emotion, valence, ar
   const coords = hasContinuous
     ? { valence, arousal }
     : (EMOTION_COORDINATES[finalEmotion] || EMOTION_COORDINATES.neutral);
+  const finalDerivedLabel = hasContinuous ? derivedEmotionLabel(valence, arousal) : finalEmotion;
+  const contributionSuggestionSet = getContributionSuggestions({
+    domain: finalTrigger,
+    valence: coords.valence,
+    arousal: coords.arousal,
+    intensity,
+    emotionLabel: emotionLabel || finalDerivedLabel,
+    emotionQuadrant,
+    intensityBand: emotionIntensity,
+  });
+  const finalContributionTags = Array.isArray(contributionTags)
+    ? contributionTags
+    : (Array.isArray(tags) ? tags : []);
+  const finalContributionMeta = Array.isArray(contributionTagMeta) && contributionTagMeta.length
+    ? contributionTagMeta
+    : buildContributionTagMeta(finalContributionTags, contributionSuggestionSet.all);
+  const finalEmotionPoint = emotionPoint || {
+    valence: coords.valence,
+    arousal: coords.arousal,
+    x: coords.valence,
+    y: coords.arousal,
+  };
 
   return {
     id: id || randomUUID(),
@@ -45,11 +87,18 @@ export function createMomentPayload({ ownerId, id, trigger, emotion, valence, ar
     emotion_legacy: finalEmotion,
     valence: coords.valence,
     arousal: coords.arousal,
+    emotionPoint: finalEmotionPoint,
     intensity: typeof intensity === "number" ? intensity : Math.sqrt(coords.valence ** 2 + coords.arousal ** 2),
-    derivedLabel: hasContinuous ? derivedEmotionLabel(valence, arousal) : finalEmotion,
+    derivedLabel: finalDerivedLabel,
+    emotionLabel: emotionLabel || finalDerivedLabel,
+    emotionSubtitle: emotionSubtitle || finalDerivedLabel,
+    emotionQuadrant: emotionQuadrant || contributionSuggestionSet.emotionQuadrant || emotionRegionKey(coords.valence, coords.arousal),
+    emotionIntensity: emotionIntensity || contributionSuggestionSet.intensityBand,
     note: sanitizeText(note || ""),
     timestamp: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
     isAnonymous: Boolean(isAnonymous),
+    contributionTags: finalContributionTags,
+    contributionTagMeta: finalContributionMeta,
     ...(tags?.length ? { tags } : {}),
   };
 }

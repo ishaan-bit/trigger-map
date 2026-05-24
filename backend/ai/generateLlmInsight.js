@@ -171,10 +171,10 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Trigger diversity: ${report.triggerConcentration < 0.3 ? "spread broadly" : report.triggerConcentration < 0.5 ? "moderately concentrated" : "dominated by few"}.`);
   }
 
-  const tagEntries = Object.entries(report.tagFrequency || {}).sort(([, a], [, b]) => b - a);
+  const tagEntries = Object.entries(report.contributionTagFrequency || report.tagFrequency || {}).sort(([, a], [, b]) => b - a);
   if (tagEntries.length) {
     const topTags = tagEntries.slice(0, 5).map(([tag, count]) => `${tag} (${count}x)`);
-    lines.push(`Context tags: ${topTags.join(", ")}.`);
+    lines.push(`Contribution tags the user marked: ${topTags.join(", ")}.`);
   }
 
   const pa = report.predictionAccuracy;
@@ -239,8 +239,14 @@ function buildSignals(report, recentNotes, actionFeedback) {
   if (recentNotes?.length) {
     // Cap notes to prevent prompt from exceeding context window (VRAM-limited GPUs)
     const cappedNotes = recentNotes.slice(0, 8);
-    const noteLines = cappedNotes.map(n => `[${n.trigger}/${n.emotion}] "${(n.note || "").slice(0, 120)}"`);
-    lines.push(`Recent user notes:\n${noteLines.join("\n")}`);
+    const noteLines = cappedNotes.map((n) => {
+      const coords = typeof n.valence === "number" && typeof n.arousal === "number"
+        ? ` v${n.valence.toFixed(2)}/a${n.arousal.toFixed(2)}`
+        : "";
+      const tags = n.contributionTags?.length ? ` tags: ${n.contributionTags.join(", ")}` : "";
+      return `[${n.trigger}/${n.emotion}${coords}]${tags} "${(n.note || "").slice(0, 120)}"`;
+    });
+    lines.push(`Recent user moments:\n${noteLines.join("\n")}`);
   }
 
   // Signal profile constraints
@@ -302,6 +308,8 @@ END OF EXAMPLE. Now write your three sections using the data above.
 
 CRITICAL RULES (must follow):
 - ONLY describe emotions, triggers, and patterns that appear in the data above. Do not invent deadlines, meetings, mornings, evenings, or any context not present.
+- Treat contribution tags as user-marked context. Refer to them as "you marked..." or "this was tagged with..." and do not invent causes beyond those tags.
+- Do not infer clinical or diagnostic states from contribution tags.
 - Do NOT reference specific days of the week (Monday, Tuesday, etc.) unless they appear literally in the user's notes above. Never fabricate day references.
 - If the SIGNAL PROFILE says FLATTENING DETECTED, the central story MUST be about emotional range narrowing toward neutral. Do not describe this as positive stability.
 - If the data shows a Within-week trajectory decline, acknowledge the drop. Do not call the week stable or even.

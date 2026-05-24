@@ -106,6 +106,10 @@ function extractBriefContext(report) {
   }
   if (report?.topEmotion) lines.push(`Dominant emotion: ${report.topEmotion}.`);
   if (report?.topTrigger) lines.push(`Top trigger: ${report.topTrigger}.`);
+  const tagEntries = Object.entries(report?.contributionTagFrequency || report?.tagFrequency || {}).sort(([, a], [, b]) => b - a);
+  if (tagEntries.length) {
+    lines.push(`User-marked contribution tags: ${tagEntries.slice(0, 5).map(([tag, count]) => `${tag} (${count}x)`).join(", ")}.`);
+  }
 
   // Emotional trajectory direction (this week)
   const traj = report?.weeklyEmotionTrajectory || [];

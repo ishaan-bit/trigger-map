@@ -93,9 +93,16 @@ export async function runGenerateFreePass({ force = false, minMoments = 5, owner
       if (needsGeneration) {
         const allMoments = await getTimeline(ownerId);
         const recentNotes = allMoments
-          .filter(m => m.note && m.note.trim())
+          .filter(m => (m.note && m.note.trim()) || m.contributionTags?.length)
           .slice(0, 15)
-          .map(m => ({ trigger: m.trigger, emotion: m.emotion, note: m.note.slice(0, 120) }));
+          .map(m => ({
+            trigger: m.trigger,
+            emotion: m.derivedLabel || m.emotion,
+            valence: m.valence,
+            arousal: m.arousal,
+            contributionTags: m.contributionTags || m.tags || [],
+            note: (m.note || "").slice(0, 120),
+          }));
 
         console.log(`  ${ownerId.slice(0, 8)}: generating... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
 
