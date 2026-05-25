@@ -1655,6 +1655,15 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     }
     return ids;
   }, [feedbackGiven]);
+  const serverBackfillExcludeIds = useMemo(() => {
+    const ids = new Set(dismissedItemIds);
+    if (mode === "fuel" && safeItems.length > 0) {
+      for (const [id, resp] of Object.entries(feedbackGiven)) {
+        if (resp === "helpful") ids.add(id);
+      }
+    }
+    return ids;
+  }, [dismissedItemIds, feedbackGiven, mode, safeItems.length]);
 
   // Move suggestions — use server-picked items when available (adaptive + feedback-aware),
   // fall back to full client library otherwise. Duration filter + emotion sort applied on top.
@@ -1734,12 +1743,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       { key: "ritual", label: isHi ? "भोजन रिचुअल" : "Food Ritual", icon: "🧘", types: ["ritual"] },
     ];
     // Full library pool for backfill, using exact category semantics for filters.
+    const hasServerFuelItems = mode === "fuel" && safeItems.length > 0;
     const allLibrary = fuelDiet ? NOURISHMENTS.filter((n) => matchesDietFilter(n, fuelDiet)) : NOURISHMENTS;
     const backfillLibrary = allLibrary
-      .filter((n) => !dismissedItemIds.has(n.id))
+      .filter((n) => !serverBackfillExcludeIds.has(n.id))
       .sort((a, b) => {
-        const aLiked = feedbackGiven[a.id] === "helpful" ? 1 : 0;
-        const bLiked = feedbackGiven[b.id] === "helpful" ? 1 : 0;
+        const aLiked = !hasServerFuelItems && feedbackGiven[a.id] === "helpful" ? 1 : 0;
+        const bLiked = !hasServerFuelItems && feedbackGiven[b.id] === "helpful" ? 1 : 0;
         if (aLiked !== bLiked) return bLiked - aLiked;
         const aScore = emotions.length ? (a.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
         const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
@@ -1758,7 +1768,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       if (pick) used.add(pick.id);
       return { ...slot, item: pick };
     }).filter((slot) => slot.item);
-  }, [fuelSuggestions, lang, fuelDiet, dismissedItemIds, feedbackGiven, emotions]);
+  }, [fuelSuggestions, lang, fuelDiet, serverBackfillExcludeIds, feedbackGiven, emotions, mode, safeItems.length]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
   const modeHint = (key, fallback) => {
@@ -1869,7 +1879,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 
   return (
     <View style={s.modeContent}>
-      <Text style={s.modeContentBody}>{MODE_HINTS[mode]}</Text>
+      <Text style={s.modeSubheading}>{MODE_HINTS[mode]}</Text>
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
       {/* ── Move: duration filter + exercise list ── */}
@@ -3200,7 +3210,8 @@ const s = StyleSheet.create({
   modeTabTextActive: { color: palette.accent },
   modeContent: { gap: 10, backgroundColor: "rgba(6, 10, 18, 0.70)", borderRadius: radius.md, padding: 12 },
   modeContentBody: { color: palette.text, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
-  modeNarrative: { color: palette.text, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  modeSubheading: { color: palette.accent, fontSize: 12, lineHeight: 18, fontWeight: "800", letterSpacing: 0, textTransform: "uppercase", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  modeNarrative: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeEmptyCta: {
     alignSelf: "flex-start",
     marginTop: 4,
@@ -3216,7 +3227,7 @@ const s = StyleSheet.create({
     backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
     borderLeftWidth: 3, borderLeftColor: palette.accent,
   },
-  modeCardTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
+  modeCardTitle: { color: palette.accent, fontSize: 15, fontWeight: "800" },
   modeCardDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 19 },
   modeCardMeta: { color: palette.muted, fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
   modeFeedbackRow: { flexDirection: "row", gap: 8, marginTop: 4 },
@@ -3384,7 +3395,7 @@ const s = StyleSheet.create({
   rotateBtnText: { color: "#5ee6a0", fontSize: 12, fontWeight: "700" },
   suggestionDesc: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
   suggestionDescSecondary: { color: palette.muted, fontSize: 12, lineHeight: 16, marginTop: 2 },
-  suggestionReason: { color: palette.text, fontSize: 13, lineHeight: 19, fontStyle: "italic", marginBottom: 2 },
+  suggestionReason: { color: palette.accent, fontSize: 12, lineHeight: 18, fontWeight: "800", letterSpacing: 0, marginBottom: 2 },
   suggestionMeta: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
   suggestionMetaText: { color: palette.muted, fontSize: 11, fontWeight: "600" },
   suggestionMatch: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },

@@ -332,17 +332,19 @@ async function selectMoveItems(ownerId, emotions, profile) {
   const equip = profile?.equipment || undefined;
   const liked = profile?.likedMovements || [];
   const disliked = expandDislikedIds("move", profile?.dislikedMovements || [], liked);
-  const boost = expandLikedBoostIds("move", liked, [...recentIds, ...disliked]);
-  const strict = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost, environment: env, equipment: equip });
+  const exactPreferenceExcludes = [...liked, ...disliked];
+  const strictExclude = [...recentIds, ...exactPreferenceExcludes];
+  const boost = expandLikedBoostIds("move", liked, strictExclude);
+  const strict = pickMovements(emotions, 12, { exclude: strictExclude, boost, environment: env, equipment: equip });
   if (strict.length >= 6) return strict;
 
-  const relaxedRecent = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost });
+  const relaxedRecent = pickMovements(emotions, 12, { exclude: strictExclude, boost });
   if (relaxedRecent.length) {
     console.log(`[modeComposer] move selection relaxed recent history for ${ownerId.slice(0, 8)} (${strict.length}->${relaxedRecent.length})`);
     return relaxedRecent;
   }
 
-  const broadClean = pickMovements(emotions, 12, { exclude: disliked, boost });
+  const broadClean = pickMovements(emotions, 12, { exclude: exactPreferenceExcludes, boost });
   if (broadClean.length) return broadClean;
 
   console.warn(`[modeComposer] move selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);
@@ -394,7 +396,8 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const cuisine = profile?.cuisine || undefined;
   const liked = profile?.likedNourishments || [];
   const disliked = expandDislikedIds("fuel", profile?.dislikedNourishments || [], liked);
-  const strictExclude = [...recentIds, ...disliked];
+  const exactPreferenceExcludes = [...liked, ...disliked];
+  const strictExclude = [...recentIds, ...exactPreferenceExcludes];
   const boost = expandLikedBoostIds("fuel", liked, strictExclude);
 
   const base = pickNourishments(emotions, 15, { exclude: strictExclude, boost, diet, cuisine });
@@ -426,7 +429,7 @@ async function selectFuelItems(ownerId, emotions, profile) {
     return relaxedRecent;
   }
 
-  const broadClean = pickNourishments(emotions, 18, { exclude: disliked, boost, diet, cuisine: undefined });
+  const broadClean = pickNourishments(emotions, 18, { exclude: exactPreferenceExcludes, boost, diet, cuisine: undefined });
   if (broadClean.length) return broadClean;
 
   console.warn(`[modeComposer] fuel selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);

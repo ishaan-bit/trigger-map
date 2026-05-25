@@ -85,10 +85,15 @@ export function applyModeFeedbackToResults(results = {}, feedbackEntries = [], m
     if (mode !== "move" && mode !== "fuel") continue;
     const output = next[mode];
     if (!output || !Array.isArray(output.items)) continue;
+    const generatedAt = output.generatedAt ? new Date(output.generatedAt).getTime() : 0;
 
     const items = output.items.filter((item) => {
       const feedback = latest.get(`${mode}:${item?.id}`);
-      return feedback?.response !== "not_helpful";
+      if (feedback?.response === "not_helpful") return false;
+      if (feedback?.response === "helpful" && generatedAt && Number(feedback.timestamp || 0) <= generatedAt) {
+        return false;
+      }
+      return true;
     });
     next[mode] = { ...output, items };
   }

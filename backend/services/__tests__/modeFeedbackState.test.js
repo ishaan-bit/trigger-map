@@ -34,6 +34,23 @@ describe("modeFeedbackState", () => {
     expect(filtered.fuel.items.map((item) => item.id)).toEqual(["oats"]);
   });
 
+  it("filters helpful exact items only after a newer Move or Fuel generation", () => {
+    const now = Date.now();
+    const feedbackAt = now - 1_000;
+    const results = {
+      move: { generatedAt: new Date(feedbackAt - 100).toISOString(), items: [{ id: "walk" }, { id: "stretch" }] },
+      fuel: { generatedAt: new Date(feedbackAt + 100).toISOString(), items: [{ id: "tea" }, { id: "oats" }] },
+    };
+
+    const filtered = applyModeFeedbackToResults(results, [
+      { mode: "move", itemId: "walk", response: "helpful", timestamp: feedbackAt },
+      { mode: "fuel", itemId: "tea", response: "helpful", timestamp: feedbackAt },
+    ]);
+
+    expect(filtered.move.items.map((item) => item.id)).toEqual(["walk", "stretch"]);
+    expect(filtered.fuel.items.map((item) => item.id)).toEqual(["oats"]);
+  });
+
   it("returns Move and Fuel dismissal state even when the item is not in current output", () => {
     const now = Date.now();
     const map = buildModeFeedbackMap({
