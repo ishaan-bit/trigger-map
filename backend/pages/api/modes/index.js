@@ -3,7 +3,7 @@ import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
 import { getStoredModeOutput, getModeFeedback } from "@/services/modeStore.js";
-import { applyModeFeedbackToResults, buildModeFeedbackMap } from "@/services/modeFeedbackState.js";
+import { applyModeFeedbackToResults, buildModeFeedbackByMode, buildModeFeedbackMap } from "@/services/modeFeedbackState.js";
 import { captureServerError } from "@/services/monitoringService.js";
 import { generateRuleBasedModeOutput } from "@/ai/modeComposer.js";
 
@@ -81,6 +81,7 @@ export default async function handler(req, res) {
       const feedbackEntries = await getModeFeedback(ownerId);
       const filtered = await ensureVisibleFallbacks({ ownerId, lang, results: { [requestedMode]: output }, feedbackEntries, modes: [requestedMode] });
       filtered.feedback = buildModeFeedbackMap(filtered, feedbackEntries, [requestedMode]);
+      filtered.feedbackByMode = buildModeFeedbackByMode(filtered, feedbackEntries, [requestedMode]);
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       return sendSuccess(res, filtered);
     }
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
     const feedbackEntries = await getModeFeedback(ownerId);
     const filteredResults = await ensureVisibleFallbacks({ ownerId, lang, results, feedbackEntries, modes: VALID_MODES });
     filteredResults.feedback = buildModeFeedbackMap(filteredResults, feedbackEntries, VALID_MODES);
+    filteredResults.feedbackByMode = buildModeFeedbackByMode(filteredResults, feedbackEntries, VALID_MODES);
 
     const populated = VALID_MODES.filter((m) => filteredResults[m] != null);
     if (!populated.length) {

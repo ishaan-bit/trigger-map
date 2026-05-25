@@ -13,9 +13,6 @@ import { getWeeklyAggregates } from "@/services/aggregationService.js";
 import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { generateInsight } from "@/ai/generateInsight.js";
 import { storeWeeklyInsight } from "@/services/reportStore.js";
-import { generateRuleBasedModeOutput } from "@/ai/modeComposer.js";
-import { getStoredModeOutput } from "@/services/modeStore.js";
-import { isRuleBasedModeOutput } from "@/services/modeFeedbackState.js";
 
 const schema = z.object({
   deviceId: z.string().min(1).optional(),
@@ -70,17 +67,6 @@ async function refreshWeeklyInsight(ownerId, lang) {
     generatedAt: insight.generatedAt,
   });
 
-  await Promise.all(["move", "fuel"].map(async (mode) => {
-    const existing = await getStoredModeOutput(ownerId, mode).catch(() => null);
-    if (existing && !isRuleBasedModeOutput(existing)) return;
-    await generateRuleBasedModeOutput({
-      ownerId,
-      mode,
-      lang,
-      persist: true,
-      reason: "moment_logged",
-    });
-  }));
 }
 
 export default async function handler(req, res) {

@@ -1,4 +1,4 @@
-const MODE_FEEDBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+export const MODE_FEEDBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 export function isRuleBasedModeOutput(output) {
   if (!output) return false;
@@ -25,6 +25,25 @@ export function latestModeFeedback(feedbackEntries = [], { now = Date.now(), win
   return latest;
 }
 
+export function feedbackPreferenceIds(feedbackEntries = [], mode, options = {}) {
+  const latest = latestModeFeedback(feedbackEntries, options);
+  const liked = new Set();
+  const disliked = new Set();
+
+  for (const entry of latest.values()) {
+    if (entry.mode !== mode || !entry.itemId) continue;
+    if (entry.response === "helpful") {
+      liked.add(entry.itemId);
+      disliked.delete(entry.itemId);
+    } else if (entry.response === "not_helpful") {
+      disliked.add(entry.itemId);
+      liked.delete(entry.itemId);
+    }
+  }
+
+  return { liked: [...liked], disliked: [...disliked] };
+}
+
 export function buildModeFeedbackMap(results = {}, feedbackEntries = [], modes = ["move", "fuel", "perspective"]) {
   const latest = latestModeFeedback(feedbackEntries);
   const feedbackMap = {};
@@ -37,9 +56,7 @@ export function buildModeFeedbackMap(results = {}, feedbackEntries = [], modes =
       if (entry.mode !== mode) continue;
 
       if (mode === "move" || mode === "fuel") {
-        if (entry.response === "not_helpful" || currentIds.has(entry.itemId)) {
-          feedbackMap[entry.itemId] = entry.response;
-        }
+        feedbackMap[entry.itemId] = entry.response;
         continue;
       }
 
@@ -50,6 +67,14 @@ export function buildModeFeedbackMap(results = {}, feedbackEntries = [], modes =
   }
 
   return feedbackMap;
+}
+
+export function buildModeFeedbackByMode(results = {}, feedbackEntries = [], modes = ["move", "fuel", "perspective"]) {
+  const byMode = {};
+  for (const mode of modes) {
+    byMode[mode] = buildModeFeedbackMap(results, feedbackEntries, [mode]);
+  }
+  return byMode;
 }
 
 export function applyModeFeedbackToResults(results = {}, feedbackEntries = [], modes = ["move", "fuel"]) {

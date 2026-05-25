@@ -30,7 +30,7 @@ import {
   storeModeOutput,
   appendModeHistory,
 } from "../services/modeStore.js";
-import { isRuleBasedModeOutput } from "../services/modeFeedbackState.js";
+import { feedbackPreferenceIds, isRuleBasedModeOutput } from "../services/modeFeedbackState.js";
 import { getStoredWeeklyInsight } from "../services/reportStore.js";
 import { getStylePrompt, validateStyle } from "./styleProfiles.js";
 
@@ -161,14 +161,9 @@ function extractBriefContext(report) {
 function buildFeedbackContext(feedback, mode, items, lang) {
   if (!feedback || feedback.length === 0) return "";
 
-  // Only consider recent feedback (last 30 days) — preferences change over time
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const modeFb = feedback.filter((f) => f.mode === mode && (f.timestamp || 0) >= thirtyDaysAgo);
-  if (modeFb.length === 0) return "";
-
-  // Build liked / disliked item ID lists from recent feedback
-  const liked = modeFb.filter((f) => f.response === "helpful").map((f) => f.itemId);
-  const disliked = modeFb.filter((f) => f.response === "not_helpful").map((f) => f.itemId);
+  // Use the latest stored feedback for each item.
+  const { liked, disliked } = feedbackPreferenceIds(feedback, mode);
+  if (!liked.length && !disliked.length) return "";
 
   // Resolve names from the full library for richer context
   const allItems = items; // full library passed in
@@ -202,13 +197,121 @@ function buildFeedbackContext(feedback, mode, items, lang) {
 
 // ── Item selection (knowledge → structured picks) ──────────────────────
 
+function mergeProfileWithFeedback(profile, feedback, mode) {
+  if (mode !== "move" && mode !== "fuel") return profile || {};
+
+  const likedKey = mode === "move" ? "likedMovements" : "likedNourishments";
+  const dislikedKey = mode === "move" ? "dislikedMovements" : "dislikedNourishments";
+  const prefs = feedbackPreferenceIds(feedback, mode);
+  const liked = new Set(profile?.[likedKey] || []);
+  const disliked = new Set(profile?.[dislikedKey] || []);
+
+  for (const id of prefs.liked) {
+    liked.add(id);
+    disliked.delete(id);
+  }
+  for (const id of prefs.disliked) {
+    disliked.add(id);
+    liked.delete(id);
+  }
+
+  return {
+    ...(profile || {}),
+    [likedKey]: [...liked],
+    [dislikedKey]: [...disliked],
+  };
+}
+
+function hasOverlap(a = [], b = []) {
+  const set = new Set(a || []);
+  return (b || []).some((value) => set.has(value));
+}
+
+function overlapCount(a = [], b = []) {
+  const set = new Set(a || []);
+  return (b || []).filter((value) => set.has(value)).length;
+}
+
+function movementDurationBand(item) {
+  const minutes = Number(item?.durationMin || 0);
+  if (minutes <= 5) return "short";
+  if (minutes <= 12) return "medium";
+  return "long";
+}
+
+function isSimilarMovement(candidate, disliked) {
+  if (!candidate || !disliked || candidate.id === disliked.id) return false;
+  const sharedMechanism = hasOverlap(candidate.mechanism, disliked.mechanism);
+  if (!sharedMechanism) return false;
+
+  let score = 2;
+  if (candidate.intensity === disliked.intensity) score += 1;
+  if (candidate.equipment === disliked.equipment) score += 1;
+  if (hasOverlap(candidate.environment, disliked.environment)) score += 1;
+  if (movementDurationBand(candidate) === movementDurationBand(disliked)) score += 1;
+  if (overlapCount(candidate.emotionTags, disliked.emotionTags) >= 2) score += 1;
+  return score >= 5;
+}
+
+const NUTRIENT_KEYWORDS = [
+  "b12", "carb", "caffeine", "calcium", "electrolyte", "fat", "fiber",
+  "fibre", "iron", "magnesium", "omega", "probiotic", "protein",
+  "tryptophan", "zinc",
+];
+
+function nutrientTokens(value) {
+  const text = String(value || "").toLowerCase();
+  return NUTRIENT_KEYWORDS.filter((token) => text.includes(token));
+}
+
+function isSimilarNourishment(candidate, disliked) {
+  if (!candidate || !disliked || candidate.id === disliked.id) return false;
+  if (candidate.type !== disliked.type) return false;
+
+  const nutrientOverlap = overlapCount(nutrientTokens(candidate.nutrientFocus), nutrientTokens(disliked.nutrientFocus));
+  const cuisineOverlap = hasOverlap(candidate.cuisine, disliked.cuisine);
+  const dietOverlap = hasOverlap(getDietaryTags(candidate), getDietaryTags(disliked));
+  const emotionOverlap = overlapCount(candidate.emotionTags, disliked.emotionTags);
+
+  let score = 2;
+  if (nutrientOverlap > 0) score += 2;
+  if (cuisineOverlap) score += 1;
+  if (dietOverlap) score += 1;
+  if (candidate.prepLevel === disliked.prepLevel) score += 1;
+  if (emotionOverlap >= 2) score += 1;
+  return nutrientOverlap > 0 && score >= 5;
+}
+
+function expandDislikedIds(mode, dislikedIds, likedIds = []) {
+  const library = mode === "move" ? MOVEMENTS : NOURISHMENTS;
+  const liked = new Set(likedIds || []);
+  const disliked = (dislikedIds || []).filter(Boolean);
+  const byId = new Map(library.map((item) => [item.id, item]));
+  const exclude = new Set(disliked);
+
+  for (const id of disliked) {
+    const dislikedItem = byId.get(id);
+    if (!dislikedItem) continue;
+    for (const candidate of library) {
+      const similar = mode === "move"
+        ? isSimilarMovement(candidate, dislikedItem)
+        : isSimilarNourishment(candidate, dislikedItem);
+      if (similar) exclude.add(candidate.id);
+    }
+  }
+
+  for (const id of liked) exclude.delete(id);
+  return [...exclude];
+}
+
 async function selectMoveItems(ownerId, emotions, profile) {
   const recentIds = await getRecentItemIds(ownerId, "move", 3);
   const env = profile?.environment || undefined;
   const equip = profile?.equipment || undefined;
-  const disliked = profile?.dislikedMovements || [];
   const liked = profile?.likedMovements || [];
-  const strict = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost: liked, environment: env, equipment: equip });
+  const disliked = expandDislikedIds("move", profile?.dislikedMovements || [], liked);
+  const recentExcludes = recentIds.filter((id) => !liked.includes(id));
+  const strict = pickMovements(emotions, 12, { exclude: [...recentExcludes, ...disliked], boost: liked, environment: env, equipment: equip });
   if (strict.length >= 6) return strict;
 
   const relaxedRecent = pickMovements(emotions, 12, { exclude: disliked, boost: liked, environment: env, equipment: equip });
@@ -217,8 +320,11 @@ async function selectMoveItems(ownerId, emotions, profile) {
     return relaxedRecent;
   }
 
-  console.warn(`[modeComposer] move selection had to include disliked items for ${ownerId.slice(0, 8)}; no clean alternatives available`);
-  return pickMovements(emotions, 12, { exclude: [], boost: liked, environment: env, equipment: equip });
+  const broadClean = pickMovements(emotions, 12, { exclude: disliked, boost: liked });
+  if (broadClean.length) return broadClean;
+
+  console.warn(`[modeComposer] move selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);
+  return [];
 }
 
 function scoreNourishment(item, emotions = [], boostSet = new Set()) {
@@ -264,9 +370,10 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const recentIds = await getRecentItemIds(ownerId, "fuel", 3);
   const diet = normalizeDietId(profile?.diet) || undefined;
   const cuisine = profile?.cuisine || undefined;
-  const disliked = profile?.dislikedNourishments || [];
   const liked = profile?.likedNourishments || [];
-  const strictExclude = [...recentIds, ...disliked];
+  const disliked = expandDislikedIds("fuel", profile?.dislikedNourishments || [], liked);
+  const recentExcludes = recentIds.filter((id) => !liked.includes(id));
+  const strictExclude = [...recentExcludes, ...disliked];
 
   const base = pickNourishments(emotions, 15, { exclude: strictExclude, boost: liked, diet, cuisine });
   const categoryGroups = [];
@@ -297,8 +404,11 @@ async function selectFuelItems(ownerId, emotions, profile) {
     return relaxedRecent;
   }
 
-  console.warn(`[modeComposer] fuel selection had to include disliked items for ${ownerId.slice(0, 8)}; no clean alternatives available`);
-  return pickNourishments(emotions, 18, { exclude: [], boost: liked, diet, cuisine });
+  const broadClean = pickNourishments(emotions, 18, { exclude: disliked, boost: liked, diet, cuisine: undefined });
+  if (broadClean.length) return broadClean;
+
+  console.warn(`[modeComposer] fuel selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);
+  return [];
 }
 
 // ── Prompt builders ────────────────────────────────────────────────────
@@ -490,10 +600,11 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
   const report = await getStoredWeeklyInsight(ownerId).catch(() => null);
   const emotions = extractEmotions(report);
   const profile = await getModeProfile(ownerId).catch(() => null);
+  const feedback = await getModeFeedback(ownerId).catch(() => []);
   let output;
 
   if (mode === "move") {
-    const items = await selectMoveItems(ownerId, emotions, profile);
+    const items = await selectMoveItems(ownerId, emotions, mergeProfileWithFeedback(profile, feedback, "move"));
     const itemSummaries = items.map((i) => ({
       id: i.id,
       name: lang === "hi" ? i.nameHi : i.name,
@@ -519,7 +630,7 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
       fallbackReason: reason,
     };
   } else if (mode === "fuel") {
-    const items = await selectFuelItems(ownerId, emotions, profile);
+    const items = await selectFuelItems(ownerId, emotions, mergeProfileWithFeedback(profile, feedback, "fuel"));
     const itemSummaries = items.map((i) => ({
       id: i.id,
       name: lang === "hi" ? i.nameHi : i.name,
@@ -559,7 +670,6 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
 
   if (persist) {
     await storeModeOutput(ownerId, mode, output);
-    if (output.items?.length) await appendModeHistory(ownerId, mode, output.items.map((i) => i.id));
   }
 
   console.log(`[modeComposer] ${mode} rule generation completed for ${ownerId.slice(0, 8)} items=${output.items?.length || 0} persist=${persist}`);
@@ -628,11 +738,11 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
   let feedbackCtx = "";
 
   if (mode === "move") {
-    items = await selectMoveItems(ownerId, emotions, profile);
+    items = await selectMoveItems(ownerId, emotions, mergeProfileWithFeedback(profile, feedback, "move"));
     feedbackCtx = buildFeedbackContext(feedback, "move", MOVEMENTS, lang);
     prompt = buildMovePrompt(items, feedbackCtx ? `${context}\n\n${feedbackCtx}` : context, lang);
   } else if (mode === "fuel") {
-    items = await selectFuelItems(ownerId, emotions, profile);
+    items = await selectFuelItems(ownerId, emotions, mergeProfileWithFeedback(profile, feedback, "fuel"));
     feedbackCtx = buildFeedbackContext(feedback, "fuel", NOURISHMENTS, lang);
     prompt = buildFuelPrompt(items, feedbackCtx ? `${context}\n\n${feedbackCtx}` : context, lang);
   } else {

@@ -1615,16 +1615,18 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   );
   const dataSource = typeof data?.source === "string" ? data.source : typeof data?.model === "string" ? data.model : null;
   const hasNarrative = typeof data?.narrative === "string" && data.narrative.trim().length > 0;
-  // Only restore feedback for items in the CURRENT output — don't carry stale feedback from previous generations
+  // Move/Fuel feedback is longitudinal; Perspective feedback is tied to current output.
   const currentItemIds = useMemo(() => new Set(safeItems.map((i) => i.id).filter(Boolean)), [safeItems]);
   const freshFeedback = useMemo(() => {
     if (!savedFeedback) return {};
     const filtered = {};
     for (const [id, resp] of Object.entries(savedFeedback)) {
-      if (currentItemIds.has(id) || resp === "not_helpful") filtered[id] = resp;
+      if (mode === "move" || mode === "fuel" || currentItemIds.has(id) || resp === "not_helpful") {
+        filtered[id] = resp;
+      }
     }
     return filtered;
-  }, [savedFeedback, currentItemIds]);
+  }, [savedFeedback, currentItemIds, mode]);
   const [feedbackGiven, setFeedbackGiven] = useState(freshFeedback);
   const [feedbackPending, setFeedbackPending] = useState({});
   const [feedbackError, setFeedbackError] = useState({});
@@ -1733,7 +1735,16 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     ];
     // Full library pool for backfill, using exact category semantics for filters.
     const allLibrary = fuelDiet ? NOURISHMENTS.filter((n) => matchesDietFilter(n, fuelDiet)) : NOURISHMENTS;
-    const backfillLibrary = allLibrary.filter((n) => !dismissedItemIds.has(n.id));
+    const backfillLibrary = allLibrary
+      .filter((n) => !dismissedItemIds.has(n.id))
+      .sort((a, b) => {
+        const aLiked = feedbackGiven[a.id] === "helpful" ? 1 : 0;
+        const bLiked = feedbackGiven[b.id] === "helpful" ? 1 : 0;
+        if (aLiked !== bLiked) return bLiked - aLiked;
+        const aScore = emotions.length ? (a.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
+        const bScore = emotions.length ? (b.emotionTags || []).filter((e) => emotions.includes(e)).length : 0;
+        return bScore - aScore;
+      });
     const used = new Set();
     return SLOTS.map((slot) => {
       // Try server suggestions first
@@ -1747,7 +1758,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       if (pick) used.add(pick.id);
       return { ...slot, item: pick };
     }).filter((slot) => slot.item);
-  }, [fuelSuggestions, lang, fuelDiet, dismissedItemIds]);
+  }, [fuelSuggestions, lang, fuelDiet, dismissedItemIds, feedbackGiven, emotions]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
   const modeHint = (key, fallback) => {
@@ -2128,7 +2139,7 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
                 <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
               </View>
             ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedback} onLogMoment={onLogMoment} />
+              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedbackByMode?.[activeMode] || modes?.feedback} onLogMoment={onLogMoment} />
             )}
 
 
@@ -2403,7 +2414,14 @@ export function WeeklyReportScreen() {
     await submitModeFeedback(mode, itemId, response, token, deviceId, source);
     trackEvent("mode_feedback", { mode, itemId, response, source });
     // Update local feedback cache so it persists across tab switches
-    setModes((prev) => prev ? { ...prev, feedback: { ...prev.feedback, [itemId]: response } } : prev);
+    setModes((prev) => prev ? {
+      ...prev,
+      feedback: { ...prev.feedback, [itemId]: response },
+      feedbackByMode: {
+        ...prev.feedbackByMode,
+        [mode]: { ...(prev.feedbackByMode?.[mode] || {}), [itemId]: response },
+      },
+    } : prev);
     try {
       const freshModes = await fetchModes(token, deviceId, lang);
       if (__DEV__) {
