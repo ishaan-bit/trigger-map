@@ -304,23 +304,45 @@ function expandDislikedIds(mode, dislikedIds, likedIds = []) {
   return [...exclude];
 }
 
+function expandLikedBoostIds(mode, likedIds, excludeIds = []) {
+  const library = mode === "move" ? MOVEMENTS : NOURISHMENTS;
+  const exclude = new Set(excludeIds || []);
+  const liked = (likedIds || []).filter(Boolean);
+  const byId = new Map(library.map((item) => [item.id, item]));
+  const boost = new Set(liked);
+
+  for (const id of liked) {
+    const likedItem = byId.get(id);
+    if (!likedItem) continue;
+    for (const candidate of library) {
+      if (exclude.has(candidate.id)) continue;
+      const similar = mode === "move"
+        ? isSimilarMovement(candidate, likedItem)
+        : isSimilarNourishment(candidate, likedItem);
+      if (similar) boost.add(candidate.id);
+    }
+  }
+
+  return [...boost].filter((id) => !exclude.has(id));
+}
+
 async function selectMoveItems(ownerId, emotions, profile) {
   const recentIds = await getRecentItemIds(ownerId, "move", 3);
   const env = profile?.environment || undefined;
   const equip = profile?.equipment || undefined;
   const liked = profile?.likedMovements || [];
   const disliked = expandDislikedIds("move", profile?.dislikedMovements || [], liked);
-  const recentExcludes = recentIds.filter((id) => !liked.includes(id));
-  const strict = pickMovements(emotions, 12, { exclude: [...recentExcludes, ...disliked], boost: liked, environment: env, equipment: equip });
+  const boost = expandLikedBoostIds("move", liked, [...recentIds, ...disliked]);
+  const strict = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost, environment: env, equipment: equip });
   if (strict.length >= 6) return strict;
 
-  const relaxedRecent = pickMovements(emotions, 12, { exclude: disliked, boost: liked, environment: env, equipment: equip });
+  const relaxedRecent = pickMovements(emotions, 12, { exclude: [...recentIds, ...disliked], boost });
   if (relaxedRecent.length) {
     console.log(`[modeComposer] move selection relaxed recent history for ${ownerId.slice(0, 8)} (${strict.length}->${relaxedRecent.length})`);
     return relaxedRecent;
   }
 
-  const broadClean = pickMovements(emotions, 12, { exclude: disliked, boost: liked });
+  const broadClean = pickMovements(emotions, 12, { exclude: disliked, boost });
   if (broadClean.length) return broadClean;
 
   console.warn(`[modeComposer] move selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);
@@ -372,39 +394,39 @@ async function selectFuelItems(ownerId, emotions, profile) {
   const cuisine = profile?.cuisine || undefined;
   const liked = profile?.likedNourishments || [];
   const disliked = expandDislikedIds("fuel", profile?.dislikedNourishments || [], liked);
-  const recentExcludes = recentIds.filter((id) => !liked.includes(id));
-  const strictExclude = [...recentExcludes, ...disliked];
+  const strictExclude = [...recentIds, ...disliked];
+  const boost = expandLikedBoostIds("fuel", liked, strictExclude);
 
-  const base = pickNourishments(emotions, 15, { exclude: strictExclude, boost: liked, diet, cuisine });
+  const base = pickNourishments(emotions, 15, { exclude: strictExclude, boost, diet, cuisine });
   const categoryGroups = [];
 
   if (!diet || diet === "nonVeg") {
     categoryGroups.push(
-      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegetarian", cuisine }),
-      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
-      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "nonVeg", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost, dietFilter: "vegetarian", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost, dietFilter: "vegan", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost, dietFilter: "nonVeg", cuisine }),
     );
   } else if (diet === "vegetarian") {
     categoryGroups.push(
-      pickNourishmentsForCategory(emotions, 8, { exclude: strictExclude, boost: liked, dietFilter: "vegetarian", cuisine }),
-      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
+      pickNourishmentsForCategory(emotions, 8, { exclude: strictExclude, boost, dietFilter: "vegetarian", cuisine }),
+      pickNourishmentsForCategory(emotions, 5, { exclude: strictExclude, boost, dietFilter: "vegan", cuisine }),
     );
   } else if (diet === "vegan") {
     categoryGroups.push(
-      pickNourishmentsForCategory(emotions, 15, { exclude: strictExclude, boost: liked, dietFilter: "vegan", cuisine }),
+      pickNourishmentsForCategory(emotions, 15, { exclude: strictExclude, boost, dietFilter: "vegan", cuisine }),
     );
   }
 
   const strict = mergeUniqueItems([base, ...categoryGroups], 18);
   if (strict.length >= 6) return strict;
 
-  const relaxedRecent = pickNourishments(emotions, 18, { exclude: disliked, boost: liked, diet, cuisine });
+  const relaxedRecent = pickNourishments(emotions, 18, { exclude: strictExclude, boost, diet, cuisine: undefined });
   if (relaxedRecent.length) {
     console.log(`[modeComposer] fuel selection relaxed recent history for ${ownerId.slice(0, 8)} (${strict.length}->${relaxedRecent.length})`);
     return relaxedRecent;
   }
 
-  const broadClean = pickNourishments(emotions, 18, { exclude: disliked, boost: liked, diet, cuisine: undefined });
+  const broadClean = pickNourishments(emotions, 18, { exclude: disliked, boost, diet, cuisine: undefined });
   if (broadClean.length) return broadClean;
 
   console.warn(`[modeComposer] fuel selection found no clean alternatives for ${ownerId.slice(0, 8)} after dislikes`);

@@ -10,6 +10,8 @@
 
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { statSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { config as loadEnv } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,28 +23,61 @@ loadEnv({ path: resolve(BACKEND_DIR, ".env") });
 // Dynamic imports for backend modules (resolved at runtime)
 let _generateLlmInsightForUser;
 let _generateForOwner;
-let _generateModeOutput;
 let _redis;
 let _redisKey;
 
+function versionedBackendModuleUrl(...parts) {
+  const filePath = resolve(BACKEND_DIR, ...parts);
+  const url = pathToFileURL(filePath);
+  url.searchParams.set("v", String(statSync(filePath).mtimeMs));
+  return url.href;
+}
+
 async function ensureImports() {
   if (!_generateLlmInsightForUser) {
-    const mod = await import(pathToFileURL(resolve(BACKEND_DIR, "jobs", "generateLlmInsights.js")).href);
+    const mod = await import(versionedBackendModuleUrl("jobs", "generateLlmInsights.js"));
     _generateLlmInsightForUser = mod.generateLlmInsightForUser;
   }
   if (!_generateForOwner) {
-    const mod = await import(pathToFileURL(resolve(BACKEND_DIR, "jobs", "generateLlmActions.js")).href);
+    const mod = await import(versionedBackendModuleUrl("jobs", "generateLlmActions.js"));
     _generateForOwner = mod.generateForOwner;
   }
-  if (!_generateModeOutput) {
-    const mod = await import(pathToFileURL(resolve(BACKEND_DIR, "ai", "modeComposer.js")).href);
-    _generateModeOutput = mod.generateModeOutput;
-  }
   if (!_redis) {
-    const mod = await import(pathToFileURL(resolve(BACKEND_DIR, "services", "redisClient.js")).href);
+    const mod = await import(versionedBackendModuleUrl("services", "redisClient.js"));
     _redis = mod.redis;
     _redisKey = mod.redisKey;
   }
+}
+
+function runModeOutputInChild(payload) {
+  return new Promise((promiseResolve, reject) => {
+    const child = spawn("node", [resolve(__dirname, "runModeOutput.js")], {
+      cwd: BACKEND_DIR,
+      env: { ...process.env, MODE_JOB_JSON: JSON.stringify(payload) },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => { stdout += d.toString(); });
+    child.stderr.on("data", (d) => { stderr += d.toString(); });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      const resultLine = stdout.split(/\r?\n/).find((line) => line.startsWith("__MODE_RESULT__"));
+      if (code === 0 && resultLine) {
+        try {
+          promiseResolve(JSON.parse(resultLine.slice("__MODE_RESULT__".length)));
+        } catch (err) {
+          reject(new Error(`Mode child returned invalid JSON: ${err.message}`));
+        }
+        return;
+      }
+
+      const errorLine = stderr.split(/\r?\n/).find((line) => line.startsWith("__MODE_ERROR__"));
+      reject(new Error(errorLine?.slice("__MODE_ERROR__".length) || stderr.trim() || stdout.trim() || `Mode child exited ${code}`));
+    });
+  });
 }
 
 // ── Batch state ────────────────────────────────────────────────────────
@@ -279,7 +314,7 @@ async function executePair(pair, config) {
         });
 
       case "move":
-        return await _generateModeOutput({
+        return await runModeOutputInChild({
           ownerId: pair.ownerId,
           mode: "move",
           model,
@@ -288,7 +323,7 @@ async function executePair(pair, config) {
         });
 
       case "fuel":
-        return await _generateModeOutput({
+        return await runModeOutputInChild({
           ownerId: pair.ownerId,
           mode: "fuel",
           model,
@@ -297,7 +332,7 @@ async function executePair(pair, config) {
         });
 
       case "perspective":
-        return await _generateModeOutput({
+        return await runModeOutputInChild({
           ownerId: pair.ownerId,
           mode: "perspective",
           model,
