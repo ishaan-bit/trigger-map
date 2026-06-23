@@ -233,7 +233,7 @@ function computeLikedTriggers(feedback) {
   return [...triedTriggers];
 }
 
-export async function generateForOwner(ownerId, { model, apiUrl, force }) {
+export async function generateForOwner(ownerId, { model, apiUrl, force, signal }) {
   const user = await getUserById(ownerId).catch(() => null);
   const firstName = extractFirstName(user?.name);
   const userLang = user?.lang || "en";
@@ -265,6 +265,7 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      if (signal?.aborted) throw signal.reason || new Error("LLM action generation aborted");
       const result = await ollamaChat({
         apiUrl,
         model,
@@ -277,6 +278,7 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
         temperature: 0.65,
         maxTokens: 600,
         timeoutMs: REQUEST_TIMEOUT_MS,
+        signal,
       });
 
       const content = result.content;
@@ -303,6 +305,7 @@ export async function generateForOwner(ownerId, { model, apiUrl, force }) {
       if (attempt > 1) console.log(`    Succeeded on attempt ${attempt}`);
       return { ok: true, actionCount: actions.length, model, likedTriggers };
     } catch (err) {
+      if (signal?.aborted) throw signal.reason || err;
       lastError = err;
       if (attempt < MAX_ATTEMPTS) {
         console.log(`    Attempt ${attempt} failed (${err.message}), retrying...`);

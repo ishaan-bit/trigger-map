@@ -209,6 +209,9 @@ export async function migrateMoments(fromOwnerId, toOwnerId) {
   const mergedMoments = [...merged].sort((left, right) => new Date(left.timestamp) - new Date(right.timestamp));
   const targetKey = getMomentsKey(toOwnerId);
 
+  // TODO: rebuild or transfer daily aggregate hashes during migration.
+  // Today this moves the canonical raw timeline only; insights generation has
+  // a raw fallback so existing aggregate drift does not block users.
   await redis(["DEL", targetKey]);
 
   if (mergedMoments.length) {

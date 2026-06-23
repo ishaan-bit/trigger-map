@@ -17,32 +17,105 @@ const DEFAULT_API_URL = "http://localhost:11434/v1";
 const DEFAULT_MODEL = "phi3";
 const REQUEST_TIMEOUT_MS = 600_000;
 const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
+const MODEL_CHECK_TIMEOUT_MS = 5_000;
+const MAX_PROMPT_CHARS = parseInt(process.env.LLM_MAX_PROMPT_CHARS, 10) || 20_000;
+
+export function approximateTokenEstimate(text = "") {
+  return Math.ceil(String(text || "").length / 4);
+}
+
+function llmApiHost(apiUrl) {
+  try {
+    return new URL(apiUrl).host;
+  } catch {
+    return "invalid-url";
+  }
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw signal.reason || new Error("LLM request aborted");
+  }
+}
+
+function makeUnavailableError(message, details = {}) {
+  const err = new Error(message);
+  err.code = "LLM_UNAVAILABLE";
+  err.reason = "llm_unavailable";
+  err.details = details;
+  return err;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = MODEL_CHECK_TIMEOUT_MS, signal) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+  const abortFromParent = () => controller.abort(signal.reason || new Error("Request aborted"));
+  if (signal?.aborted) abortFromParent();
+  else signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener?.("abort", abortFromParent);
+  }
+}
 
 /**
  * Ensure the requested model is available in Ollama.
  * If not, pull it automatically. Uses the Ollama native API (not /v1).
  */
-async function ensureModelAvailable(ollamaBase, model) {
+async function ensureModelAvailable(ollamaBase, model, { signal, failFast = true, onDiagnostics } = {}) {
   // ollamaBase is like "http://localhost:11434/v1" — strip /v1 for native API
   const nativeBase = ollamaBase.replace(/\/v1\/?$/, "");
+  const startedAt = Date.now();
+  onDiagnostics?.({
+    llmApiHost: llmApiHost(ollamaBase),
+    model,
+    modelCheckStartedAt: new Date(startedAt).toISOString(),
+  });
 
   // Check if model exists
   try {
-    const showRes = await fetch(`${nativeBase}/api/show`, {
+    const tagsRes = await fetchWithTimeout(`${nativeBase}/api/tags`, {}, MODEL_CHECK_TIMEOUT_MS, signal);
+    if (!tagsRes.ok) {
+      throw makeUnavailableError(`LLM unavailable at ${llmApiHost(ollamaBase)} (HTTP ${tagsRes.status})`, {
+        model,
+        llmApiHost: llmApiHost(ollamaBase),
+      });
+    }
+
+    const showRes = await fetchWithTimeout(`${nativeBase}/api/show`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: model }),
-    });
+    }, MODEL_CHECK_TIMEOUT_MS, signal);
+    onDiagnostics?.({ modelCheckDurationMs: Date.now() - startedAt });
     if (showRes.ok) return; // model already available
-  } catch {
-    // Ollama might not be running — let the main call handle the error
-    return;
+    if (failFast) {
+      throw makeUnavailableError(`LLM model "${model}" unavailable at ${llmApiHost(ollamaBase)} (HTTP ${showRes.status})`, {
+        model,
+        llmApiHost: llmApiHost(ollamaBase),
+      });
+    }
+  } catch (err) {
+    throwIfAborted(signal);
+    if (err.code === "LLM_UNAVAILABLE") throw err;
+    if (failFast) {
+      throw makeUnavailableError(`LLM unavailable at ${llmApiHost(ollamaBase)} (${err.message})`, {
+        model,
+        llmApiHost: llmApiHost(ollamaBase),
+      });
+    }
   }
 
   // Model not found — pull it
   console.log(`[LLM] Model "${model}" not found locally. Pulling from Ollama registry...`);
   const controller = new AbortController();
   const pullTimeout = setTimeout(() => controller.abort(), PULL_TIMEOUT_MS);
+  const abortPullFromParent = () => controller.abort(signal.reason || new Error("Model pull aborted"));
+  if (signal?.aborted) abortPullFromParent();
+  else signal?.addEventListener("abort", abortPullFromParent, { once: true });
 
   try {
     const pullRes = await fetch(`${nativeBase}/api/pull`, {
@@ -59,12 +132,14 @@ async function ensureModelAvailable(ollamaBase, model) {
 
     console.log(`[LLM] Model "${model}" pulled successfully.`);
   } catch (err) {
+    throwIfAborted(signal);
     if (err.name === "AbortError") {
       throw new Error(`Model pull timed out after ${PULL_TIMEOUT_MS / 1000}s. Try pulling "${model}" manually: ollama pull ${model}`);
     }
     throw new Error(`Failed to pull model "${model}": ${err.message}`);
   } finally {
     clearTimeout(pullTimeout);
+    signal?.removeEventListener?.("abort", abortPullFromParent);
   }
 }
 
@@ -74,6 +149,33 @@ function buildSignals(report, recentNotes, actionFeedback) {
 
   lines.push(`Moments logged: ${dq.totalMoments || 0} over ${dq.daysLogged || 0} days.`);
   lines.push(`Confidence: ${dq.confidence || "unknown"}.`);
+
+  const rawSummary = report.rawFallbackSummary;
+  if (rawSummary?.isRawFallback) {
+    const activeRange = rawSummary.activeDateRange?.firstDate && rawSummary.activeDateRange?.lastDate
+      ? `${rawSummary.activeDateRange.firstDate} to ${rawSummary.activeDateRange.lastDate}`
+      : "unknown";
+    const selectedRange = rawSummary.selectedDateRange?.firstDate && rawSummary.selectedDateRange?.lastDate
+      ? `${rawSummary.selectedDateRange.firstDate} to ${rawSummary.selectedDateRange.lastDate}`
+      : "unknown";
+    lines.push(`Raw fallback compact summary: ${rawSummary.totalMomentCount || 0} usable moments across ${rawSummary.activeDaysTotal || 0} active days (${activeRange}).`);
+    lines.push(`Prompt window: ${rawSummary.selectedMomentCount || 0} moments across ${rawSummary.activeDaysUsed || 0} active days (${selectedRange}).`);
+    if (rawSummary.recentActivityDates?.length) {
+      lines.push(`Recent activity dates: ${rawSummary.recentActivityDates.slice(-7).join(", ")}.`);
+    }
+    if (rawSummary.responsePatternFrequency?.length) {
+      const patterns = rawSummary.responsePatternFrequency.slice(0, 5).map((entry) => `${entry.key} (${entry.count}x)`);
+      lines.push(`Repeated trigger-emotion patterns: ${patterns.join("; ")}.`);
+    }
+    if (rawSummary.repeatedContexts?.length) {
+      const contexts = rawSummary.repeatedContexts.slice(0, 5).map((entry) => `${entry.key} (${entry.count}x)`);
+      lines.push(`Repeated user-marked contexts: ${contexts.join(", ")}.`);
+    }
+    if (rawSummary.valenceArousalTrend) {
+      const trend = rawSummary.valenceArousalTrend;
+      lines.push(`Valence/arousal trend: valence ${trend.valenceDelta > 0 ? "+" : ""}${trend.valenceDelta}, arousal ${trend.arousalDelta > 0 ? "+" : ""}${trend.arousalDelta}.`);
+    }
+  }
 
   // Silence signal: user returned after a gap
   if (dq.isSilent) {
@@ -182,7 +284,7 @@ function buildSignals(report, recentNotes, actionFeedback) {
     lines.push(`Prediction accuracy: ${pa.correct} of ${pa.daysCompared} days matched (${Math.round(pa.rate * 100)}%).`);
   }
 
-  const dailyPredictions = (report.dailyAggregates || []).filter(d => d.prediction && Number(d.total || 0) > 0);
+  const dailyPredictions = (report.dailyAggregates || []).filter(d => d.prediction && Number(d.total || 0) > 0).slice(-7);
   if (dailyPredictions.length) {
     const pLines = dailyPredictions.map(d => {
       const actual = Object.entries(d.emotions || {}).sort(([, a], [, b]) => b - a)[0]?.[0] || "unknown";
@@ -230,7 +332,9 @@ function buildSignals(report, recentNotes, actionFeedback) {
   if (cDrift && (Math.abs(cDrift.valence) > 0.05 || Math.abs(cDrift.arousal) > 0.05)) {
     lines.push(`Centroid drift (start-of-week to end): valence ${cDrift.valence > 0 ? "+" : ""}${cDrift.valence.toFixed(2)}, arousal ${cDrift.arousal > 0 ? "+" : ""}${cDrift.arousal.toFixed(2)}.`);
   }
-  const dc = report.dailyCentroids;
+  const dc = report.rawFallbackSummary?.isRawFallback
+    ? (report.dailyCentroids || []).slice(-10)
+    : report.dailyCentroids;
   if (dc?.length >= 3) {
     const trail = dc.map(d => `${d.date}: v${d.valence.toFixed(2)}/a${d.arousal.toFixed(2)}`);
     lines.push(`Daily centroid trail: ${trail.join(", ")}.`);
@@ -262,7 +366,7 @@ function buildSignals(report, recentNotes, actionFeedback) {
   return lines.join("\n");
 }
 
-function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
+function buildPrompt(report, recentNotes, actionFeedback, lang = "en", maxWordsOverride = null) {
   const signals = buildSignals(report, recentNotes, actionFeedback);
   let ragContext = "";
   try { ragContext = retrieveForLLM(report, 6) || ""; } catch (e) { console.error("[RAG] retrieveForLLM failed:", e.message); }
@@ -272,7 +376,9 @@ function buildPrompt(report, recentNotes, actionFeedback, lang = "en") {
   const hasNotes = recentNotes?.length > 0;
   const hi = lang === "hi";
 
-  const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
+  const maxWords = Number(maxWordsOverride) > 0
+    ? Number(maxWordsOverride)
+    : parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
   const minWords = Math.round(maxWords * 0.6);
   const hardCap = Math.round(maxWords * 1.1);
   const sentencesPerSection = maxWords <= 100 ? '1-2' : maxWords <= 200 ? '2-3' : '3-4';
@@ -332,6 +438,22 @@ Format rules:
 - "${headerTry}" must be specific to the dominant pattern. If neutral-dominance and flattening are present, the suggestion should be about reintroducing variety or noticing more nuance, not about generic reflection or journaling.${sparse ? (hi ? "\n- सीमित डेटा। जो दिख रहा है और जो नहीं दिख रहा, उसके बारे में ईमानदार रहें।" : "\n- Limited data. Be honest about what you can and cannot see.") : ""}`;
 }
 
+export function buildLlmInsightPromptDiagnostics({
+  weeklyReport,
+  recentNotes = [],
+  actionFeedback = [],
+  lang = "en",
+  maxWords,
+} = {}) {
+  const startedAt = Date.now();
+  const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang, maxWords);
+  return {
+    promptBuildDurationMs: Date.now() - startedAt,
+    userPromptCharCount: prompt.length,
+    userPromptTokenEstimate: approximateTokenEstimate(prompt),
+  };
+}
+
 /**
  * Trim trailing incomplete sentence — finds the last sentence-ending
  * punctuation (.!?) and drops everything after it.
@@ -345,28 +467,73 @@ function trimIncomplete(text) {
   return text;
 }
 
-export async function generateLlmInsight({ weeklyReport, recentNotes = [], actionFeedback = [], lang = "en" }) {
+export async function generateLlmInsight({
+  weeklyReport,
+  recentNotes = [],
+  actionFeedback = [],
+  lang = "en",
+  maxWords,
+  signal,
+  onDiagnostics,
+  failFastModelCheck = true,
+} = {}) {
   const apiUrl = process.env.LLM_API_URL || DEFAULT_API_URL;
   const model = process.env.LLM_MODEL || DEFAULT_MODEL;
-  const maxWords = parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
+  const resolvedMaxWords = Number(maxWords) > 0
+    ? Number(maxWords)
+    : parseInt(process.env.LLM_MAX_WORDS, 10) || 150;
+  const baseDiagnostics = {
+    model,
+    llmApiHost: llmApiHost(apiUrl),
+    maxWords: resolvedMaxWords,
+  };
+  onDiagnostics?.(baseDiagnostics);
 
   // Auto-pull model if not available locally
-  await ensureModelAvailable(apiUrl, model);
+  await ensureModelAvailable(apiUrl, model, { signal, failFast: failFastModelCheck, onDiagnostics });
 
-const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
+  throwIfAborted(signal);
+  const promptStartedAt = Date.now();
+  const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang, resolvedMaxWords);
+  const promptBuildDurationMs = Date.now() - promptStartedAt;
 
     // Scale max_tokens — tight enough to discourage verbosity but with headroom
     // for the model to complete sentences. Roughly 1.5 tokens per word.
     // Hindi Devanagari tokens are larger — allow more headroom.
     const tokenMultiplier = lang === "hi" ? 3.5 : 2.5;
-    const maxTokens = Math.max(300, Math.round(maxWords * tokenMultiplier));
+    const maxTokens = Math.max(300, Math.round(resolvedMaxWords * tokenMultiplier));
 
     const systemBase = lang === "hi"
       ? "You are a concise emotional pattern analyst. Write in natural conversational Hindi (Devanagari script). No Hinglish or transliteration — use pure Hindi. Write plain, grammatically correct Hindi sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use 'आप' and 'आपका/आपकी' for addressing the user. Do not mix English words into Hindi text. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Be balanced and grounded. Match language intensity to signal strength. Use simple everyday Hindi."
       : "You are a concise emotional pattern analyst. Write plain, grammatically correct English sentences. No em dashes, bullet points, numbered lists, markdown, or special characters. Never repeat the prompt. Never invent data not provided. Use lowercase 'you' and 'your' mid-sentence. Only capitalize them at the start of a sentence. Never write 'You's' which is not valid English. Do not mix digits or random characters into words. CRITICAL: Do not fabricate negative emotions, diagnoses, or weaknesses that are not explicitly present in the data. If the data shows calm, neutral, or positive emotions, reflect that honestly and positively. Never ascribe low confidence, depression, or negative traits unless the data clearly shows repeated negative emotion patterns. Be balanced and grounded. When data is positive or neutral, say so clearly. Default to a supportive, encouraging tone. If a user had a brief rough stretch but overall positive data, emphasize resilience and the positive majority. Match language intensity to signal strength. When patterns are weak or subtle, use observational restrained language. Do not dramatize or exaggerate weak patterns. Use simple everyday English. Never use uncommon or technical words like exergy, entropy, amplify, optimize, dichotomy, juxtaposition, modulate, ameliorate, paradigm, or trajectory. Prefer words like energy, shift, change, pattern, steady, and subtle. Avoid generic filler phrases like 'overall consistency is present' or 'it appears that'. Be specific, not vague. NEVER reference the user by name. Always say 'you' or 'your', never a person's name. NEVER speculate about the user's psychological state, coping ability, or personality. Only describe observable patterns in the data. If the SIGNAL PROFILE section contains a FLATTENING DETECTED or Within-week trajectory constraint, those MUST be the central theme of your response. Do not ignore them.";
+    const sysContent = systemBase + getStylePrompt(process.env.LLM_STYLE);
+    const promptCharCount = prompt.length + sysContent.length;
+    const approximateTokenCount = approximateTokenEstimate(prompt) + approximateTokenEstimate(sysContent);
+    onDiagnostics?.({
+      ...baseDiagnostics,
+      promptBuildDurationMs,
+      promptCharCount,
+      approximateTokenEstimate: approximateTokenCount,
+      maxPromptChars: MAX_PROMPT_CHARS,
+    });
+
+    if (promptCharCount > MAX_PROMPT_CHARS) {
+      const err = new Error(`LLM prompt too large (${promptCharCount} chars > ${MAX_PROMPT_CHARS})`);
+      err.code = "PROMPT_TOO_LARGE";
+      err.reason = "prompt_too_large";
+      err.details = {
+        promptCharCount,
+        approximateTokenEstimate: approximateTokenCount,
+        maxPromptChars: MAX_PROMPT_CHARS,
+        model,
+      };
+      throw err;
+    }
 
   try {
-    const sysContent = systemBase + getStylePrompt(process.env.LLM_STYLE);
+    throwIfAborted(signal);
+    const llmRequestStartedAt = Date.now();
+    onDiagnostics?.({ llmRequestStartedAt: new Date(llmRequestStartedAt).toISOString() });
     const result = await ollamaChat({
       apiUrl,
       model,
@@ -377,7 +544,10 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
       temperature: 0.15,
       maxTokens,
       timeoutMs: REQUEST_TIMEOUT_MS,
+      signal,
+      onDiagnostics,
     });
+    onDiagnostics?.({ llmResponseDurationMs: Date.now() - llmRequestStartedAt });
 
     let content = result.content;
     const finishReason = result.finishReason;
@@ -586,6 +756,12 @@ const prompt = buildPrompt(weeklyReport, recentNotes, actionFeedback, lang);
       generatedAt: new Date().toISOString(),
     };
   } catch (err) {
+    if (signal?.aborted) {
+      throw signal.reason || err;
+    }
+    if (err.code === "LLM_UNAVAILABLE" || err.code === "PROMPT_TOO_LARGE") {
+      throw err;
+    }
     if (err.name === "AbortError") {
       throw new Error(`LLM request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
     }

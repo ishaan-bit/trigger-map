@@ -23,6 +23,8 @@ const DEFAULT_NUM_GPU = 26; // phi3 has 32 layers; 26 on GPU ≈ 81% GPU / 19% C
  * @param {number}  [opts.maxTokens=375]
  * @param {number}  [opts.numCtx]    – context window (default: DEFAULT_NUM_CTX)
  * @param {number}  [opts.timeoutMs=600000]
+ * @param {AbortSignal} [opts.signal]
+ * @param {(diagnostics: object) => void} [opts.onDiagnostics]
  * @returns {Promise<{content: string, finishReason: string, promptTokens: number, completionTokens: number}>}
  */
 export async function ollamaChat({
@@ -33,12 +35,17 @@ export async function ollamaChat({
   maxTokens = 375,
   numCtx,
   timeoutMs = 600_000,
+  signal,
+  onDiagnostics,
 }) {
   // Strip /v1 suffix if present — native API lives at the root
   const nativeBase = apiUrl.replace(/\/v1\/?$/, "");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(new Error(`LLM request timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+  const abortFromParent = () => controller.abort(signal.reason || new Error("LLM request aborted"));
+  if (signal?.aborted) abortFromParent();
+  else signal?.addEventListener("abort", abortFromParent, { once: true });
 
   try {
     const response = await fetch(`${nativeBase}/api/chat`, {
@@ -57,13 +64,17 @@ export async function ollamaChat({
       }),
       signal: controller.signal,
     });
+    onDiagnostics?.({ llmHttpStatus: response.status });
 
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`LLM API returned ${response.status}: ${text}`);
     }
 
+    const jsonStartedAt = Date.now();
+    onDiagnostics?.({ jsonParseStartedAt: new Date(jsonStartedAt).toISOString() });
     const data = await response.json();
+    onDiagnostics?.({ jsonParseDurationMs: Date.now() - jsonStartedAt });
     const content = data.message?.content?.trim() || "";
 
     return {
@@ -74,5 +85,6 @@ export async function ollamaChat({
     };
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener?.("abort", abortFromParent);
   }
 }

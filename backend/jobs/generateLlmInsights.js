@@ -9,15 +9,17 @@
 import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import { generateLlmInsight } from "../ai/generateLlmInsight.js";
-import { getWeeklyAggregates, listOwnerIds } from "../services/aggregationService.js";
-import { generateWeeklyReport } from "../services/patternEngine.js";
+import { listOwnerIds } from "../services/aggregationService.js";
 import { getTimeline } from "../services/momentService.js";
 import { getUserById } from "../services/authService.js";
-import { redis, redisKey } from "../services/redisClient.js";
+import { redis } from "../services/redisClient.js";
 import { getStoredLlmInsight, getLlmInsightKey, getActionFeedback, appendLlmInsightHistory } from "../services/reportStore.js";
-import { phraseText, extractFirstName } from "../utils/phrasingLayer.js";
+import { phraseText } from "../utils/phrasingLayer.js";
+import { resolveLlmInsightSource } from "./llmInsightSource.js";
 
 const LLM_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const RECENT_NOTE_LIMIT = 8;
+const RECENT_NOTE_CONTEXT_LIMIT = 120;
 
 function parseCliFlags(argv) {
   const flags = { force: false, minMoments: 1 };
@@ -31,79 +33,101 @@ function parseCliFlags(argv) {
   return flags;
 }
 
-async function storeLlmInsight(ownerId, payload) {
-  await redis(["SET", getLlmInsightKey(ownerId), JSON.stringify(payload)]);
-  // Also append to the insight history archive
-  await appendLlmInsightHistory(ownerId, payload).catch((err) =>
-    console.error(`  History append failed for ${ownerId.slice(0, 8)}: ${err.message}`)
-  );
-  return payload;
+export function toStoredLlmInsightPayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const { diagnostics, promptDiagnostics, ...stored } = payload;
+  return stored;
 }
 
-/**
- * Generate LLM insight for a single user. Used by batch orchestrator.
- * Skips eligibility checks — caller is responsible for filtering.
- */
-export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWords } = {}) {
-  const user = await getUserById(ownerId);
-  if (!user) throw new Error("user not found");
-  const userLang = user.lang || "en";
+async function storeLlmInsight(ownerId, payload) {
+  const storedPayload = toStoredLlmInsightPayload(payload);
+  await redis(["SET", getLlmInsightKey(ownerId), JSON.stringify(storedPayload)]);
+  // Also append to the insight history archive
+  await appendLlmInsightHistory(ownerId, storedPayload).catch((err) =>
+    console.error(`  History append failed for ${ownerId.slice(0, 8)}: ${err.message}`)
+  );
+  return storedPayload;
+}
 
-  const aggregates = await getWeeklyAggregates(ownerId, 45);
+function formatDiagnostics(diagnostics = {}) {
+  const fields = {
+    status: diagnostics.status,
+    reason: diagnostics.reason,
+    selectedSource: diagnostics.selectedSource,
+    aggregateWindowDays: diagnostics.aggregateWindowDays,
+    aggregateWindowCount: diagnostics.aggregateWindowCount,
+    rawMomentCount: diagnostics.rawMomentCount,
+    rawQualifyingCount: diagnostics.rawQualifyingCount,
+    threshold: diagnostics.threshold,
+    skippedMalformedCount: diagnostics.skippedMalformedCount,
+    rawActiveDaysUsed: diagnostics.rawActiveDaysUsed,
+    rawSelectedMomentCount: diagnostics.rawSelectedMomentCount,
+    promptCharCount: diagnostics.promptCharCount,
+    approximateTokenEstimate: diagnostics.approximateTokenEstimate,
+  };
 
-  const sevenDayAgg = aggregates.slice(-7);
-  const weeklyTotal = sevenDayAgg.reduce((s, a) => s + Number(a.total || 0), 0);
-  const lifetimeTotal = aggregates.reduce((s, a) => s + Number(a.total || 0), 0);
-  const isSilent = weeklyTotal === 0 && lifetimeTotal >= 3;
+  return Object.entries(fields)
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+}
 
-  let silenceWindow = null;
-  let effectiveAggregates = aggregates;
+function logSourceDecision(ownerId, diagnostics) {
+  console.log(`  ${ownerId.slice(0, 8)}: insight-source ${formatDiagnostics(diagnostics)}`);
+}
 
-  if (isSilent) {
-    const activeDays = aggregates.filter(a => Number(a.total || 0) > 0);
-    const lastActiveDate = activeDays[activeDays.length - 1]?.date;
-    const daysSinceLastLog = lastActiveDate
-      ? Math.floor((Date.now() - new Date(lastActiveDate).getTime()) / 86400000)
-      : null;
-    silenceWindow = { isSilent: true, daysSinceLastLog, lastLogDate: lastActiveDate, totalLifetimeMoments: lifetimeTotal };
-    effectiveAggregates = activeDays.slice(-7);
-  }
-
-  const weeklyReport = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates: aggregates, silenceWindow });
-
-  if (!weeklyReport.totalMoments && !isSilent) {
-    throw new Error("no-data");
-  }
-  if (weeklyReport.totalMoments < minMoments && !isSilent) {
-    throw new Error(`below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})`);
-  }
-
-  const allMoments = await getTimeline(ownerId);
-  const recentNotes = allMoments
+export function buildRecentNotes(moments) {
+  return (moments || [])
     .filter(m => (m.note && m.note.trim()) || m.contributionTags?.length)
-    .slice(0, 15)
+    .slice(0, RECENT_NOTE_LIMIT)
     .map(m => ({
       trigger: m.trigger,
       emotion: m.derivedLabel || m.emotion,
       valence: m.valence,
       arousal: m.arousal,
       contributionTags: m.contributionTags || m.tags || [],
-      note: (m.note || "").slice(0, 120),
+      note: (m.note || "").slice(0, RECENT_NOTE_CONTEXT_LIMIT),
     }));
+}
 
-  const actionFeedback = await getActionFeedback(ownerId);
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw signal.reason || new Error("LLM insight generation aborted");
+  }
+}
 
+function shouldRetryInsightError(err) {
+  return !["LLM_UNAVAILABLE", "PROMPT_TOO_LARGE", "PAIR_TIMEOUT"].includes(err?.code);
+}
+
+async function generateWithRetries({ weeklyReport, recentNotes, actionFeedback, maxWords, userLang, signal, onDiagnostics, logAttempts = false }) {
   let insight;
   let bestSoFar = null;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, maxWords, lang: userLang });
+      throwIfAborted(signal);
+      onDiagnostics?.({ llmAttempt: attempt });
+      insight = await generateLlmInsight({
+        weeklyReport,
+        recentNotes,
+        actionFeedback,
+        maxWords,
+        lang: userLang,
+        signal,
+        onDiagnostics,
+        failFastModelCheck: true,
+      });
       if (insight.sectionCount >= 3) break;
       bestSoFar = bestSoFar || insight;
+      if (logAttempts) console.log(`  Attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying...`);
       if (attempt >= 5) break;
     } catch (retryErr) {
+      throwIfAborted(signal);
+      if (!shouldRetryInsightError(retryErr)) {
+        throw retryErr;
+      }
       if (attempt < 5) {
-        /* retry */
+        if (logAttempts) console.log(`  Attempt ${attempt} failed, retrying... (${retryErr.message})`);
       } else if (bestSoFar) {
         insight = bestSoFar;
         break;
@@ -112,26 +136,126 @@ export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWo
       }
     }
   }
+  return insight;
+}
 
-  if (insight.narrative && userLang !== "hi") {
-    const sections = insight.narrative.split(/\n\n/);
-    const phrased = [];
-    for (const section of sections) {
-      const headerMatch = section.match(/^(What stood out|What may be contributing|One thing to try)\n/i);
-      if (headerMatch) {
-        const header = headerMatch[1];
-        const body = section.slice(header.length).trim();
-        const polished = await phraseText(body);
-        phrased.push(`${header}\n${polished}`);
-      } else {
-        phrased.push(section);
-      }
+async function polishInsight(insight, userLang) {
+  if (!insight?.narrative || userLang === "hi") return insight;
+
+  const sections = insight.narrative.split(/\n\n/);
+  const phrased = [];
+  for (const section of sections) {
+    const headerMatch = section.match(/^(What stood out|What may be contributing|One thing to try)\n/i);
+    if (headerMatch) {
+      const header = headerMatch[1];
+      const body = section.slice(header.length).trim();
+      const polished = await phraseText(body);
+      phrased.push(`${header}\n${polished}`);
+    } else {
+      phrased.push(section);
     }
-    insight.narrative = phrased.join("\n\n");
+  }
+  insight.narrative = phrased.join("\n\n");
+  return insight;
+}
+
+/**
+ * Generate LLM insight for a single user. Used by batch orchestrator.
+ * Skips eligibility checks — caller is responsible for filtering.
+ */
+export async function generateLlmInsightForUser(ownerId, { minMoments = 1, maxWords, signal, onDiagnostics } = {}) {
+  const startedAt = Date.now();
+  const diagnostics = {
+    ownerIdPrefix: ownerId.slice(0, 8),
+    status: "running",
+    reason: null,
+  };
+  const updateDiagnostics = (patch) => {
+    Object.assign(diagnostics, patch);
+    onDiagnostics?.({ ...diagnostics });
+  };
+
+  const user = await getUserById(ownerId);
+  if (!user) throw new Error("user not found");
+  const userLang = user.lang || "en";
+
+  const source = await resolveLlmInsightSource(ownerId, { minMoments });
+  updateDiagnostics(source.diagnostics);
+  logSourceDecision(ownerId, source.diagnostics);
+
+  if (source.status === "skipped") {
+    return { skipped: true, reason: source.reason, diagnostics: source.diagnostics };
   }
 
+  const allMoments = source.moments || await getTimeline(ownerId);
+  const recentNotes = buildRecentNotes(allMoments);
+  updateDiagnostics({
+    recentNoteCount: recentNotes.length,
+    maxRecentNotes: RECENT_NOTE_LIMIT,
+    maxContextCharsPerNote: RECENT_NOTE_CONTEXT_LIMIT,
+  });
+
+  const actionFeedback = await getActionFeedback(ownerId);
+  let insight;
+
+  try {
+    insight = await polishInsight(await generateWithRetries({
+      weeklyReport: source.weeklyReport,
+      recentNotes,
+      actionFeedback,
+      maxWords,
+      userLang,
+      signal,
+      onDiagnostics: updateDiagnostics,
+    }), userLang);
+  } catch (err) {
+    throwIfAborted(signal);
+    if (err.code === "LLM_UNAVAILABLE") {
+      return {
+        skipped: true,
+        status: "skipped",
+        reason: "llm_unavailable",
+        model: err.details?.model || diagnostics.model || process.env.LLM_MODEL || "phi3",
+        selectedSource: source.selectedSource,
+        diagnostics: {
+          ...diagnostics,
+          status: "skipped",
+          reason: "llm_unavailable",
+          durationMs: Date.now() - startedAt,
+          ...(err.details || {}),
+        },
+      };
+    }
+    if (err.code === "PROMPT_TOO_LARGE") {
+      return {
+        skipped: true,
+        status: "skipped",
+        reason: "prompt_too_large",
+        model: diagnostics.model || process.env.LLM_MODEL || "phi3",
+        selectedSource: source.selectedSource,
+        diagnostics: {
+          ...diagnostics,
+          status: "skipped",
+          reason: "prompt_too_large",
+          durationMs: Date.now() - startedAt,
+          ...(err.details || {}),
+        },
+      };
+    }
+    throw err;
+  }
+
+  throwIfAborted(signal);
+  updateDiagnostics({ insightWriteStartedAt: new Date().toISOString() });
   await storeLlmInsight(ownerId, insight);
-  return { ok: true, model: insight.model, sectionCount: insight.sectionCount };
+  updateDiagnostics({ status: "generated", reason: null, durationMs: Date.now() - startedAt });
+  return {
+    ok: true,
+    model: insight.model,
+    sectionCount: insight.sectionCount,
+    selectedSource: source.selectedSource,
+    diagnostics: { ...diagnostics },
+  };
 }
 
 export async function runGenerateLlmInsights({ force = false, minMoments = 1, ownerIds } = {}) {
@@ -173,109 +297,49 @@ export async function runGenerateLlmInsights({ force = false, minMoments = 1, ow
         }
       }
 
-      const aggregates = await getWeeklyAggregates(ownerId, 45);
+      const source = await resolveLlmInsightSource(ownerId, { minMoments });
+      logSourceDecision(ownerId, source.diagnostics);
 
-      // Detect silence: check if the last 7 days have 0 moments but lifetime has data
-      const sevenDayAgg = aggregates.slice(-7);
-      const weeklyTotal = sevenDayAgg.reduce((s, a) => s + Number(a.total || 0), 0);
-      const lifetimeTotal = aggregates.reduce((s, a) => s + Number(a.total || 0), 0);
-      const isSilent = weeklyTotal === 0 && lifetimeTotal >= 3;
-
-      let silenceWindow = null;
-      let effectiveAggregates = aggregates;
-
-      if (isSilent) {
-        const activeDays = aggregates.filter(a => Number(a.total || 0) > 0);
-        const lastActiveDate = activeDays[activeDays.length - 1]?.date;
-        const daysSinceLastLog = lastActiveDate
-          ? Math.floor((Date.now() - new Date(lastActiveDate).getTime()) / 86400000)
-          : null;
-        silenceWindow = { isSilent: true, daysSinceLastLog, lastLogDate: lastActiveDate, totalLifetimeMoments: lifetimeTotal };
-        effectiveAggregates = activeDays.slice(-7);
-        console.log(`  ${ownerId.slice(0, 8)}: SILENCE — ${daysSinceLastLog}d gap, sliding to ${effectiveAggregates.length} active days`);
-      }
-
-      const weeklyReport = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates: aggregates, silenceWindow });
-
-      if (!weeklyReport.totalMoments && !isSilent) {
-        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — 0 moments and no history`);
-        results.push({ ownerId, skipped: true, reason: "no-data" });
+      if (source.status === "skipped") {
+        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED - ${source.reason}`);
+        results.push({ ownerId, skipped: true, reason: source.reason, diagnostics: source.diagnostics });
         skipped++;
         continue;
       }
 
-      if (weeklyReport.totalMoments < minMoments && !isSilent) {
-        console.log(`  ${ownerId.slice(0, 8)}: SKIPPED — ${weeklyReport.totalMoments || 0} moments < ${minMoments} min`);
-        results.push({ ownerId, skipped: true, reason: `below-threshold (${weeklyReport.totalMoments || 0} < ${minMoments})` });
-        skipped++;
-        continue;
-      }
-
-      // Fetch recent notes for LLM context (all available, max 15, truncated)
-      const allMoments = await getTimeline(ownerId);
-      const recentNotes = allMoments
-        .filter(m => (m.note && m.note.trim()) || m.contributionTags?.length)
-        .slice(0, 15)
-        .map(m => ({
-          trigger: m.trigger,
-          emotion: m.derivedLabel || m.emotion,
-          valence: m.valence,
-          arousal: m.arousal,
-          contributionTags: m.contributionTags || m.tags || [],
-          note: (m.note || "").slice(0, 120),
-        }));
+      // Fetch recent notes for LLM context (bounded and truncated)
+      const allMoments = source.moments || await getTimeline(ownerId);
+      const recentNotes = buildRecentNotes(allMoments);
 
       // Fetch action feedback for HiTL-aware LLM personalization
       const actionFeedback = await getActionFeedback(ownerId);
 
-      console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${weeklyReport.totalMoments} moments, ${recentNotes.length} notes)`);
+      console.log(`Generating LLM insight for ${ownerId.slice(0, 8)}... (${source.weeklyReport.totalMoments} moments, ${recentNotes.length} notes, source=${source.selectedSource})`);
 
-      let insight;
-      let bestSoFar = null;
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-          insight = await generateLlmInsight({ weeklyReport, recentNotes, actionFeedback, lang: userLang });
-          if (insight.sectionCount >= 3) break;
-          bestSoFar = bestSoFar || insight;
-          console.log(`  Attempt ${attempt} got ${insight.sectionCount}/3 sections, retrying...`);
-          if (attempt >= 5) break;
-        } catch (retryErr) {
-          if (attempt < 5) {
-            console.log(`  Attempt ${attempt} failed, retrying... (${retryErr.message})`);
-          } else if (bestSoFar) {
-            insight = bestSoFar;
-            break;
-          } else {
-            throw retryErr;
-          }
-        }
-      }
+      let insight = await generateWithRetries({
+        weeklyReport: source.weeklyReport,
+        recentNotes,
+        actionFeedback,
+        userLang,
+        logAttempts: true,
+      });
 
       // Polish LLM output — local deterministic cleanup (no HF API by default)
       // Skip firstName personalization for LLM output — the LLM writes in 2nd
       // person ("you"/"your") and replacing "Your" → "Name's" creates a jarring
       // 3rd-person switch that reads like a clinical report.
       // Skip phraseText for Hindi — Hindi text is pre-composed by the LLM.
-      if (insight.narrative && userLang !== "hi") {
-        const sections = insight.narrative.split(/\n\n/);
-        const phrased = [];
-        for (const section of sections) {
-          const headerMatch = section.match(/^(What stood out|What may be contributing|One thing to try)\n/i);
-          if (headerMatch) {
-            const header = headerMatch[1];
-            const body = section.slice(header.length).trim();
-            const polished = await phraseText(body);
-            phrased.push(`${header}\n${polished}`);
-          } else {
-            phrased.push(section);
-          }
-        }
-        insight.narrative = phrased.join("\n\n");
-      }
+      insight = await polishInsight(insight, userLang);
 
       await storeLlmInsight(ownerId, insight);
       processed++;
-      results.push({ ownerId, generated: true, model: insight.model });
+      results.push({
+        ownerId,
+        generated: true,
+        model: insight.model,
+        selectedSource: source.selectedSource,
+        diagnostics: source.diagnostics,
+      });
       console.log(`  Done (${insight.model}, ${insight.sectionCount}/3 sections)`);
 
     } catch (error) {

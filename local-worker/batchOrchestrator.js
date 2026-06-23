@@ -49,8 +49,9 @@ async function ensureImports() {
   }
 }
 
-function runModeOutputInChild(payload) {
+function runModeOutputInChild(payload, { signal } = {}) {
   return new Promise((promiseResolve, reject) => {
+    let settled = false;
     const child = spawn("node", [resolve(__dirname, "runModeOutput.js")], {
       cwd: BACKEND_DIR,
       env: { ...process.env, MODE_JOB_JSON: JSON.stringify(payload) },
@@ -60,22 +61,47 @@ function runModeOutputInChild(payload) {
 
     let stdout = "";
     let stderr = "";
+    const cleanup = () => {
+      signal?.removeEventListener?.("abort", onAbort);
+    };
+    const finishResolve = (value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      promiseResolve(value);
+    };
+    const finishReject = (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err);
+    };
+    const onAbort = () => {
+      try { child.kill("SIGTERM"); } catch {}
+      finishReject(signal.reason || new Error("Mode child aborted"));
+    };
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener?.("abort", onAbort, { once: true });
     child.stdout.on("data", (d) => { stdout += d.toString(); });
     child.stderr.on("data", (d) => { stderr += d.toString(); });
-    child.on("error", reject);
+    child.on("error", finishReject);
     child.on("close", (code) => {
+      if (settled) return;
       const resultLine = stdout.split(/\r?\n/).find((line) => line.startsWith("__MODE_RESULT__"));
       if (code === 0 && resultLine) {
         try {
-          promiseResolve(JSON.parse(resultLine.slice("__MODE_RESULT__".length)));
+          finishResolve(JSON.parse(resultLine.slice("__MODE_RESULT__".length)));
         } catch (err) {
-          reject(new Error(`Mode child returned invalid JSON: ${err.message}`));
+          finishReject(new Error(`Mode child returned invalid JSON: ${err.message}`));
         }
         return;
       }
 
       const errorLine = stderr.split(/\r?\n/).find((line) => line.startsWith("__MODE_ERROR__"));
-      reject(new Error(errorLine?.slice("__MODE_ERROR__".length) || stderr.trim() || stdout.trim() || `Mode child exited ${code}`));
+      finishReject(new Error(errorLine?.slice("__MODE_ERROR__".length) || stderr.trim() || stdout.trim() || `Mode child exited ${code}`));
     });
   });
 }
@@ -87,7 +113,123 @@ const batchHistory = []; // last N completed batches
 const MAX_HISTORY = 10;
 
 // Per-pair timeout: if a single LLM call takes > 3 min, abort it
-const PAIR_TIMEOUT_MS = 180_000;
+export const PAIR_TIMEOUT_MS = 180_000;
+export const BATCH_LOG_TTL = 3 * 24 * 60 * 60; // 3 days in seconds
+export const LLM_BATCH_LOG_WINDOW_MS = BATCH_LOG_TTL * 1000;
+
+class PairTimeoutError extends Error {
+  constructor(pair, diagnostics) {
+    super(`Pair timeout after ${PAIR_TIMEOUT_MS / 1000}s`);
+    this.name = "PairTimeoutError";
+    this.code = "PAIR_TIMEOUT";
+    this.reason = "llm_timeout";
+    this.diagnostics = diagnostics;
+  }
+}
+
+function llmApiHost(apiUrl) {
+  try {
+    return new URL(apiUrl).host;
+  } catch {
+    return "invalid-url";
+  }
+}
+
+function buildPairDiagnostics(pair, config, patch = {}) {
+  const rowConfig = config[pair.process] || {};
+  const model = rowConfig.model || process.env.LLM_MODEL || "phi3";
+  const apiUrl = process.env.LLM_API_URL || "http://localhost:11434/v1";
+  return {
+    ...(pair.diagnostics || {}),
+    pairId: pair.id,
+    ownerIdPrefix: pair.ownerId ? pair.ownerId.slice(0, 8) : null,
+    process: pair.process,
+    section: pair.process === "insights" ? "insights" : pair.process,
+    provider: "ollama",
+    model,
+    llmApiHost: llmApiHost(apiUrl),
+    ...patch,
+  };
+}
+
+function classifyErrorReason(error) {
+  if (!error) return null;
+  if (error.reason) return error.reason;
+  if (error.code === "PAIR_TIMEOUT") return "llm_timeout";
+  if (error.code === "LLM_UNAVAILABLE") return "llm_unavailable";
+  if (error.code === "PROMPT_TOO_LARGE") return "prompt_too_large";
+
+  const message = String(error.message || error);
+  if (/invalid json/i.test(message)) return "invalid_json";
+  if (/valid section|empty response|output only had/i.test(message)) return "invalid_json";
+  if (/timed out|timeout/i.test(message)) return "llm_timeout";
+  return "error";
+}
+
+function terminalStatusForPair(pair) {
+  if (pair.status === "completed" && pair.process === "insights") return "generated";
+  if (pair.status === "completed") return "completed";
+  if (pair.status === "timeout") return "timeout";
+  if (pair.status === "failed") return "error";
+  return pair.status || "unknown";
+}
+
+function terminalMessage(pair, reason, error) {
+  if (error?.message) return error.message;
+  if (pair.error) return pair.error;
+  if (reason) return reason;
+  if (pair.process === "insights" && pair.status === "completed") return "LLM insight generated";
+  if (pair.status === "completed") return "Run completed";
+  return pair.status || "Run";
+}
+
+export function buildTerminalPairLog(pair, config = {}, { result, error, now = Date.now() } = {}) {
+  const diagnostics = {
+    ...(pair.diagnostics || {}),
+    ...(result?.diagnostics || {}),
+    ...(error?.diagnostics || {}),
+  };
+  const rowConfig = config[pair.process] || {};
+  const status = terminalStatusForPair(pair);
+  const reason = diagnostics.reason || result?.reason || classifyErrorReason(error);
+  const completedAt = pair.completedAt || now;
+  const durationMs = Number.isFinite(pair.durationMs)
+    ? pair.durationMs
+    : pair.startedAt
+      ? completedAt - pair.startedAt
+      : diagnostics.durationMs;
+  const model = diagnostics.model || result?.model || rowConfig.model || process.env.LLM_MODEL || "phi3";
+
+  return {
+    timestamp: new Date(completedAt).toISOString(),
+    section: pair.process === "insights" ? "insights" : pair.process,
+    ownerIdPrefix: pair.ownerId ? pair.ownerId.slice(0, 8) : diagnostics.ownerIdPrefix || null,
+    pairId: pair.id || diagnostics.pairId || null,
+    process: pair.process,
+    status,
+    reason,
+    durationMs,
+    selectedSource: result?.selectedSource || diagnostics.selectedSource || null,
+    promptCharCount: diagnostics.promptCharCount ?? null,
+    model,
+    provider: diagnostics.provider || "ollama",
+    llmApiHost: diagnostics.llmApiHost || llmApiHost(process.env.LLM_API_URL || "http://localhost:11434/v1"),
+    message: terminalMessage(pair, reason, error),
+  };
+}
+
+export function finalizePairLog(pair, config = {}, context = {}) {
+  const log = buildTerminalPairLog(pair, config, context);
+  pair.llmLog = log;
+  pair.timestamp = log.timestamp;
+  pair.message = log.message;
+  pair.reason = log.reason;
+  pair.diagnostics = {
+    ...(pair.diagnostics || {}),
+    ...log,
+  };
+  return log;
+}
 
 /**
  * Estimate runtime for a set of pairs.
@@ -203,20 +345,21 @@ async function executeBatch() {
 
     // Check cancel
     if (batch.cancelRequested) {
-      markRemaining(batch.pairs, i, "incomplete", "cancelled");
+      markRemaining(batch.pairs, i, "incomplete", "cancelled", batch.config);
       break;
     }
 
     // Check timeout — but let at least 1 pair run
     if (i > 0 && Date.now() >= deadline) {
       console.log(`[batch] Deadline reached after ${i} pairs. Marking remaining as incomplete.`);
-      markRemaining(batch.pairs, i, "incomplete", "timeout - max runtime exceeded");
+      markRemaining(batch.pairs, i, "incomplete", "timeout - max runtime exceeded", batch.config);
       break;
     }
 
     // Execute pair
     pair.status = "running";
     pair.startedAt = Date.now();
+    let pairError = null;
 
     try {
       const result = await executeWithTimeout(pair, batch.config);
@@ -225,6 +368,8 @@ async function executeBatch() {
       if (result && result.skipped) {
         pair.status = "skipped";
         pair.error = result.reason || "skipped by backend";
+        pair.result = result;
+        pair.diagnostics = result.diagnostics || null;
         batch.failedCount++;
         console.log(`[batch] ⊘ ${pair.ownerId.slice(0, 8)}/${pair.process}: skipped — ${pair.error}`);
       } else {
@@ -234,14 +379,20 @@ async function executeBatch() {
         console.log(`[batch] ✓ ${pair.ownerId.slice(0, 8)}/${pair.process} (${Date.now() - pair.startedAt}ms)`);
       }
     } catch (err) {
-      pair.status = "failed";
+      pairError = err;
+      pair.status = err.code === "PAIR_TIMEOUT" ? "timeout" : "failed";
       pair.error = err.message || String(err);
+      pair.diagnostics = err.diagnostics || pair.diagnostics || null;
       batch.failedCount++;
       console.error(`[batch] ✗ ${pair.ownerId.slice(0, 8)}/${pair.process}: ${pair.error}`);
     }
 
     pair.completedAt = Date.now();
     pair.durationMs = pair.completedAt - pair.startedAt;
+    finalizePairLog(pair, batch.config, { result: pair.result, error: pairError });
+    persistCurrentBatchSnapshot(batch).catch((err) =>
+      console.error(`[batch] Failed to persist pair log to Redis: ${err.message}`)
+    );
   }
 
   batch.status = "done";
@@ -261,18 +412,44 @@ async function executeBatch() {
 /**
  * Execute a single pair with a timeout guard.
  */
-async function executeWithTimeout(pair, config) {
+export async function executeWithTimeout(pair, config, { runner = executePair, timeoutMs = PAIR_TIMEOUT_MS } = {}) {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  let settled = false;
+
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`Pair timeout after ${PAIR_TIMEOUT_MS / 1000}s`));
-    }, PAIR_TIMEOUT_MS);
+      if (settled) return;
+      settled = true;
+      const diagnostics = buildPairDiagnostics(pair, config, {
+        status: "timeout",
+        reason: "llm_timeout",
+        durationMs: Date.now() - startedAt,
+        timeoutAt: new Date().toISOString(),
+        timeoutMs,
+        message: `Pair timeout after ${PAIR_TIMEOUT_MS / 1000}s`,
+      });
+      pair.diagnostics = diagnostics;
+      const timeoutError = new PairTimeoutError(pair, diagnostics);
+      controller.abort(timeoutError);
+      reject(timeoutError);
+    }, timeoutMs);
 
-    executePair(pair, config)
+    const onDiagnostics = (diagnostics) => {
+      pair.diagnostics = buildPairDiagnostics(pair, config, diagnostics);
+    };
+
+    Promise.resolve()
+      .then(() => runner(pair, config, { signal: controller.signal, onDiagnostics }))
       .then((result) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(result);
       })
       .catch((err) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         reject(err);
       });
@@ -282,11 +459,17 @@ async function executeWithTimeout(pair, config) {
 /**
  * Dispatch a single (user, process) pair to the appropriate function.
  */
-async function executePair(pair, config) {
+async function executePair(pair, config, { signal, onDiagnostics } = {}) {
   const rowConfig = config[pair.process] || {};
   const model = rowConfig.model || process.env.LLM_MODEL || "phi3";
   const apiUrl = process.env.LLM_API_URL || "http://localhost:11434/v1";
   const style = rowConfig.style || "default";
+  onDiagnostics?.({
+    model,
+    llmApiHost: llmApiHost(apiUrl),
+    status: "running",
+    pairStartedAt: new Date().toISOString(),
+  });
 
   // Set model + style env for the duration of this call
   const prevModel = process.env.LLM_MODEL;
@@ -304,6 +487,8 @@ async function executePair(pair, config) {
         return await _generateLlmInsightForUser(pair.ownerId, {
           minMoments: rowConfig.minMoments || 5,
           maxWords: rowConfig.maxWords || 100,
+          signal,
+          onDiagnostics,
         });
 
       case "actions":
@@ -311,6 +496,7 @@ async function executePair(pair, config) {
           model,
           apiUrl,
           force: true, // batch always forces — eligibility already checked
+          signal,
         });
 
       case "move":
@@ -320,7 +506,7 @@ async function executePair(pair, config) {
           model,
           maxWords: rowConfig.maxWords || 100,
           style,
-        });
+        }, { signal });
 
       case "fuel":
         return await runModeOutputInChild({
@@ -329,7 +515,7 @@ async function executePair(pair, config) {
           model,
           maxWords: rowConfig.maxWords || 100,
           style,
-        });
+        }, { signal });
 
       case "perspective":
         return await runModeOutputInChild({
@@ -338,7 +524,7 @@ async function executePair(pair, config) {
           model,
           maxWords: rowConfig.maxWords || 100,
           style,
-        });
+        }, { signal });
 
       default:
         throw new Error(`Unknown process: ${pair.process}`);
@@ -358,29 +544,38 @@ async function executePair(pair, config) {
   }
 }
 
-function markRemaining(pairs, fromIndex, status, reason) {
+function markRemaining(pairs, fromIndex, status, reason, config = {}) {
   for (let j = fromIndex; j < pairs.length; j++) {
     if (pairs[j].status === "pending") {
-      pairs[j].status = status;
-      pairs[j].error = reason;
-      pairs[j].completedAt = Date.now();
+      const pair = pairs[j];
+      pair.status = status;
+      pair.error = reason;
+      pair.completedAt = Date.now();
+      pair.durationMs = pair.startedAt ? pair.completedAt - pair.startedAt : 0;
+      finalizePairLog(pair, config, { error: new Error(reason) });
     }
   }
 }
 
+export function createBatchSummary(batch) {
+  return {
+    id: batch.id,
+    status: batch.status,
+    error: batch.error || null,
+    startedAt: batch.startedAt,
+    completedAt: batch.completedAt,
+    totalPairs: batch.pairs.length,
+    completedCount: batch.completedCount,
+    failedCount: batch.failedCount,
+    incompleteCount: batch.incompleteCount,
+    totalDurationMs: batch.totalDurationMs,
+    pairs: batch.pairs.map(simplifyPair),
+  };
+}
+
 function archiveBatch() {
   if (!currentBatch) return;
-  const summary = {
-    id: currentBatch.id,
-    startedAt: currentBatch.startedAt,
-    completedAt: currentBatch.completedAt,
-    totalPairs: currentBatch.pairs.length,
-    completedCount: currentBatch.completedCount,
-    failedCount: currentBatch.failedCount,
-    incompleteCount: currentBatch.incompleteCount,
-    totalDurationMs: currentBatch.totalDurationMs,
-    pairs: currentBatch.pairs.map(simplifyPair),
-  };
+  const summary = createBatchSummary(currentBatch);
   batchHistory.unshift(summary);
   if (batchHistory.length > MAX_HISTORY) batchHistory.pop();
 
@@ -390,17 +585,35 @@ function archiveBatch() {
   );
 }
 
-const BATCH_LOG_TTL = 3 * 24 * 60 * 60; // 3 days in seconds
+function persistCurrentBatchSnapshot(batch = currentBatch) {
+  if (!batch) return Promise.resolve();
+  return persistBatchToRedis(createBatchSummary(batch));
+}
+
+export function buildBatchLogRedisCommands(redisKeyFn, summary) {
+  return [
+    ["SET", redisKeyFn("llm_batch_log", summary.id), JSON.stringify(summary)],
+    ["EXPIRE", redisKeyFn("llm_batch_log", summary.id), String(BATCH_LOG_TTL)],
+    ["ZADD", redisKeyFn("llm_batch_logs"), String(summary.startedAt), summary.id],
+    ["ZREMRANGEBYRANK", redisKeyFn("llm_batch_logs"), "0", "-31"],
+  ];
+}
 
 async function persistBatchToRedis(summary) {
   if (!_redis || !_redisKey) return;
-  const key = _redisKey("llm_batch_log", summary.id);
-  await _redis(["SET", key, JSON.stringify(summary)]);
-  await _redis(["EXPIRE", key, BATCH_LOG_TTL]);
-  // Also maintain a sorted set of batch IDs for easy retrieval
-  await _redis(["ZADD", _redisKey("llm_batch_logs"), String(summary.startedAt), summary.id]);
-  // Trim old entries (keep last 30)
-  await _redis(["ZREMRANGEBYRANK", _redisKey("llm_batch_logs"), "0", "-31"]);
+  for (const command of buildBatchLogRedisCommands(_redisKey, summary)) {
+    await _redis(command);
+  }
+}
+
+export function isBatchLogVisibleWithinWindow(summary, nowMs = Date.now()) {
+  const timestamp = Number(summary?.completedAt || summary?.startedAt);
+  return Number.isFinite(timestamp) && nowMs - timestamp <= LLM_BATCH_LOG_WINDOW_MS;
+}
+
+function visibleBatchHistory() {
+  const nowMs = Date.now();
+  return batchHistory.filter((batch) => isBatchLogVisibleWithinWindow(batch, nowMs));
 }
 
 async function loadHistoryFromRedis() {
@@ -416,7 +629,10 @@ async function loadHistoryFromRedis() {
     for (const id of ids) {
       const raw = await _redis(["GET", _redisKey("llm_batch_log", id)]);
       if (raw) {
-        try { loaded.push(JSON.parse(raw)); } catch {}
+        try {
+          const parsed = JSON.parse(raw);
+          if (isBatchLogVisibleWithinWindow(parsed)) loaded.push(parsed);
+        } catch {}
       }
     }
     // Merge into in-memory history (avoid duplicates)
@@ -449,11 +665,11 @@ export async function getBatchStatus() {
   }
 
   if (!currentBatch) {
-    return { status: "idle", history: batchHistory };
+    return { status: "idle", history: visibleBatchHistory() };
   }
 
   const completed = currentBatch.pairs.filter((p) => p.status === "completed");
-  const failed = currentBatch.pairs.filter((p) => p.status === "failed" || p.status === "skipped");
+  const failed = currentBatch.pairs.filter((p) => p.status === "failed" || p.status === "skipped" || p.status === "timeout");
   const incomplete = currentBatch.pairs.filter((p) => p.status === "incomplete");
   const pending = currentBatch.pairs.filter((p) => p.status === "pending");
   const running = currentBatch.pairs.find((p) => p.status === "running") || null;
@@ -475,7 +691,7 @@ export async function getBatchStatus() {
     completed: completed.map(simplifyPair),
     failed: failed.map(simplifyPair),
     incomplete: incomplete.map(simplifyPair),
-    history: batchHistory,
+    history: visibleBatchHistory(),
     error: currentBatch.error || null,
   };
 }
@@ -520,13 +736,25 @@ export async function rerunPairs(pairIds, maxRuntimeMinutes) {
   return startBatch(newPairs, config, maxRuntimeMinutes || 120);
 }
 
-function simplifyPair(p) {
+export function simplifyPair(p) {
+  const log = p.llmLog || p.diagnostics || {};
   return {
     id: p.id,
     ownerId: p.ownerId,
     process: p.process,
     status: p.status,
     error: p.error,
+    message: p.message || log.message || null,
+    reason: p.reason || log.reason || null,
+    timestamp: p.timestamp || log.timestamp || null,
+    section: log.section || (p.process === "insights" ? "insights" : p.process),
+    selectedSource: p.result?.selectedSource || log.selectedSource || null,
+    promptCharCount: log.promptCharCount ?? null,
+    model: log.model || p.result?.model || null,
+    provider: log.provider || null,
+    llmApiHost: log.llmApiHost || null,
+    llmLog: p.llmLog || null,
+    diagnostics: p.result?.diagnostics || p.diagnostics || null,
     durationMs: p.durationMs,
     startedAt: p.startedAt,
     completedAt: p.completedAt,
