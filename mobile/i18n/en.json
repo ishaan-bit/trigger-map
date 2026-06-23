@@ -105,6 +105,7 @@
     "momentCount": "{count} moment today",
     "momentCountPlural": "{count} moments today",
     "tapToStart": "Tap a trigger to start",
+    "valueStatement": "Notice what moves you — patterns appear after a few quick logs.",
     "trending": "Trending {emotion}",
     "nudgeTrigger": "{trigger} keeps coming up",
     "nudgeImproving": "Things are looking up",
@@ -156,7 +157,10 @@
     "spark": "Spark",
     "building": "Building",
     "strong": "Strong",
-    "legendary": "Legendary"
+    "legendary": "Legendary",
+    "pausedTitle": "Streak paused",
+    "pausedBody": "Log today to pick it back up.",
+    "pausedBest": "Your best run was {count} days. Log today to start again."
   },
 
   "weather": {
@@ -367,6 +371,7 @@
     "tabThisWeek": "This week",
     "tabActions": "Actions",
     "tabPremium": "Premium",
+    "tabForYou": "For you",
 
     "weeklyPatterns": "Weekly patterns",
     "yourWeek": "Your Week",
@@ -627,6 +632,8 @@
         "thanksHelpful": "Thanks - noted",
         "thanksNot": "Noted - we'll adjust",
         "matchesMood": "matches your current mood",
+        "sourceAi": "✨ Personalised for you",
+        "sourceLibrary": "From our library",
         "showing": "Showing {shown} of {total}",
         "noExercises": "No exercises match these filters",
         "noFuelItems": "No items match these filters"

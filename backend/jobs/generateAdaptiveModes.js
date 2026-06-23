@@ -62,12 +62,22 @@ export async function runGenerateAdaptiveModes({ force = false, maxWords, ownerI
       // Check cooldown. Feedback after the last generation should bypass the
       // window so preferences are consumed on the next run.
       if (!force) {
-        const outputs = await Promise.all(["move", "fuel", "perspective"].map((mode) => getStoredModeOutput(ownerId, mode).catch(() => null)));
-        const generatedTimes = outputs.map((output) => output?.generatedAt ? new Date(output.generatedAt).getTime() : 0);
-        const oldestGeneratedAt = Math.min(...generatedTimes);
-        const hasAllFresh = generatedTimes.every((ts) => ts && Date.now() - ts < MODE_WINDOW_MS);
+        const modeList = ["move", "fuel", "perspective"];
+        const outputs = await Promise.all(modeList.map((mode) => getStoredModeOutput(ownerId, mode).catch(() => null)));
+        const generatedAtByMode = {};
+        modeList.forEach((mode, i) => {
+          generatedAtByMode[mode] = outputs[i]?.generatedAt ? new Date(outputs[i].generatedAt).getTime() : 0;
+        });
+        const hasAllFresh = modeList.every((mode) => generatedAtByMode[mode] && Date.now() - generatedAtByMode[mode] < MODE_WINDOW_MS);
         const feedback = await getModeFeedback(ownerId).catch(() => []);
-        const hasNewModeFeedback = feedback.some((entry) => ["move", "fuel"].includes(entry?.mode) && Number(entry.timestamp || 0) > oldestGeneratedAt);
+        // Compare each feedback entry against ITS OWN mode's last generation, not
+        // the oldest timestamp across all three modes — otherwise a stale
+        // perspective generation made legitimately-new move/fuel feedback look
+        // old (or new), so refreshes were skipped or over-fired incorrectly.
+        const hasNewModeFeedback = feedback.some((entry) =>
+          ["move", "fuel"].includes(entry?.mode) &&
+          Number(entry.timestamp || 0) > (generatedAtByMode[entry.mode] || 0)
+        );
 
         if (hasAllFresh && !hasNewModeFeedback) {
           results.push({ ownerId, skipped: true, reason: "window-not-elapsed" });

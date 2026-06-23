@@ -132,6 +132,8 @@ export function TriggerSelectionScreen() {
                 ? (todayCount !== 1 ? t("log.momentCountPlural", { count: todayCount }) : t("log.momentCount", { count: todayCount }))
                 : t("log.tapToStart")}
             </Text>
+            {/* Persistent value statement — keeps the "why" visible in steady state */}
+            <Text style={styles.valueStatement}>{t("log.valueStatement")}</Text>
           </View>
         </StaggerIn>
 
@@ -267,6 +269,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     marginTop: 2,
+  },
+  valueStatement: {
+    color: palette.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
   },
   grid: {
     flexDirection: "row",

@@ -200,6 +200,8 @@ export function SessionProvider({ children }) {
               registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, null).catch(() => null);
             }
           });
+          // Sync notification prefs keyed by deviceId so push-cron honors anon opt-outs
+          saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, null, storedDeviceId).catch(() => null);
         }
       } catch (error) {
         captureMobileError(error, { source: "bootstrap" });
@@ -519,8 +521,8 @@ export function SessionProvider({ children }) {
 
         await setReminderEnabled(enabled);
         setReminderEnabledState(enabled);
-        // Sync to server so push-cron respects this
-        if (token) saveNotificationPrefs({ weekly: enabled }, token).catch(() => null);
+        // Sync to server so push-cron respects this (keyed by deviceId when anonymous)
+        saveNotificationPrefs({ weekly: enabled }, token, deviceId).catch(() => null);
       },
       async toggleReflection(enabled) {
         if (enabled) {
@@ -531,12 +533,12 @@ export function SessionProvider({ children }) {
 
         await setReflectionEnabled(enabled);
         setReflectionEnabledState(enabled);
-        if (token) saveNotificationPrefs({ daily: enabled }, token).catch(() => null);
+        saveNotificationPrefs({ daily: enabled }, token, deviceId).catch(() => null);
       },
       async toggleNudges(enabled) {
         await setNudgesEnabled(enabled);
         setNudgesEnabledState(enabled);
-        if (token) saveNotificationPrefs({ nudge: enabled }, token).catch(() => null);
+        saveNotificationPrefs({ nudge: enabled }, token, deviceId).catch(() => null);
       },
       async subscribe() {
         const result = await startSubscriptionFlow(token);

@@ -6,11 +6,15 @@ import { getBearerToken } from "@/services/security.js";
 import { redis, redisKey } from "@/services/redisClient.js";
 
 /**
- * GET  /api/notification-prefs — read user prefs
- * POST /api/notification-prefs — save user prefs
+ * GET  /api/notification-prefs — read prefs
+ * POST /api/notification-prefs — save prefs
  *
- * Body (POST): { daily: bool, weekly: bool, nudge: bool }
- * Stored in Redis hash: notification_prefs:<userId> → JSON
+ * Body (POST): { daily: bool, weekly: bool, nudge: bool, deviceId?: string }
+ * Stored in Redis: notification_prefs:<ownerId> → JSON
+ *
+ * ownerId = user.id when signed in, else the anonymous deviceId. This mirrors
+ * push-token.js so anonymous (sign-in-free) users can persist their opt-outs and
+ * push-cron honors them — it already reads notification_prefs:<ownerId> generically.
  */
 export default async function handler(req, res) {
   if (enableCors(req, res)) return;
@@ -21,12 +25,15 @@ export default async function handler(req, res) {
 
   try {
     const bearerToken = getBearerToken(req);
-    if (!bearerToken) {
-      return sendError(res, 401, "UNAUTHORIZED", "Authentication required");
+    const user = bearerToken ? await validateSession(bearerToken).catch(() => null) : null;
+    const deviceId = req.body?.deviceId || req.query.deviceId;
+    const ownerId = user?.id || deviceId;
+
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId or authentication required");
     }
 
-    const user = await validateSession(bearerToken);
-    const key = redisKey("notification_prefs", user.id);
+    const key = redisKey("notification_prefs", ownerId);
 
     if (req.method === "GET") {
       const raw = await redis(["GET", key]);
@@ -47,10 +54,10 @@ export default async function handler(req, res) {
     };
 
     await redis(["SET", key, JSON.stringify(prefs)]);
-    console.log(`[notification-prefs] saved user=${user.id.slice(0, 8)}… daily=${prefs.daily} weekly=${prefs.weekly} nudge=${prefs.nudge}`);
+    console.log(`[notification-prefs] saved owner=${String(ownerId).slice(0, 8)}… daily=${prefs.daily} weekly=${prefs.weekly} nudge=${prefs.nudge}`);
     return sendSuccess(res, { prefs });
   } catch (error) {
     captureServerError(error, { route: "notification-prefs" });
-    return sendError(res, 401, "UNAUTHORIZED", "Session is invalid");
+    return sendError(res, 500, "PREFS_FAILED", "Unable to update notification preferences");
   }
 }

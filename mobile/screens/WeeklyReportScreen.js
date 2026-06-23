@@ -394,12 +394,14 @@ function NarrativeCard({ icon, title, items, positive, t }) {
 
 /* ── Tab pill selector ── */
 
+// Collapsed from 5 sub-tabs to 3 by intent:
+//   week    = your state + what happened this week (Mirror + This Week merged)
+//   progress = trends over time
+//   forYou  = what to do for you (Actions + adaptive Move/Fuel/Perspective + premium)
 const TAB_KEYS = [
-  { key: "mirror", labelKey: "report.tabMirror", icon: "🪞" },
   { key: "week", labelKey: "report.tabThisWeek", icon: "📅" },
   { key: "progress", labelKey: "report.progress.tabLabel", icon: "📈" },
-  { key: "actions", labelKey: "report.tabActions", icon: "⚡" },
-  { key: "premium", labelKey: "report.tabPremium", icon: "💎" },
+  { key: "forYou", labelKey: "report.tabForYou", icon: "✨" },
 ];
 
 function TabBar({ activeTab, onTabChange, t }) {
@@ -676,12 +678,6 @@ function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }
         </View>
       </AnimatedSection>
 
-      {!isSignedIn ? (
-        <View style={{ marginTop: 8 }}>
-          <PrimaryButton label={t("report.signInDeepen")} onPress={handleSignIn} />
-        </View>
-      ) : null}
-
       {/* Past Insights Archive — at bottom of Mirror tab */}
       {report?.insightHistory?.length > 0 ? (
         <AnimatedSection index={8} style={s.section}>
@@ -882,8 +878,8 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
         </AnimatedSection>
       ) : null}
 
-      {/* Correlations */}
-      {isSignedIn && dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
+      {/* Correlations — free for everyone (it's the user's own data) */}
+      {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
         <AnimatedSection index={6} style={s.section}>
           <SectionHeader label={t("report.triggerEmotion")} badge="live" t={t} />
           <View style={s.card}>
@@ -915,12 +911,6 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
           <Text style={s.ctaCardText}>📖 {t("report.viewTimeline")}</Text>
         </Pressable>
       </AnimatedSection>
-
-      {!isSignedIn ? (
-        <View style={{ marginTop: 8 }}>
-          <PrimaryButton label={t("report.signInAnalytics")} onPress={handleSignIn} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1507,11 +1497,6 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         </View>
       </AnimatedSection>
 
-      {!isSignedIn ? (
-        <View style={{ marginTop: 8 }}>
-          <PrimaryButton label={t("report.signInDeepen")} onPress={handleSignIn} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1614,6 +1599,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     [data]
   );
   const dataSource = typeof data?.source === "string" ? data.source : typeof data?.model === "string" ? data.model : null;
+  const isLlmSource = dataSource === "llm" || dataSource === "ai";
   const hasNarrative = typeof data?.narrative === "string" && data.narrative.trim().length > 0;
   // Move/Fuel feedback is longitudinal; Perspective feedback is tied to current output.
   const currentItemIds = useMemo(() => new Set(safeItems.map((i) => i.id).filter(Boolean)), [safeItems]);
@@ -1630,12 +1616,17 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   const [feedbackGiven, setFeedbackGiven] = useState(freshFeedback);
   const [feedbackPending, setFeedbackPending] = useState({});
   const [feedbackError, setFeedbackError] = useState({});
-  // Reset when generation changes
+  // Reset only when a genuinely NEW generation arrives (generatedAt changes), not
+  // on every savedFeedback identity change — otherwise a refresh that returns the
+  // same generation wipes the user's optimistic feedback state, causing the
+  // "thanks" flicker / feedback-replacement churn.
+  const generationKey = `${mode}:${data?.generatedAt || ""}`;
   useEffect(() => {
     setFeedbackGiven(freshFeedback);
     setFeedbackPending({});
     setFeedbackError({});
-  }, [freshFeedback]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generationKey]);
 
   // Move state
   const [moveDuration, setMoveDuration] = useState(null); // null | [min,max]
@@ -1757,18 +1748,23 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       });
     const used = new Set();
     return SLOTS.map((slot) => {
-      // Try server suggestions first
+      // Try server (LLM/rule) suggestions first
       let pool = fuelSuggestions.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
       let pick = pool[0] || null;
-      // Backfill from full library if server items can't fill this slot
-      if (!pick) {
+      let origin = pick ? "server" : null;
+      // Backfill from the full library ONLY for rule/empty outputs. When the server
+      // returned a PERSONALISED (LLM) plan, never pad it with generic library items
+      // — that padding is the on-device "mixing rule with LLM" symptom. Unfilled
+      // slots are simply omitted so the user only ever sees LLM-picked fuel.
+      if (!pick && !(isLlmSource && hasServerFuelItems)) {
         const backfill = backfillLibrary.filter((n) => slot.types.includes(n.type) && !used.has(n.id));
         pick = backfill[0] || null;
+        origin = pick ? "library" : null;
       }
       if (pick) used.add(pick.id);
-      return { ...slot, item: pick };
+      return { ...slot, item: pick, origin };
     }).filter((slot) => slot.item);
-  }, [fuelSuggestions, lang, fuelDiet, serverBackfillExcludeIds, feedbackGiven, emotions, mode, safeItems.length]);
+  }, [fuelSuggestions, lang, fuelDiet, serverBackfillExcludeIds, feedbackGiven, emotions, mode, safeItems.length, isLlmSource]);
 
   const MODE_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
   const modeHint = (key, fallback) => {
@@ -1880,6 +1876,11 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   return (
     <View style={s.modeContent}>
       <Text style={s.modeSubheading}>{MODE_HINTS[mode]}</Text>
+      {dataSource ? (
+        <Text style={[s.modeSourceTag, isLlmSource ? s.modeSourceTagAi : s.modeSourceTagRule]}>
+          {isLlmSource ? modeHint("sourceAi", "✨ Personalised for you") : modeHint("sourceLibrary", "From our library")}
+        </Text>
+      ) : null}
       {narrative ? renderColoredText(cleanText(narrative), t, s.modeNarrative) : null}
 
       {/* ── Move: duration filter + exercise list ── */}
@@ -1934,7 +1935,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
             ))}
           </View>
           {fuelPlan.length > 0 ? (
-            fuelPlan.map(({ key, label, icon, item }) => (
+            fuelPlan.map(({ key, label, icon, item, origin }) => (
               <View key={key} style={s.suggestionCard}>
                 <Text style={s.fuelSlotLabel}>{icon} {label}</Text>
                 <Text style={s.suggestionTitle}>{hi ? item.nameHi : item.name}</Text>
@@ -1950,7 +1951,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                     <Text style={s.suggestionMatchText}>✓ {t("report.prem.mode.matchesMood")}</Text>
                   </View>
                 )}
-                {renderFeedbackControls(item.id, dataSource || "rule")}
+                {renderFeedbackControls(item.id, origin === "library" ? "rule" : (dataSource || "rule"))}
               </View>
             ))
           ) : (
@@ -1984,6 +1985,10 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
 }
 
 function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, dominantEmotion, onLogMoment }) {
+  // Default to "core" so the headline premium content (LLM Pattern Intelligence,
+  // direction, levers, snapshot) is visible immediately. Move/Fuel/Perspective are
+  // one tap away in the mode bar, which the report tab-collapse already surfaces a
+  // level higher than before (Insights → For You → mode bar).
   const [activeMode, setActiveMode] = useState("core");
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
@@ -2342,7 +2347,7 @@ export function WeeklyReportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [purchasing, setPurchasing] = useState(false);
-  const [activeTab, setActiveTab] = useState("mirror");
+  const [activeTab, setActiveTab] = useState("week");
   const [modes, setModes] = useState(null);
   const [progress, setProgress] = useState(null);
   const [showInsightsGuide, setShowInsightsGuide] = useState(false);
@@ -2391,10 +2396,12 @@ export function WeeklyReportScreen() {
     let modesTimer = null;
     let guideTimer = null;
 
-    // Refresh adaptive modes every time screen gains focus
+    // Refresh adaptive modes once on focus. We intentionally do NOT poll on an
+    // interval — regeneration is a background (cron/ops) job that won't finish
+    // while the user watches, and the old 45s poll swapped Move/Fuel lists out
+    // mid-read and mid-feedback (the "feedback replacement" churn).
     if (p && t) {
       refreshModes();
-      modesTimer = globalThis.setInterval(refreshModes, 45000);
     }
 
     // FTUE: show insights guide when arriving from second log
@@ -2432,17 +2439,11 @@ export function WeeklyReportScreen() {
         [mode]: { ...(prev.feedbackByMode?.[mode] || {}), [itemId]: response },
       },
     } : prev);
-    try {
-      const freshModes = await fetchModes(token, deviceId, lang);
-      if (__DEV__) {
-        const count = freshModes?.[mode]?.items?.length || 0;
-        console.log("Modes refreshed after feedback:", mode, count, freshModes?.[mode]?.source || freshModes?.[mode]?.model);
-      }
-      setModes(freshModes || {});
-    } catch (err) {
-      if (__DEV__) console.log("Mode feedback stored; refresh failed:", err?.message || err);
-    }
-  }, [token, deviceId, lang]);
+    // Do NOT refetch all modes here. The optimistic merge above already reflects
+    // the tap; an immediate full refetch reorders/replaces the visible list under
+    // the user (the "feedback replacement" churn). Server-side feedback effects
+    // are picked up on the next focus refresh.
+  }, [token, deviceId]);
 
   const handleActionFeedback = useCallback((actionId, response) => {
     trackEvent("action_feedback", { actionId, response });
@@ -2539,7 +2540,7 @@ export function WeeklyReportScreen() {
                   : t("report.momentsSummary", { moments: report.totalMoments, days: dq.daysLogged || "-" })}
               </Text>
             ) : null}
-            {report?.totalMoments ? (
+            {(report?.totalMoments || confidence === "stale") ? (
               <>
                 <View style={s.heroRow}>
                   <View style={s.heroPill}>
@@ -2558,29 +2559,32 @@ export function WeeklyReportScreen() {
                     <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
                   </View>
                 </View>
-                <Pressable
-                  onPress={handleShare}
-                  disabled={sharing}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share my week"
-                  style={({ pressed }) => [s.shareButtonWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
-                >
-                  <LinearGradient
-                    colors={["#5fd3e0", "#7e9cff"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={s.shareButton}
+                {/* Share needs an actual snapshot — only show when there's data to share */}
+                {report?.totalMoments ? (
+                  <Pressable
+                    onPress={handleShare}
+                    disabled={sharing}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share my week"
+                    style={({ pressed }) => [s.shareButtonWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
                   >
-                    <View style={s.shareButtonIconWrap}>
-                      <Text style={s.shareButtonIcon}>📤</Text>
-                    </View>
-                    <View style={s.shareButtonTextWrap}>
-                      <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
-                      <Text style={s.shareButtonSubtext}>Send a snapshot to anyone</Text>
-                    </View>
-                    <Text style={s.shareButtonArrow}>›</Text>
-                  </LinearGradient>
-                </Pressable>
+                    <LinearGradient
+                      colors={["#5fd3e0", "#7e9cff"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={s.shareButton}
+                    >
+                      <View style={s.shareButtonIconWrap}>
+                        <Text style={s.shareButtonIcon}>📤</Text>
+                      </View>
+                      <View style={s.shareButtonTextWrap}>
+                        <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
+                        <Text style={s.shareButtonSubtext}>Send a snapshot to anyone</Text>
+                      </View>
+                      <Text style={s.shareButtonArrow}>›</Text>
+                    </LinearGradient>
+                  </Pressable>
+                ) : null}
               </>
             ) : null}
           </View>
@@ -2600,16 +2604,9 @@ export function WeeklyReportScreen() {
               <Text style={s.starterBody}>
                 {isSignedIn ? t("report.starterBodySignedIn") : t("report.starterBodyAnon")}
               </Text>
-              {!isSignedIn ? (
-                <>
-                  <PrimaryButton label={t("report.signInDeeper")} onPress={handleSignIn} />
-                  <Pressable style={s.nudgeSecondary} onPress={() => router.push("/(tabs)/log")} accessibilityRole="button">
-                    <Text style={s.nudgeSecondaryText}>{t("report.logMoment")}</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
-              )}
+              {/* Anonymous-first: logging is the value, so always lead with it
+                  (no sign-in-first gate — the rule-based insight is now free). */}
+              <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
             </View>
           ) : null}
 
@@ -2670,29 +2667,31 @@ export function WeeklyReportScreen() {
                 </View>
               ) : null}
 
-              {/* Tab content */}
-              {activeTab === "mirror" ? (
-                <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
-              ) : activeTab === "week" ? (
-                <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
+              {/* Tab content — 3 collapsed tabs */}
+              {activeTab === "week" ? (
+                <>
+                  <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
+                  <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
+                </>
               ) : activeTab === "progress" ? (
                 <ProgressTab
                   progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
                   handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
                 />
-              ) : activeTab === "actions" ? (
-                <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
               ) : (
-                <PremiumTab
-                  report={report} dq={dq} confidence={confidence}
-                  isSignedIn={isSignedIn} isPremium={isPremium}
-                  hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
-                  handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                  purchasing={purchasing} subscription={subscription} t={t} lang={lang}
-                  modes={modes} onModeFeedback={handleModeFeedback}
-                  dominantEmotion={dominantEmotion}
-                  onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
-                />
+                <>
+                  <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
+                  <PremiumTab
+                    report={report} dq={dq} confidence={confidence}
+                    isSignedIn={isSignedIn} isPremium={isPremium}
+                    hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
+                    handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
+                    purchasing={purchasing} subscription={subscription} t={t} lang={lang}
+                    modes={modes} onModeFeedback={handleModeFeedback}
+                    dominantEmotion={dominantEmotion}
+                    onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                  />
+                </>
               )}
             </>
           ) : null}
@@ -3212,6 +3211,9 @@ const s = StyleSheet.create({
   modeContentBody: { color: palette.text, fontSize: 13, lineHeight: 19, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeSubheading: { color: palette.accent, fontSize: 12, lineHeight: 18, fontWeight: "800", letterSpacing: 0, textTransform: "uppercase", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   modeNarrative: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  modeSourceTag: { alignSelf: "flex-start", marginTop: 6, marginBottom: 2, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: "hidden", fontSize: 10, fontWeight: "800", letterSpacing: 0.4, textTransform: "uppercase", borderWidth: 1 },
+  modeSourceTagAi: { color: palette.accent, backgroundColor: palette.accent + "15", borderColor: palette.accent + "40" },
+  modeSourceTagRule: { color: palette.muted, backgroundColor: palette.muted + "12", borderColor: palette.muted + "33" },
   modeEmptyCta: {
     alignSelf: "flex-start",
     marginTop: 4,

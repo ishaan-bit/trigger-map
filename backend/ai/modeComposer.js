@@ -39,7 +39,7 @@ const DEFAULT_MODEL = "phi3";
 const REQUEST_TIMEOUT_MS = 120_000; // 2 min per mode generation call
 const PULL_TIMEOUT_MS = 600_000; // 10 min for model downloads
 const RETRY_DELAY_MS = 3_000; // 3 s between retries
-const MAX_RETRIES = 1;
+const MAX_RETRIES = 2; // up to 3 attempts — a transient LLM hiccup should not flip the stored layer to rule
 
 // ── Model availability check ──────────────────────────────────────────
 
@@ -694,7 +694,15 @@ export async function generateRuleBasedModeOutput({ ownerId, mode, lang = "en", 
   }
 
   if (persist) {
-    await storeModeOutput(ownerId, mode, output);
+    // Never clobber a still-valid LLM output with rule content. This guards the
+    // layer-replacement invariant centrally, regardless of caller, and closes the
+    // race where a concurrent LLM write lands between an upstream check and here.
+    const existing = await getStoredModeOutput(ownerId, mode).catch(() => null);
+    if (existing && !isRuleBasedModeOutput(existing)) {
+      console.log(`[modeComposer] ${mode} rule persist skipped — preserving stored LLM output for ${ownerId.slice(0, 8)}`);
+    } else {
+      await storeModeOutput(ownerId, mode, output);
+    }
   }
 
   console.log(`[modeComposer] ${mode} rule generation completed for ${ownerId.slice(0, 8)} items=${output.items?.length || 0} persist=${persist}`);
@@ -856,17 +864,22 @@ export async function generateModeOutput({ ownerId, mode, lang = "en", model: mo
       let parsedOpening = "";
 
       if (mode === "move" || mode === "fuel") {
-        try {
-          // Extract JSON from LLM response (may have wrapping text)
-          const jsonMatch = narrative.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            parsedOpening = cleanLlmText(parsed.opening || "");
-            parsedReasons = (parsed.reasons || []).map((r) => cleanLlmText(r));
-          }
-        } catch (e) {
-          console.warn(`[modeComposer] JSON parse failed for ${mode}, using raw narrative: ${e.message}`);
-          parsedOpening = cleanLlmText(narrative);
+        // Move/Fuel require structured JSON so the LLM layer (opening + per-item
+        // reasons) cleanly REPLACES the rule layer. If parsing fails or the model
+        // returns no reasons, storing it stamped source:"llm" would be a silent
+        // rule/LLM hybrid (rule-selected items with generic/no reasons). Treat
+        // that as a generation FAILURE so the retry loop runs and, if still
+        // failing, generateAllModes falls through to a clearly-labelled rule
+        // output instead of a hybrid that looks like a clean LLM overwrite.
+        const jsonMatch = narrative.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error(`LLM returned no JSON object for ${mode}`);
+        }
+        const parsed = JSON.parse(jsonMatch[0]); // throws on malformed JSON → caught by retry loop
+        parsedOpening = cleanLlmText(parsed.opening || "");
+        parsedReasons = (Array.isArray(parsed.reasons) ? parsed.reasons : []).map((r) => cleanLlmText(r));
+        if (items.length && !parsedReasons.length) {
+          throw new Error(`LLM returned no per-item reasons for ${mode}`);
         }
         narrative = parsedOpening || cleanLlmText(narrative);
       } else {

@@ -105,6 +105,7 @@
     "momentCount": "आज {count} पल",
     "momentCountPlural": "आज {count} पल",
     "tapToStart": "शुरू करने के लिए टैप करें",
+    "valueStatement": "ध्यान दें कि आपको क्या प्रभावित करता है — कुछ लॉग के बाद आपके पैटर्न दिखने लगेंगे।",
     "trending": "{emotion} चल रहा है",
     "nudgeTrigger": "{trigger} बार-बार आ रहा है",
     "nudgeImproving": "चीज़ें बेहतर हो रही हैं",
@@ -156,7 +157,10 @@
     "spark": "चिंगारी",
     "building": "बनता हुआ",
     "strong": "मज़बूत",
-    "legendary": "अद्भुत"
+    "legendary": "अद्भुत",
+    "pausedTitle": "स्ट्रीक रुकी हुई है",
+    "pausedBody": "आज लॉग करें और इसे फिर से शुरू करें।",
+    "pausedBest": "आपकी सबसे लंबी स्ट्रीक {count} दिन की थी। आज लॉग करके फिर शुरू करें।"
   },
   "weather": {
     "clear": "साफ़",
@@ -366,6 +370,7 @@
     "tabThisWeek": "यह सप्ताह",
     "tabActions": "कार्रवाई",
     "tabPremium": "प्रीमियम",
+    "tabForYou": "आपके लिए",
 
     "weeklyPatterns": "साप्ताहिक पैटर्न",
     "yourWeek": "आपका सप्ताह",
@@ -623,6 +628,8 @@
         "thanksHelpful": "शुक्रिया - नोट किया",
         "thanksNot": "नोट किया - हम समायोजित करेंगे",
         "matchesMood": "आपकी मौजूदा मनोदशा से मेल खाता है",
+        "sourceAi": "✨ आपके लिए वैयक्तिकृत",
+        "sourceLibrary": "हमारी लाइब्रेरी से",
         "showing": "{total} में से {shown} दिखा रहे हैं",
         "noExercises": "इन फ़िल्टरों से कोई व्यायाम मेल नहीं खाता",
         "noFuelItems": "इन फ़िल्टरों से कोई आइटम मेल नहीं खाता"

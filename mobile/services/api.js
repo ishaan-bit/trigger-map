@@ -233,16 +233,18 @@ export function unregisterPushToken({ deviceId }, authToken) {
   });
 }
 
-export function saveNotificationPrefs({ daily, weekly, nudge }, authToken) {
+export function saveNotificationPrefs({ daily, weekly, nudge }, authToken, deviceId) {
+  // Anonymous users persist prefs keyed by deviceId so push-cron honors opt-outs.
   return fetchJson("/notification-prefs", {
     method: "POST",
-    body: { daily, weekly, nudge },
-    token: authToken,
+    body: { daily, weekly, nudge, deviceId },
+    ...(authToken ? { token: authToken } : {}),
   });
 }
 
-export function getNotificationPrefs(authToken) {
-  return fetchJson("/notification-prefs", { token: authToken });
+export function getNotificationPrefs(authToken, deviceId) {
+  const query = !authToken && deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
+  return fetchJson(`/notification-prefs${query}`, { ...(authToken ? { token: authToken } : {}) });
 }
 
 export function submitActionFeedback(actionId, response, deviceId, token) {

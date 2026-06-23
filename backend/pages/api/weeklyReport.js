@@ -14,6 +14,7 @@ import { getBearerToken } from "@/services/security.js";
 import { validateSession, getSubscription, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
 import { checkFeatureAccess } from "@/services/premiumService.js";
 import { getTimeline } from "@/services/momentService.js";
+import { buildAggregatesFromRawMoments, parseRawMomentEntries } from "@/jobs/llmInsightSource.js";
 
 export default async function handler(req, res) {
   if (enableCors(req, res)) {
@@ -73,6 +74,7 @@ export default async function handler(req, res) {
 
     let silenceWindow = null;
     let effectiveAggregates = aggregates;
+    let effectiveAllAggregates = allAggregates;
     let effectivePreviousAggregates;
 
     if (isSilent) {
@@ -84,7 +86,24 @@ export default async function handler(req, res) {
       };
 
       // Slide aggregate window: use the most recent 7 days that had data
-      const activeDays = allAggregates.filter(a => Number(a.total || 0) > 0);
+      let activeDays = allAggregates.filter(a => Number(a.total || 0) > 0);
+
+      // Daily aggregates have a 45-day TTL, so a user silent longer than that has
+      // no surviving snapshots even though their raw moments persist. Rebuild
+      // aggregates from the raw timeline so the returning experience stays
+      // populated (anchor pattern, baseline, history) instead of collapsing to an
+      // empty "stale" report — the exact lapsed user we most want to recover.
+      if (activeDays.length === 0 && lifetimeMoments > 0) {
+        const { moments: normalizedMoments } = parseRawMomentEntries(allMoments || [], { ownerId });
+        const rebuilt = buildAggregatesFromRawMoments(normalizedMoments);
+        const rebuiltActive = rebuilt.filter(a => Number(a.total || 0) > 0);
+        if (rebuiltActive.length) {
+          activeDays = rebuiltActive;
+          effectiveAllAggregates = rebuilt; // baseline engine reads allAggregates
+          console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: aggregates expired — rebuilt ${rebuilt.length} day(s) from ${lifetimeMoments} raw moments`);
+        }
+      }
+
       effectiveAggregates = activeDays.slice(-7);
 
       // Recompute previous aggregates relative to the last active window
@@ -116,7 +135,7 @@ export default async function handler(req, res) {
     // Always compute the rule-based insight from fresh aggregate data
     // so the summary text matches the live charts.
     // Pass allAggregates (45d) for baseline computation.
-    const report = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates, previousAggregates: effectivePreviousAggregates, moments: recentMoments, silenceWindow });
+    const report = generateWeeklyReport({ aggregates: effectiveAggregates, allAggregates: effectiveAllAggregates, previousAggregates: effectivePreviousAggregates, moments: recentMoments, silenceWindow });
     report.lifetimeMoments = (allMoments || []).length;
     console.log(`[weeklyReport] ${ownerId.slice(0, 8)}: moments=${recentMoments.length}, lifetime=${report.lifetimeMoments}, correlations=${Object.keys(report.correlations || {}).length}, invokedMetrics=${report.invokedMetrics != null}, compound=${report.compoundPatterns != null}`);
     const firstName = isAuthenticated ? extractFirstName(user?.name) : null;
@@ -127,19 +146,10 @@ export default async function handler(req, res) {
       if (report.aiInsight && storedReport?.rewrittenBy && storedReport.summary) {
         report.aiInsight.summary = storedReport.summary;
       }
-    } else if (!isAuthenticated && report.totalMoments >= 3) {
-      // Anonymous preview: give users a taste of their personalised insight
-      // (summary sentence + top driver) so they have a reason to sign in.
-      // generateInsight is pure computation — no I/O, safe to call here.
-      // Revert: remove this else-if block to restore previous behaviour.
-      const anonInsight = await generateInsight(report, { firstName: null, lang });
-      report.aiInsight = {
-        summary: anonInsight.summary,
-        drivers: anonInsight.drivers?.slice(0, 1),
-        confidence: anonInsight.confidence,
-        _anonymousPreview: true,
-      };
     }
+    // Note: the rule-based insight is now free for everyone (anonymous included),
+    // so there is no anonymous "preview" downgrade — anonymous users get the full
+    // report.aiInsight from the branch above.
 
     // Attach LLM insight for premium users, first-free eligible, OR free-pass holders
     // For Strava-style gating: non-premium see a truncated teaser
@@ -183,26 +193,16 @@ export default async function handler(req, res) {
       report.insightHistory = insightHistory;
     }
 
-    if (report.totalMoments >= 3) {
-      if (!isAuthenticated) {
-        // Anonymous → prompt sign-in for free rule-based insights
-        report.aiPreview = {
-          available: true,
-          teaser: lang === "hi"
-            ? "Google से साइन इन करें और अपने पैटर्न इनसाइट्स अनलॉक करें - सभी अकाउंट्स के लिए मुफ़्त।"
-            : "Sign in with Google to unlock your pattern insights, free for all accounts.",
-          action: "sign-in",
-        };
-      } else if (!hasPremium) {
-        // Signed-in free → tease upcoming LLM personalized insight
-        report.llmPreview = {
-          available: false,
-          teaser: lang === "hi"
-            ? "व्यक्तिगत AI इनसाइट्स जल्द आ रहे हैं। Premium में अपग्रेड करें।"
-            : "Personalized AI insights are coming soon. Upgrade to Premium to be first in line.",
-          action: "upgrade",
-        };
-      }
+    // Non-premium users (anonymous or signed-in free) with enough data → tease
+    // the premium LLM personalized insight. The rule-based insight is already free.
+    if (report.totalMoments >= 3 && !hasPremium) {
+      report.llmPreview = {
+        available: false,
+        teaser: lang === "hi"
+          ? "व्यक्तिगत AI इनसाइट्स जल्द आ रहे हैं। Premium में अपग्रेड करें।"
+          : "Personalized AI insights are coming soon. Upgrade to Premium to be first in line.",
+        action: "upgrade",
+      };
     }
 
     // Generate contextual actions from the report (feedback-aware)

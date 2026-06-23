@@ -12,7 +12,7 @@ export const PREMIUM_FEATURES = {
   timeline: { tier: "free", label: "Timeline review" },
   basicWeeklyReport: { tier: "free", label: "Weekly pattern report" },
   exportLogs: { tier: "free", label: "Export your data" },
-  aiWeeklySummary: { tier: "signed", label: "Pattern insights (rule-based)" },
+  aiWeeklySummary: { tier: "free", label: "Pattern insights (rule-based)" },
   llmPersonalizedInsight: { tier: "premium", label: "AI-powered personalized insight" },
   detailedReportCharts: { tier: "premium", label: "Detailed report charts" },
   momentEditing: { tier: "free", label: "Edit and delete moments" },

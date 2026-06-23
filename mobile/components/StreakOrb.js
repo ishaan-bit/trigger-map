@@ -24,7 +24,26 @@ export function StreakOrb({ moments }) {
     }
   }, [streak, pulseAnim]);
 
-  if (streak < 1) return null;
+  // Silence as signal: a returning user whose streak lapsed should not see the
+  // orb silently vanish. If they have history, show a gentle "paused" state that
+  // acknowledges the break and invites a restart — instead of nothing.
+  if (streak < 1) {
+    if (!moments?.length) return null; // genuinely new user — nothing to acknowledge yet
+    const best = computeBestStreak(moments);
+    return (
+      <View style={[styles.wrap, styles.pausedWrap]}>
+        <View style={styles.content}>
+          <Text style={styles.fire}>🌙</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.count, { color: palette.muted }]}>{t("streak.pausedTitle")}</Text>
+            <Text style={styles.sub}>
+              {best >= 2 ? t("streak.pausedBest", { count: best }) : t("streak.pausedBody")}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const orbOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.6] });
   const orbScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
@@ -94,6 +113,27 @@ function computeStreak(moments) {
   return streak;
 }
 
+// Longest consecutive-day run ever, ignoring whether it includes today —
+// used to acknowledge a lapsed user's best run in the paused state.
+function computeBestStreak(moments) {
+  if (!moments?.length) return 0;
+  const dates = [...new Set(moments.map((m) => new Date(m.timestamp).toDateString()))]
+    .map((d) => new Date(d))
+    .sort((a, b) => a - b);
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const diff = Math.round((dates[i] - dates[i - 1]) / 86_400_000);
+    if (diff === 1) {
+      run++;
+      if (run > best) best = run;
+    } else if (diff > 1) {
+      run = 1;
+    }
+  }
+  return best;
+}
+
 const styles = StyleSheet.create({
   wrap: {
     borderRadius: radius.md,
@@ -103,6 +143,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     overflow: "hidden",
     position: "relative",
+  },
+  pausedWrap: {
+    backgroundColor: "rgba(13, 20, 36, 0.6)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   glow: {
     position: "absolute",

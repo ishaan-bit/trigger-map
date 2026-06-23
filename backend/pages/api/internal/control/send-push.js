@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       errors: errors.length,
       errorDetails: errors.slice(0, 5).map(e => e.message),
       note: sent.length === 0
-        ? 'No push tokens registered yet. Users must be logged in on a device to receive notifications.'
+        ? 'No push tokens registered for the selected devices yet. Tokens register on app launch for both anonymous and signed-in users once notification permission is granted.'
         : undefined,
     });
   } catch (err) {
