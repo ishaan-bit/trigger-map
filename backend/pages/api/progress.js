@@ -6,6 +6,7 @@ import enableCors from "@/lib/cors.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
+import { recoverDeviceIfNeeded } from "@/services/dataMigration.js";
 import { buildAggregatesFromRawMoments, loadRawMomentEntries, parseRawMomentEntries } from "@/jobs/llmInsightSource.js";
 
 export default async function handler(req, res) {
@@ -22,6 +23,10 @@ export default async function handler(req, res) {
 
     if (!ownerId) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
+    }
+
+    if (!user) {
+      await recoverDeviceIfNeeded(ownerId).catch(() => null);
     }
 
     // Fetch 45-day aggregates for longitudinal view

@@ -191,6 +191,14 @@ const QUICK_ACTIONS = [
     target: 'owners',
     noConfirm: true,
   },
+  {
+    id: 'recover-all',
+    label: '♻️ Recover All Users',
+    description: 'Copy every signed-in account’s data onto its linked device(s) (userId → deviceId). Non-destructive and idempotent — safe to re-run; skips already-recovered devices.',
+    action: 'recover-all',
+    target: 'all',
+    noConfirm: true,
+  },
 ];
 
 function SourceBadge({ source }) {

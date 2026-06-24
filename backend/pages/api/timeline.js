@@ -4,6 +4,7 @@ import { captureServerError } from "@/services/monitoringService.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession } from "@/services/authService.js";
+import { recoverDeviceIfNeeded } from "@/services/dataMigration.js";
 
 function groupMomentsByDay(moments) {
   return moments.reduce((accumulator, moment) => {
@@ -34,6 +35,12 @@ export default async function handler(req, res) {
 
     if (!ownerId) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
+    }
+
+    // Self-healing recovery: if this device updated from a signed-in build, copy
+    // its stranded account data back onto the deviceId (once). No-op afterwards.
+    if (!user) {
+      await recoverDeviceIfNeeded(ownerId).catch(() => null);
     }
 
     const moments = await getTimeline(ownerId);

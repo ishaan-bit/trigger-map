@@ -5,6 +5,8 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 const DEVICE_ID_KEY = "triggermap.device-id";
+const SESSION_TOKEN_KEY = "triggermap.session-token";
+const RECOVERY_KEY = "triggermap.recovery-done";
 const ONBOARDING_KEY = "triggermap.onboarding-complete";
 const REMINDER_KEY = "triggermap.reminder-enabled";
 const REFLECTION_KEY = "triggermap.reflection-enabled";
@@ -36,6 +38,36 @@ export async function getOrCreateDeviceId() {
     await SecureStore.setItemAsync(DEVICE_ID_KEY, created);
   }
   return created;
+}
+
+// Legacy account session token, left over in SecureStore from the pre-device-id
+// (signed-in) build. We never write it anymore — we only read it once to recover
+// stranded account data, then clear it.
+export async function getSessionToken() {
+  if (Platform.OS === "web") return null;
+  try {
+    return await SecureStore.getItemAsync(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function clearSessionToken() {
+  if (Platform.OS === "web") return;
+  try {
+    await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// One-shot guard so the first-launch data recovery runs at most once per device.
+export async function getRecoveryDone() {
+  return (await AsyncStorage.getItem(RECOVERY_KEY)) === "true";
+}
+
+export async function setRecoveryDone(value) {
+  return AsyncStorage.setItem(RECOVERY_KEY, value ? "true" : "false");
 }
 
 export async function getOnboardingComplete() {

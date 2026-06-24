@@ -12,6 +12,7 @@ import { runGenerateWeeklyReports } from "@/jobs/generateWeeklyReports.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getBearerToken } from "@/services/security.js";
 import { validateSession, getSubscription, isFirstAiFreeAvailable, markFirstAiFreeUsed } from "@/services/authService.js";
+import { recoverDeviceIfNeeded } from "@/services/dataMigration.js";
 import { checkFeatureAccess } from "@/services/premiumService.js";
 import { getTimeline } from "@/services/momentService.js";
 import { buildAggregatesFromRawMoments, parseRawMomentEntries } from "@/jobs/llmInsightSource.js";
@@ -38,6 +39,13 @@ export default async function handler(req, res) {
 
     if (!ownerId) {
       return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
+    }
+
+    // Self-healing recovery: pull a signed-in build's stranded account data onto
+    // the deviceId (once) so the report shows historical logs even on builds that
+    // can't trigger recovery from the client.
+    if (!user) {
+      await recoverDeviceIfNeeded(ownerId).catch(() => null);
     }
 
     const isAuthenticated = Boolean(user);

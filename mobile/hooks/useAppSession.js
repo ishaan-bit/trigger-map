@@ -12,12 +12,20 @@ import {
   setReminderEnabled,
   setReflectionEnabled,
   setNudgesEnabled,
+  getSessionToken,
+  clearSessionToken,
+  getRecoveryDone,
+  setRecoveryDone,
 } from "@/services/deviceService";
 import {
   deleteAllData,
+  editMoment,
+  deleteMomentApi,
   fetchMe,
+  fetchTimeline,
   fetchWeeklyReport,
   logMoment,
+  recover,
   registerDevice,
   registerPushToken,
   saveNotificationPrefs,
@@ -151,6 +159,31 @@ export function SessionProvider({ children }) {
         setReminderEnabledState(enabledReminder);
         setReflectionEnabledState(enabledReflection);
         setNudgesEnabledState(enabledNudges);
+
+        // ── One-time data recovery ──────────────────────────────────────────
+        // Users who updated from a signed-in build had their logs stored on the
+        // backend under their old account userId. Trigger the server-side
+        // userId→deviceId copy once (the server derives the account from the
+        // leftover session token or the device→account link). After this, the
+        // backend bucket for this deviceId holds the full history, which the
+        // timeline/report read. The server also self-heals on any read, so this
+        // is best-effort; on failure we leave the flag unset to retry next launch.
+        try {
+          const recoveryDone = await getRecoveryDone();
+          if (!recoveryDone) {
+            const legacyToken = await getSessionToken();
+            const result = await recover(storedDeviceId, legacyToken);
+            // Only finalize (and discard the legacy token) when the server confirms a
+            // completed recovery; otherwise retry on the next launch with the token.
+            if (result?.ok) {
+              await setRecoveryDone(true);
+              if (legacyToken) await clearSessionToken();
+            }
+            invalidateCache();
+          }
+        } catch (recoveryErr) {
+          console.warn("[recovery] deferred, will retry next launch:", recoveryErr?.message);
+        }
 
         // Announce the install so it's visible in the ops console regardless of
         // push permission or logging activity.
@@ -312,19 +345,46 @@ export function SessionProvider({ children }) {
         return { moment: localMoment };
       },
       async loadTimeline() {
-        await ensureDeviceIdentity();
-        // Timeline reads from the local store (source of truth for the device).
-        return getLocalMoments();
+        const activeDeviceId = await ensureDeviceIdentity();
+        const local = await getLocalMoments();
+
+        const cached = getCached("timeline");
+        if (cached) return cached;
+
+        // The backend (keyed by deviceId) is authoritative — it holds the full
+        // history, including data recovered from a previous signed-in account.
+        // Merge with the local store (unsynced/offline moments) and fall back to
+        // local when offline.
+        try {
+          const response = await fetchTimeline(activeDeviceId, null);
+          const server = response.moments || [];
+          const map = new Map();
+          for (const m of local) map.set(m.id, m);
+          for (const m of server) map.set(m.id, m); // server wins on conflict
+          const merged = [...map.values()].sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+          );
+          setCache("timeline", merged);
+          return merged;
+        } catch {
+          return local;
+        }
       },
       async updateMoment(momentId, updates) {
         invalidateCache();
-        const updated = await updateLocalMoment(momentId, updates);
+        const activeDeviceId = await ensureDeviceIdentity();
+        // Update the local cache (for moments stored there) and the backend
+        // (authoritative for the timeline merge, incl. recovered moments).
+        const local = await updateLocalMoment(momentId, updates).catch(() => null);
+        const response = await editMoment(momentId, { ...updates, deviceId: activeDeviceId }, null).catch(() => null);
         trackEvent("moment_edited", { momentId });
-        return updated;
+        return response?.moment || local || { id: momentId, ...updates };
       },
       async removeMoment(momentId) {
         invalidateCache();
-        await deleteLocalMoment(momentId);
+        const activeDeviceId = await ensureDeviceIdentity();
+        await deleteLocalMoment(momentId).catch(() => null);
+        await deleteMomentApi(momentId, null, activeDeviceId).catch(() => null);
         trackEvent("moment_deleted", { momentId });
       },
       async loadWeeklyReport(lang) {

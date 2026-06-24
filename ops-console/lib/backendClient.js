@@ -66,6 +66,15 @@ export async function getPushSchedule() {
   return backendRequest('/api/internal/control/push-schedule', { method: 'GET' });
 }
 
+// One-time bulk recovery: copy every signed-in account's data onto its linked
+// device(s) (userId → deviceId). Idempotent — safe to re-run.
+export async function recoverAllUsers(params = {}) {
+  return backendRequest('/api/internal/control/migrate-auth-devices', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
 export async function savePushSchedule(config) {
   return backendRequest('/api/internal/control/push-schedule', {
     method: 'POST',

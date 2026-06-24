@@ -117,8 +117,16 @@ export function editMoment(momentId, payload, token) {
   return fetchJson(`/moment/${encodeURIComponent(momentId)}`, { method: "PUT", body: payload, token });
 }
 
-export function deleteMomentApi(momentId, token) {
-  return fetchJson(`/moment/${encodeURIComponent(momentId)}`, { method: "DELETE", token });
+export function deleteMomentApi(momentId, token, deviceId) {
+  const query = !token && deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
+  return fetchJson(`/moment/${encodeURIComponent(momentId)}${query}`, { method: "DELETE", token });
+}
+
+// One-time recovery of an updated device's stranded account data. The server
+// derives the account from the legacy session token (if any) or the device→account
+// link — we never send a userId.
+export function recover(deviceId, token) {
+  return fetchJson("/recover", { method: "POST", body: { deviceId }, token });
 }
 
 export function fetchTimeline(deviceId, token) {

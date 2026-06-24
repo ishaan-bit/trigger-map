@@ -1,5 +1,5 @@
 import { requireAuth } from '../../../lib/auth.js';
-import { triggerJob, clearCache, getBackendHealth, fetchPilotMetrics } from '../../../lib/backendClient.js';
+import { triggerJob, clearCache, getBackendHealth, fetchPilotMetrics, recoverAllUsers } from '../../../lib/backendClient.js';
 import { runLlmInsights, runFreePass, runRewriteSummaries, runLlmActions, runAdaptiveModes, cancelWorkerJob, getWorkerHealth, listModels, pullModel } from '../../../lib/workerClient.js';
 import { pingRedis, sMembers, redisKey } from '../../../lib/redis.js';
 
@@ -167,6 +167,20 @@ export default async function handler(req, res) {
         action,
         durationMs: duration,
         result: result.data,
+      });
+    }
+
+    // ── Recover All Users (userId → deviceId backfill) ──
+    if (action === 'recover-all') {
+      const result = await recoverAllUsers(params || {});
+      const duration = Date.now() - startTime;
+      return res.status(result.ok ? 200 : 502).json({
+        ok: result.ok,
+        action,
+        source: 'backend',
+        durationMs: duration,
+        result: result.data,
+        ...(result.ok ? {} : { error: result.data?.error || `Backend returned ${result.status}` }),
       });
     }
 
