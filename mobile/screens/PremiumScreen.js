@@ -1,161 +1,172 @@
 import { useState } from "react";
-import { Alert, Image, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle } from "react-native-svg";
 import { ScreenShell } from "@/components/ScreenShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { Card } from "@/components/Card";
+import { Sparkline } from "@/components/graphics";
+import { AppearScale, FadeInView, Pulse } from "@/components/motion";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
 import { PREMIUM_PRICE_LABEL } from "@triggermap/shared/constants/premium";
 import { success as hapticSuccess } from "@/utils/haptics";
 
-const transformationKeys = [
-  { beforeKey: "premium.transform1Before", afterKey: "premium.transform1After", icon: "🔍" },
-  { beforeKey: "premium.transform2Before", afterKey: "premium.transform2After", icon: "🌿" },
-  { beforeKey: "premium.transform3Before", afterKey: "premium.transform3After", icon: "✦" },
+const outcomes = [
+  { titleKey: "premium.outcome1Title", bodyKey: "premium.outcome1Body", exampleKey: "premium.outcome1Example" },
+  { titleKey: "premium.outcome2Title", bodyKey: "premium.outcome2Body", exampleKey: "premium.outcome2Example" },
+  { titleKey: "premium.outcome3Title", bodyKey: "premium.outcome3Body", exampleKey: "premium.outcome3Example" },
 ];
 
-const premiumFeatureKeys = [
-  { icon: "🧠", key: "premium.feature1" },
-  { icon: "📈", key: "premium.feature2" },
-  { icon: "🔥", key: "premium.feature3" },
-  { icon: "💬", key: "premium.feature4" },
-];
+/**
+ * ClarityVisual — a purely visual metaphor for "your patterns get clearer the
+ * more you log": faint scattered moments (dots) with a clear trend line emerging
+ * through them, sharpening toward the right. No audio, no sound — just signal
+ * resolving out of noise. Illustrative (not user data) so the screen is self-contained.
+ */
+function ClarityVisual() {
+  const W = 300;
+  const H = 128;
+  const dots = [
+    { x: 16, y: 94, r: 3, o: 0.16 },
+    { x: 38, y: 68, r: 2.5, o: 0.13 },
+    { x: 56, y: 102, r: 3.5, o: 0.2 },
+    { x: 84, y: 58, r: 2.5, o: 0.15 },
+    { x: 102, y: 90, r: 3, o: 0.19 },
+    { x: 128, y: 52, r: 2.5, o: 0.18 },
+    { x: 148, y: 78, r: 3.5, o: 0.25 },
+    { x: 176, y: 44, r: 3, o: 0.24 },
+    { x: 198, y: 64, r: 2.5, o: 0.22 },
+    { x: 224, y: 38, r: 3.5, o: 0.32 },
+    { x: 248, y: 50, r: 3, o: 0.36 },
+    { x: 272, y: 30, r: 3.5, o: 0.46 },
+    { x: 292, y: 40, r: 4, o: 0.55 },
+  ];
+  const line = [0.26, 0.3, 0.27, 0.42, 0.4, 0.54, 0.58, 0.7, 0.74, 0.86, 0.93];
+
+  return (
+    <View style={styles.clarityWrap}>
+      <Pulse style={styles.clarityGlow} minScale={1} maxScale={1.16} duration={3400}>
+        <View style={styles.clarityGlowOrb} />
+      </Pulse>
+      <Svg width={W} height={H} style={styles.claritySvg} pointerEvents="none">
+        {dots.map((d, i) => (
+          <Circle key={i} cx={d.x} cy={d.y} r={d.r} fill={palette.accent} opacity={d.o} />
+        ))}
+      </Svg>
+      <Sparkline data={line} width={W} height={H} color={palette.accent} strokeWidth={3} fill />
+    </View>
+  );
+}
 
 export function PremiumScreen() {
-  const router = useRouter();
-  const { subscribe, restoreSubscription, subscription, user } = useAppSession();
+  const { subscribe, restoreSubscription, subscription } = useAppSession();
   const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const isActive = subscription?.status === "active" || subscription?.status === "grace_period";
 
+  async function handleSubscribe() {
+    try {
+      setBusy(true);
+      await subscribe();
+      hapticSuccess();
+      Alert.alert(t("premium.premiumEnabled"), t("premium.insightsReady"));
+    } catch (error) {
+      const msg = error?.message || "Something went wrong";
+      if (error?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) {
+        // User dismissed the purchase sheet — no alert needed
+      } else if (msg.includes("not found") || msg.includes("No subscription")) {
+        Alert.alert(t("premium.subscriptionUnavailable"), t("premium.subscriptionUnavailableMessage"));
+      } else if (msg.includes("not completed")) {
+        Alert.alert(t("premium.purchaseIncomplete"), t("premium.purchaseIncompleteMessage"));
+      } else {
+        Alert.alert(t("premium.subscriptionError"), msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    try {
+      setBusy(true);
+      const result = await restoreSubscription();
+      if (result) {
+        Alert.alert(t("premium.restored"), t("premium.restoredMessage"));
+      } else {
+        Alert.alert(t("premium.noSubscription"), t("premium.noSubscriptionMessage"));
+      }
+    } catch {
+      Alert.alert(t("premium.restoreFailed"), t("premium.restoreFailedMessage"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <ScreenShell scroll edges={["top", "left", "right", "bottom"]}>
-      <View style={styles.hero}>
-        <Image
-          source={require("@/assets/premium-pattern.png")}
-          style={styles.heroVisual}
-          resizeMode="cover"
-          accessible={false}
-        />
-        <View style={styles.heroOverlay}>
-          <Text style={styles.kicker}>{t("premium.kicker")}</Text>
-          <Text style={styles.title}>{t("premium.title")}</Text>
-          <Text style={styles.subtitle}>
-            {t("premium.subtitle")}
-          </Text>
-        </View>
-      </View>
+      {/* ── Hero: clarity emerging over time ── */}
+      <AppearScale style={styles.hero}>
+        <Text style={styles.kicker}>{t("premium.kicker")}</Text>
+        <ClarityVisual />
+        <Text style={styles.title}>{t("premium.title")}</Text>
+        <Text style={styles.subtitle}>{t("premium.subtitle")}</Text>
+      </AppearScale>
 
-      {/* BEFORE → AFTER transformations */}
-      <View style={styles.transformSection}>
-        <Text style={styles.transformHeader}>{t("premium.transformHeader")}</Text>
-        {transformationKeys.map((tk) => (
-          <View key={tk.beforeKey} style={styles.transformCard}>
-            <View style={styles.transformRow}>
-              <Text style={styles.transformLabel}>{t("premium.before")}</Text>
-              <Text style={styles.transformBefore}>"{t(tk.beforeKey)}"</Text>
-            </View>
-            <View style={styles.transformArrow}>
-              <Text style={styles.transformArrowIcon}>{tk.icon}</Text>
-              <View style={styles.transformArrowLine} />
-            </View>
-            <View style={styles.transformRow}>
-              <Text style={[styles.transformLabel, styles.transformLabelAfter]}>{t("premium.after")}</Text>
-              <Text style={styles.transformAfter}>"{t(tk.afterKey)}"</Text>
-            </View>
+      {/* ── What deepens with Premium (outcomes, not a checklist) ── */}
+      <Text style={styles.sectionHeader}>{t("premium.outcomesHeader")}</Text>
+      {outcomes.map((o, i) => (
+        <Card key={o.titleKey} accent={palette.accent} glow delay={80 + i * 90} style={styles.card}>
+          <Text style={styles.outcomeTitle}>{t(o.titleKey)}</Text>
+          <Text style={styles.outcomeBody}>{t(o.bodyKey)}</Text>
+          <View style={styles.exampleRow}>
+            <View style={styles.exampleDot} />
+            <Text style={styles.outcomeExample}>{t(o.exampleKey)}</Text>
           </View>
-        ))}
-      </View>
+        </Card>
+      ))}
 
-      {/* Blurred insight preview */}
-      <View style={styles.previewCard}>
-        <Text style={styles.previewTitle}>{t("premium.previewTitle")}</Text>
-        <View style={styles.previewBlur}>
-          <Text style={styles.previewBlurText}>
-            {t("premium.previewText")}
-          </Text>
-          <LinearGradient
-            colors={["transparent", "transparent", "transparent", "rgba(13, 20, 36, 0.85)"]}
-            locations={[0, 0.6, 0.75, 1]}
-            style={styles.previewGradient}
-          />
-        </View>
-        <Text style={styles.previewHint}>{t("premium.previewHint")}</Text>
-      </View>
-
-      {/* Feature list */}
-      <View style={styles.featureCard}>
-        <Text style={styles.featureCardTitle}>{t("premium.featureCardTitle")}</Text>
-        <Text style={styles.featureCardPrice}>{PREMIUM_PRICE_LABEL}</Text>
-        {premiumFeatureKeys.map((f) => (
-          <View key={f.key} style={styles.featureRow}>
-            <Text style={styles.featureIcon}>{f.icon}</Text>
-            <Text style={styles.featureText}>{t(f.key)}</Text>
+      {/* ── Honest preview hook ── */}
+      <FadeInView delay={360}>
+        <View style={styles.previewCard}>
+          <Text style={styles.previewTitle}>{t("premium.previewTitle")}</Text>
+          <View style={styles.previewBlur}>
+            <Text style={styles.previewBlurText}>{t("premium.previewText")}</Text>
+            <LinearGradient
+              colors={["transparent", "transparent", "transparent", "rgba(13, 20, 36, 0.85)"]}
+              locations={[0, 0.6, 0.75, 1]}
+              style={styles.previewGradient}
+            />
           </View>
-        ))}
-      </View>
+          <Text style={styles.previewHint}>{t("premium.previewHint")}</Text>
+        </View>
+      </FadeInView>
 
-      {!user ? (
-        <PrimaryButton
-          label={t("premium.createFreeAccount")}
-          onPress={() => router.push("/login")}
-        />
-      ) : !isActive ? (
-        <>
-          <PrimaryButton
-            label={busy ? t("common.pleaseWait") : t("premium.unlockPatterns")}
-            disabled={busy}
-            onPress={async () => {
-              try {
-                setBusy(true);
-                await subscribe();
-                hapticSuccess();
-                Alert.alert(t("premium.premiumEnabled"), t("premium.insightsReady"));
-              } catch (error) {
-                const msg = error?.message || "Something went wrong";
-                if (error?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) {
-                  // User dismissed the purchase sheet — no alert needed
-                } else if (msg.includes("not found") || msg.includes("No subscription")) {
-                  Alert.alert(
-                    t("premium.subscriptionUnavailable"),
-                    t("premium.subscriptionUnavailableMessage")
-                  );
-                } else if (msg.includes("not completed")) {
-                  Alert.alert(t("premium.purchaseIncomplete"), t("premium.purchaseIncompleteMessage"));
-                } else {
-                  Alert.alert(t("premium.subscriptionError"), msg);
-                }
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-          <PrimaryButton
-            label={t("premium.restorePurchase")}
-            secondary
-            disabled={busy}
-            onPress={async () => {
-              try {
-                setBusy(true);
-                const result = await restoreSubscription();
-                if (result) {
-                  Alert.alert(t("premium.restored"), t("premium.restoredMessage"));
-                } else {
-                  Alert.alert(t("premium.noSubscription"), t("premium.noSubscriptionMessage"));
-                }
-              } catch {
-                Alert.alert(t("premium.restoreFailed"), t("premium.restoreFailedMessage"));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        </>
-      ) : null}
+      {/* ── Free-baseline reassurance: nothing is gated ── */}
+      <FadeInView delay={440}>
+        <View style={styles.reassureRow}>
+          <Text style={styles.reassureIcon}>🔒</Text>
+          <Text style={styles.reassureText}>{t("premium.baselineSafe")}</Text>
+        </View>
+      </FadeInView>
 
-      {isActive && (
+      {/* ── One inevitable CTA ── */}
+      {!isActive ? (
+        <AppearScale delay={120} style={styles.ctaWrap}>
+          <View style={styles.ctaGlow}>
+            <PrimaryButton
+              label={busy ? t("common.pleaseWait") : t("premium.unlockCta")}
+              disabled={busy}
+              onPress={handleSubscribe}
+            />
+          </View>
+          <Text style={styles.price}>{PREMIUM_PRICE_LABEL}</Text>
+          <Pressable onPress={handleRestore} disabled={busy} hitSlop={10}>
+            <Text style={styles.restoreLink}>{t("premium.restorePurchase")}</Text>
+          </Pressable>
+        </AppearScale>
+      ) : (
         <View style={styles.activeCard}>
           <Text style={styles.activeIcon}>✓</Text>
           <Text style={styles.activeText}>{t("premium.activeText")}</Text>
@@ -166,102 +177,110 @@ export function PremiumScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* Hero */
   hero: {
+    alignItems: "center",
+    gap: 8,
     marginTop: 8,
-    marginHorizontal: -20,
-    borderRadius: 0,
-    overflow: "hidden",
-    height: 200,
-    position: "relative",
-  },
-  heroVisual: {
-    width: "100%",
-    height: "100%",
-    opacity: 0.35,
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "flex-end",
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-    gap: 6,
+    marginBottom: 6,
   },
   kicker: {
     color: palette.accent,
     textTransform: "uppercase",
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
     fontSize: 11,
     fontWeight: "700",
   },
   title: {
     color: palette.text,
     fontSize: 28,
-    fontWeight: "700",
-    lineHeight: 34,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    textAlign: "center",
   },
   subtitle: {
+    color: palette.muted,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: "center",
+    maxWidth: 300,
+  },
+
+  /* Clarity visual */
+  clarityWrap: {
+    width: 300,
+    height: 128,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+  },
+  claritySvg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  clarityGlow: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clarityGlowOrb: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: palette.cardGlow,
+  },
+
+  /* Section header */
+  sectionHeader: {
+    color: palette.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+
+  /* Outcome cards */
+  card: {
+    marginBottom: 2,
+  },
+  outcomeTitle: {
+    color: palette.text,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  outcomeBody: {
     color: palette.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    marginTop: 5,
   },
-
-  /* Transformation section */
-  transformSection: {
-    gap: 12,
+  exampleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: palette.glassBorder,
   },
-  transformHeader: {
-    color: palette.text,
-    fontSize: 16,
-    fontWeight: "700",
+  exampleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.accent,
+    marginTop: 6,
   },
-  transformCard: {
-    borderRadius: radius.md,
-    padding: 16,
-    backgroundColor: palette.glass,
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    gap: 10,
-  },
-  transformRow: {
-    gap: 4,
-  },
-  transformLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
-    color: palette.textSecondary,
-  },
-  transformLabelAfter: {
+  outcomeExample: {
+    flex: 1,
     color: palette.accent,
-  },
-  transformBefore: {
-    color: palette.textSecondary,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     fontStyle: "italic",
   },
-  transformAfter: {
-    color: palette.text,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  transformArrow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  transformArrowIcon: {
-    fontSize: 16,
-  },
-  transformArrowLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: palette.glassBorder,
-  },
 
-  /* Blurred preview */
+  /* Preview */
   previewCard: {
     borderRadius: radius.md,
     padding: 18,
@@ -301,44 +320,52 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  /* Feature card */
-  featureCard: {
-    borderRadius: radius.md,
-    padding: 18,
-    backgroundColor: palette.glass,
-    borderWidth: 1,
-    borderColor: palette.accentMedium,
-    gap: 12,
-  },
-  featureCardTitle: {
-    color: palette.accent,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  featureCardPrice: {
-    color: palette.textSecondary,
-    fontSize: 13,
-    marginTop: -6,
-  },
-  featureRow: {
+  /* Reassurance */
+  reassureRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingLeft: 4,
+    gap: 8,
+    paddingHorizontal: 4,
+    marginTop: 2,
   },
-  featureIcon: {
-    fontSize: 16,
-    width: 22,
-    textAlign: "center",
+  reassureIcon: {
+    fontSize: 13,
   },
-  featureText: {
-    color: palette.text,
-    fontSize: 14,
+  reassureText: {
     flex: 1,
-    lineHeight: 20,
+    color: palette.muted,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
-  /* Active state */
+  /* CTA */
+  ctaWrap: {
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  ctaGlow: {
+    alignSelf: "stretch",
+    borderRadius: radius.pill,
+    shadowColor: palette.accent,
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  price: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  restoreLink: {
+    color: palette.muted,
+    fontSize: 13,
+    textDecorationLine: "underline",
+    paddingVertical: 4,
+  },
+
+  /* Active */
   activeCard: {
     borderRadius: radius.md,
     padding: 16,

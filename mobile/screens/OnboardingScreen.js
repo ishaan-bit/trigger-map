@@ -6,6 +6,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { AppearScale, FadeInView, Pulse, Stagger } from "@/components/motion";
 import { palette, radius } from "@/utils/theme";
 
 export function OnboardingScreen() {
@@ -53,25 +54,35 @@ export function OnboardingScreen() {
 
   return (
     <ScreenShell scroll={false}>
-      <View style={styles.top}>
+      <FadeInView from="top" offset={12} style={styles.top}>
         <Text style={styles.brand}>{t("onboarding.brand")}</Text>
         {!isLast && (
           <Pressable onPress={handleSkip} hitSlop={12} accessibilityRole="button">
             <Text style={styles.skip}>{t("onboarding.skip")}</Text>
           </Pressable>
         )}
-      </View>
+      </FadeInView>
 
       <FlatList
         ref={flatListRef}
         data={slides}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width: screenWidth }]}>
-            <Text style={styles.slideIcon}>{item.icon}</Text>
-            <Text style={styles.slideTitle}>{item.title}</Text>
-            <Text style={styles.slideBody}>{item.body}</Text>
-          </View>
-        )}
+        renderItem={({ item, index }) => {
+          const active = index === currentIndex;
+          return (
+            <View style={[styles.slide, { width: screenWidth }]}>
+              <AppearScale key={`icon-${active ? currentIndex : "idle"}`} delay={active ? 60 : 0} style={styles.iconWrap}>
+                <Pulse style={styles.iconGlow} maxScale={1.12} duration={2600} />
+                <Text style={styles.slideIcon}>{item.icon}</Text>
+              </AppearScale>
+              <FadeInView key={`title-${active ? currentIndex : "idle"}`} delay={active ? 200 : 0}>
+                <Text style={styles.slideTitle}>{item.title}</Text>
+              </FadeInView>
+              <FadeInView key={`body-${active ? currentIndex : "idle"}`} delay={active ? 290 : 0}>
+                <Text style={styles.slideBody}>{item.body}</Text>
+              </FadeInView>
+            </View>
+          );
+        }}
         keyExtractor={(_, i) => String(i)}
         horizontal
         pagingEnabled
@@ -85,17 +96,19 @@ export function OnboardingScreen() {
         getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
       />
 
-      <View style={styles.dots} accessibilityRole="tablist">
-        {slides.map((_, i) => (
-          <View key={i} style={[styles.dot, i === currentIndex && styles.dotActive]} accessibilityRole="tab" accessibilityLabel={`Slide ${i + 1} of ${slides.length}`} accessibilityState={{ selected: i === currentIndex }} />
-        ))}
-      </View>
+      <Stagger delay={180}>
+        <View style={styles.dots} accessibilityRole="tablist">
+          {slides.map((_, i) => (
+            <View key={i} style={[styles.dot, i === currentIndex && styles.dotActive]} accessibilityRole="tab" accessibilityLabel={`Slide ${i + 1} of ${slides.length}`} accessibilityState={{ selected: i === currentIndex }} />
+          ))}
+        </View>
 
-      <PrimaryButton
-        label={isLast ? (loading ? t("onboarding.starting") : t("onboarding.startLogging")) : t("onboarding.continue")}
-        onPress={handleNext}
-        disabled={loading}
-      />
+        <PrimaryButton
+          label={isLast ? (loading ? t("onboarding.starting") : t("onboarding.startLogging")) : t("onboarding.continue")}
+          onPress={handleNext}
+          disabled={loading}
+        />
+      </Stagger>
     </ScreenShell>
   );
 }
@@ -128,6 +141,20 @@ const styles = StyleSheet.create({
     gap: 18,
     paddingVertical: 32,
     paddingHorizontal: 20,
+  },
+  iconWrap: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 88,
+    height: 88,
+  },
+  iconGlow: {
+    position: "absolute",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: palette.accentSoft,
   },
   slideIcon: {
     fontSize: 52,

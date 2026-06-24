@@ -22,19 +22,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Device-based identity: token optional, fall back to deviceId. Premium is keyed by ownerId.
     const token = getBearerToken(req);
     const user = token ? await validateSession(token).catch(() => null) : null;
-    if (!user) {
-      return sendError(res, 401, "AUTH_REQUIRED", "Sign in required");
+    const ownerId = user?.id || req.body?.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
     }
 
-    const sub = await getSubscription(user.id);
+    const sub = await getSubscription(ownerId);
     if (sub?.status !== "active" && sub?.status !== "grace_period") {
       return sendError(res, 403, "PREMIUM_REQUIRED", "Premium subscription required");
     }
 
     // Rate limit: max 3 regenerations per hour
-    const allowed = await enforceRateLimit(`regen:${user.id}`, 3, 3600);
+    const allowed = await enforceRateLimit(`regen:${ownerId}`, 3, 3600);
     if (!allowed) {
       return sendError(res, 429, "RATE_LIMITED", "Too many regenerations. Try again later.");
     }
@@ -46,15 +48,15 @@ export default async function handler(req, res) {
     const safeMaxWords = (typeof maxWords === "number" && maxWords >= 50 && maxWords <= 300) ? maxWords : 100;
     const safeStyle = (typeof style === "string" && STYLE_IDS.includes(style)) ? style : undefined;
 
-    console.log(`[modes/regenerate] started owner=${user.id.slice(0, 8)} model=${safeModel || process.env.LLM_MODEL || "default"}`);
+    console.log(`[modes/regenerate] started owner=${ownerId.slice(0, 8)} model=${safeModel || process.env.LLM_MODEL || "default"}`);
     const results = await generateAllModes({
-      ownerId: user.id,
+      ownerId,
       lang: safeLang,
       model: safeModel,
       maxWords: safeMaxWords,
       style: safeStyle,
     });
-    console.log(`[modes/regenerate] completed owner=${user.id.slice(0, 8)} move=${results.move?.items?.length || 0} fuel=${results.fuel?.items?.length || 0}`);
+    console.log(`[modes/regenerate] completed owner=${ownerId.slice(0, 8)} move=${results.move?.items?.length || 0} fuel=${results.fuel?.items?.length || 0}`);
 
     return sendSuccess(res, results);
   } catch (error) {

@@ -135,16 +135,11 @@ export function fetchWeeklyReport(deviceId, token, lang) {
   return fetchJson(`/weeklyReport${query}`, { token, timeoutMs: SCREEN_REQUEST_TIMEOUT_MS });
 }
 
-export function login(payload) {
-  return fetchJson("/login", { method: "POST", body: payload });
-}
-
-export function register(payload) {
-  return fetchJson("/register", { method: "POST", body: payload });
-}
-
-export function fetchMe(token) {
-  return fetchJson("/me", { token });
+export function fetchMe(token, deviceId) {
+  // Device-based identity: hydrate subscription / first-AI-free state by deviceId
+  // when there is no token (which is now always, post sign-in removal).
+  const query = !token && deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
+  return fetchJson(`/me${query}`, { token });
 }
 
 export function verifySubscription(payload, token) {
@@ -185,8 +180,9 @@ export function fetchHealth() {
   return fetchJson("/health", { timeoutMs: 4000 });
 }
 
-export function deleteAllData(token) {
-  return fetchJson("/deleteData", { method: "DELETE", token });
+export function deleteAllData(token, deviceId) {
+  const query = !token && deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
+  return fetchJson(`/deleteData${query}`, { method: "DELETE", token });
 }
 
 export function getApiOrigin() {

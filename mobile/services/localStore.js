@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-get-random-values";
 import * as Crypto from "expo-crypto";
-import { logMoment } from "@/services/api";
 import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 
 const STORAGE_KEY = "triggermap.local-moments";
@@ -86,46 +85,6 @@ export async function updateLocalMoment(id, updates) {
   return moments[index];
 }
 
-/**
- * Upload all local moments to the server, then clear local storage.
- */
-export async function migrateLocalMoments(token, deviceId) {
-  const moments = await getLocalMoments();
-  if (!moments.length) return [];
-
-  for (const m of moments) {
-    try {
-      await logMoment(
-        {
-          deviceId,
-          momentId: m.id,
-          trigger: m.trigger,
-          emotion: m.emotion,
-          ...(typeof m.valence === "number" ? { valence: m.valence } : {}),
-          ...(typeof m.arousal === "number" ? { arousal: m.arousal } : {}),
-          ...(typeof m.intensity === "number" ? { intensity: m.intensity } : {}),
-          ...(m.emotionPoint ? { emotionPoint: m.emotionPoint } : {}),
-          ...(m.emotionLabel ? { emotionLabel: m.emotionLabel } : {}),
-          ...(m.emotionSubtitle ? { emotionSubtitle: m.emotionSubtitle } : {}),
-          ...(m.emotionQuadrant ? { emotionQuadrant: m.emotionQuadrant } : {}),
-          ...(m.emotionIntensity ? { emotionIntensity: m.emotionIntensity } : {}),
-          note: m.note || "",
-          timestamp: m.timestamp,
-          tags: m.tags || [],
-          contributionTags: m.contributionTags || m.tags || [],
-          contributionTagMeta: m.contributionTagMeta || [],
-        },
-        token
-      );
-    } catch {
-      // skip individual failures, best-effort migration
-    }
-  }
-
-  await AsyncStorage.removeItem(STORAGE_KEY);
-  return moments;
-}
-
 export async function clearLocalMoments() {
   await AsyncStorage.removeItem(STORAGE_KEY);
 }
@@ -172,10 +131,40 @@ export async function removePendingSync(momentId) {
  * Matches the output shape of the backend patternEngine.
  */
 export function buildLocalReport(moments) {
+  const now = Date.now();
+  const sorted = [...moments].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const lifetimeMoments = sorted.length;
+
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
+  let weekMoments = sorted.filter((m) => new Date(m.timestamp) >= weekAgo);
 
-  const weekMoments = moments.filter((m) => new Date(m.timestamp) >= weekAgo);
+  // ── Silence detection (mirrors backend weeklyReport) ──────────────
+  // If there's historical data but nothing in the last 7 days, slide the
+  // window to the user's last active 7-day period so the report stays
+  // populated and we can render a "welcome back" banner instead of a blank.
+  const lastTimestamp = sorted[0]?.timestamp;
+  const daysSinceLastLog = lastTimestamp
+    ? Math.floor((now - new Date(lastTimestamp).getTime()) / 86400000)
+    : null;
+  const isSilent = weekMoments.length === 0 && lifetimeMoments >= 3 && daysSinceLastLog >= 1;
+
+  let silenceWindow = null;
+  if (isSilent) {
+    const lastDate = new Date(lastTimestamp);
+    const windowStart = new Date(lastDate);
+    windowStart.setDate(windowStart.getDate() - 6);
+    weekMoments = sorted.filter((m) => {
+      const ts = new Date(m.timestamp);
+      return ts >= windowStart && ts <= lastDate;
+    });
+    silenceWindow = {
+      isSilent: true,
+      daysSinceLastLog,
+      lastLogDate: lastDate.toISOString().slice(0, 10),
+      totalLifetimeMoments: lifetimeMoments,
+    };
+  }
 
   if (weekMoments.length === 0) return null;
 
@@ -211,9 +200,13 @@ export function buildLocalReport(moments) {
 
   const totalMoments = weekMoments.length;
   const daysLogged = new Set(weekMoments.map((m) => m.timestamp?.slice(0, 10))).size;
-  const confidence = totalMoments < 3 ? "too_early" : totalMoments < 5 ? "low" : daysLogged < 3 ? "emerging" : "moderate";
+  const confidence = isSilent
+    ? "stale"
+    : totalMoments < 3 ? "too_early" : totalMoments < 5 ? "low" : daysLogged < 3 ? "emerging" : "moderate";
 
   return {
+    lifetimeMoments,
+    silenceWindow,
     topTrigger: hasDominantTrigger ? tiedTriggers[0] : null,
     topEmotion: hasDominantEmotion ? tiedEmotions[0] : null,
     tiedTriggers,

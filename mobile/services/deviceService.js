@@ -2,9 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-get-random-values";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 const DEVICE_ID_KEY = "triggermap.device-id";
-const SESSION_TOKEN_KEY = "triggermap.session-token";
 const ONBOARDING_KEY = "triggermap.onboarding-complete";
 const REMINDER_KEY = "triggermap.reminder-enabled";
 const REFLECTION_KEY = "triggermap.reflection-enabled";
@@ -20,28 +20,22 @@ export async function getOrCreateDeviceId() {
     return existing;
   }
 
-  const secureStoreValue = await SecureStore.getItemAsync(DEVICE_ID_KEY);
-  if (secureStoreValue) {
-    await AsyncStorage.setItem(DEVICE_ID_KEY, secureStoreValue);
-    return secureStoreValue;
+  // SecureStore is native-only; on web we persist the deviceId via AsyncStorage
+  // (localStorage), which is sufficient for the web/screenshot build.
+  if (Platform.OS !== "web") {
+    const secureStoreValue = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+    if (secureStoreValue) {
+      await AsyncStorage.setItem(DEVICE_ID_KEY, secureStoreValue);
+      return secureStoreValue;
+    }
   }
 
   const created = Crypto.randomUUID();
   await AsyncStorage.setItem(DEVICE_ID_KEY, created);
-  await SecureStore.setItemAsync(DEVICE_ID_KEY, created);
+  if (Platform.OS !== "web") {
+    await SecureStore.setItemAsync(DEVICE_ID_KEY, created);
+  }
   return created;
-}
-
-export async function getSessionToken() {
-  return SecureStore.getItemAsync(SESSION_TOKEN_KEY);
-}
-
-export async function setSessionToken(token) {
-  return SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
-}
-
-export async function clearSessionToken() {
-  return SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
 }
 
 export async function getOnboardingComplete() {

@@ -54,3 +54,44 @@ export const type = {
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "600" },
   kicker: { fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
 };
+
+/**
+ * Motion design tokens — a single source of truth for animation so the whole
+ * app moves with one consistent rhythm. Durations in ms.
+ */
+export const motion = {
+  duration: {
+    instant: 120,
+    fast: 220,
+    base: 360,
+    slow: 560,
+    count: 900,    // number count-up
+    breath: 4000,  // ambient loops
+  },
+  stagger: 70,     // delay between sequential list items
+  // Reanimated spring presets
+  spring: {
+    soft: { damping: 18, stiffness: 160, mass: 0.9 },
+    snappy: { damping: 16, stiffness: 320, mass: 0.7 },
+    bouncy: { damping: 11, stiffness: 200, mass: 0.8 },
+  },
+  press: { scale: 0.96 },
+};
+
+/** Soft, layered shadow presets for elevated surfaces. */
+export const shadow = {
+  card: {
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  glow: (color = palette.accent) => ({
+    shadowColor: color,
+    shadowOpacity: 0.45,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  }),
+};

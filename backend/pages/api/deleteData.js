@@ -18,17 +18,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Device-based identity: a token is optional. Anonymous owners delete by deviceId.
     const token = getBearerToken(req);
-    if (!token) {
-      return sendError(res, 401, "UNAUTHORIZED", "Authentication required");
+    const user = token ? await validateSession(token).catch(() => null) : null;
+    const ownerId = user?.id || req.query.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
     }
-
-    const user = await validateSession(token);
-    if (!user) {
-      return sendError(res, 401, "UNAUTHORIZED", "Invalid session");
-    }
-
-    const ownerId = user.id;
 
     // Collect all known user-scoped keys
     const keysToDelete = [

@@ -14,6 +14,7 @@ import {
   getContributionSuggestions,
 } from "@triggermap/shared/constants/contributions";
 import { ScreenShell } from "@/components/ScreenShell";
+import { AppearScale, FadeInView, PressableScale } from "@/components/motion";
 import { EmotionPad } from "@/components/EmotionPad";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { GuidedTooltip } from "@/components/SpotlightOverlay";
@@ -301,7 +302,7 @@ export function EmotionSelectionScreen() {
           ) : isSecondLog ? (
             <Text style={styles.ftueSubtext}>{t("ftue.patternsFormingSub")}</Text>
           ) : null}
-          <Pressable style={styles.goTimelineBtn} onPress={() => {
+          <PressableScale style={styles.goTimelineBtn} haptic={false} onPress={() => {
             tap();
             if (isSecondLog) { router.replace("/(tabs)/report"); }
             else { router.replace("/(tabs)/timeline"); }
@@ -309,7 +310,7 @@ export function EmotionSelectionScreen() {
             <Text style={styles.goTimelineText}>
               {isFirstLog ? t("ftue.seeTimeline") : isSecondLog ? t("ftue.seeInsights") : t("emotion.goTimeline")}
             </Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </ScreenShell>
     );
@@ -324,10 +325,12 @@ export function EmotionSelectionScreen() {
         <Text style={styles.backLabel}>{t("common.back")}</Text>
       </Pressable>
 
-      <View style={styles.header}>
-        <Text style={styles.kicker}>{triggerLabel}</Text>
-        <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
-      </View>
+      <AppearScale delay={60}>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>{triggerLabel}</Text>
+          <Text style={styles.prompt}>{t("emotion.prompt")}</Text>
+        </View>
+      </AppearScale>
 
       <EmotionPad
         value={emotionCoords}
@@ -367,14 +370,15 @@ export function EmotionSelectionScreen() {
                 {selectedTags
                   .filter((tag) => !adaptiveTags.some((item) => item.label === tag))
                   .map((tag) => (
-                    <Pressable
+                    <PressableScale
                       key={`selected-${tag}`}
+                      haptic={false}
                       onPress={() => toggleTag(tag)}
                       accessibilityRole="button"
-                      style={({ pressed }) => [styles.tagChip, styles.tagChipActive, { borderColor: accentColor }, pressed && styles.tagChipPressed]}
+                      style={[styles.tagChip, styles.tagChipActive, { borderColor: accentColor }]}
                     >
                       <Text style={[styles.tagText, styles.tagTextActive]}>{tag}</Text>
-                    </Pressable>
+                    </PressableScale>
                   ))}
               </View>
             </View>
@@ -385,15 +389,16 @@ export function EmotionSelectionScreen() {
               const active = selectedTags.includes(tag);
               const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
               return (
-                <Pressable
+                <PressableScale
                   key={tag}
+                  haptic={false}
                   onPress={() => toggleTag(tag)}
                   disabled={atMax}
                   accessibilityRole="button"
-                  style={({ pressed }) => [styles.tagChip, active && [styles.tagChipActive, { borderColor: accentColor }], atMax && styles.tagChipDisabled, pressed && !atMax && styles.tagChipPressed]}
+                  style={[styles.tagChip, active && [styles.tagChipActive, { borderColor: accentColor }], atMax && styles.tagChipDisabled]}
                 >
                   <Text style={[styles.tagText, active && styles.tagTextActive, atMax && styles.tagTextDisabled]}>{tag}</Text>
-                </Pressable>
+                </PressableScale>
               );
             })}
           </View>
@@ -401,19 +406,21 @@ export function EmotionSelectionScreen() {
       )}
 
       <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={80}>
-        <View style={styles.noteCard}>
-          <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
-          <TextInput
-            multiline
-            numberOfLines={3}
-            onChangeText={setNote}
-            placeholder={t("emotion.notePlaceholder")}
-            placeholderTextColor={palette.muted}
-            style={styles.input}
-            value={note}
-            maxFontSizeMultiplier={1.2}
-          />
-        </View>
+        <FadeInView delay={120}>
+          <View style={styles.noteCard}>
+            <Text style={styles.noteLabel}>{t("emotion.noteLabel")}</Text>
+            <TextInput
+              multiline
+              numberOfLines={3}
+              onChangeText={setNote}
+              placeholder={t("emotion.notePlaceholder")}
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              value={note}
+              maxFontSizeMultiplier={1.2}
+            />
+          </View>
+        </FadeInView>
 
         <Animated.View style={{ transform: [{ scale: saveButtonScale }] }}>
           <Pressable

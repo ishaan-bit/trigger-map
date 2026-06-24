@@ -19,6 +19,8 @@ import { palette, radius } from "@/utils/theme";
 import { legacyToCoordinates } from "@triggermap/shared/constants/emotions";
 import { emotionColor as getEmotionColor } from "@/utils/emotionModel";
 import { tap } from "@/utils/haptics";
+import { FadeInView, PressableScale, CountUpText } from "@/components/motion";
+import { Sparkline } from "@/components/graphics";
 
 const EMOTION_COLORS = {
   calm: palette.success,
@@ -237,9 +239,17 @@ function EmotionTrajectory({ moments, onTapPoint }) {
           }}
         />
       </View>
+      {/* Valence trend over the window — already-computed point data */}
+      <Sparkline
+        data={points.map((p) => p.valence)}
+        width={TRAJECTORY_SIZE}
+        height={48}
+        color={getEmotionColor(last.valence, last.arousal)}
+        style={ts.spark}
+      />
       {/* Micro summary */}
       <Text style={ts.summary}>
-        {points.length} moments
+        <CountUpText value={points.length} style={ts.summary} /> moments
         {dominant ? ` · mostly ${dominant.label.toLowerCase()}` : ""}
         {driftLabel ? ` · now ${driftLabel}` : ""}
       </Text>
@@ -274,6 +284,7 @@ const ts = StyleSheet.create({
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.35)",
     borderStyle: "dashed",
   },
+  spark: { alignSelf: "center", marginTop: 4 },
   summary: {
     color: palette.text, fontSize: 12, textAlign: "center",
     fontWeight: "600", marginTop: 4,
@@ -445,7 +456,7 @@ export function TimelineScreen() {
       scroll
       edges={["top", "left", "right", "bottom"]}
     >
-      <View style={styles.header}>
+      <FadeInView style={styles.header}>
         <Text style={styles.kicker}>{t("timeline.kicker")}</Text>
         <Text style={styles.title}>{t("timeline.title")}</Text>
         <Text style={styles.subtitle}>
@@ -453,21 +464,21 @@ export function TimelineScreen() {
             ? (moments.length !== 1 ? t("timeline.subtitleWithCountPlural", { count: moments.length }) : t("timeline.subtitleWithCount", { count: moments.length }))
             : t("timeline.subtitleEmpty")}
         </Text>
-      </View>
+      </FadeInView>
 
       {/* Emotional weather ribbon */}
       <MoodWeather moments={moments} />
 
       {/* Trajectory toggle */}
       {moments.length >= 2 && (
-        <Pressable
+        <PressableScale
           onPress={() => { tap(); setShowTrajectory((p) => !p); }}
           style={styles.trajectoryToggle}
         >
           <Text style={styles.trajectoryToggleText}>
             {showTrajectory ? "▾ hide trajectory" : "▸ emotional trajectory"}
           </Text>
-        </Pressable>
+        </PressableScale>
       )}
 
       {/* 2D Emotional Trajectory */}
@@ -537,8 +548,8 @@ export function TimelineScreen() {
         </View>
       ) : null}
 
-      {!error && dayGroups.map(([dayLabel, dayMoments]) => (
-        <View key={dayLabel} style={styles.daySection}>
+      {!error && dayGroups.map(([dayLabel, dayMoments], groupIdx) => (
+        <FadeInView key={dayLabel} delay={Math.min(groupIdx, 8) * 60} style={styles.daySection}>
           <Text style={styles.dayHeader}>{dayLabel}</Text>
           <View style={styles.timelineConnector}>
             {dayMoments.map((moment, idx) => {
@@ -581,18 +592,18 @@ export function TimelineScreen() {
               );
             })}
           </View>
-        </View>
+        </FadeInView>
       ))}
 
       {!moments.length && !loading && !error ? (
-        <View style={styles.emptyState}>
+        <FadeInView style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📝</Text>
           <Text style={styles.emptyTitle}>{t("timeline.emptyTitle")}</Text>
           <Text style={styles.emptyBody}>
             {t("timeline.emptyBody")}
           </Text>
           <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
-        </View>
+        </FadeInView>
       ) : null}
 
       <EditMomentModal

@@ -96,6 +96,8 @@ export default function RootLayout() {
 
     validateStartup();
 
+    // Notifications are native-only — skip listener setup on web (screenshot build).
+    if (Platform.OS !== "web") {
     // Handle cold-start: app was killed, user tapped notification to open it.
     // Delay by 1.5s so the router is fully initialised before we navigate.
     Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -125,6 +127,7 @@ export default function RootLayout() {
       console.info("[NOTIF] Tapped:", type);
       handleNotificationTap(router, type);
     });
+    }
 
     return () => {
       active = false;
@@ -149,7 +152,6 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="onboarding" />
-              <Stack.Screen name="login" options={{ animation: "slide_from_right", gestureEnabled: true }} />
               <Stack.Screen name="emotion" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
               <Stack.Screen name="(tabs)" />
             </Stack>

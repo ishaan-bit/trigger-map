@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeProgressMetrics, computePilotMetrics } from "../progressEngine.js";
+import { buildAggregatesFromRawMoments } from "../../jobs/llmInsightSource.js";
+import { padToDailyWindow } from "../aggregationService.js";
 import { EMOTION_SCORE } from "@triggermap/shared/constants/emotions";
 
 // Helper: build a daily aggregate snapshot
@@ -78,6 +80,39 @@ describe("computeProgressMetrics", () => {
     const result = computeProgressMetrics({ aggregates: agg, baselineScore: 3.0 });
     expect(result).not.toBeNull();
     expect(result.trajectory.change).toBeLessThan(0);
+  });
+
+  // Regression: the "log 2 weeks" bug — sparse raw moments spanning two weeks
+  // must yield progress once rebuilt + padded to a continuous daily window,
+  // even though their active-day count is < 10. This mirrors the raw-moment
+  // fallback added to the /progress endpoint.
+  it("yields progress from sparse raw moments spanning 2 weeks (raw fallback path)", () => {
+    const dayMs = 86400000;
+    const now = Date.now();
+    const at = (daysAgo, hour = 12) => {
+      const d = new Date(now - daysAgo * dayMs);
+      d.setHours(hour, 0, 0, 0);
+      return d.toISOString();
+    };
+    // Active days in BOTH the most-recent week and the prior week, but only
+    // 8 active days total (< the 10-aggregate gate that operates on raw days).
+    const rawMoments = [
+      { trigger: "work", emotion: "frustrated", timestamp: at(13) },
+      { trigger: "work", emotion: "anxious", timestamp: at(11) },
+      { trigger: "family", emotion: "neutral", timestamp: at(10) },
+      { trigger: "work", emotion: "neutral", timestamp: at(8) },
+      { trigger: "exercise", emotion: "calm", timestamp: at(5) },
+      { trigger: "social", emotion: "energized", timestamp: at(3) },
+      { trigger: "work", emotion: "calm", timestamp: at(1) },
+      { trigger: "work", emotion: "calm", timestamp: at(0) },
+    ];
+
+    const rebuilt = padToDailyWindow(buildAggregatesFromRawMoments(rawMoments), 45);
+    expect(rebuilt).toHaveLength(45);
+
+    const result = computeProgressMetrics({ aggregates: rebuilt, baselineScore: 3.0 });
+    expect(result).not.toBeNull();
+    expect(result.trajectory.weeksTracked).toBeGreaterThanOrEqual(2);
   });
 
   it("metrics include stability, volatility, drift, recoveryDays", () => {

@@ -49,9 +49,11 @@ export default async function handler(req, res) {
       const lastMomentRaw = results[i * 5 + 2];
       const llmInsightRaw = results[i * 5 + 3];
 
-      // Must be signed-in (has user hash with email or name)
-      if (!userHash.email && !userHash.name) continue;
-      // Must meet min-moments threshold
+      // Device-based identity: users are anonymous (deviceId) with no email/name.
+      // Eligibility is by DATA, not account — skip only empty records (nothing to
+      // process) and those below the requested threshold. (Previously this required
+      // an email or name, which excluded every account-less device-ID user.)
+      if (momentCount === 0) continue;
       if (momentCount < minMoments) continue;
 
       // Extract lastMomentAt

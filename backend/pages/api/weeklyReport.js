@@ -43,18 +43,22 @@ export default async function handler(req, res) {
     const isAuthenticated = Boolean(user);
 
     // Parallel fetch: aggregates (7d + 45d), moments, subscription, LLM insight, stored report, first-free check, free pass, action feedback
+    // Identity is device-based now: every owner (anonymous deviceId included) can
+    // hold a subscription and a first-AI-free grant, so fetch them unconditionally
+    // by ownerId. (These were previously gated behind isAuthenticated, which
+    // silently disabled premium for everyone once sign-in was removed.)
     const [aggregates, allAggregates, allMoments, subscription, llmInsight, storedReport, firstFreeAvailable, freePass, actionFeedback, actionPrefs, insightHistory] = await Promise.all([
       getWeeklyAggregates(ownerId),
       getWeeklyAggregates(ownerId, 45),
       getTimeline(ownerId),
-      isAuthenticated ? getSubscription(ownerId) : Promise.resolve(null),
+      getSubscription(ownerId),
       getStoredLlmInsight(ownerId),
       getStoredWeeklyInsight(ownerId),
-      isAuthenticated ? isFirstAiFreeAvailable(ownerId) : Promise.resolve(false),
-      isAuthenticated ? hasFreePass(ownerId) : Promise.resolve(false),
+      isFirstAiFreeAvailable(ownerId),
+      hasFreePass(ownerId),
       getActionFeedback(ownerId),
       getActionPrefs(ownerId),
-      isAuthenticated ? getLlmInsightHistory(ownerId) : Promise.resolve([]),
+      getLlmInsightHistory(ownerId),
     ]);
 
     // Filter moments to last 7 days for invoked metrics computation
@@ -164,8 +168,9 @@ export default async function handler(req, res) {
         // Free pass: show full insight (pass auto-expires via TTL)
         report.llmInsight = llmInsight;
         report.llmInsight.freePass = true;
-      } else if (isAuthenticated) {
+      } else {
         // Teaser: extract first section ("What stood out") for curiosity-driven preview
+        // Shown to every non-premium owner (all device-based now) as the upgrade hook.
         const narrative = llmInsight.narrative || "";
         const headerRe = /(?:what stood out|what may be contributing|one thing to try|क्या ख़ास रहा|क्या कारण हो सकता है|एक बात आज़माएँ)/gi;
         const hits = [];

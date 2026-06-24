@@ -10,6 +10,7 @@ import { verifyAndStoreSubscription, grantGracePeriodFallback } from "@/services
 const schema = z.object({
   subscriptionId: z.string().min(1),
   purchaseToken: z.string().min(1),
+  deviceId: z.string().optional(),
 });
 
 export default async function handler(req, res) {
@@ -22,26 +23,29 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Device-based identity: subscriptions are keyed by ownerId (deviceId when anonymous).
     const token = getBearerToken(req);
-    if (!token) {
-      return sendError(res, 401, "UNAUTHORIZED", "Authentication required");
-    }
+    const user = token ? await validateSession(token).catch(() => null) : null;
 
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return sendError(res, 400, "INVALID_INPUT", "Request body is invalid", parsed.error.flatten());
     }
 
-    const user = await validateSession(token);
+    const ownerId = user?.id || parsed.data.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
+    }
+
     const subscription = await verifyAndStoreSubscription({
-      userId: user.id,
+      userId: ownerId,
       subscriptionId: parsed.data.subscriptionId,
       purchaseToken: parsed.data.purchaseToken,
     });
 
     await trackServerEvent(
       subscription.status === "active" ? "subscription_started" : "subscription_cancelled",
-      user.id,
+      ownerId,
       subscription
     );
 
@@ -56,20 +60,22 @@ export default async function handler(req, res) {
     // Google API verification failed but user has a purchase token — grant grace period
     // so they get immediate access while API permissions are resolved
     try {
-      const user = await validateSession(getBearerToken(req));
+      const fbToken = getBearerToken(req);
+      const fbUser = fbToken ? await validateSession(fbToken).catch(() => null) : null;
       const parsed = schema.safeParse(req.body);
-      if (user && parsed.success) {
+      const ownerId = fbUser?.id || parsed.data?.deviceId;
+      if (ownerId && parsed.success) {
         const fallback = await grantGracePeriodFallback({
-          userId: user.id,
+          userId: ownerId,
           subscriptionId: parsed.data.subscriptionId,
           purchaseToken: parsed.data.purchaseToken,
         });
         captureServerError(new Error(`Subscription granted via fallback — Google API failed: ${error.message}`), {
           route: "subscriptionVerify",
-          userId: user.id,
+          ownerId,
           fallback: true,
         });
-        await trackServerEvent("subscription_started", user.id, { ...fallback, fallback: true });
+        await trackServerEvent("subscription_started", ownerId, { ...fallback, fallback: true });
         return sendSuccess(res, { subscription: fallback });
       }
     } catch (fallbackErr) {

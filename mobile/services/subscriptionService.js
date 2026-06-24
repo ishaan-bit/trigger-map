@@ -80,9 +80,9 @@ async function getOfferToken() {
   throw lastError;
 }
 
-export async function startSubscriptionFlow(token) {
-  if (!token) {
-    throw new Error("Please sign in before starting a subscription");
+export async function startSubscriptionFlow(deviceId) {
+  if (!deviceId) {
+    throw new Error("Device not ready. Please try again.");
   }
 
   console.info("[Billing] Starting subscription flow...");
@@ -113,8 +113,8 @@ export async function startSubscriptionFlow(token) {
 
     console.info("[Billing] Purchase completed, verifying with backend...");
     const response = await verifySubscription(
-      { subscriptionId: SUBSCRIPTION_SKU, purchaseToken },
-      token
+      { subscriptionId: SUBSCRIPTION_SKU, purchaseToken, deviceId },
+      null
     );
 
     await finishTransaction({ purchase: resolved, isConsumable: false });
@@ -129,8 +129,8 @@ export async function startSubscriptionFlow(token) {
  * Restore an existing subscription (e.g. after reinstall or sign-in on new device).
  * Returns the restored subscription, or null if none found.
  */
-export async function restoreSubscriptionFlow(token) {
-  if (!token) return null;
+export async function restoreSubscriptionFlow(deviceId) {
+  if (!deviceId) return null;
 
   console.info("[Billing] Starting restore flow...");
   await initConnection();
@@ -146,8 +146,8 @@ export async function restoreSubscriptionFlow(token) {
     }
 
     const response = await verifySubscription(
-      { subscriptionId: SUBSCRIPTION_SKU, purchaseToken: sub.purchaseToken },
-      token
+      { subscriptionId: SUBSCRIPTION_SKU, purchaseToken: sub.purchaseToken, deviceId },
+      null
     );
 
     await finishTransaction({ purchase: sub, isConsumable: false });

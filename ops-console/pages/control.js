@@ -54,7 +54,7 @@ const JOBS = [
   {
     id: 'generateLlmInsights',
     label: 'Generate LLM Insights',
-    description: 'Generate premium LLM-based narratives for all eligible signed-in users. Signals now include deltas, action feedback, and change highlights.',
+    description: 'Generate premium LLM-based narratives for all eligible users (device-based). Signals now include deltas, action feedback, and change highlights.',
     danger: false,
     usesLlm: true,
     hasUserPicker: true,

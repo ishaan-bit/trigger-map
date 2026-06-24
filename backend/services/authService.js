@@ -253,6 +253,38 @@ export async function validateSession(token) {
   return user;
 }
 
+/**
+ * Correlate an anonymous device with a signed-in account.
+ *
+ * Stores a bidirectional link so we can (a) recognise which account a device
+ * belongs to for cross-device sync / premium restore, and (b) list every
+ * device an account has used (ops + future multi-device migration). Idempotent
+ * and best-effort — never blocks the auth flow.
+ */
+export async function linkDeviceToUser(deviceId, userId) {
+  if (!deviceId || !userId || deviceId === userId) return;
+  const now = new Date().toISOString();
+  try {
+    await pipeline([
+      // Reverse pointer: device → owning account (latest wins)
+      ["HSET", redisKey("deviceUser", deviceId), "userId", userId, "linkedAt", now],
+      // Forward set: account → all known devices
+      ["SADD", redisKey("userDevices", userId), deviceId],
+      // Stamp the account's most recent device for quick lookup
+      ["HSET", userKey(userId), "lastDeviceId", deviceId, "lastDeviceLinkedAt", now],
+    ]);
+  } catch (err) {
+    console.error("[linkDeviceToUser] failed:", err?.message || err);
+  }
+}
+
+/** Resolve the account a device is linked to, if any. */
+export async function getUserIdForDevice(deviceId) {
+  if (!deviceId) return null;
+  const userId = await redis(["HGET", redisKey("deviceUser", deviceId), "userId"]);
+  return userId || null;
+}
+
 export async function getSubscription(userId) {
   return hgetallObject(redisKey("subscription", userId));
 }

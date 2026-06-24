@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { loginEmailUser, loginGoogleUser, createSession } from "@/services/authService.js";
+import { loginEmailUser, loginGoogleUser, createSession, linkDeviceToUser } from "@/services/authService.js";
 import enableCors from "@/lib/cors.js";
 import { migrateMoments } from "@/services/momentService.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
@@ -8,6 +8,10 @@ import { enforceRateLimit } from "@/services/rateLimitService.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { getClientIp } from "@/services/security.js";
 
+// NOTE: The mobile app no longer ships sign-in (it is fully device-based). This
+// route is kept FUNCTIONAL — not disabled — so that already-installed older app
+// builds (the live app) can still authenticate during rollout. It can be retired
+// once the device-only build is fully adopted.
 const schema = z.discriminatedUnion("provider", [
   z.object({
     provider: z.literal("email"),
@@ -50,6 +54,8 @@ export default async function handler(req, res) {
       createSession(user),
       migrateMoments(parsed.data.deviceId, user.id),
     ]);
+    // Correlate this device with the account (cross-device sync, premium restore, ops)
+    linkDeviceToUser(parsed.data.deviceId, user.id).catch(() => {});
     // Fire-and-forget analytics
     trackServerEvent("login_completed", user.id, { provider: parsed.data.provider, migrated: migration.migrated }).catch(() => {});
 

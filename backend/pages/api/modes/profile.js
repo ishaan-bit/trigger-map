@@ -21,13 +21,13 @@ export default async function handler(req, res) {
   if (enableCors(req, res)) return;
 
   try {
+    // Device-based identity: token optional, fall back to deviceId (query for GET, body for PUT).
     const token = getBearerToken(req);
-    const user = token ? await validateSession(token) : null;
-    if (!user) {
-      return sendError(res, 401, "AUTH_REQUIRED", "Sign in to access mode profile");
+    const user = token ? await validateSession(token).catch(() => null) : null;
+    const ownerId = user?.id || req.query.deviceId || req.body?.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
     }
-
-    const ownerId = user.id;
 
     if (req.method === "GET") {
       const profile = await getModeProfile(ownerId);

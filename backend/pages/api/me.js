@@ -14,19 +14,26 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Device-based identity: a token is optional. Fall back to the deviceId so
+    // anonymous owners can hydrate their subscription / first-AI-free state.
     const token = getBearerToken(req);
-    if (!token) {
-      return sendError(res, 401, "UNAUTHORIZED", "Authentication required");
+    const user = token ? await validateSession(token).catch(() => null) : null;
+    const ownerId = user?.id || req.query.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
     }
 
-    const user = await validateSession(token);
     const [subscription, firstAiFreeAvailable] = await Promise.all([
-      getSubscription(user.id),
-      isFirstAiFreeAvailable(user.id),
+      getSubscription(ownerId),
+      isFirstAiFreeAvailable(ownerId),
     ]);
-    return sendSuccess(res, { user, subscription, firstAiFreeAvailable });
+    return sendSuccess(res, {
+      user: user || { id: ownerId, anonymous: true },
+      subscription,
+      firstAiFreeAvailable,
+    });
   } catch (error) {
     captureServerError(error, { route: "me" });
-    return sendError(res, 401, "UNAUTHORIZED", "Session is invalid");
+    return sendError(res, 500, "ME_FAILED", "Unable to load account");
   }
 }

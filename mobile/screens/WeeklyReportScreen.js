@@ -18,9 +18,11 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
-import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress, createShareSnapshot } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius } from "@/utils/theme";
+import { ProgressRing, Gauge, Sparkline, AnimatedBar } from "@/components/graphics";
+import { CountUpText, FadeInView, Pulse } from "@/components/motion";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
@@ -1080,14 +1082,26 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
   if (!progress) {
     return (
       <View style={s.tabContent}>
-        <View style={s.insightStateCard}>
-          <Text style={s.insightStateIcon}>📈</Text>
-          <Text style={s.insightStateTitle}>{t("report.progress.tabLabel")}</Text>
-          <Text style={s.insightStateBody}>{t("report.progress.needMoreWeeks")}</Text>
-        </View>
+        <FadeInView>
+          <View style={s.progressEmptyCard}>
+            <Pulse style={s.progressEmptyGlow} />
+            <ProgressRing progress={0.18} size={132} strokeWidth={10} color={palette.accent} duration={900}>
+              <Text style={s.progressEmptyEmoji}>📈</Text>
+            </ProgressRing>
+            <Text style={s.insightStateTitle}>{t("report.progress.tabLabel")}</Text>
+            <Text style={s.insightStateBody}>{t("report.progress.needMoreWeeks")}</Text>
+            {/* Two-week filling track makes the goal tangible at a glance */}
+            <View style={s.progressEmptyTrack}>
+              <AnimatedBar progress={0.18} color={palette.accent} height={8} />
+            </View>
+          </View>
+        </FadeInView>
       </View>
     );
   }
+
+  // Emotion score runs 1..5 — normalise to 0..1 for rings/gauges.
+  const scoreToFill = (sc) => (sc == null ? 0 : Math.max(0, Math.min(1, (sc - 1) / 4)));
 
   const { trajectory, metrics, patternShifts, attributions, weeklySnapshots, dataQuality } = progress;
   const hasShifts =
@@ -1119,20 +1133,21 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
         <AnimatedSection index={0} style={s.section}>
           <SectionHeader label={t("report.progress.trajectoryTitle")} badge="weekly" t={t} />
 
-          {/* Visual arc: past → present → projected */}
+          {/* Visual arc: past → present → projected, as animated rings */}
           <View style={s.progressArc}>
             {/* Past */}
             <View style={s.progressArcNode}>
-              <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.past?.tone)}</Text>
-              <Text style={[s.progressArcScore, { color: toneColor(trajectory.past?.tone) }]}>
-                {trajectory.past?.score?.toFixed(1) || "-"}
-              </Text>
+              <ProgressRing progress={scoreToFill(trajectory.past?.score)} size={64} strokeWidth={6} color={toneColor(trajectory.past?.tone)}>
+                <Text style={[s.progressRingScore, { color: toneColor(trajectory.past?.tone) }]}>
+                  {trajectory.past?.score != null ? trajectory.past.score.toFixed(1) : "–"}
+                </Text>
+              </ProgressRing>
               <Text style={s.progressArcLabel}>
                 {t("report.progress.weeksAgo", { count: trajectory.weeksTracked || "-" })}
               </Text>
             </View>
 
-            {/* Connector with direction */}
+            {/* Delta connector */}
             <View style={s.progressArcConnector}>
               <View style={[s.progressArcLine, {
                 backgroundColor: trajectory.direction === "improving" ? palette.success + "60"
@@ -1156,24 +1171,27 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               ) : null}
             </View>
 
-            {/* Present */}
+            {/* Present — hero gauge with count-up */}
             <View style={s.progressArcNode}>
-              <Text style={[s.progressArcEmoji]}>{toneEmoji(trajectory.present?.tone)}</Text>
-              <Text style={[s.progressArcScore, { color: toneColor(trajectory.present?.tone) }]}>
-                {trajectory.present?.score?.toFixed(1) || "-"}
-              </Text>
-              <Text style={s.progressArcLabel}>{t("report.progress.thisWeek")}</Text>
+              <Gauge value={scoreToFill(trajectory.present?.score)} size={108} strokeWidth={10} color={toneColor(trajectory.present?.tone)}>
+                <CountUpText
+                  value={trajectory.present?.score ?? 0}
+                  decimals={1}
+                  style={[s.progressGaugeScore, { color: toneColor(trajectory.present?.tone) }]}
+                />
+                <Text style={s.progressGaugeLabel}>{t("report.progress.thisWeek")}</Text>
+              </Gauge>
             </View>
 
             {/* Projected */}
             <View style={s.progressArcConnector}>
               <View style={[s.progressArcLine, { backgroundColor: palette.muted + "30", borderStyle: "dashed" }]} />
             </View>
-            <View style={[s.progressArcNode, { opacity: 0.7 }]}>
+            <View style={[s.progressArcNode, { opacity: 0.85 }]}>
               <Text style={s.progressArcEmoji}>
                 {trajectory.projected === "improving" ? "📈" : trajectory.projected === "declining" ? "📉" : "➡️"}
               </Text>
-              <Text style={[s.progressArcScore, { color: palette.muted, fontSize: 13 }]}>
+              <Text style={[s.progressArcScore, { color: palette.muted, fontSize: 12 }]}>
                 {trajectory.projected === "improving"
                   ? t("report.progress.projectedImproving")
                   : trajectory.projected === "declining"
@@ -1183,6 +1201,18 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               <Text style={s.progressArcLabel}>{t("report.progress.projected")}</Text>
             </View>
           </View>
+
+          {/* Trend sparkline across all tracked weeks */}
+          {weeklySnapshots?.length >= 2 ? (
+            <View style={s.progressSparkWrap}>
+              <Sparkline
+                data={weeklySnapshots.map((w) => w.score ?? 0)}
+                width={300}
+                height={56}
+                color={toneColor(trajectory.present?.tone)}
+              />
+            </View>
+          ) : null}
 
           {/* Direction badge */}
           {trajectory.direction ? (
@@ -1293,12 +1323,13 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     <Text style={s.progressMetricLabel}>{m.label}</Text>
                   </View>
                   <Text style={[s.progressMetricBigValue, { color: barColor }]}>{displayCurrent}</Text>
-                  <View style={s.progressMetricBarTrack}>
-                    <View style={[s.progressMetricBarFill, { width: `${Math.round(fillNow * 100)}%`, backgroundColor: barColor }]} />
-                    {fillPrev !== null && Math.abs(fillPrev - fillNow) > 0.02 ? (
-                      <View style={[s.progressMetricBarPrev, { left: `${Math.round(fillPrev * 100)}%` }]} />
-                    ) : null}
-                  </View>
+                  <AnimatedBar
+                    progress={fillNow}
+                    color={barColor}
+                    height={8}
+                    markerAt={fillPrev !== null && Math.abs(fillPrev - fillNow) > 0.02 ? fillPrev : null}
+                    style={{ marginTop: 4 }}
+                  />
                   <TrendBadge trend={md.trend} t={t} />
                 </View>
               );
@@ -2338,7 +2369,10 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
 /* ── Main screen ── */
 
 export function WeeklyReportScreen() {
-  const { loadWeeklyReport, refreshSession, subscription, user, token, subscribe, deviceId, invalidateCache } = useAppSession();
+  // Device-based identity: `token` is always null (no sign-in). It is kept here only
+  // so the existing deviceId-fallback call signatures (fetchProgress, submitModeFeedback,
+  // ActionsTab) keep working unchanged.
+  const { loadWeeklyReport, subscription, token, subscribe, deviceId, invalidateCache } = useAppSession();
   const router = useRouter();
   const { state: obState, advance: obAdvance } = useOnboarding();
   const { dominantEmotion } = useEmotionalState();
@@ -2353,13 +2387,15 @@ export function WeeklyReportScreen() {
   const [showInsightsGuide, setShowInsightsGuide] = useState(false);
   const [showActionsGuide, setShowActionsGuide] = useState(false);
   const [showCloseLoop, setShowCloseLoop] = useState(false);
-  const [sharing, setSharing] = useState(false);
 
-  const isSignedIn = Boolean(user && token);
+  // Device-based identity: there is no sign-in. Every user now has the full (free)
+  // experience; the only gate is premium (isPremium). Kept as a constant so the
+  // existing tier-aware UI resolves to the non-premium / upgrade path (never a "sign in" CTA).
+  const isSignedIn = true;
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
 
   const callbacksRef = useRef({});
-  callbacksRef.current = { loadWeeklyReport, refreshSession, token, isPremium, isSignedIn };
+  callbacksRef.current = { loadWeeklyReport, token, isPremium, isSignedIn };
   const reportRef = useRef(null);
   reportRef.current = report;
 
@@ -2376,12 +2412,11 @@ export function WeeklyReportScreen() {
 
   useFocusEffect(useCallback(() => {
     load();
-    const { token: t, refreshSession: rs, isPremium: p, isSignedIn: si } = callbacksRef.current;
-    if (t) rs().catch(() => null);
-    trackEvent("report_screen_viewed", { tier: p ? "premium" : si ? "signed" : "anonymous" });
+    const { isPremium: p } = callbacksRef.current;
+    trackEvent("report_screen_viewed", { tier: p ? "premium" : "free" });
 
     const refreshModes = () => {
-      fetchModes(t, deviceId, lang)
+      fetchModes(null, deviceId, lang)
         .then((data) => {
           const populated = ["move", "fuel", "perspective"].filter((m) => data?.[m] != null);
           if (__DEV__) console.log("Modes response:", populated.length ? `${populated.join(", ")} populated` : "all empty");
@@ -2400,7 +2435,7 @@ export function WeeklyReportScreen() {
     // interval — regeneration is a background (cron/ops) job that won't finish
     // while the user watches, and the old 45s poll swapped Move/Fuel lists out
     // mid-read and mid-feedback (the "feedback replacement" churn).
-    if (p && t) {
+    if (p && deviceId) {
       refreshModes();
     }
 
@@ -2462,38 +2497,10 @@ export function WeeklyReportScreen() {
   const isHistoricalUser = lifetimeMoments >= 3;
   const showTabs = confidence !== "too_early" || isHistoricalUser;
 
-  function handleSignIn() { tap(); trackEvent("report_signin_unlock_tapped", {}); router.push("/login"); }
+  // Device-based app: no sign-in. Inert no-op kept because the (now-dead) tier-aware
+  // branches still reference it as a prop; premium gating uses handleUpgrade instead.
+  function handleSignIn() {}
 
-  async function handleShare() {
-    if (!token) {
-      Alert.alert("Sign in required", "Sign in to create a shareable link for your weekly snapshot.");
-      return;
-    }
-    if (!report?.totalMoments) {
-      Alert.alert("Nothing to share yet", "Log a few moments first to build your weekly snapshot.");
-      return;
-    }
-    try {
-      setSharing(true);
-      const { token: shareToken } = await createShareSnapshot(token);
-      const webBase = (process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://web-ashy-kappa-14.vercel.app").replace(/\/$/, "");
-      const url = `${webBase}/share/${shareToken}`;
-      const teaser = report?.topEmotion
-        ? `Mostly ${report.topEmotion} this week. ${report.totalMoments} moments across ${dq.daysLogged || 0} days.`
-        : `${report?.totalMoments || 0} moments logged this week.`;
-      await Share.share({
-        // URL on its own line so WhatsApp / iMessage auto-render it as a link preview.
-        message: `My week on TriggerMap 📊\n\n${teaser}\n\nTop trigger, signature pattern, plus what helped vs. what added friction. Full snapshot:\n\n${url}`,
-        url,
-      });
-      trackEvent("report_share_created", {});
-    } catch (err) {
-      if (err?.message?.includes("cancel")) return;
-      Alert.alert("Could not create link", err?.message || "Please try again.");
-    } finally {
-      setSharing(false);
-    }
-  }
   async function handleUpgrade() {
     tap();
     trackEvent("report_upgrade_tapped", {});
@@ -2501,8 +2508,8 @@ export function WeeklyReportScreen() {
       setPurchasing(true);
       await subscribe();
       load();
-      // Fetch adaptive modes now that the user is premium
-      if (token) fetchModes(token, deviceId, lang).then((m) => setModes(m || {})).catch(() => setModes({}));
+      // Fetch adaptive modes now that the user is premium (keyed by deviceId)
+      if (deviceId) fetchModes(null, deviceId, lang).then((m) => setModes(m || {})).catch(() => setModes({}));
     } catch (err) {
       const msg = err?.message || "";
       if (err?.code === "E_USER_CANCELLED" || msg.includes("cancelled")) return;
@@ -2559,32 +2566,7 @@ export function WeeklyReportScreen() {
                     <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
                   </View>
                 </View>
-                {/* Share needs an actual snapshot — only show when there's data to share */}
-                {report?.totalMoments ? (
-                  <Pressable
-                    onPress={handleShare}
-                    disabled={sharing}
-                    accessibilityRole="button"
-                    accessibilityLabel="Share my week"
-                    style={({ pressed }) => [s.shareButtonWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
-                  >
-                    <LinearGradient
-                      colors={["#5fd3e0", "#7e9cff"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={s.shareButton}
-                    >
-                      <View style={s.shareButtonIconWrap}>
-                        <Text style={s.shareButtonIcon}>📤</Text>
-                      </View>
-                      <View style={s.shareButtonTextWrap}>
-                        <Text style={s.shareButtonText}>{sharing ? "Creating link…" : "Share my week"}</Text>
-                        <Text style={s.shareButtonSubtext}>Send a snapshot to anyone</Text>
-                      </View>
-                      <Text style={s.shareButtonArrow}>›</Text>
-                    </LinearGradient>
-                  </Pressable>
-                ) : null}
+                {/* Per-account share link removed — the app is device-based. */}
               </>
             ) : null}
           </View>
@@ -2659,12 +2641,23 @@ export function WeeklyReportScreen() {
 
               {/* Silence banner for returning users who haven't logged in 7+ days */}
               {confidence === "stale" && report?.silenceWindow ? (
-                <View style={s.lightWeekBanner}>
-                  <Text style={s.lightWeekText}>
-                    {t("report.silenceBanner") || "Welcome back!"}{" "}
-                    {(t("report.silenceBannerBody") || "It's been {days} days since your last check-in. Here's what we still see from your previous activity.").replace("{days}", report.silenceWindow.daysSinceLastLog || "a few")}
-                  </Text>
-                </View>
+                <FadeInView>
+                  <View style={s.silenceBanner}>
+                    <Pulse style={s.silenceBannerGlow} />
+                    <View style={s.silenceBannerRow}>
+                      <View style={s.silenceBannerDays}>
+                        <Text style={s.silenceBannerDaysNum}>{report.silenceWindow.daysSinceLastLog ?? "•"}</Text>
+                        <Text style={s.silenceBannerDaysLabel}>{t("report.silenceDaysLabel") || "days"}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.silenceBannerTitle}>{t("report.silenceBanner") || "Welcome back"}</Text>
+                        <Text style={s.silenceBannerBody}>
+                          {(t("report.silenceBannerBody") || "It's been {days} days since your last check-in. Here's what we still see from your previous activity.").replace("{days}", report.silenceWindow.daysSinceLastLog || "a few")}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </FadeInView>
               ) : null}
 
               {/* Tab content — 3 collapsed tabs */}
@@ -3033,6 +3026,24 @@ const s = StyleSheet.create({
   },
   lightWeekText: { color: palette.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center" },
 
+  silenceBanner: {
+    padding: 16, borderRadius: radius.lg, marginBottom: 8, overflow: "hidden",
+    backgroundColor: palette.card, borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  silenceBannerGlow: {
+    position: "absolute", top: -40, left: -20, width: 140, height: 140, borderRadius: 70,
+    backgroundColor: palette.accentSoft,
+  },
+  silenceBannerRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  silenceBannerDays: {
+    width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center",
+    backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  silenceBannerDaysNum: { color: palette.accent, fontSize: 22, fontWeight: "800", lineHeight: 24 },
+  silenceBannerDaysLabel: { color: palette.accent, fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  silenceBannerTitle: { color: palette.text, fontSize: 16, fontWeight: "800", marginBottom: 2 },
+  silenceBannerBody: { color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
+
   nudgeSecondary: { marginTop: 4, paddingVertical: 10, alignItems: "center" },
   nudgeSecondaryText: { color: palette.accent, fontSize: 14, fontWeight: "600", textDecorationLine: "underline" },
 
@@ -3301,13 +3312,28 @@ const s = StyleSheet.create({
   },
 
   /* ── Progress tab ── */
+  progressEmptyCard: {
+    alignItems: "center", gap: 14, paddingVertical: 36, paddingHorizontal: 24,
+    backgroundColor: "rgba(6, 10, 18, 0.85)", borderRadius: radius.lg,
+    borderWidth: 1, borderColor: palette.glassBorder, overflow: "hidden",
+  },
+  progressEmptyGlow: {
+    position: "absolute", top: -30, width: 180, height: 180, borderRadius: 90,
+    backgroundColor: palette.accentSoft,
+  },
+  progressEmptyEmoji: { fontSize: 40 },
+  progressEmptyTrack: { width: "70%", marginTop: 4 },
+  progressRingScore: { fontSize: 16, fontWeight: "800" },
+  progressGaugeScore: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  progressGaugeLabel: { color: palette.textSecondary, fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase", marginTop: 1 },
+  progressSparkWrap: { alignItems: "center", marginTop: 10 },
   progressArc: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     paddingVertical: 20, paddingHorizontal: 12, gap: 0,
     backgroundColor: "rgba(6, 10, 18, 0.85)", borderRadius: radius.md,
     borderWidth: 1, borderColor: palette.glassBorder,
   },
-  progressArcNode: { alignItems: "center", gap: 4, width: 80 },
+  progressArcNode: { alignItems: "center", gap: 4, width: 88 },
   progressArcConnector: {
     flex: 1, flexDirection: "row", alignItems: "center", marginHorizontal: -4,
   },

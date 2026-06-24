@@ -1,36 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
-  clearSessionToken,
   getOnboardingComplete,
   getOrCreateDeviceId,
   setLastLoggedAt,
   getReminderEnabled,
   getReflectionEnabled,
   getNudgesEnabled,
-  getSessionToken,
   setOnboardingComplete,
   setReminderEnabled,
   setReflectionEnabled,
   setNudgesEnabled,
-  setSessionToken,
 } from "@/services/deviceService";
 import {
-  downloadExport,
-  editMoment,
-  deleteMomentApi,
   deleteAllData,
   fetchMe,
-  fetchTimeline,
   fetchWeeklyReport,
-  login,
   logMoment,
-  register,
   registerDevice,
   registerPushToken,
-  unregisterPushToken,
   saveNotificationPrefs,
 } from "@/services/api";
 import {
@@ -38,7 +27,6 @@ import {
   getLocalMoments,
   deleteLocalMoment,
   updateLocalMoment,
-  migrateLocalMoments,
   buildLocalReport,
   clearLocalMoments,
   queuePendingSync,
@@ -103,9 +91,10 @@ function createEmptyReport() {
 export function SessionProvider({ children }) {
   const [ready, setReady] = useState(false);
   const readyRef = useRef(false);
+  // Device-based identity: deviceId is the single canonical owner id. There is
+  // no sign-in, no account, and no auth token — every user is anonymous and
+  // their data is keyed server-side by this deviceId.
   const [deviceId, setDeviceId] = useState(null);
-  const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [firstAiFreeAvailable, setFirstAiFreeAvailable] = useState(false);
   const [onboardingComplete, setOnboardingCompleteState] = useState(false);
@@ -145,9 +134,8 @@ export function SessionProvider({ children }) {
       let enabledReflection = false;
       let enabledNudges = false;
       try {
-        const [storedDeviceId, storedToken, completedOnboarding, _enabledReminder, _enabledReflection, _enabledNudges] = await Promise.all([
+        const [storedDeviceId, completedOnboarding, _enabledReminder, _enabledReflection, _enabledNudges] = await Promise.all([
           getOrCreateDeviceId(),
-          getSessionToken(),
           getOnboardingComplete(),
           getReminderEnabled(),
           getReflectionEnabled(),
@@ -164,50 +152,38 @@ export function SessionProvider({ children }) {
         setReflectionEnabledState(enabledReflection);
         setNudgesEnabledState(enabledNudges);
 
-        if (storedToken) {
-          const session = await fetchMe(storedToken);
-          setToken(storedToken);
-          setUser(session.user);
-          setSubscription(session.subscription || null);
-          setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
+        // Announce the install so it's visible in the ops console regardless of
+        // push permission or logging activity.
+        registerDevice(storedDeviceId).catch(() => null);
 
-          // Re-register push token on every app start (tokens can rotate)
-          getExpoPushToken().then(pushInfo => {
-            if (pushInfo) {
-              registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, storedToken).catch(() => null);
-            }
-          });
-          // Sync local notification prefs to server
-          saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, storedToken).catch(() => null);
-        } else {
-          // Anonymous user — register device immediately so the install is visible
-          // in ops console regardless of push permission or moment logging.
-          registerDevice(storedDeviceId).catch(() => null);
+        // Hydrate premium + first-AI-free state, keyed by deviceId.
+        fetchMe(null, storedDeviceId)
+          .then((session) => {
+            setSubscription(session.subscription || null);
+            setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
+          })
+          .catch(() => null);
 
-          // Retry any pending syncs from previous failed attempts
-          getPendingSyncs().then((pendingSyncs) => {
-            for (const pendingPayload of pendingSyncs) {
-              const { queuedAt: _q, lang, ...momentPayload } = pendingPayload;
-              logMoment(momentPayload, null, lang)
-                .then(() => removePendingSync(pendingPayload.momentId))
-                .catch(() => {}); // still fire-and-forget; will retry on next open
-            }
-          }).catch(() => null);
+        // Retry any pending syncs from previous failed attempts.
+        getPendingSyncs().then((pendingSyncs) => {
+          for (const pendingPayload of pendingSyncs) {
+            const { queuedAt: _q, lang, ...momentPayload } = pendingPayload;
+            logMoment(momentPayload, null, lang)
+              .then(() => removePendingSync(pendingPayload.momentId))
+              .catch(() => {}); // fire-and-forget; will retry on next open
+          }
+        }).catch(() => null);
 
-          // Still register push token so ops console can reach anonymous users
-          getExpoPushToken().then(pushInfo => {
-            if (pushInfo) {
-              registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, null).catch(() => null);
-            }
-          });
-          // Sync notification prefs keyed by deviceId so push-cron honors anon opt-outs
-          saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, null, storedDeviceId).catch(() => null);
-        }
+        // Register push token so the ops console can reach this device.
+        getExpoPushToken().then(pushInfo => {
+          if (pushInfo) {
+            registerPushToken({ deviceId: storedDeviceId, ...pushInfo }, null).catch(() => null);
+          }
+        });
+        // Sync notification prefs keyed by deviceId so push-cron honors opt-outs.
+        saveNotificationPrefs({ daily: enabledReflection, weekly: enabledReminder, nudge: enabledNudges }, null, storedDeviceId).catch(() => null);
       } catch (error) {
         captureMobileError(error, { source: "bootstrap" });
-        await clearSessionToken();
-        setToken(null);
-        setUser(null);
         setSubscription(null);
       } finally {
         readyRef.current = true;
@@ -243,8 +219,10 @@ export function SessionProvider({ children }) {
     () => ({
       ready,
       deviceId,
-      token,
-      user,
+      // Kept as stable nulls so the (now universal) anonymous code paths across
+      // screens keep working without edits. There is no account or token anymore.
+      token: null,
+      user: null,
       subscription,
       firstAiFreeAvailable,
       onboardingComplete,
@@ -268,84 +246,6 @@ export function SessionProvider({ children }) {
             // Permission denied or scheduling failed — leave disabled
           }
         })();
-      },
-      async signInWithEmail(email, password) {
-        const activeDeviceId = await ensureDeviceIdentity();
-        const response = await login({ provider: "email", email, password, deviceId: activeDeviceId });
-        await setSessionToken(response.token);
-        setToken(response.token);
-        setUser(response.user);
-        await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
-        trackEvent("login_completed", { provider: "email" });
-        // Register push token in background
-        getExpoPushToken().then(pushInfo => {
-          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
-        });
-      },
-      async registerWithEmail(name, email, password) {
-        const activeDeviceId = await ensureDeviceIdentity();
-        const response = await register({ name, email, password, deviceId: activeDeviceId });
-        await setSessionToken(response.token);
-        setToken(response.token);
-        setUser(response.user);
-        await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
-        trackEvent("register_completed", {});
-        getExpoPushToken().then(pushInfo => {
-          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
-        });
-      },
-      async signInWithGoogle(idToken) {
-        const activeDeviceId = await ensureDeviceIdentity();
-        const response = await login({ provider: "google", idToken, deviceId: activeDeviceId });
-        await setSessionToken(response.token);
-        setToken(response.token);
-        setUser(response.user);
-        await migrateLocalMoments(response.token, activeDeviceId).catch(() => null);
-        trackEvent("login_completed", { provider: "google" });
-        getExpoPushToken().then(pushInfo => {
-          if (pushInfo) registerPushToken({ deviceId: activeDeviceId, ...pushInfo }, response.token).catch(() => null);
-        });
-      },
-      async signOut() {
-        // Unregister push token before clearing session (needs auth token)
-        if (token && deviceId) {
-          unregisterPushToken({ deviceId }, token).catch(() => null);
-        }
-
-        // Clear local session immediately for instant UX
-        await clearSessionToken();
-        setToken(null);
-        setUser(null);
-        setSubscription(null);
-        setFirstAiFreeAvailable(false);
-        invalidateCache();
-
-        // Revoke Google access in background (non-blocking)
-        (async () => {
-          try {
-            GoogleSignin.configure({
-              webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-            });
-            await GoogleSignin.revokeAccess();
-          } catch {
-            // No previous Google session — safe to ignore
-          }
-          try {
-            await GoogleSignin.signOut();
-          } catch {
-            // Safe to ignore
-          }
-        })();
-      },
-      async refreshSession() {
-        if (!token) {
-          return null;
-        }
-        const session = await fetchMe(token);
-        setUser(session.user);
-        setSubscription(session.subscription || null);
-        setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
-        return session;
       },
       async saveMoment(payload) {
         const activeDeviceId = await ensureDeviceIdentity();
@@ -373,138 +273,89 @@ export function SessionProvider({ children }) {
           contributionTagMeta: payload.contributionTagMeta || [],
         };
 
-        if (!token) {
-          const localMoment = await saveLocalMoment({
-            trigger: payload.trigger,
-            ...emotionFields,
-            ...contributionFields,
-            note: notes,
-            timestamp,
-            tags: payload.tags || [],
-          });
-          await setLastLoggedAt(timestamp);
-          trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion, local: true });
-
-          // Also send to backend so anonymous users are tracked in ops console
-          const anonSyncPayload = {
-            deviceId: activeDeviceId,
-            momentId: localMoment.id,
-            trigger: payload.trigger,
-            ...emotionFields,
-            ...contributionFields,
-            note: notes,
-            notes,
-            timestamp,
-            tags: payload.tags || [],
-          };
-          logMoment(anonSyncPayload, null, payload.lang).catch((err) => {
-            console.warn("[TriggerMap] Anon sync failed, queued for retry:", err.message);
-            queuePendingSync({ ...anonSyncPayload, lang: payload.lang }).catch(() => null);
-          });
-
-          return { moment: localMoment };
-        }
-
-        const response = await logMoment(
-          {
-            deviceId: activeDeviceId,
-            trigger: payload.trigger,
-            ...emotionFields,
-            ...contributionFields,
-            note: notes,
-            notes,
-            timestamp,
-            tags: payload.tags || [],
-          },
-          token,
-          payload.lang
-        );
-        console.info("QuietDen: moment logged", {
-          id: response.moment?.id,
-          trigger: response.moment?.trigger,
-          emotion: response.moment?.emotion,
+        // Save locally first so the Timeline reflects it instantly (offline-first).
+        const localMoment = await saveLocalMoment({
+          trigger: payload.trigger,
+          ...emotionFields,
+          ...contributionFields,
+          note: notes,
+          timestamp,
+          tags: payload.tags || [],
         });
-        await setLastLoggedAt(response.moment?.timestamp || timestamp);
-        if (response.patternFeedback) {
-          schedulePatternAlert(response.patternFeedback).catch(() => null);
-        }
-        if (reflectionEnabled) {
-          scheduleReflectionReminder().catch(() => null);
-        }
-        trackEvent("moment_logged", { trigger: response.moment.trigger, emotion: response.moment.emotion });
-        // Invalidate report cache so next view gets fresh actions with updated feedback
+        await setLastLoggedAt(timestamp);
+        trackEvent("moment_logged", { trigger: payload.trigger, emotion: localMoment.emotion });
+
+        // Sync to the backend (keyed by deviceId) so the server-computed report,
+        // progress, and pattern alerts stay populated. Fire-and-forget with retry queue.
+        const syncPayload = {
+          deviceId: activeDeviceId,
+          momentId: localMoment.id,
+          trigger: payload.trigger,
+          ...emotionFields,
+          ...contributionFields,
+          note: notes,
+          notes,
+          timestamp,
+          tags: payload.tags || [],
+        };
+        logMoment(syncPayload, null, payload.lang)
+          .then((res) => {
+            if (res?.patternFeedback) schedulePatternAlert(res.patternFeedback).catch(() => null);
+            if (reflectionEnabled) scheduleReflectionReminder().catch(() => null);
+          })
+          .catch((err) => {
+            console.warn("[TriggerMap] Moment sync failed, queued for retry:", err.message);
+            queuePendingSync({ ...syncPayload, lang: payload.lang }).catch(() => null);
+          });
+
         invalidateCache("weeklyReport");
-        return response;
+        return { moment: localMoment };
       },
       async loadTimeline() {
-        const activeDeviceId = await ensureDeviceIdentity();
-
-        if (!token) {
-          const localMoments = await getLocalMoments();
-          return localMoments;
-        }
-
-        const cached = getCached("timeline");
-        if (cached) return cached;
-
-        const response = await fetchTimeline(activeDeviceId, token);
-        console.info("QuietDen: timeline fetched", { count: response.moments?.length ?? 0 });
-        const moments = response.moments || [];
-        setCache("timeline", moments);
-        return moments;
+        await ensureDeviceIdentity();
+        // Timeline reads from the local store (source of truth for the device).
+        return getLocalMoments();
       },
       async updateMoment(momentId, updates) {
         invalidateCache();
-        if (!token) {
-          const updated = await updateLocalMoment(momentId, updates);
-          trackEvent("moment_edited", { momentId, local: true });
-          return updated;
-        }
-        const response = await editMoment(momentId, updates, token);
+        const updated = await updateLocalMoment(momentId, updates);
         trackEvent("moment_edited", { momentId });
-        return response.moment;
+        return updated;
       },
       async removeMoment(momentId) {
         invalidateCache();
-        if (!token) {
-          await deleteLocalMoment(momentId);
-          trackEvent("moment_deleted", { momentId, local: true });
-          return;
-        }
-        await deleteMomentApi(momentId, token);
+        await deleteLocalMoment(momentId);
         trackEvent("moment_deleted", { momentId });
       },
       async loadWeeklyReport(lang) {
         const activeDeviceId = await ensureDeviceIdentity();
 
-        if (!token) {
+        const cached = getCached("weeklyReport");
+        if (cached) return cached;
+
+        // The server-computed report (keyed by deviceId) is authoritative — it
+        // wires silence detection, trajectory, and progress. Moments are synced
+        // to the backend on log; the local report is an offline fallback.
+        try {
+          const response = await fetchWeeklyReport(activeDeviceId, null, lang);
+          const report = response.report || createEmptyReport();
+          console.info("QuietDen: report generated", { totalMoments: report.totalMoments ?? 0 });
+          trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments, local: false });
+          setCache("weeklyReport", report);
+          return report;
+        } catch (error) {
+          // Offline / unreachable: fall back to a locally-computed report so the
+          // user always sees their data.
           const localMoments = await getLocalMoments();
           const report = buildLocalReport(localMoments) || createEmptyReport();
           trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments, local: true });
           return report;
         }
-
-        const cached = getCached("weeklyReport");
-        if (cached) return cached;
-
-        const response = await fetchWeeklyReport(activeDeviceId, token, lang);
-        const report = response.report || createEmptyReport();
-        console.info("QuietDen: report generated", { totalMoments: report.totalMoments ?? 0 });
-        trackEvent("weekly_report_viewed", { totalMoments: report.totalMoments });
-        setCache("weeklyReport", report);
-        return report;
       },
       async exportLogs() {
-        const activeDeviceId = await ensureDeviceIdentity();
-
-        let contents;
-        if (token) {
-          contents = await downloadExport(activeDeviceId, token);
-        } else {
-          // Export local moments for anonymous users
-          const localMoments = await getLocalMoments();
-          contents = JSON.stringify(localMoments, null, 2);
-        }
+        await ensureDeviceIdentity();
+        const localMoments = await getLocalMoments();
+        const contents = JSON.stringify(localMoments, null, 2);
 
         const fileUri = `${FileSystem.cacheDirectory}quietden-export.json`;
         await FileSystem.writeAsStringAsync(fileUri, contents, { encoding: FileSystem.EncodingType.UTF8 });
@@ -521,8 +372,8 @@ export function SessionProvider({ children }) {
 
         await setReminderEnabled(enabled);
         setReminderEnabledState(enabled);
-        // Sync to server so push-cron respects this (keyed by deviceId when anonymous)
-        saveNotificationPrefs({ weekly: enabled }, token, deviceId).catch(() => null);
+        // Sync to server (keyed by deviceId) so push-cron respects this.
+        saveNotificationPrefs({ weekly: enabled }, null, deviceId).catch(() => null);
       },
       async toggleReflection(enabled) {
         if (enabled) {
@@ -533,46 +384,45 @@ export function SessionProvider({ children }) {
 
         await setReflectionEnabled(enabled);
         setReflectionEnabledState(enabled);
-        saveNotificationPrefs({ daily: enabled }, token, deviceId).catch(() => null);
+        saveNotificationPrefs({ daily: enabled }, null, deviceId).catch(() => null);
       },
       async toggleNudges(enabled) {
         await setNudgesEnabled(enabled);
         setNudgesEnabledState(enabled);
-        saveNotificationPrefs({ nudge: enabled }, token, deviceId).catch(() => null);
+        saveNotificationPrefs({ nudge: enabled }, null, deviceId).catch(() => null);
       },
       async subscribe() {
-        const result = await startSubscriptionFlow(token);
+        const activeDeviceId = await ensureDeviceIdentity();
+        const result = await startSubscriptionFlow(activeDeviceId);
         setSubscription(result);
-        // Force re-fetch session so premium state and insight are immediately available
-        if (token) {
-          try {
-            const session = await fetchMe(token);
-            setUser(session.user);
-            setSubscription(session.subscription || result);
-            setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
-          } catch {
-            // Subscribe succeeded; session refresh is best-effort
-          }
+        // Best-effort refresh of premium + first-free state so the insight is
+        // immediately available after purchase.
+        try {
+          const session = await fetchMe(null, activeDeviceId);
+          setSubscription(session.subscription || result);
+          setFirstAiFreeAvailable(session.firstAiFreeAvailable ?? false);
+        } catch {
+          // Subscribe succeeded; session refresh is best-effort
         }
+        invalidateCache("weeklyReport");
         return result;
       },
       async restoreSubscription() {
-        const result = await restoreSubscriptionFlow(token);
+        const activeDeviceId = await ensureDeviceIdentity();
+        const result = await restoreSubscriptionFlow(activeDeviceId);
         if (result) setSubscription(result);
         return result;
       },
       async deleteAllUserData() {
-        if (token) {
-          await deleteAllData(token);
-          await clearSessionToken();
-          setToken(null);
-          setUser(null);
-          setSubscription(null);
-        }
+        const activeDeviceId = await ensureDeviceIdentity();
+        await deleteAllData(null, activeDeviceId).catch(() => null);
         await clearLocalMoments();
+        setSubscription(null);
+        setFirstAiFreeAvailable(false);
+        invalidateCache();
       },
     }),
-    [deviceId, ensureDeviceIdentity, firstAiFreeAvailable, nudgesEnabled, onboardingComplete, ready, reflectionEnabled, reminderEnabled, subscription, token, user]
+    [deviceId, ensureDeviceIdentity, firstAiFreeAvailable, nudgesEnabled, onboardingComplete, ready, reflectionEnabled, reminderEnabled, subscription]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

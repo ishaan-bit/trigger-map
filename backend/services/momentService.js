@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { TRIGGER_KEYWORDS, TRIGGERS } from "@triggermap/shared/constants/triggers";
 import { EMOTIONS, EMOTION_COORDINATES, coordinatesToLegacy, derivedEmotionLabel, emotionRegionKey } from "@triggermap/shared/constants/emotions";
 import { buildContributionTagMeta, getContributionSuggestions } from "@triggermap/shared/constants/contributions";
-import { appendDailyAggregate, getOwnerIndexKey } from "./aggregationService.js";
+import { appendDailyAggregate, getOwnerIndexKey, replaceDailyAggregates } from "./aggregationService.js";
 import { lrangeJson, pipeline, redis, redisKey } from "./redisClient.js";
 import { sanitizeText } from "./security.js";
+import { buildAggregatesFromRawMoments } from "../jobs/llmInsightSource.js";
 
 function detectTriggerFromNote(note) {
   const normalized = sanitizeText(note).toLowerCase();
@@ -209,13 +210,23 @@ export async function migrateMoments(fromOwnerId, toOwnerId) {
   const mergedMoments = [...merged].sort((left, right) => new Date(left.timestamp) - new Date(right.timestamp));
   const targetKey = getMomentsKey(toOwnerId);
 
-  // TODO: rebuild or transfer daily aggregate hashes during migration.
-  // Today this moves the canonical raw timeline only; insights generation has
-  // a raw fallback so existing aggregate drift does not block users.
   await redis(["DEL", targetKey]);
 
   if (mergedMoments.length) {
     await redis(["RPUSH", targetKey, ...mergedMoments.map((moment) => JSON.stringify(moment))]);
+  }
+
+  // Rebuild the target's daily aggregate hashes from the full merged timeline.
+  // Progress, weekly report, and baseline engines all read daily aggregates,
+  // so without this the freshly-migrated account shows "log 2 weeks" / empty
+  // trajectory even though its raw moments span weeks.
+  try {
+    const rebuilt = buildAggregatesFromRawMoments(mergedMoments);
+    await replaceDailyAggregates(toOwnerId, rebuilt);
+  } catch (err) {
+    // Non-fatal: raw timeline is migrated; report/insight engines have a raw
+    // fallback. Surface for monitoring but don't fail the sign-in.
+    console.error("[migrateMoments] aggregate rebuild failed:", err?.message || err);
   }
 
   await redis(["DEL", getMomentsKey(fromOwnerId)]);

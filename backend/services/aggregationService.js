@@ -119,6 +119,84 @@ export async function getDailyAggregate(ownerId, date) {
   return parseAggregateHash(record, date);
 }
 
+/**
+ * Overwrite an owner's daily aggregate hashes from rebuilt snapshots
+ * (shape produced by buildAggregatesFromRawMoments). Used during
+ * anonymous→account migration so progress + report engines, which read
+ * daily aggregates, stay correct for the merged timeline.
+ *
+ * Each snapshot's day key is fully replaced (DEL then HSET) and re-stamped
+ * with the standard 45-day TTL. Snapshots whose day already fell out of the
+ * TTL window are skipped — they would only be written to expire immediately.
+ */
+export async function replaceDailyAggregates(ownerId, snapshots = []) {
+  if (!ownerId || !Array.isArray(snapshots) || snapshots.length === 0) return;
+
+  const cutoff = formatAggregateDate(new Date(Date.now() - AGGREGATE_TTL_SECONDS * 1000));
+  const cmds = [];
+
+  for (const snap of snapshots) {
+    const date = snap?.date;
+    if (!date || date < cutoff) continue;
+    if (Number(snap.total || 0) <= 0) continue;
+
+    const key = getDailyAggregateKey(ownerId, date);
+    const fields = ["date", date, "total", String(Number(snap.total || 0))];
+
+    for (const [trigger, count] of Object.entries(snap.triggers || {})) {
+      fields.push(`trigger:${trigger}`, String(Number(count || 0)));
+    }
+    for (const [emotion, count] of Object.entries(snap.emotions || {})) {
+      fields.push(`emotion:${emotion}`, String(Number(count || 0)));
+    }
+    for (const [pair, count] of Object.entries(snap.pairs || {})) {
+      fields.push(`pair:${pair}`, String(Number(count || 0)));
+    }
+    for (const [bucket, count] of Object.entries(snap.timeOfDay || {})) {
+      fields.push(`time:${bucket}`, String(Number(count || 0)));
+    }
+    for (const [tag, count] of Object.entries(snap.tags || {})) {
+      fields.push(`tag:${tag}`, String(Number(count || 0)));
+    }
+    for (const [tag, count] of Object.entries(snap.contributionTags || {})) {
+      fields.push(`contribution:${tag}`, String(Number(count || 0)));
+    }
+    if (Number(snap.continuousCount || 0) > 0) {
+      fields.push("valence_sum", String(Math.round(Number(snap.valenceSum || 0) * 1000)));
+      fields.push("arousal_sum", String(Math.round(Number(snap.arousalSum || 0) * 1000)));
+      fields.push("continuous_count", String(Number(snap.continuousCount || 0)));
+    }
+
+    cmds.push(["DEL", key]);
+    cmds.push(["HSET", key, ...fields]);
+    cmds.push(["EXPIRE", key, String(AGGREGATE_TTL_SECONDS)]);
+  }
+
+  cmds.push(["SADD", getOwnerIndexKey(), ownerId]);
+
+  if (cmds.length) {
+    await pipeline(cmds);
+  }
+}
+
+/**
+ * Pad a sparse, date-keyed snapshot list into a continuous daily array
+ * spanning `days` back from today (oldest → newest). Engines that bin by
+ * array index (progress: every 7 entries = 1 week) need one slot per
+ * calendar day; rebuilt-from-raw aggregates only contain active days.
+ */
+export function padToDailyWindow(snapshots = [], days = 45) {
+  const byDate = new Map((snapshots || []).map((s) => [s.date, s]));
+  const out = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    const date = formatAggregateDate(d);
+    out.push(byDate.get(date) || parseAggregateHash({}, date));
+  }
+  return out;
+}
+
 export async function getWeeklyAggregates(ownerId, days = 7) {
   const dates = [];
 

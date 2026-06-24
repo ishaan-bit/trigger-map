@@ -13,6 +13,7 @@ const editSchema = z.object({
   trigger: z.string().min(1).optional(),
   emotion: z.string().min(1).optional(),
   note: z.string().max(280).optional(),
+  deviceId: z.string().optional(),
 });
 
 export default async function handler(req, res) {
@@ -27,13 +28,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Device-based identity: token optional, fall back to deviceId (body for PUT, query for DELETE).
     const token = getBearerToken(req);
-    if (!token) {
-      return sendError(res, 401, "UNAUTHORIZED", "Authentication required to edit moments");
+    const user = token ? await validateSession(token).catch(() => null) : null;
+    const ownerId = user?.id || req.body?.deviceId || req.query.deviceId;
+    if (!ownerId) {
+      return sendError(res, 400, "MISSING_OWNER", "deviceId is required");
     }
-
-    const user = await validateSession(token);
-    const ownerId = user.id;
 
     if (req.method === "PUT") {
       const allowed = await enforceRateLimit(`edit:${getClientIp(req)}`, 60, 60);

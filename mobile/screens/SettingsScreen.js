@@ -1,4 +1,4 @@
-import { Alert, Animated, Easing, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Animated, Easing, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
@@ -10,7 +10,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { getWebBaseUrl } from "@/services/api";
 import { palette, radius } from "@/utils/theme";
 import { GuideModal } from "@/components/GuideModal";
-import { selection, warning, tap } from "@/utils/haptics";
+import { selection, warning } from "@/utils/haptics";
 import { STAGGER_DELAY } from "@/utils/designSystem";
 
 /** Stagger-in wrapper */
@@ -55,7 +55,7 @@ export function SettingsScreen() {
   const router = useRouter();
   const {
     exportLogs, deleteAllUserData, reminderEnabled, reflectionEnabled, nudgesEnabled,
-    signOut, subscription, toggleReminder, toggleReflection, toggleNudges, user,
+    subscription, toggleReminder, toggleReflection, toggleNudges,
   } = useAppSession();
   const { t, lang, setLang } = useLanguage();
   const baseUrl = getWebBaseUrl();
@@ -64,7 +64,9 @@ export function SettingsScreen() {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Notifications.getPermissionsAsync().then(({ status }) => setPermissionStatus(status));
+    if (Platform.OS !== "web") {
+      Notifications.getPermissionsAsync().then(({ status }) => setPermissionStatus(status));
+    }
     Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
@@ -76,7 +78,7 @@ export function SettingsScreen() {
   const notificationsBlocked = permissionStatus === "denied";
 
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
-  const planLabel = isPremium ? t("settings.premium") : user ? t("settings.free") : t("settings.anonymous");
+  const planLabel = isPremium ? t("settings.premium") : t("settings.free");
 
   const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.05] });
 
@@ -92,47 +94,20 @@ export function SettingsScreen() {
         </View>
       </StaggerIn>
 
-      {/* ── Account ── */}
-      <Section icon="👤" title={t("settings.account")} index={1}>
-        <Row label={t("settings.status")} value={user ? user.email : t("settings.anonymous")} />
-        {!user && (
-          <Text style={styles.hintText}>{t("settings.signInHint")}</Text>
-        )}
-        <PrimaryButton
-          label={user ? t("settings.signOut") : t("settings.signIn")}
-          onPress={user ? async () => {
-            tap();
-            try {
-              await signOut();
-              router.replace("/login");
-            } catch {
-              Alert.alert(t("login.signOutFailed"), t("common.retry"));
-            }
-          } : () => { tap(); router.push("/login"); }}
-          secondary
-        />
-      </Section>
-
       {/* ── Subscription ── */}
-      <Section icon="✦" title={t("settings.subscription")} index={2}>
+      <Section icon="✦" title={t("settings.subscription")} index={1}>
         <View style={styles.planRow}>
           <View style={[styles.planBadge, isPremium && styles.planBadgePremium]}>
             <Text style={[styles.planBadgeText, isPremium && styles.planBadgeTextPremium]}>{planLabel}</Text>
           </View>
         </View>
-        {isPremium ? (
-          <Text style={styles.hintText}>{t("settings.premiumHint")}</Text>
-        ) : user ? (
-          <Text style={styles.hintText}>{t("settings.upgradeHint")}</Text>
-        ) : (
-          <Text style={styles.hintText}>{t("settings.anonPremiumHint")}</Text>
-        )}
+        <Text style={styles.hintText}>{isPremium ? t("settings.premiumHint") : t("settings.upgradeHint")}</Text>
         <PrimaryButton label={t("settings.viewPlans")} onPress={() => router.push("/(tabs)/premium")} secondary />
       </Section>
 
       {/* ── Notifications ── */}
       {/* ── Language ── */}
-      <Section icon="🌐" title={t("settings.language")} index={3}>
+      <Section icon="🌐" title={t("settings.language")} index={2}>
         <Text style={styles.hintText}>{t("settings.languageHint")}</Text>
         <View style={styles.langRow}>
           <Pressable
@@ -153,7 +128,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Notifications ── */}
-      <Section icon="🔔" title={t("settings.notifications")} index={4}>
+      <Section icon="🔔" title={t("settings.notifications")} index={3}>
         {notificationsBlocked ? (
           <View style={styles.permissionNotice}>
             <Text style={styles.permissionNoticeText}>
@@ -213,7 +188,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Data ── */}
-      <Section icon="📂" title={t("settings.data")} index={5}>
+      <Section icon="📂" title={t("settings.data")} index={4}>
         <PrimaryButton
           label={t("settings.exportLogs")}
           onPress={async () => {
@@ -225,9 +200,7 @@ export function SettingsScreen() {
           }}
           secondary
         />
-        {user && (
-          <Text style={styles.hintText}>{t("settings.exportHint")}</Text>
-        )}
+        <Text style={styles.hintText}>{t("settings.exportHint")}</Text>
         <PrimaryButton
           label={t("settings.deleteAll")}
           onPress={() => {
@@ -257,7 +230,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── Privacy ── */}
-      <Section icon="🔒" title={t("settings.privacy")} index={6}>
+      <Section icon="🔒" title={t("settings.privacy")} index={5}>
         <Text style={styles.hintText}>{t("settings.privacyHint")}</Text>
         <PrimaryButton label={t("settings.privacyPolicy")} onPress={() => Linking.openURL(`${baseUrl}/legal/privacy`)} secondary />
         <PrimaryButton label={t("settings.terms")} onPress={() => Linking.openURL(`${baseUrl}/legal/terms`)} secondary />
@@ -265,7 +238,7 @@ export function SettingsScreen() {
       </Section>
 
       {/* ── About ── */}
-      <Section icon="ℹ️" title={t("settings.about")} index={7}>
+      <Section icon="ℹ️" title={t("settings.about")} index={6}>
         <PrimaryButton label={t("settings.userGuide")} onPress={() => setShowGuide(true)} secondary />
         <Text style={styles.aboutName}>{t("settings.aboutName")}</Text>
         <Text style={styles.aboutBody}>

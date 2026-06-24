@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createSession, registerEmailUser } from "@/services/authService.js";
+import { createSession, registerEmailUser, linkDeviceToUser } from "@/services/authService.js";
 import enableCors from "@/lib/cors.js";
 import { migrateMoments } from "@/services/momentService.js";
 import { trackServerEvent } from "@/services/analyticsService.js";
@@ -8,6 +8,9 @@ import { enforceRateLimit } from "@/services/rateLimitService.js";
 import { sendError, sendSuccess } from "@/services/response.js";
 import { sanitizeText, getClientIp } from "@/services/security.js";
 
+// NOTE: Kept FUNCTIONAL (not disabled) so already-installed older app builds (the
+// live app) can still create accounts during rollout. The device-only build does
+// not call this; it can be retired once the old builds age out.
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -41,6 +44,8 @@ export default async function handler(req, res) {
     });
     const token = await createSession(user);
     const migration = await migrateMoments(parsed.data.deviceId, user.id);
+    // Correlate this device with the account (cross-device sync, premium restore, ops)
+    linkDeviceToUser(parsed.data.deviceId, user.id).catch(() => {});
 
     await trackServerEvent("register_completed", user.id, { migrated: migration.migrated });
 
