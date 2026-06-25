@@ -653,5 +653,139 @@
         "noFuelItems": "No items match these filters"
       }
     }
+  },
+  "triggerMap": {
+    "kicker": "Trigger map",
+    "logMoment": "Log a moment",
+    "disclaimer": "Patterns drawn from your own check-ins — a mirror, not a diagnosis.",
+    "headline": {
+      "seeding": {
+        "title": "Still learning your patterns",
+        "body": "A few more moments and your map starts to take shape. There isn't enough yet to read."
+      },
+      "reflection": {
+        "title": "Your first point on the map",
+        "body": "You logged {trigger}, feeling {emotion}. This is where your map begins — every moment you add sharpens it.",
+        "bodyNoLead": "You've logged your first moment. This is where your map begins — every moment you add sharpens it."
+      },
+      "thread": {
+        "title": "A possible thread",
+        "bodyBoth": "{trigger} and feeling {emotion} have each come up more than once. A possible thread — one more check-in could clarify it.",
+        "bodyTrigger": "{trigger} has come up more than once already. A possible thread — one more check-in could clarify it.",
+        "bodyEmotion": "Feeling {emotion} has come up more than once already. A possible thread — one more check-in could clarify it."
+      },
+      "threadForming": {
+        "title": "Two moments, taking shape",
+        "body": "Two different moments so far — no thread yet. One more check-in and an echo may start to appear."
+      },
+      "forming": {
+        "title": "Your map is taking shape",
+        "body": "Early signals are surfacing. A little more and the patterns get clearer."
+      },
+      "formingPending": {
+        "title": "Bringing your map online",
+        "body": "Syncing your latest moments — your full picture is on the way."
+      },
+      "steady": {
+        "title": "Things look steady",
+        "body": "Nothing is pulling hard against you right now. Here's what's been keeping you level."
+      },
+      "pattern": {
+        "title": "A pattern is taking shape",
+        "body": "{trigger} has been linked to feeling {emotion} lately."
+      },
+      "patternNoLead": "A few of your areas are starting to repeat.",
+      "building": {
+        "title": "Something may be building",
+        "body": "A few signals are pointing the same way. Worth a gentle look — not an alarm."
+      },
+      "dormant": {
+        "title": "Welcome back",
+        "body": "Here's what your map still remembers. Log a moment to bring it up to date.",
+        "bodyDays": "It's been {days} days. Here's what your map still remembers — log a moment to refresh it."
+      }
+    },
+    "confidence": {
+      "insufficient": "Not enough yet",
+      "firstReflection": "First reflection",
+      "possibleThread": "Possible thread",
+      "forming": "Still forming",
+      "emerging": "Emerging signal",
+      "observed": "Observed pattern",
+      "established": "Established pattern"
+    },
+    "seed": {
+      "kicker": "Your map so far",
+      "areasLabel": "Areas",
+      "feelingsLabel": "Feelings",
+      "again": "again",
+      "firstPoint": "Your first point",
+      "growCaption": "Each moment you log sharpens your map."
+    },
+    "barometer": {
+      "subtitle": "Is something building?",
+      "notEnough": "Not enough yet to read the pressure. Keep logging and this fills in.",
+      "zones": {
+        "steady": "Steady",
+        "shifting": "Shifting",
+        "building": "Building"
+      },
+      "direction": {
+        "easing": "Easing",
+        "holding": "Holding",
+        "rising": "Rising"
+      },
+      "drivers": {
+        "driftDeclining": "Your recent tone is sitting below your usual",
+        "driftImproving": "Your recent tone is above your usual",
+        "negativeStreak": "{days} tougher days in a row",
+        "positiveStreak": "{days} steadier days in a row",
+        "crashRisk": "Calm on the surface, but the days under it keep dipping",
+        "falseRecovery": "Looks recovered on top — the steadier read underneath hasn't caught up",
+        "masking": "Your logging rhythm looks unsettled even while the mood reads okay",
+        "vacuumDrift": "Your steadier baseline has slipped lower",
+        "lowVolatility": "Your days have been even",
+        "highVolatility": "Your days have swung a fair bit"
+      },
+      "divergence": {
+        "title": "How it looks vs how it's landing",
+        "surface": "On the surface",
+        "ground": "Underneath",
+        "body": "Your days read okay on top, but the steadier read underneath is lower. That gap is worth noticing."
+      }
+    },
+    "connected": {
+      "title": "What's connected",
+      "frictionTitle": "What tends to cost you",
+      "regulatorTitle": "What steadies you",
+      "emerging": "Emerging",
+      "recurring": "Recurring",
+      "times": "{count}×",
+      "empty": "No clear links yet — a few more moments and these start to appear."
+    },
+    "changes": {
+      "title": "What's changed",
+      "triggerUp": "{trigger} came up {delta} more than before",
+      "triggerDown": "{trigger} came up {delta} less than before",
+      "emotionUp": "You felt {emotion} {delta} more than before",
+      "emotionDown": "You felt {emotion} {delta} less than before",
+      "newPattern": "{trigger} → {emotion} is newly showing up"
+    },
+    "watch": {
+      "title": "Worth noticing",
+      "emergingPair": "{trigger} → {emotion} has appeared a few times",
+      "carryOver": "Tension from {source} may be carrying into {target}"
+    },
+    "action": {
+      "title": "One thing to try",
+      "helpful": "Helpful",
+      "notHelpful": "Not helpful",
+      "thanks": "Thanks — noted. This shapes what you see next."
+    },
+    "explore": {
+      "open": "Explore your full map",
+      "close": "Hide the details",
+      "hint": "Patterns, progress and guidance in depth"
+    }
   }
 }

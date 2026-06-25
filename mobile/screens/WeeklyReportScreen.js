@@ -7,7 +7,6 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -30,6 +29,8 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { emotionColor as getFieldColor } from "@/utils/emotionModel";
 import { MOVEMENTS, EQUIPMENT, filterMovements, pickMovements } from "@triggermap/shared";
 import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments, getDietaryTags, matchesDietFilter } from "@triggermap/shared";
+import { deriveSignalState } from "@/utils/triggerSignal";
+import { TriggerMapView } from "@/components/triggermap/TriggerMapView";
 
 /* ── Helpers ── */
 
@@ -2497,6 +2498,10 @@ export function WeeklyReportScreen() {
   const isHistoricalUser = lifetimeMoments >= 3;
   const showTabs = confidence !== "too_early" || isHistoricalUser;
 
+  // Redesigned Trigger Map: one synthesized read of the already-client-available
+  // signal. The legacy tabbed breakdown is preserved below as opt-in "Explore" depth.
+  const signal = useMemo(() => deriveSignalState(report, progress), [report, progress]);
+
   // Device-based app: no sign-in. Inert no-op kept because the (now-dead) tier-aware
   // branches still reference it as a prop; premium gating uses handleUpgrade instead.
   function handleSignIn() {}
@@ -2536,40 +2541,8 @@ export function WeeklyReportScreen() {
 
         <View style={s.content}>
 
-          {/* Hero header */}
-          <View style={s.header}>
-            <Text style={s.kicker}>{t("report.weeklyPatterns")}</Text>
-            <Text style={s.title}>{t("report.yourWeek")}</Text>
-            {report?.totalMoments ? (
-              <Text style={s.subtitle}>
-                {report.totalMoments !== 1
-                  ? t("report.momentsSummaryPlural", { moments: report.totalMoments, days: dq.daysLogged || "-" })
-                  : t("report.momentsSummary", { moments: report.totalMoments, days: dq.daysLogged || "-" })}
-              </Text>
-            ) : null}
-            {(report?.totalMoments || confidence === "stale") ? (
-              <>
-                <View style={s.heroRow}>
-                  <View style={s.heroPill}>
-                    <Text style={s.heroPillEmoji}>{report.topEmotion ? (EMOTION_EMOJIS[report.topEmotion] || "•") : "🌀"}</Text>
-                    <Text style={[s.heroPillLabel, report.topEmotion && { color: EMOTION_COLORS[report.topEmotion] }]}>
-                      {report.topEmotion ? (t("emotions." + report.topEmotion) || report.topEmotion) : t("report.mixedEmotion")}
-                    </Text>
-                  </View>
-                  <View style={s.heroPill}>
-                    <Text style={s.heroPillEmoji}>🎯</Text>
-                    <Text style={[s.heroPillLabel, report.topTrigger && { color: TRIGGER_COLORS[report.topTrigger] || palette.accent }]}>
-                      {report.topTrigger ? triggerDisplay(report.topTrigger, t) : (report.tiedTriggers?.length > 1 ? t("report.areasCount", { count: report.tiedTriggers.length }) : "-")}
-                    </Text>
-                  </View>
-                  <View style={[s.heroPill, s.confidencePill]}>
-                    <Text style={s.heroPillLabel}>{getConfidenceLabel(confidence, t)}</Text>
-                  </View>
-                </View>
-                {/* Per-account share link removed — the app is device-based. */}
-              </>
-            ) : null}
-          </View>
+          {/* Redesigned Trigger Map leads with its own meaning-first headline,
+              so the legacy "Your Week" pill header is intentionally removed. */}
 
           {error ? (
             <View style={s.stateCard}>
@@ -2579,25 +2552,9 @@ export function WeeklyReportScreen() {
             </View>
           ) : null}
 
-          {report && !error && confidence === "too_early" && !isHistoricalUser ? (
-            <View style={s.starterCard}>
-              <Text style={s.starterEmoji}>🌱</Text>
-              <Text style={s.starterTitle}>{isSignedIn ? t("report.starterSignedIn") : t("report.starterAnon")}</Text>
-              <Text style={s.starterBody}>
-                {isSignedIn ? t("report.starterBodySignedIn") : t("report.starterBodyAnon")}
-              </Text>
-              {/* Anonymous-first: logging is the value, so always lead with it
-                  (no sign-in-first gate — the rule-based insight is now free). */}
-              <PrimaryButton label={t("report.logMoment")} onPress={() => router.push("/(tabs)/log")} />
-            </View>
-          ) : null}
-
+          {/* FTUE guided tooltips — kept at the top of the new experience */}
           {report && !error && showTabs ? (
             <>
-              {/* Tab bar */}
-              <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
-
-              {/* FTUE guided tooltips */}
               {showInsightsGuide ? (
                 <GuidedTooltip
                   text={t("ftue.insightsExplain")}
@@ -2629,64 +2586,53 @@ export function WeeklyReportScreen() {
                   duration={7000}
                 />
               ) : null}
-
-              {/* Light week banner for historical users with sparse current data */}
-              {confidence === "too_early" && isHistoricalUser ? (
-                <View style={s.lightWeekBanner}>
-                  <Text style={s.lightWeekText}>
-                    {t("report.lightWeek") || "Quiet week so far \u2014 showing your recent patterns and past insights."}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Silence banner for returning users who haven't logged in 7+ days */}
-              {confidence === "stale" && report?.silenceWindow ? (
-                <FadeInView>
-                  <View style={s.silenceBanner}>
-                    <Pulse style={s.silenceBannerGlow} />
-                    <View style={s.silenceBannerRow}>
-                      <View style={s.silenceBannerDays}>
-                        <Text style={s.silenceBannerDaysNum}>{report.silenceWindow.daysSinceLastLog ?? "•"}</Text>
-                        <Text style={s.silenceBannerDaysLabel}>{t("report.silenceDaysLabel") || "days"}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.silenceBannerTitle}>{t("report.silenceBanner") || "Welcome back"}</Text>
-                        <Text style={s.silenceBannerBody}>
-                          {(t("report.silenceBannerBody") || "It's been {days} days since your last check-in. Here's what we still see from your previous activity.").replace("{days}", report.silenceWindow.daysSinceLastLog || "a few")}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </FadeInView>
-              ) : null}
-
-              {/* Tab content — 3 collapsed tabs */}
-              {activeTab === "week" ? (
-                <>
-                  <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
-                  <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
-                </>
-              ) : activeTab === "progress" ? (
-                <ProgressTab
-                  progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
-                  handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
-                />
-              ) : (
-                <>
-                  <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
-                  <PremiumTab
-                    report={report} dq={dq} confidence={confidence}
-                    isSignedIn={isSignedIn} isPremium={isPremium}
-                    hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
-                    handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                    purchasing={purchasing} subscription={subscription} t={t} lang={lang}
-                    modes={modes} onModeFeedback={handleModeFeedback}
-                    dominantEmotion={dominantEmotion}
-                    onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
-                  />
-                </>
-              )}
             </>
+          ) : null}
+
+          {/* ── Redesigned Trigger Map: meaning-first narrative spine ──
+              The legacy 3-tab breakdown is preserved as opt-in "Explore" depth. */}
+          {report && !error ? (
+            <TriggerMapView
+              signal={signal}
+              t={t}
+              lang={lang}
+              onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+              onActionFeedback={handleActionFeedback}
+              renderExplore={
+                showTabs
+                  ? () => (
+                      <>
+                        <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+                        {activeTab === "week" ? (
+                          <>
+                            <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
+                            <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
+                          </>
+                        ) : activeTab === "progress" ? (
+                          <ProgressTab
+                            progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
+                            handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
+                          />
+                        ) : (
+                          <>
+                            <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
+                            <PremiumTab
+                              report={report} dq={dq} confidence={confidence}
+                              isSignedIn={isSignedIn} isPremium={isPremium}
+                              hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
+                              handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
+                              purchasing={purchasing} subscription={subscription} t={t} lang={lang}
+                              modes={modes} onModeFeedback={handleModeFeedback}
+                              dominantEmotion={dominantEmotion}
+                              onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                            />
+                          </>
+                        )}
+                      </>
+                    )
+                  : null
+              }
+            />
           ) : null}
 
           {!report && !loading && !error ? (
@@ -2709,46 +2655,6 @@ const s = StyleSheet.create({
   canvas: { position: "relative", minHeight: 1 },
   bgImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined, opacity: 0.05 },
   content: { gap: 14 },
-
-  /* Header / hero */
-  header: { gap: 6, marginTop: 10 },
-  kicker: { color: palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
-  title: { color: palette.text, fontSize: 26, fontWeight: "700" },
-  subtitle: { color: palette.textSecondary, fontSize: 13, marginTop: 2 },
-  heroRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  heroPill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: radius.pill, backgroundColor: palette.glass,
-    borderWidth: 1, borderColor: palette.glassBorder,
-  },
-  confidencePill: { backgroundColor: palette.accentSoft, borderColor: palette.accentMedium },
-  shareButtonWrap: {
-    alignSelf: "stretch", marginTop: 14,
-    borderRadius: 16,
-    shadowColor: "#5fd3e0",
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  shareButton: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderRadius: 16,
-  },
-  shareButtonIconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    alignItems: "center", justifyContent: "center",
-  },
-  shareButtonIcon: { fontSize: 18 },
-  shareButtonTextWrap: { flex: 1 },
-  shareButtonText: { color: "#0b1220", fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
-  shareButtonSubtext: { color: "rgba(11,18,32,0.72)", fontSize: 11.5, fontWeight: "600", marginTop: 1 },
-  shareButtonArrow: { color: "#0b1220", fontSize: 26, fontWeight: "300", marginLeft: 4, marginTop: -4 },
-  heroPillEmoji: { fontSize: 14 },
-  heroPillLabel: { color: palette.text, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
 
   /* Tab bar */
   tabBar: {
