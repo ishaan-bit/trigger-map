@@ -2,6 +2,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from "react-native";
 import { useAppSession } from "@/hooks/useAppSession";
 import { palette } from "@/utils/theme";
+import { coordinatesToLegacy } from "@triggermap/shared";
+
+/** Legacy emotion key with a coordinate fallback — new-model moments store only
+ *  valence/arousal, so reading `m.emotion` directly leaves the whole atmosphere
+ *  stuck on neutral. */
+function momentEmotion(m) {
+  if (m.emotion) return m.emotion;
+  if (typeof m.valence === "number" && typeof m.arousal === "number") {
+    return coordinatesToLegacy(m.valence, m.arousal);
+  }
+  return "neutral";
+}
 
 const EMOTION_PALETTE = {
   calm:      { primary: palette.success,  glow: "rgba(94, 230, 160, 0.08)",  glowDeep: "rgba(94, 230, 160, 0.05)" },
@@ -40,7 +52,7 @@ function computeDominantEmotion(moments) {
   for (const m of recent) {
     const ageH = (now - new Date(m.timestamp).getTime()) / 3_600_000;
     const w = ageH < 2 ? 1.5 : ageH < 6 ? 1.2 : 1.0;
-    weightedSum += (SCORE[m.emotion] || 3) * w;
+    weightedSum += (SCORE[momentEmotion(m)] || 3) * w;
     totalWeight += w;
   }
   const avg = weightedSum / totalWeight;
@@ -76,7 +88,7 @@ function computeTrend(moments) {
     return age >= 3 * day && age < 7 * day;
   });
   if (recent.length < 2 || older.length < 2) return null;
-  const avg = (arr) => arr.reduce((s, m) => s + (SCORE[m.emotion] || 3), 0) / arr.length;
+  const avg = (arr) => arr.reduce((s, m) => s + (SCORE[momentEmotion(m)] || 3), 0) / arr.length;
   const diff = avg(recent) - avg(older);
   if (diff > 0.5) return "improving";
   if (diff < -0.5) return "declining";

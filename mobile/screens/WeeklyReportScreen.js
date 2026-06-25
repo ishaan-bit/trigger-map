@@ -2537,7 +2537,7 @@ export function WeeklyReportScreen() {
       edges={["top", "left", "right", "bottom"]}
     >
       <View style={s.canvas}>
-        <Image source={require("@/assets/report-bg.png")} style={s.bgImage} resizeMode="cover" accessible={false} />
+        {/* Background handled by the living AtmosphericField in ScreenShell. */}
 
         <View style={s.content}>
 
@@ -2653,7 +2653,6 @@ export function WeeklyReportScreen() {
 
 const s = StyleSheet.create({
   canvas: { position: "relative", minHeight: 1 },
-  bgImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined, opacity: 0.05 },
   content: { gap: 14 },
 
   /* Tab bar */

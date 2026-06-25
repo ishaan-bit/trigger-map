@@ -1,8 +1,11 @@
 import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { palette, radius } from "@/utils/theme";
 import { tap } from "@/utils/haptics";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { TRIGGER_COLORS } from "@/utils/designSystem";
 
 const TRIGGER_ICONS = {
   work: "🏢",
@@ -18,43 +21,34 @@ const TRIGGER_ICONS = {
   other: "📌",
 };
 
-const TRIGGER_TINTS = {
-  work: { bg: "rgba(167, 139, 250, 0.45)", glow: "rgba(167, 139, 250, 0.55)" },
-  social: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
-  money: { bg: "rgba(255, 179, 71, 0.45)", glow: "rgba(255, 179, 71, 0.55)" },
-  family: { bg: "rgba(94, 230, 160, 0.45)", glow: "rgba(94, 230, 160, 0.55)" },
-  exercise: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
-  health: { bg: "rgba(255, 107, 122, 0.45)", glow: "rgba(255, 107, 122, 0.55)" },
-  sleep: { bg: "rgba(167, 139, 250, 0.45)", glow: "rgba(167, 139, 250, 0.55)" },
-  partner: { bg: "rgba(255, 179, 71, 0.45)", glow: "rgba(255, 179, 71, 0.55)" },
-  alone: { bg: "rgba(94, 230, 160, 0.45)", glow: "rgba(94, 230, 160, 0.55)" },
-  travel: { bg: "rgba(86, 208, 224, 0.45)", glow: "rgba(86, 208, 224, 0.55)" },
-  other: { bg: "rgba(148, 180, 224, 0.40)", glow: "rgba(148, 180, 224, 0.50)" },
-};
+/* Soft luminous halo behind the icon, in the trigger's colour. */
+function IconGlow({ color, id }) {
+  return (
+    <Svg width={86} height={86} style={styles.glow} pointerEvents="none">
+      <Defs>
+        <RadialGradient id={id} cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor={color} stopOpacity="0.55" />
+          <Stop offset="0.6" stopColor={color} stopOpacity="0.18" />
+          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={43} cy={43} r={43} fill={`url(#${id})`} />
+    </Svg>
+  );
+}
 
 export function TriggerTile({ label, onPress }) {
-  const tint = TRIGGER_TINTS[label] || TRIGGER_TINTS.other;
+  const color = TRIGGER_COLORS[label] || palette.accent;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { t } = useLanguage();
   const displayLabel = t("triggers." + label) || label;
 
   function handlePressIn() {
     tap();
-    Animated.spring(scaleAnim, {
-      toValue: 0.92,
-      friction: 5,
-      tension: 120,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 0.93, friction: 5, tension: 140, useNativeDriver: true }).start();
   }
-
   function handlePressOut() {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }).start();
   }
 
   return (
@@ -65,10 +59,24 @@ export function TriggerTile({ label, onPress }) {
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.tile, { backgroundColor: tint.bg, borderColor: tint.glow }]}
+        style={[styles.tile, { borderColor: color + "59", shadowColor: color }]}
       >
-        <View style={[styles.iconWrap, { shadowColor: tint.glow }]}>
-          <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
+        {/* Depth fill: trigger colour glass fading into deep space. */}
+        <LinearGradient
+          colors={[color + "2e", color + "12", "rgba(9, 14, 26, 0.65)"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View style={[styles.topHighlight, { backgroundColor: color + "66" }]} pointerEvents="none" />
+
+        <View style={styles.iconArea}>
+          <IconGlow color={color} id={`tile-${label}`} />
+          <View style={[styles.iconDisc, { borderColor: color + "73", backgroundColor: color + "26" }]}>
+            <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
+          </View>
         </View>
         <Text style={styles.label}>{displayLabel}</Text>
       </Pressable>
@@ -77,42 +85,43 @@ export function TriggerTile({ label, onPress }) {
 }
 
 const styles = StyleSheet.create({
-  tileWrap: {
-    width: "100%",
-  },
+  tileWrap: { width: "100%" },
   tile: {
-    aspectRatio: 1.1,
+    aspectRatio: 1.05,
     borderRadius: radius.lg,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: palette.glassBorder,
-    gap: 6,
-    shadowColor: "rgba(86, 208, 224, 0.15)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    borderWidth: 1,
+    overflow: "hidden",
+    backgroundColor: "rgba(11, 17, 30, 0.5)",
+    gap: 9,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.10)",
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: radius.lg,
+    right: radius.lg,
+    height: 1,
+  },
+  iconArea: { width: 52, height: 52, alignItems: "center", justifyContent: "center" },
+  glow: { position: "absolute", top: -17, left: -17 },
+  iconDisc: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  icon: {
-    fontSize: 22,
-  },
+  icon: { fontSize: 24 },
   label: {
-    color: "#ffffff",
+    color: "#f3f7fc",
     fontSize: 13,
     fontWeight: "700",
     textTransform: "capitalize",

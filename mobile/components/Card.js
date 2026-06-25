@@ -28,16 +28,21 @@ export function Card({
         contentStyle,
       ]}
     >
+      {/* Glass sheen — light catches the top of the surface and falls off. */}
       <LinearGradient
         colors={[
-          accent ? accent + "14" : "rgba(255,255,255,0.05)",
-          "rgba(255,255,255,0.01)",
+          accent ? accent + "1f" : "rgba(255,255,255,0.07)",
+          "rgba(255,255,255,0.015)",
+          "rgba(0,0,0,0)",
         ]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        locations={[0, 0.45, 1]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      {/* Hairline highlight along the very top edge. */}
+      <View style={[styles.topHighlight, accent ? { backgroundColor: accent + "55" } : null]} pointerEvents="none" />
       {accent ? <View style={[styles.edge, { backgroundColor: accent }]} /> : null}
       {children}
     </View>
@@ -71,5 +76,13 @@ const styles = StyleSheet.create({
     width: 3,
     borderTopLeftRadius: radius.lg,
     borderBottomLeftRadius: radius.lg,
+  },
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: radius.lg,
+    right: radius.lg,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
 });

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
-import { EMOTION_STYLES } from "@/utils/designSystem";
+import { AtmosphericField } from "@/components/AtmosphericField";
 
 const LOADING_TIMEOUT_MS = 3000;
 
@@ -21,25 +21,13 @@ export function ScreenShell({
 }) {
   const [showTimeout, setShowTimeout] = useState(false);
   const insets = useSafeAreaInsets();
-  const { glowColor, glowDeepColor, dominantEmotion } = useEmotionalState();
+  const { dominantEmotion, momentCount } = useEmotionalState();
   const { t } = useLanguage();
-  const breathAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathAnim, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(breathAnim, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-      ])
-    ).start();
-  }, [breathAnim]);
-
-  const breathScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-  const breathOpacity = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.5] });
-
-  // Living gradient — tinted by emotional state
-  const emotionTint = EMOTION_STYLES[dominantEmotion]?.glow || "rgba(86, 208, 224, 0.10)";
-  const gradientColors = ["#080e1a", emotionTint, "#040710"];
+  // Deep space base; the living aurora layers its emotional colour on top.
+  const gradientColors = ["#070c18", "#05080f", "#03050b"];
+  // Subtler atmosphere before there's emotional history to read.
+  const fieldIntensity = momentCount > 0 ? 1 : 0.6;
 
   useEffect(() => {
     if (!loading) {
@@ -77,10 +65,8 @@ export function ScreenShell({
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
-      {/* Ambient glow orbs — tinted by emotional state, breathing */}
-      <Animated.View style={[styles.glowTopRight, { backgroundColor: glowColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
-      <Animated.View style={[styles.glowMidLeft, { backgroundColor: glowDeepColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
-      <Animated.View style={[styles.glowBottomCenter, { backgroundColor: glowDeepColor, transform: [{ scale: breathScale }], opacity: breathOpacity }]} />
+      {/* Living emotional atmosphere — drifting aurora tinted by current state */}
+      <AtmosphericField emotion={dominantEmotion || "neutral"} intensity={fieldIntensity} />
       <SafeAreaView style={styles.safeArea} edges={edges}>
         {scroll ? (
           <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(48, insets.bottom + 16) }]} showsVerticalScrollIndicator={false}>
@@ -97,33 +83,6 @@ export function ScreenShell({
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
-  },
-  glowTopRight: {
-    position: "absolute",
-    top: -100,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: "rgba(86, 208, 224, 0.04)",
-  },
-  glowMidLeft: {
-    position: "absolute",
-    top: "35%",
-    left: -120,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(167, 139, 250, 0.03)",
-  },
-  glowBottomCenter: {
-    position: "absolute",
-    bottom: -140,
-    alignSelf: "center",
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: "rgba(46, 147, 168, 0.04)",
   },
   safeArea: {
     flex: 1,
