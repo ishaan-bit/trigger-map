@@ -2,6 +2,17 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { palette, radius } from "@/utils/theme";
+import { coordinatesToLegacy } from "@triggermap/shared";
+
+/** Legacy emotion key with a coordinate fallback (new-model moments may store
+ *  only valence/arousal). Keeps the weather from defaulting everything to neutral. */
+function momentEmotion(m) {
+  if (m.emotion) return m.emotion;
+  if (typeof m.valence === "number" && typeof m.arousal === "number") {
+    return coordinatesToLegacy(m.valence, m.arousal);
+  }
+  return "neutral";
+}
 
 const WEATHER_MAP = {
   clear:      { icon: "☀️", key: "clear",    color: palette.success },
@@ -44,10 +55,11 @@ function computeWeather(moments) {
   let weightedSum = 0;
   const counts = {};
   for (const m of recent) {
+    const emo = momentEmotion(m);
     const w = recencyWeight(now - new Date(m.timestamp).getTime());
-    weightedSum += (SCORE[m.emotion] || 3) * w;
+    weightedSum += (SCORE[emo] || 3) * w;
     totalWeight += w;
-    counts[m.emotion] = (counts[m.emotion] || 0) + 1;
+    counts[emo] = (counts[emo] || 0) + 1;
   }
   const avg = weightedSum / totalWeight; // 1-5 scale
 

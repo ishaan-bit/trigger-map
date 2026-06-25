@@ -1,4 +1,23 @@
+import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
+
 const MIN_MOMENTS = 5;
+
+/** Resolve a moment's legacy emotion key, falling back to coordinates so a
+ *  missing `emotion` never surfaces as "undefined" in copy. */
+function momentEmotion(m) {
+  if (m.emotion) return m.emotion;
+  if (typeof m.valence === "number" && typeof m.arousal === "number") {
+    return coordinatesToLegacy(m.valence, m.arousal);
+  }
+  return "neutral";
+}
+
+/** Translate an emotion key, guarding against the t() missing-key passthrough. */
+function emotionDisplay(key, t) {
+  if (!t) return key;
+  const v = t("emotions." + key);
+  return v && v !== "emotions." + key ? v : key;
+}
 
 /**
  * Generate client-side micro-insight strings from a list of moments.
@@ -17,10 +36,11 @@ export function generateMicroInsights(moments, t) {
   const emotionCounts = {};
 
   for (const m of moments) {
+    const emo = momentEmotion(m);
     triggerCounts[m.trigger] = (triggerCounts[m.trigger] || 0) + 1;
-    emotionCounts[m.emotion] = (emotionCounts[m.emotion] || 0) + 1;
+    emotionCounts[emo] = (emotionCounts[emo] || 0) + 1;
 
-    const pairKey = `${m.trigger}→${m.emotion}`;
+    const pairKey = `${m.trigger}→${emo}`;
     triggerEmotionCounts[pairKey] = (triggerEmotionCounts[pairKey] || 0) + 1;
   }
 
@@ -37,7 +57,7 @@ export function generateMicroInsights(moments, t) {
   if (topPair && topPairCount >= 2) {
     const [trigger, emotion] = topPair.split("→");
     const triggerName = t ? (t("triggers." + trigger) || trigger) : trigger;
-    const emotionName = t ? (t("emotions." + emotion) || emotion) : emotion;
+    const emotionName = emotionDisplay(emotion, t);
     if (t) {
       insights.push(t("microInsight.triggerEmotion", { trigger: triggerName, emotion: emotionName, count: topPairCount }));
     } else {
@@ -51,7 +71,7 @@ export function generateMicroInsights(moments, t) {
     const [topEmotion, topCount] = sortedEmotions[0];
     const pct = Math.round((topCount / moments.length) * 100);
     if (pct >= 40) {
-      const emotionName = t ? (t("emotions." + topEmotion) || topEmotion) : topEmotion;
+      const emotionName = emotionDisplay(topEmotion, t);
       if (t) {
         insights.push(t("microInsight.dominantEmotion", { emotion: emotionName, pct }));
       } else {

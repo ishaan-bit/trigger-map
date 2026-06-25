@@ -16,7 +16,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { getRelativeDayLabel } from "@/utils/date";
 import { generateMicroInsights } from "@/utils/microInsights";
 import { palette, radius } from "@/utils/theme";
-import { legacyToCoordinates } from "@triggermap/shared/constants/emotions";
+import { legacyToCoordinates, coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 import { emotionColor as getEmotionColor } from "@/utils/emotionModel";
 import { tap } from "@/utils/haptics";
 import { FadeInView, PressableScale, CountUpText } from "@/components/motion";
@@ -295,6 +295,16 @@ const ts = StyleSheet.create({
   },
 });
 
+/** Resolve a moment's legacy emotion, falling back to coordinates so distinct
+ *  feelings (stored only as valence/arousal) don't merge as `undefined === undefined`. */
+function resolveEmotion(m) {
+  if (m.emotion) return m.emotion;
+  if (typeof m.valence === "number" && typeof m.arousal === "number") {
+    return coordinatesToLegacy(m.valence, m.arousal);
+  }
+  return "neutral";
+}
+
 /**
  * Merge duplicate entries: if same trigger + emotion within 30 min → group into one entry with count
  */
@@ -306,7 +316,7 @@ function mergeSimilarMoments(moments) {
     if (
       last &&
       last.trigger === m.trigger &&
-      last.emotion === m.emotion &&
+      resolveEmotion(last) === resolveEmotion(m) &&
       Math.abs(new Date(last.timestamp).getTime() - new Date(m.timestamp).getTime()) < MERGE_WINDOW_MS
     ) {
       if (!last._grouped) {

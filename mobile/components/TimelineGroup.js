@@ -3,6 +3,7 @@ import { palette, radius } from "@/utils/theme";
 import { warning } from "@/utils/haptics";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { emotionColor as getEmotionColorFromCoords } from "@/utils/emotionModel";
+import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -24,8 +25,14 @@ const EMOTION_ICONS = {
 export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   const { t, lang } = useLanguage();
   const triggerLabel = t("triggers." + moment.trigger) || moment.trigger;
-  const displayEmotion = moment.derivedLabel || moment.emotion;
-  const emotionLabel = t("emotions." + displayEmotion) || displayEmotion;
+  // New-model moments store valence/arousal and may carry no legacy `emotion`
+  // string — resolve a legacy key from coordinates so the label never renders
+  // as "Undefined" (mirrors the fallback in localStore.buildLocalReport).
+  const hasCoords = typeof moment.valence === "number" && typeof moment.arousal === "number";
+  const legacyEmotion = moment.emotion || (hasCoords ? coordinatesToLegacy(moment.valence, moment.arousal) : "neutral");
+  const displayEmotion = moment.derivedLabel || legacyEmotion;
+  const translated = t("emotions." + displayEmotion);
+  const emotionLabel = translated && translated !== "emotions." + displayEmotion ? translated : displayEmotion;
   const locale = lang === "hi" ? "hi-IN" : "en-IN";
   const contributionTags = moment.contributionTags?.length ? moment.contributionTags : (moment.tags || []);
   const visibleTags = contributionTags.slice(0, 3);
@@ -39,10 +46,9 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
     ]);
   }
 
-  const hasCoords = typeof moment.valence === "number" && typeof moment.arousal === "number";
   const emotionColor = hasCoords
     ? getEmotionColorFromCoords(moment.valence, moment.arousal)
-    : (EMOTION_COLORS[moment.emotion] || palette.muted);
+    : (EMOTION_COLORS[legacyEmotion] || palette.muted);
 
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: emotionColor }]}>
@@ -54,7 +60,7 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
           <View style={styles.titleRow}>
             <Text style={styles.trigger}>{triggerLabel}</Text>
             <View style={[styles.emotionBadge, { backgroundColor: `${emotionColor}28` }]}>
-              <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || "•"}</Text>
+              <Text style={styles.emotionIcon}>{EMOTION_ICONS[moment.emotion] || EMOTION_ICONS[legacyEmotion] || "•"}</Text>
               <Text style={[styles.emotionLabel, { color: emotionColor }]}>{emotionLabel}</Text>
             </View>
             {groupCount > 1 && (

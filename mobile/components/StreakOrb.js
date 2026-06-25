@@ -45,7 +45,9 @@ export function StreakOrb({ moments }) {
     );
   }
 
-  const orbOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.6] });
+  // Lower static floor so the un-pulsing spark tier (streak 1) reads as a soft
+  // glow rather than a flat grey disc clipped in the corner.
+  const orbOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.5] });
   const orbScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const tier = streak >= 14 ? "legendary" : streak >= 7 ? "strong" : streak >= 3 ? "building" : "spark";
   const tierMeta = TIER_MAP[tier];

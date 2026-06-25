@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import { palette, radius } from "@/utils/theme";
 import { EMOTION_STYLES } from "@/utils/designSystem";
 import { emotionColor as getFieldColor } from "@/utils/emotionModel";
-import { legacyToCoordinates } from "@triggermap/shared";
+import { legacyToCoordinates, coordinatesToLegacy } from "@triggermap/shared";
 import { useLanguage } from "@/i18n/LanguageContext";
 
 // ── Animation configs per emotion feel ──
@@ -53,7 +53,9 @@ export function EmotionGarden({ moments, highlightEmotion }) {
     const groups = {};
     let vSum = 0, aSum = 0, n = 0;
     for (const m of todayMoments) {
-      const emo = m.emotion || "neutral";
+      // Resolve from coordinates when no legacy emotion is stored, so distinct
+      // feelings don't all collapse into a single "Neutral" bloom.
+      const emo = m.emotion || (typeof m.valence === "number" && typeof m.arousal === "number" ? coordinatesToLegacy(m.valence, m.arousal) : "neutral");
       if (!groups[emo]) groups[emo] = { emotion: emo, count: 0, triggers: {}, hours: [], valence: 0, arousal: 0 };
       groups[emo].count++;
       if (m.trigger) groups[emo].triggers[m.trigger] = (groups[emo].triggers[m.trigger] || 0) + 1;
