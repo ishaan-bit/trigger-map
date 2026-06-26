@@ -8,6 +8,7 @@ import { getStoredWeeklyInsight, getStoredLlmInsight } from "@/services/reportSt
 import { getWeeklyAggregates } from "@/services/aggregationService.js";
 import { generateWeeklyReport } from "@/services/patternEngine.js";
 import { getTimeline } from "@/services/momentService.js";
+import { recoverDeviceIfNeeded } from "@/services/dataMigration.js";
 import { captureServerError } from "@/services/monitoringService.js";
 
 const SHARE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -22,21 +23,27 @@ export default async function handler(req, res) {
   try {
     if (req.method === "POST") {
       const token = getBearerToken(req);
-      if (!token) return sendError(res, 401, "AUTH_REQUIRED", "Sign in to share your snapshot");
+      const user = token ? await validateSession(token).catch(() => null) : null;
+      // Device-ID identity: an unauthenticated owner shares by deviceId (mirrors
+      // weeklyReport.js). The Bearer-token path still works for any legacy session.
+      const ownerId = user?.id || req.body?.deviceId || req.query?.deviceId;
+      if (!ownerId) return sendError(res, 400, "MISSING_OWNER", "deviceId is required when unauthenticated");
 
-      const user = await validateSession(token).catch(() => null);
-      if (!user) return sendError(res, 401, "AUTH_REQUIRED", "Invalid session");
+      // Mirror weeklyReport.js: self-heal a device whose history is still stranded
+      // under a signed-in account before reading aggregates, so an anonymous owner
+      // gets the same populated snapshot the in-app report shows (idempotent).
+      if (!user) await recoverDeviceIfNeeded(ownerId).catch(() => null);
 
       // Build the full report on-demand from live aggregates — mirrors weeklyReport.js.
       // The cached `weekly_report:<id>` payload only stores the AI summary fields,
       // not the structured stats (totalMoments, topEmotion, dataQuality, etc.) that
       // the share page renders, so we cannot read it directly.
       const [aggregates, allAggregates, allMoments, storedSummary, llmInsight] = await Promise.all([
-        getWeeklyAggregates(user.id),
-        getWeeklyAggregates(user.id, 45),
-        getTimeline(user.id),
-        getStoredWeeklyInsight(user.id),
-        getStoredLlmInsight(user.id),
+        getWeeklyAggregates(ownerId),
+        getWeeklyAggregates(ownerId, 45),
+        getTimeline(ownerId),
+        getStoredWeeklyInsight(ownerId),
+        getStoredLlmInsight(ownerId),
       ]);
 
       // Match the silence-window sliding logic used by weeklyReport.js so
@@ -113,6 +120,8 @@ export default async function handler(req, res) {
 }
 
 function buildSnapshot(report, user, { storedSummary, llmInsight } = {}) {
+  // `user` is null for device-ID (anonymous) owners — the snapshot degrades
+  // gracefully (no first name), and the public share page already handles that.
   const dq = report.dataQuality || {};
   const bm = report.baselineMetrics || {};
   const insight = report.aiInsight || {};
@@ -140,7 +149,7 @@ function buildSnapshot(report, user, { storedSummary, llmInsight } = {}) {
 
   return {
     sharedAt: new Date().toISOString(),
-    firstName: user.firstName || (user.name ? String(user.name).split(/\s+/)[0] : null),
+    firstName: user?.firstName || (user?.name ? String(user.name).split(/\s+/)[0] : null),
     weekLabel: report.weekLabel || null,
     totalMoments: report.totalMoments || 0,
     daysLogged: dq.daysLogged || 0,

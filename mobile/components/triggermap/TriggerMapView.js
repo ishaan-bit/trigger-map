@@ -80,6 +80,70 @@ function ActionCard({ action, t, onFeedback, response }) {
   );
 }
 
+/* ── Rotating "one thing to try" ──
+   The Read surface now owns ALL the week's actions (they were removed from the
+   For You tab). It shows one at a time and rotates through them — a fresh one
+   per day, plus a "try another" tap — so the single most-relevant nudge stays
+   alive instead of going stale. Feedback is keyed per action and shared, so a
+   tap sticks regardless of which one is on screen. */
+function RotatingAction({ actions, t, onFeedback, getResponse }) {
+  const [idx, setIdx] = useState(() => {
+    // Deterministic daily rotation so it changes day to day, not every render.
+    const day = Math.floor(Date.now() / 86400000);
+    return actions.length ? day % actions.length : 0;
+  });
+  if (!actions.length) return null;
+  const action = actions[idx % actions.length];
+  const response = getResponse ? getResponse(action.id) : null;
+  const cycle = () => { tap(); setIdx((i) => (i + 1) % actions.length); };
+  return (
+    <View style={styles.section}>
+      <View style={styles.actionHeadRow}>
+        <Text style={[styles.sectionLabel, { color: palette.accent, marginBottom: 0 }]}>{t("triggerMap.action.title")}</Text>
+        {actions.length > 1 ? (
+          <PressableScale onPress={cycle} style={styles.actionRotate} accessibilityRole="button" accessibilityLabel={t("triggerMap.action.another")}>
+            <Text style={styles.actionRotateText}>↻ {t("triggerMap.action.another")}</Text>
+          </PressableScale>
+        ) : null}
+      </View>
+      {/* key on the action id so rotating remounts the card (re-runs entrance +
+          re-seeds its feedback state from the now-visible action's response). */}
+      <ActionCard key={action.id} action={action} t={t} onFeedback={onFeedback} response={response} />
+    </View>
+  );
+}
+
+/* ── Early-warning signal — gentle, non-diagnostic "worth noticing" ── */
+const EARLY_LEAN_COLOR = { depression: palette.accent, anxiety: palette.warning, both: palette.purple };
+
+function EarlySignals({ data, t }) {
+  if (!data?.signals?.length) return null;
+  return (
+    <View style={styles.section}>
+      <SectionLabel color={palette.purple}>{t("triggerMap.early.title")}</SectionLabel>
+      <Text style={styles.earlyIntro}>{t("triggerMap.early.intro")}</Text>
+      <View style={styles.earlyList}>
+        {data.signals.map((sig, i) => {
+          const color = EARLY_LEAN_COLOR[sig.lean] || palette.purple;
+          const vars = { ...sig.vars };
+          if (vars.domain) {
+            const label = t("triggers." + vars.domain);
+            vars.domain = label && label !== "triggers." + vars.domain ? label : vars.domain;
+          }
+          return (
+            <FadeInView key={sig.key} delay={i * 90} style={[styles.earlyCard, { borderLeftColor: color }]}>
+              <Pulse style={[styles.earlyGlow, { backgroundColor: color + "1c" }]} />
+              <Text style={[styles.earlyCardTitle, { color }]}>{t(sig.titleKey, vars)}</Text>
+              <Text style={styles.earlyCardBody}>{t(sig.bodyKey, vars)}</Text>
+            </FadeInView>
+          );
+        })}
+      </View>
+      {data.careNote ? <Text style={styles.earlyCare}>{t("triggerMap.early.care")}</Text> : null}
+    </View>
+  );
+}
+
 function seedLabels(t) {
   return {
     kicker: t("triggerMap.seed.kicker"),
@@ -150,7 +214,7 @@ function StarterState({ signal, t, onLogMoment }) {
   );
 }
 
-export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback, actionResponse }) {
+export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback, getActionResponse, earlySignals }) {
   if (!signal) return null;
 
   // First & second log get a real, personal map — not a half-empty shell.
@@ -223,12 +287,14 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback,
         </View>
       ) : null}
 
-      {signal.action ? (
-        <View style={styles.section}>
-          <SectionLabel color={palette.accent}>{t("triggerMap.action.title")}</SectionLabel>
-          <ActionCard action={signal.action} t={t} onFeedback={onActionFeedback} response={actionResponse} />
-        </View>
-      ) : null}
+      <EarlySignals data={earlySignals} t={t} />
+
+      <RotatingAction
+        actions={signal.actions && signal.actions.length ? signal.actions : (signal.action ? [signal.action] : [])}
+        t={t}
+        onFeedback={onActionFeedback}
+        getResponse={getActionResponse}
+      />
 
       <Text style={styles.disclaimer}>{t("triggerMap.disclaimer")}</Text>
     </View>
@@ -275,7 +341,28 @@ const styles = StyleSheet.create({
   listDot: { color: palette.muted, fontSize: 15, lineHeight: 20, fontWeight: "800" },
   listText: { flex: 1, color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
 
+  /* Early-warning signal */
+  earlyIntro: { color: palette.muted, fontSize: 12.5, lineHeight: 18, marginBottom: spacing.sm },
+  earlyList: { gap: 8 },
+  earlyCard: {
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: palette.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+    borderLeftWidth: 3,
+    padding: spacing.md,
+  },
+  earlyGlow: { position: "absolute", top: -24, right: -24, width: 90, height: 90, borderRadius: 45 },
+  earlyCardTitle: { fontSize: 14.5, fontWeight: "800", marginBottom: 4, letterSpacing: 0.2 },
+  earlyCardBody: { color: palette.textSecondary, fontSize: 13.5, lineHeight: 20 },
+  earlyCare: { color: palette.muted, fontSize: 12, lineHeight: 18, marginTop: spacing.sm, fontStyle: "italic" },
+
   /* Action */
+  actionHeadRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm },
+  actionRotate: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: palette.accentSoft, borderWidth: 1, borderColor: palette.accentMedium },
+  actionRotateText: { color: palette.accent, fontSize: 12, fontWeight: "700" },
   actionCard: {
     backgroundColor: palette.card,
     borderRadius: radius.lg,

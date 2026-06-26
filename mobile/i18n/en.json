@@ -425,6 +425,7 @@
 
     "badgeWeekly": "WEEKLY",
     "badgeLive": "LIVE",
+    "badgePremium": "PREMIUM",
 
     "confidence": {
       "too_early": "Just getting started",
@@ -470,6 +471,24 @@
     "falseRecoveryBody": "Positive moments may be masking an underlying pattern. Stay aware.",
     "maskingLevel": "Masking - {level}",
     "maskingBody": "Your expressed emotions may not fully reflect what's going on inside.",
+    "maskingWord_low": "light",
+    "maskingWord_moderate": "moderate",
+    "maskingWord_high": "high",
+    "maskingBody_low": "A little gap this week between how steady you logged feeling and how your check-ins moved — usually nothing, just worth a glance.",
+    "maskingBody_moderate": "Your check-in rhythm shifted more than your reported mood did this week — your outside calm may be doing some quiet work over the inside.",
+    "maskingBody_high": "A real gap this week between the calm you logged and the restlessness underneath. When the surface and the inside diverge this much, it's worth a gentle, honest check-in.",
+    "share": {
+      "kicker": "Share your week",
+      "title": "Send a snapshot to someone who gets it",
+      "body": "A private link with the shape of your week — what's been steadying you, what's added friction, and how your tone moved. No notes, no raw entries.",
+      "cta": "Share my week",
+      "note": "Private link, no account needed. It expires in 7 days.",
+      "message": "Here's a snapshot of my week on TriggerMap: {url}",
+      "errorTitle": "Couldn't create the link",
+      "errorBody": "Something went wrong building your snapshot. Please try again.",
+      "notReadyTitle": "Not enough to share yet",
+      "notReadyBody": "Log a few more moments this week and your shareable snapshot will be ready."
+    },
 
     "innerState": "Inner state",
     "vacuumScoreValue": "{score}/5",
@@ -642,9 +661,16 @@
       "statusUntil": "Premium active until {date}",
       "mode": {
         "core": "Overview",
+        "overview": "Overview",
         "move": "Move",
         "fuel": "Fuel",
         "perspective": "Perspective",
+        "moveLockedTitle": "Movement, matched to your state",
+        "moveLockedBody": "Premium turns your patterns into small physical resets for how you're feeling right now.",
+        "fuelLockedTitle": "Fuel for your energy",
+        "fuelLockedBody": "Premium builds a day of nourishment ideas around your energy, mood and preferences.",
+        "perspectiveLockedTitle": "A clearer way to see it",
+        "perspectiveLockedBody": "Premium adds a plain-language read on how your triggers, emotions and recovery connect.",
         "moveHint": "Small physical resets matched to your current state.",
         "fuelHint": "Nourishment ideas that fit your energy and preferences.",
         "perspectiveHint": "A calmer way to read the pattern in front of you.",
@@ -787,9 +813,43 @@
     },
     "action": {
       "title": "One thing to try",
+      "another": "Another",
       "helpful": "Helpful",
       "notHelpful": "Not helpful",
       "thanks": "Thanks — noted. This shapes what you see next."
+    },
+    "early": {
+      "title": "A gentle check-in",
+      "intro": "A pattern from your own check-ins — worth noticing, never a diagnosis.",
+      "care": "This is just something we noticed in your own entries — not a diagnosis or a judgment. If patterns like this have been sticking around or making daily life harder, talking to a doctor or someone you trust can help. In India, KIRAN (1800-599-0019) is free and open 24/7.",
+      "persistentLow": {
+        "title": "Low moments have been frequent",
+        "body": "Across the last couple of weeks, a lot of your moments have felt low. That's worth noticing — and worth being gentle with yourself about."
+      },
+      "anhedonia": {
+        "title": "Fewer bright moments lately",
+        "body": "Not many moments have felt good recently. Sometimes that's just a season; sometimes it's a quiet nudge to reach out to someone you trust."
+      },
+      "lowCombo": {
+        "title": "A heavier stretch",
+        "body": "Lately the low moments have been frequent and the brighter ones rare. If this has been sticking around, talking to someone can really help."
+      },
+      "anxious": {
+        "title": "Worry's been a frequent visitor",
+        "body": "Tension and worry have shown up across several recent days. Naming the pattern can be a first step toward easing it."
+      },
+      "anxiousDomain": {
+        "title": "{domain} has been weighing on you",
+        "body": "A lot of the recent worry seems to point to {domain}."
+      },
+      "withdrawal": {
+        "title": "More time on your own",
+        "body": "You've been spending more moments alone lately than you usually do. Connection, even small, tends to help."
+      },
+      "bodyRecurring": {
+        "title": "Your body's been speaking up",
+        "body": "Health and rest have come up a lot in your recent moments. Rest and mood tend to travel together."
+      }
     },
     "explore": {
       "open": "Explore your full map",

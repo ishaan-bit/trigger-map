@@ -49,12 +49,15 @@ function LinkRow({ link, labels, kind, t, index }) {
       <View style={styles.metaCol}>
         {kind === "friction" ? (
           <View style={[styles.strengthTag, link.strength === "recurring" ? styles.tagRecurring : styles.tagEmerging]}>
-            <Text style={[styles.strengthText, { color: link.strength === "recurring" ? palette.danger : palette.warning }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.strengthText, { color: link.strength === "recurring" ? palette.danger : palette.warning }]}
+            >
               {link.strength === "recurring" ? labels.recurring : labels.emerging}
             </Text>
           </View>
         ) : null}
-        <Text style={styles.count}>{labels.times.replace("{count}", link.count)}</Text>
+        <Text numberOfLines={1} style={styles.count}>{labels.times.replace("{count}", link.count)}</Text>
       </View>
     </FadeInView>
   );
@@ -102,25 +105,27 @@ const styles = StyleSheet.create({
   },
   groupTitle: { ...type.kicker, color: palette.warning, marginBottom: spacing.sm },
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-  node: { width: 64, alignItems: "center" },
+  node: { width: 58, alignItems: "center" },
   nodeDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   nodeIcon: { fontSize: 18 },
   nodeLabel: { fontSize: 11, fontWeight: "700", marginTop: 4, textAlign: "center" },
-  connector: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  // The flexible connector absorbs any horizontal squeeze (minWidth:0) so the
+  // fixed meta column keeps its room and "Recurring"/"3×" never wrap or collide.
+  connector: { flex: 1, minWidth: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   line: { width: "100%", borderRadius: 999 },
   arrow: { position: "absolute", right: 0, fontSize: 13, top: "50%", marginTop: -9 },
-  metaCol: { width: 64, alignItems: "flex-end", gap: 4 },
-  strengthTag: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
+  metaCol: { width: 76, alignItems: "flex-end", gap: 3, flexShrink: 0 },
+  strengthTag: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, maxWidth: "100%" },
   tagRecurring: { backgroundColor: palette.dangerSoft, borderColor: palette.danger + "44" },
   tagEmerging: { backgroundColor: palette.warningSoft, borderColor: palette.warning + "44" },
-  strengthText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  strengthText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
   count: { fontSize: 12, fontWeight: "700", color: palette.muted },
   emptyCard: {
     backgroundColor: palette.glass,

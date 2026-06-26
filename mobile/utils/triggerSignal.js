@@ -243,21 +243,26 @@ function buildChanges(report, progress) {
 }
 
 /**
- * Pick the single most relevant action to surface inline. Prefer a "try this"
- * regulator tied to the top friction trigger, then any awareness/experiment.
+ * Order the week's actions by relevance: a "try this" regulator tied to the top
+ * friction trigger leads, then any regulator, then the rest. The Read surface
+ * shows the head and rotates through the full list (the For You tab no longer
+ * lists actions), so we return the WHOLE ordered list — `action` is just [0].
  */
-function pickAction(report, friction) {
-  const actions = report?.actions || [];
-  if (!actions.length) return null;
+function orderActions(report, friction) {
+  const actions = (report?.actions || []).filter(Boolean);
+  if (!actions.length) return [];
   const topTrigger = friction[0]?.trigger;
-  if (topTrigger) {
-    const tied = actions.find(
-      (a) => typeof a.id === "string" && a.id.toLowerCase().includes(String(topTrigger).toLowerCase())
-    );
-    if (tied) return tied;
-  }
-  const regulate = actions.find((a) => a.type === "regulate");
-  return regulate || actions[0];
+  const score = (a) => {
+    let s = 0;
+    if (topTrigger && typeof a.id === "string" && a.id.toLowerCase().includes(String(topTrigger).toLowerCase())) s += 3;
+    if (a.type === "regulate") s += 1;
+    return s;
+  };
+  // Stable sort by descending relevance score (preserves server order in ties).
+  return actions
+    .map((a, i) => ({ a, i, s: score(a) }))
+    .sort((x, y) => y.s - x.s || x.i - y.i)
+    .map((x) => x.a);
 }
 
 /**
@@ -288,7 +293,8 @@ export function deriveSignalState(report, progress = null) {
   const watch = buildWatch(report);
   const changes = buildChanges(report, progress);
   const barometer = computeBarometer(report, concerns, stabilizers);
-  const action = pickAction(report, friction);
+  const actions = orderActions(report, friction);
+  const action = actions[0] || null;
 
   // ── State resolution (priority order) ──
   // Value lands at the FIRST log: each early log is its own real state with
@@ -352,6 +358,7 @@ export function deriveSignalState(report, progress = null) {
     changes,
     watch,
     action,
+    actions,
     meta: {
       totalMoments,
       daysLogged,

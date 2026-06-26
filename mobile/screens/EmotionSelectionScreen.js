@@ -146,9 +146,11 @@ export function EmotionSelectionScreen() {
     setAdaptiveTags(tags);
     // Preserve selected tags while dragging. If they leave the live pool, the
     // UI pins them in a selected row so the user's intent is not wiped.
-    // Only animate the section in on first appearance, not on every refresh.
-    if (wasEmpty) {
-      tagSectionAnim.setValue(0);
+    // Re-animate on EVERY region crossing (not just first appearance) so the
+    // "what contributed" chips visibly snap to the new feeling — a full rise on
+    // first reveal, a quick lighter re-settle on each subsequent swap.
+    if (tags.length) {
+      tagSectionAnim.setValue(wasEmpty ? 0 : 0.5);
       Animated.spring(tagSectionAnim, {
         toValue: 1,
         friction: 8,

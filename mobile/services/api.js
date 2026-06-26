@@ -221,8 +221,10 @@ export function registerDevice(deviceId) {
   return fetchJson("/register-device", { method: "POST", body: { deviceId } });
 }
 
-export function createShareSnapshot(token) {
-  return fetchJson("/share", { method: "POST", token });
+export function createShareSnapshot(deviceId, token) {
+  // Device-ID identity: send deviceId so anonymous owners can share; the backend
+  // prefers a Bearer token when present and falls back to deviceId.
+  return fetchJson("/share", { method: "POST", token, body: { deviceId } });
 }
 
 export function fetchShareSnapshot(shareToken) {

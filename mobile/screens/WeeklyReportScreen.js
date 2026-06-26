@@ -7,6 +7,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -17,11 +18,11 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { GuidedTooltip } from "@/components/SpotlightOverlay";
 import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
-import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
+import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress, createShareSnapshot, getWebBaseUrl } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
 import { palette, radius, motion } from "@/utils/theme";
 import { ProgressRing, Gauge, Sparkline, AnimatedBar } from "@/components/graphics";
-import { CountUpText, FadeInView, Pulse, Reanimated, withTiming, useSharedValue, useAnimatedStyle } from "@/components/motion";
+import { CountUpText, FadeInView, Pulse, PressableScale, Reanimated, withTiming, useSharedValue, useAnimatedStyle } from "@/components/motion";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
@@ -30,6 +31,7 @@ import { emotionColor as getFieldColor } from "@/utils/emotionModel";
 import { MOVEMENTS, EQUIPMENT, filterMovements, pickMovements } from "@triggermap/shared";
 import { NOURISHMENTS, DIETS, filterNourishments, pickNourishments, getDietaryTags, matchesDietFilter } from "@triggermap/shared";
 import { deriveSignalState } from "@/utils/triggerSignal";
+import { computeEarlySignals } from "@/utils/earlyDetection";
 import { TriggerMapView } from "@/components/triggermap/TriggerMapView";
 
 /* ── Helpers ── */
@@ -323,9 +325,13 @@ function SectionHeader({ label, extra, badge, t }) {
       <View style={s.sectionHeaderLeft}>
         <Text style={s.sectionKicker}>{label.toUpperCase()}</Text>
         {badge ? (
-          <View style={[s.freqBadge, badge === "weekly" && s.freqBadgeWeekly]}>
-            <Text style={[s.freqBadgeText, badge === "weekly" && s.freqBadgeTextWeekly]}>
-              {badge === "weekly" ? (t ? t("report.badgeWeekly") : "WEEKLY") : (t ? t("report.badgeLive") : "LIVE")}
+          <View style={[s.freqBadge, badge === "weekly" && s.freqBadgeWeekly, badge === "premium" && s.freqBadgePremium]}>
+            <Text style={[s.freqBadgeText, badge === "weekly" && s.freqBadgeTextWeekly, badge === "premium" && s.freqBadgeTextPremium]}>
+              {badge === "weekly"
+                ? (t ? t("report.badgeWeekly") : "WEEKLY")
+                : badge === "premium"
+                ? (t ? t("report.badgePremium") : "PREMIUM")
+                : (t ? t("report.badgeLive") : "LIVE")}
             </Text>
           </View>
         ) : null}
@@ -479,6 +485,19 @@ function resolveActionResponse(map, actionId) {
    raw-frequency / time-of-day cards — they duplicated the Read headline or read
    as noise. What's left is what a person can actually use. */
 
+/* ── Masking heads-up copy ──
+   The masking *level* (low / moderate / high) is data-driven, but the old UI
+   paired every level with one identical body line, so it read as "the same
+   result every week". Resolve a level-specific word + explanation (with a
+   graceful fall back to the legacy line) so the read actually changes. */
+function maskingDisplay(level, t) {
+  const word = t(`report.maskingWord_${level}`);
+  const safeWord = word && word !== `report.maskingWord_${level}` ? word : level;
+  const body = t(`report.maskingBody_${level}`);
+  const safeBody = body && body !== `report.maskingBody_${level}` ? body : t("report.maskingBody");
+  return { word: safeWord, body: safeBody };
+}
+
 function GeneratedSummary({ text, tone, t }) {
   const color = tone?.color || palette.accent;
   // Reveal the generated narrative line by line so it feels alive, and let the
@@ -530,7 +549,27 @@ function WeekConnected({ drivers, t }) {
   );
 }
 
-function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang }) {
+/* ── Share your week ──
+   Restores the (previously removed) "share with someone" option. The backend
+   builds a sanitised, PII-free 7-day snapshot — signature loop, what helped vs
+   what added friction, the tone trajectory, an insight headline — behind a
+   private link. The card sells that value, not just a bare button. */
+function ShareWeekCard({ onShare, sharing, t }) {
+  return (
+    <View style={s.shareCard}>
+      <Pulse style={s.shareGlow} />
+      <Text style={s.shareKicker}>✦ {t("report.share.kicker")}</Text>
+      <Text style={s.shareTitle}>{t("report.share.title")}</Text>
+      <Text style={s.shareBody}>{t("report.share.body")}</Text>
+      <PressableScale onPress={onShare} disabled={sharing} style={s.shareBtn} accessibilityRole="button">
+        <Text style={s.shareBtnText}>{sharing ? t("common.pleaseWait") : `↗  ${t("report.share.cta")}`}</Text>
+      </PressableScale>
+      <Text style={s.shareNote}>{t("report.share.note")}</Text>
+    </View>
+  );
+}
+
+function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang, onShare, sharing }) {
   const insight = report?.aiInsight;
   const summary = insight?.summary ? cleanText(insight.summary) : null;
   const drivers = insight?.drivers || [];
@@ -549,7 +588,10 @@ function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang }) {
   const headsUp = [];
   if (compound?.crashRisk) headsUp.push({ icon: "⚠️", color: palette.danger, label: t("report.crashRiskLabel"), body: t("report.crashRiskBody") });
   if (compound?.falseRecovery) headsUp.push({ icon: "🔄", color: palette.warning, label: t("report.falseRecoveryLabel"), body: t("report.falseRecoveryBody") });
-  if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") headsUp.push({ icon: "🎭", color: palette.purple, label: t("report.maskingLevel", { level: invoked.weeklyMasking.level }), body: t("report.maskingBody") });
+  if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") {
+    const md = maskingDisplay(invoked.weeklyMasking.level, t);
+    headsUp.push({ icon: "🎭", color: palette.purple, label: t("report.maskingLevel", { level: md.word }), body: md.body });
+  }
 
   const nothing = !summary && !traj.length && !drivers.length && !headsUp.length;
 
@@ -600,6 +642,14 @@ function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang }) {
         <AnimatedSection index={2} style={s.section}>
           <SectionHeader label={t("report.weekConnected")} badge="live" t={t} />
           <WeekConnected drivers={drivers} t={t} />
+        </AnimatedSection>
+      ) : null}
+
+      {/* Share your week — placed after the user has seen their state, tone and
+          connections (a natural moment to share), above the archive. */}
+      {onShare ? (
+        <AnimatedSection index={3} style={s.section}>
+          <ShareWeekCard onShare={onShare} sharing={sharing} t={t} />
         </AnimatedSection>
       ) : null}
 
@@ -681,119 +731,6 @@ function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang }) {
 
       {nothing ? (
         <View style={s.card}><Text style={s.aiSummary}>{t("report.logMoreForState")}</Text></View>
-      ) : null}
-    </View>
-  );
-}
-
-/* ── Tab 3: Actions (behavioural) ── */
-
-function ActionsTab({ report, t, responses, onActionFeedback, primaryActionId }) {
-  const allActions = report?.actions || [];
-  // The single most relevant action already leads the Read tab. Don't double up
-  // here — show the rest. Feedback is shared, so a tap in either place sticks.
-  const actions = allActions.filter((a) => a.id !== primaryActionId);
-  const primaryShownInRead = allActions.length !== actions.length;
-
-  const [submitting, setSubmitting] = useState(null);
-  const [errorId, setErrorId] = useState(null);
-  const lastAttempt = useRef({});
-
-  async function handleResponse(actionId, response) {
-    if (resolveActionResponse(responses, actionId) || submitting) return;
-    setSubmitting(actionId);
-    setErrorId(null);
-    lastAttempt.current[actionId] = response;
-    try {
-      await onActionFeedback(actionId, response);
-    } catch {
-      setErrorId(actionId);
-    } finally {
-      setSubmitting(null);
-    }
-  }
-
-  if (!allActions.length) {
-    return (
-      <View style={s.tabContent}>
-        <View style={s.insightStateCard}>
-          <Text style={s.insightStateIcon}>⚡</Text>
-          <Text style={s.insightStateTitle}>{t("report.actionsOnWay")}</Text>
-          <Text style={s.insightStateBody}>{t("report.actionsOnWayBody")}</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={s.tabContent}>
-      <AnimatedSection index={0} style={s.section}>
-        <SectionHeader
-          label={t("report.thisWeeksActions")}
-          badge="live"
-          t={t}
-          extra={actions.length ? (actions.length !== 1 ? t("report.suggestionsCountPlural", { count: actions.length }) : t("report.suggestionsCount", { count: actions.length })) : null}
-        />
-        <Text style={s.actionsLede}>{primaryShownInRead ? t("report.alreadyInRead") : t("report.basedOnPatterns")}</Text>
-      </AnimatedSection>
-
-      {actions.map((action, i) => {
-        const done = resolveActionResponse(responses, action.id);
-        const isBusy = submitting === action.id;
-        const hasError = errorId === action.id;
-        return (
-          <AnimatedSection key={action.id} index={i + 1} style={s.section}>
-            <View style={[s.actionCard, done && s.actionCardDone]}>
-              <View style={s.actionHeader}>
-                <Text style={s.actionIcon}>{action.icon || "⚡"}</Text>
-                <View style={s.actionHeaderText}>
-                  <Text style={s.actionCategory}>{action.category || t("report.defaultCategory")}</Text>
-                  <Text style={s.actionTitle}>{action.title}</Text>
-                </View>
-              </View>
-              {renderColoredText(action.reason, t, s.actionReason)}
-              {done ? (
-                <View style={[s.actionFeedbackDone, { backgroundColor: done === "helped" ? palette.successSoft : palette.warningSoft }]}>
-                  <Text style={[s.actionFeedbackDoneText, { color: done === "helped" ? palette.success : palette.warning }]}>
-                    {done === "helped" ? `✓ ${t("report.markedHelpful")}` : `✕ ${t("report.adjustThis")}`}
-                  </Text>
-                </View>
-              ) : (
-                <View style={s.actionButtons}>
-                  <Pressable
-                    style={[s.actionBtn, s.actionBtnHelped, isBusy && { opacity: 0.5 }]}
-                    onPress={() => handleResponse(action.id, "helped")}
-                    disabled={!!submitting}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("report.helped")}
-                  >
-                    <Text style={s.actionBtnHelpedText}>{isBusy ? "…" : `✓ ${t("report.helped")}`}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[s.actionBtn, s.actionBtnNotHelpful, isBusy && { opacity: 0.5 }]}
-                    onPress={() => handleResponse(action.id, "not_helpful")}
-                    disabled={!!submitting}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("report.notHelpful")}
-                  >
-                    <Text style={s.actionBtnNotHelpfulText}>{isBusy ? "…" : `✕ ${t("report.notHelpful")}`}</Text>
-                  </Pressable>
-                </View>
-              )}
-              {hasError ? (
-                <Pressable onPress={() => handleResponse(action.id, lastAttempt.current[action.id] || "helped")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>{t("common.retryError") || "Something went wrong, tap to retry"}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </AnimatedSection>
-        );
-      })}
-
-      {!actions.length ? (
-        <View style={s.card}><Text style={s.aiSummary}>{t("report.alreadyInRead")}</Text></View>
       ) : null}
     </View>
   );
@@ -901,7 +838,7 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
                     : trajectory.direction === "declining" ? palette.dangerSoft
                     : palette.glass,
                 }]}>
-                  <Text style={[s.progressArcDeltaText, {
+                  <Text numberOfLines={1} style={[s.progressArcDeltaText, {
                     color: trajectory.direction === "improving" ? palette.success
                       : trajectory.direction === "declining" ? palette.danger
                       : palette.muted,
@@ -1314,7 +1251,7 @@ function buildSignals(report, t) {
     out.push({ key: "recovery", icon: "🔄", label: t("report.prem.signalFalseRecovery"), body: t("report.falseRecoveryBody"), color: palette.warning });
   }
   if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") {
-    out.push({ key: "masking", icon: "🎭", label: t("report.prem.signalMasking"), body: t("report.maskingBody"), color: palette.purple });
+    out.push({ key: "masking", icon: "🎭", label: t("report.prem.signalMasking"), body: maskingDisplay(invoked.weeklyMasking.level, t).body, color: palette.purple });
   }
   if (invoked?.vacuumDrift != null && Math.abs(invoked.vacuumDrift) > 0.15) {
     out.push({
@@ -1674,8 +1611,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
           </View>
           {moveSuggestions.length > 0 ? (
             <>
-              {moveSuggestions.slice(0, 8).map((mv) => (
-                <View key={mv.id} style={s.suggestionCard}>
+              {moveSuggestions.slice(0, 8).map((mv, i) => (
+                <FadeInView key={mv.id} delay={i * 55} offset={18} style={s.suggestionCard}>
                   <Text style={s.suggestionTitle}>{hi ? mv.nameHi : mv.name}</Text>
                   {mv.reason ? (
                     <Text style={s.suggestionReason}>{mv.reason}</Text>
@@ -1690,7 +1627,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                     </View>
                   )}
                   {renderFeedbackControls(mv.id, dataSource || "rule")}
-                </View>
+                </FadeInView>
               ))}
               <Text style={s.suggestionCounter}>{t("report.prem.mode.showing", { shown: Math.min(moveSuggestions.length, 8), total: moveSuggestions.length })}</Text>
             </>
@@ -1711,8 +1648,8 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
             ))}
           </View>
           {fuelPlan.length > 0 ? (
-            fuelPlan.map(({ key, label, icon, item, origin }) => (
-              <View key={key} style={s.suggestionCard}>
+            fuelPlan.map(({ key, label, icon, item, origin }, i) => (
+              <FadeInView key={key} delay={i * 55} offset={18} style={s.suggestionCard}>
                 <Text style={s.fuelSlotLabel}>{icon} {label}</Text>
                 <Text style={s.suggestionTitle}>{hi ? item.nameHi : item.name}</Text>
                 {item.reason ? (
@@ -1728,7 +1665,7 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
                   </View>
                 )}
                 {renderFeedbackControls(item.id, origin === "library" ? "rule" : (dataSource || "rule"))}
-              </View>
+              </FadeInView>
             ))
           ) : (
             <Text style={s.modeContentBody}>{t("report.prem.mode.noFuelItems")}</Text>
@@ -1739,13 +1676,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
       {/* ── Perspective: server-driven items only ── */}
       {mode === "perspective" && items.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.modeCardsScroll}>
-          {items.map((item) => {
+          {items.map((item, i) => {
             return (
-              <View key={item.id} style={s.modeCard}>
+              <FadeInView key={item.id} delay={i * 70} offset={16} from="right" style={s.modeCard}>
                 <Text style={s.modeCardTitle}>{item.name}</Text>
                 <Text style={s.modeCardDesc}>{item.description}</Text>
                 {renderFeedbackControls(item.id, dataSource || "llm")}
-              </View>
+              </FadeInView>
             );
           })}
         </ScrollView>
@@ -1760,12 +1697,31 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
   );
 }
 
+/* ── Mode upsell — shown when a free user opens a premium mode tab ── */
+const MODE_TAB_ICONS = { move: "🏃", fuel: "🥗", perspective: "💡" };
+function ModeUpsell({ mode, t, onUpgrade, purchasing }) {
+  return (
+    <View style={s.modeContent}>
+      <FadeInView>
+        <View style={[s.insightStateCard, { borderLeftWidth: 3, borderLeftColor: palette.purple, overflow: "hidden", position: "relative" }]}>
+          <Pulse style={[s.modeUpsellGlow, { backgroundColor: palette.purple + "22" }]} />
+          <Text style={s.insightStateIcon}>{MODE_TAB_ICONS[mode] || "💎"}</Text>
+          <Text style={s.insightStateTitle}>{t(`report.prem.mode.${mode}LockedTitle`)}</Text>
+          <Text style={s.insightStateBody}>{t(`report.prem.mode.${mode}LockedBody`)}</Text>
+          <Pressable style={s.teaserCtaButton} onPress={onUpgrade} disabled={purchasing} accessibilityRole="button">
+            <Text style={s.teaserCtaButtonText}>{purchasing ? t("common.pleaseWait") : t("report.upgradePremium")}</Text>
+          </Pressable>
+        </View>
+      </FadeInView>
+    </View>
+  );
+}
+
 function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTeaser, handleSignIn, handleUpgrade, purchasing, subscription, t, lang, modes, onModeFeedback, dominantEmotion, onLogMoment }) {
-  // Default to "core" so the headline premium content (LLM Pattern Intelligence,
-  // direction, levers, snapshot) is visible immediately. Move/Fuel/Perspective are
-  // one tap away in the mode bar, which the report tab-collapse already surfaces a
-  // level higher than before (Insights → For You → mode bar).
-  const [activeMode, setActiveMode] = useState("core");
+  // "Overview" is open to ALL: the client-derived read (what's shifting, levers,
+  // behaviour snapshot, effectiveness) plus a premium upsell for the LLM direction
+  // and pattern intelligence. Move/Fuel/Perspective stay premium and gate inline.
+  const [activeMode, setActiveMode] = useState("overview");
   const bm = report?.baselineMetrics;
   const regulators = report?.regulators || [];
   const feedback = report?.actionFeedback || [];
@@ -1781,9 +1737,12 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
     ? localeDateStr(subscription.expiresAt, lang, { day: "numeric", month: "short", year: "numeric" })
     : null;
 
-  const lockedCta = !isSignedIn
-    ? { label: t("report.signInToUnlock"), onPress: handleSignIn }
-    : { label: purchasing ? t("common.pleaseWait") : t("report.upgradePremium"), onPress: handleUpgrade, disabled: purchasing };
+  const MODE_TABS = [
+    { key: "overview", free: true },
+    { key: "move", free: false },
+    { key: "fuel", free: false },
+    { key: "perspective", free: false },
+  ];
 
   /* ── Render helpers ── */
 
@@ -1846,190 +1805,109 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
     );
   }
 
-  return (
-    <View style={s.tabContent}>
+  /* ── Free, client-derived overview (open to ALL); the LLM direction +
+        pattern intelligence inside it remain premium and upsell when locked. ── */
+  function renderOverview() {
+    return (
+      <View style={s.modeContent}>
+        {/* ── Your direction (LLM) — premium card, or upsell for free users.
+              Leads so the premium value still stands out within the open Overview. ── */}
+        <AnimatedSection index={0} style={s.section}>
+          <SectionHeader label={t("report.prem.directionTitle")} badge={isPremium ? "weekly" : "premium"} t={t} />
+          {renderDirectionCard()}
+        </AnimatedSection>
 
-      {/* ── Full paywall gate for non-premium ── */}
-      {!isPremium ? (
-        <View style={s.tabContent}>
-          {/* Premium status badge (not premium) */}
-          <View style={s.insightStateCard}>
-            <Text style={s.insightStateIcon}>💎</Text>
-            <Text style={s.insightStateTitle}>{t("report.unlockInsightsTitle")}</Text>
-            <Text style={s.insightStateBody}>{t("report.prem.paywallBody")}</Text>
-            {!isSignedIn ? (
-              <PrimaryButton label={t("report.signInToUnlock")} onPress={handleSignIn} />
-            ) : (
-              <Pressable style={s.teaserCtaButton} onPress={handleUpgrade} disabled={purchasing} accessibilityRole="button">
-                <Text style={s.teaserCtaButtonText}>{purchasing ? t("common.pleaseWait") : t("report.upgradePremium")}</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Teaser: show one signal preview if available */}
-          {signals.length > 0 ? (
-            <AnimatedSection index={1} style={s.section}>
-              <SectionHeader label={t("report.prem.shifting")} badge="live" t={t} />
-              <View style={s.premSignalGrid}>
-                <View style={[s.premSignalCard, { borderLeftColor: signals[0].color }]}>
-                  <Text style={s.premSignalIcon}>{signals[0].icon}</Text>
-                  <Text style={[s.premSignalLabel, { color: signals[0].color }]}>{signals[0].label}</Text>
-                  <Text style={s.premSignalBody}>{signals[0].body}</Text>
-                </View>
-              </View>
-              {signals.length > 1 ? (
-                <LockedSection
-                  title={t("report.prem.unlockSignals")}
-                  teaser={t("report.prem.shiftingHint")}
-                  ctaLabel={lockedCta.label}
-                  onPress={lockedCta.onPress}
-                />
-              ) : null}
-            </AnimatedSection>
-          ) : null}
-
-          {/* Teaser: direction preview */}
-          {hasLlmTeaser ? (
-            <AnimatedSection index={2} style={s.section}>
-              <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
-              {renderDirectionCard()}
-            </AnimatedSection>
-          ) : null}
-        </View>
-      ) : (
-        /* ── Premium content (full access) ── */
-        <View style={s.tabContent}>
-
-          {/* ── Premium status badge ── */}
-          <View style={s.premBadge}>
-            <Text style={s.premBadgeText}>
-              {expiryDate ? t("report.prem.statusUntil", { date: expiryDate }) : t("report.prem.statusActive")}
-            </Text>
-          </View>
-
-          {/* ── 1. ADAPTIVE MODES (Move · Fuel · Perspective) — moved to top ── */}
-          <AnimatedSection index={0} style={s.section}>
-            <SectionHeader label={t("report.prem.adaptiveTitle")} badge="live" t={t} />
-            <View style={s.modeTabBar}>
-              {["core", "move", "fuel", "perspective"].map((tab) => (
-                <Pressable
-                  key={tab}
-                  style={[s.modeTab, activeMode === tab && s.modeTabActive]}
-                  onPress={() => { tap(); setActiveMode(tab); }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeMode === tab }}
-                >
-                  <Text style={[s.modeTabText, activeMode === tab && s.modeTabTextActive]}>
-                    {t(`report.prem.mode.${tab}`)}
-                  </Text>
-                </Pressable>
+        {/* ── What's shifting (signal cards) — FREE for all ── */}
+        {signals.length > 0 ? (
+          <AnimatedSection index={1} style={s.section}>
+            <SectionHeader label={t("report.prem.shifting")} badge="live" t={t}
+              extra={signals.length !== 1 ? t("report.prem.signalCountPlural", { count: signals.length }) : t("report.prem.signalCount", { count: signals.length })} />
+            <View style={s.premSignalGrid}>
+              {signals.map((sig, i) => (
+                <FadeInView key={sig.key} delay={i * 70} offset={20} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
+                  <Text style={s.premSignalIcon}>{sig.icon}</Text>
+                  <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
+                  <Text style={s.premSignalBody}>{sig.body}</Text>
+                </FadeInView>
               ))}
             </View>
-            {activeMode === "core" ? (
-              <View style={s.modeContent}>
-                <Text style={s.modeContentBody}>{t("report.prem.mode.coreBody")}</Text>
-              </View>
-            ) : (
-              <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedbackByMode?.[activeMode] || modes?.feedback} onLogMoment={onLogMoment} />
-            )}
-
-
           </AnimatedSection>
+        ) : null}
 
-          {/* ── Remaining premium sections visible only in Core mode ── */}
-          {activeMode === "core" ? (
-            <>
-          {/* ── 2. YOUR DIRECTION (hero) ── */}
-          <AnimatedSection index={1} style={s.section}>
-            <SectionHeader label={t("report.prem.directionTitle")} badge="weekly" t={t} />
-            {renderDirectionCard()}
-          </AnimatedSection>
-
-          {/* ── 3. WHAT'S SHIFTING (signal cards) ── */}
-          {signals.length > 0 ? (
-            <AnimatedSection index={2} style={s.section}>
-              <SectionHeader label={t("report.prem.shifting")} badge="live" t={t}
-                extra={signals.length !== 1 ? t("report.prem.signalCountPlural", { count: signals.length }) : t("report.prem.signalCount", { count: signals.length })} />
-              <View style={s.premSignalGrid}>
-                {signals.map((sig) => (
-                  <View key={sig.key} style={[s.premSignalCard, { borderLeftColor: sig.color }]}>
-                    <Text style={s.premSignalIcon}>{sig.icon}</Text>
-                    <Text style={[s.premSignalLabel, { color: sig.color }]}>{sig.label}</Text>
-                    <Text style={s.premSignalBody}>{sig.body}</Text>
+        {/* ── Pattern intelligence (LLM insight cards) — premium only ── */}
+        {isPremium && hasLlmInsight && llmSections ? (
+          <AnimatedSection index={2} style={s.section}>
+            <SectionHeader label={t("report.prem.patternIntel")} badge="weekly" t={t} />
+            <View style={s.insightCardsRow}>
+              {llmSections.map((body, idx) => {
+                if (!body) return null;
+                const insightMeta = getInsightSectionMeta(t);
+                const meta = insightMeta[idx] || {};
+                return (
+                  <View key={idx} style={s.insightSectionWrap}>
+                    <View style={s.insightSectionHeaderOuter}>
+                      <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
+                      <Text style={[s.insightSectionLabelOuter, meta.color ? { color: meta.color } : null]}>
+                        {meta.label || t("report.sectionLabel", { num: idx + 1 })}
+                      </Text>
+                    </View>
+                    <View style={[s.insightSectionCard, { borderLeftWidth: 3, borderLeftColor: meta.color || palette.accent }]}>
+                      {renderColoredText(cleanText(body), t, s.insightSectionBody)}
+                    </View>
                   </View>
-                ))}
-              </View>
-            </AnimatedSection>
-          ) : null}
+                );
+              })}
+              <Text style={s.insightFooter}>
+                {t("report.generatedBy", { date: report.llmInsight.generatedAt
+                  ? localeDateStr(report.llmInsight.generatedAt, lang)
+                  : "" })}
+              </Text>
+            </View>
+          </AnimatedSection>
+        ) : null}
 
-          {/* ── 4. PATTERN INTELLIGENCE (LLM insight cards) ── */}
-          {hasLlmInsight && llmSections ? (
-            <AnimatedSection index={3} style={s.section}>
-              <SectionHeader label={t("report.prem.patternIntel")} badge="weekly" t={t} />
-              <View style={s.insightCardsRow}>
-                {llmSections.map((body, idx) => {
-                  if (!body) return null;
-                  const insightMeta = getInsightSectionMeta(t);
-                  const meta = insightMeta[idx] || {};
-                  return (
-                    <View key={idx} style={s.insightSectionWrap}>
-                      <View style={s.insightSectionHeaderOuter}>
-                        <Text style={s.insightSectionIcon}>{meta.icon || "💡"}</Text>
-                        <Text style={[s.insightSectionLabelOuter, meta.color ? { color: meta.color } : null]}>
-                          {meta.label || t("report.sectionLabel", { num: idx + 1 })}
+        {/* ── Your levers (regulators) — FREE; trigger/emotion colour-coded ── */}
+        {sortedRegulators.length > 0 ? (
+          <AnimatedSection index={3} style={s.section}>
+            <SectionHeader label={t("report.prem.leversTitle")} badge="weekly" t={t}
+              extra={helpedTriggerSet.size > 0 ? t("report.prem.leversAdaptive") : null} />
+            <View style={s.card}>
+              {sortedRegulators.slice(0, 6).map((r, i) => {
+                const isHelped = helpedTriggerSet.has((r.trigger || "").toLowerCase());
+                const tColor = TRIGGER_COLORS[r.trigger] || palette.text;
+                const eColor = EMOTION_COLORS[r.emotion] || palette.success;
+                return (
+                  <View key={i} style={s.effectRow}>
+                    <View style={[s.effectDot, { backgroundColor: eColor + "40" }]}>
+                      <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
+                    </View>
+                    <View style={s.effectContent}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={s.effectTitle}>
+                          <Text style={{ color: tColor }}>{triggerDisplay(r.trigger, t)}</Text>
+                          <Text style={{ color: palette.muted }}> → </Text>
+                          <Text style={{ color: eColor }}>{emotionDisplay(r.emotion, t)}</Text>
                         </Text>
+                        {isHelped ? (
+                          <View style={s.premHelpedBadge}>
+                            <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
+                          </View>
+                        ) : null}
                       </View>
-                      <View style={[s.insightSectionCard, { borderLeftWidth: 3, borderLeftColor: meta.color || palette.accent }]}>
-                        {renderColoredText(cleanText(body), t, s.insightSectionBody)}
-                      </View>
+                      <Text style={s.effectCount}>{r.count !== 1 ? t("report.timesThisPeriodPlural", { count: r.count }) : t("report.timesThisPeriod", { count: r.count })}</Text>
                     </View>
-                  );
-                })}
-                <Text style={s.insightFooter}>
-                  {t("report.generatedBy", { date: report.llmInsight.generatedAt
-                    ? localeDateStr(report.llmInsight.generatedAt, lang)
-                    : "" })}
-                </Text>
-              </View>
-            </AnimatedSection>
-          ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </AnimatedSection>
+        ) : null}
 
-          {/* ── 5. YOUR LEVERS (adaptive regulators) ── */}
-          {sortedRegulators.length > 0 ? (
-            <AnimatedSection index={4} style={s.section}>
-              <SectionHeader label={t("report.prem.leversTitle")} badge="weekly" t={t}
-                extra={helpedTriggerSet.size > 0 ? t("report.prem.leversAdaptive") : null} />
-              <View style={s.card}>
-                {sortedRegulators.slice(0, 6).map((r, i) => {
-                  const isHelped = helpedTriggerSet.has((r.trigger || "").toLowerCase());
-                  return (
-                    <View key={i} style={s.effectRow}>
-                      <View style={[s.effectDot, { backgroundColor: (EMOTION_COLORS[r.emotion] || palette.success) + "40" }]}>
-                        <Text style={{ fontSize: 14 }}>{EMOTION_EMOJIS[r.emotion] || "🌿"}</Text>
-                      </View>
-                      <View style={s.effectContent}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Text style={s.effectTitle}>{triggerDisplay(r.trigger, t)} → {emotionDisplay(r.emotion, t)}</Text>
-                          {isHelped ? (
-                            <View style={s.premHelpedBadge}>
-                              <Text style={s.premHelpedBadgeText}>✓ {t("report.prem.leverHelped")}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <Text style={s.effectCount}>{r.count !== 1 ? t("report.timesThisPeriodPlural", { count: r.count }) : t("report.timesThisPeriod", { count: r.count })}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </AnimatedSection>
-          ) : null}
-
-          {/* ── 6. BEHAVIOUR SNAPSHOT (compact metrics) ── */}
-          {bm?.baseline?.reliable ? (
-            <AnimatedSection index={5} style={s.section}>
-              <SectionHeader label={t("report.prem.snapshot")} badge="weekly" t={t} />
-              <View style={s.premMetricGrid}>
+        {/* ── Behaviour snapshot (compact metrics) — FREE ── */}
+        {bm?.baseline?.reliable ? (
+          <AnimatedSection index={4} style={s.section}>
+            <SectionHeader label={t("report.prem.snapshot")} badge="weekly" t={t} />
+            <View style={s.premMetricGrid}>
                 <View style={s.premMetricItem}>
                   <Text style={s.premMetricLabel}>{t("report.prem.baseline")}</Text>
                   <Text style={s.premMetricValue}>{bm.baseline.score.toFixed(1)}/5</Text>
@@ -2084,29 +1962,66 @@ function PremiumTab({ report, dq, isSignedIn, isPremium, hasLlmInsight, hasLlmTe
             </AnimatedSection>
           ) : null}
 
-          {/* ── 7. ACTION EFFECTIVENESS (compact) ── */}
-          {(triedCount > 0 || skippedCount > 0) ? (
-            <AnimatedSection index={6} style={s.section}>
-              <SectionHeader label={t("report.prem.effectiveness")} badge="live" t={t} />
-              <View style={s.card}>
-                <View style={s.metricsRow}>
-                  <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.success }]}>
-                    <Text style={s.metricLabel}>{t("report.helped")}</Text>
-                    <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
-                  </View>
-                  <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.muted }]}>
-                    <Text style={s.metricLabel}>{t("report.notHelpful")}</Text>
-                    <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
-                  </View>
+        {/* ── Action effectiveness (compact) — FREE ── */}
+        {(triedCount > 0 || skippedCount > 0) ? (
+          <AnimatedSection index={5} style={s.section}>
+            <SectionHeader label={t("report.prem.effectiveness")} badge="live" t={t} />
+            <View style={s.card}>
+              <View style={s.metricsRow}>
+                <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.success }]}>
+                  <Text style={s.metricLabel}>{t("report.helped")}</Text>
+                  <Text style={[s.metricValue, { color: palette.success }]}>{triedCount}</Text>
                 </View>
-                <Text style={s.premAdjustingNote}>{t("report.prem.adjusting")}</Text>
+                <View style={[s.metricCard, { borderLeftWidth: 3, borderLeftColor: palette.muted }]}>
+                  <Text style={s.metricLabel}>{t("report.notHelpful")}</Text>
+                  <Text style={[s.metricValue, { color: palette.muted }]}>{skippedCount}</Text>
+                </View>
               </View>
-            </AnimatedSection>
-          ) : null}
-            </>
-          ) : null}
+              <Text style={s.premAdjustingNote}>{t("report.prem.adjusting")}</Text>
+            </View>
+          </AnimatedSection>
+        ) : null}
+      </View>
+    );
+  }
+
+  /* ── Tab body: status badge → mode bar (Overview free · Move/Fuel/Perspective
+        premium) → the active surface. ── */
+  return (
+    <View style={s.tabContent}>
+      {isPremium ? (
+        <View style={s.premBadge}>
+          <Text style={s.premBadgeText}>
+            {expiryDate ? t("report.prem.statusUntil", { date: expiryDate }) : t("report.prem.statusActive")}
+          </Text>
         </View>
-      )}
+      ) : null}
+
+      <View style={s.modeTabBar}>
+        {MODE_TABS.map((tab) => {
+          const active = activeMode === tab.key;
+          const locked = !tab.free && !isPremium;
+          return (
+            <Pressable
+              key={tab.key}
+              style={[s.modeTab, active && s.modeTabActive]}
+              onPress={() => { tap(); setActiveMode(tab.key); }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[s.modeTabText, active && s.modeTabTextActive]} numberOfLines={1}>
+                {locked ? "🔒 " : ""}{t(`report.prem.mode.${tab.key}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {activeMode === "overview"
+        ? renderOverview()
+        : isPremium
+          ? <ModeCards mode={activeMode} data={modes?.[activeMode]} t={t} lang={lang} onFeedback={onModeFeedback} isPremium={isPremium} dominantEmotion={dominantEmotion} savedFeedback={modes?.feedbackByMode?.[activeMode] || modes?.feedback} onLogMoment={onLogMoment} />
+          : <ModeUpsell mode={activeMode} t={t} onUpgrade={handleUpgrade} purchasing={purchasing} />}
     </View>
   );
 }
@@ -2117,7 +2032,7 @@ export function WeeklyReportScreen() {
   // Device-based identity: `token` is always null (no sign-in). It is kept here only
   // so the existing deviceId-fallback call signatures (fetchProgress, submitModeFeedback,
   // ActionsTab) keep working unchanged.
-  const { loadWeeklyReport, subscription, token, subscribe, deviceId, invalidateCache } = useAppSession();
+  const { loadWeeklyReport, loadTimeline, subscription, token, subscribe, deviceId, invalidateCache } = useAppSession();
   const router = useRouter();
   const { state: obState, advance: obAdvance } = useOnboarding();
   const { dominantEmotion } = useEmotionalState();
@@ -2132,6 +2047,9 @@ export function WeeklyReportScreen() {
   const [showInsightsGuide, setShowInsightsGuide] = useState(false);
   const [showActionsGuide, setShowActionsGuide] = useState(false);
   const [showCloseLoop, setShowCloseLoop] = useState(false);
+  // Raw moments power the client-side early-warning signal (last ~4 weeks).
+  const [recentMoments, setRecentMoments] = useState([]);
+  const [sharing, setSharing] = useState(false);
 
   // Device-based identity: there is no sign-in. Every user now has the full (free)
   // experience; the only gate is premium (isPremium). Kept as a constant so the
@@ -2140,7 +2058,7 @@ export function WeeklyReportScreen() {
   const isPremium = subscription?.status === "active" || subscription?.status === "grace_period";
 
   const callbacksRef = useRef({});
-  callbacksRef.current = { loadWeeklyReport, token, isPremium, isSignedIn };
+  callbacksRef.current = { loadWeeklyReport, loadTimeline, token, isPremium, isSignedIn };
   const reportRef = useRef(null);
   reportRef.current = report;
 
@@ -2157,6 +2075,11 @@ export function WeeklyReportScreen() {
 
   useFocusEffect(useCallback(() => {
     load();
+    // Pull the full timeline so the Read tab's early-warning signal reflects the
+    // latest logs (it computes over ~2 weeks of the user's own moments).
+    callbacksRef.current.loadTimeline?.()
+      .then((m) => setRecentMoments(Array.isArray(m) ? m : []))
+      .catch(() => {});
     const { isPremium: p } = callbacksRef.current;
     trackEvent("report_screen_viewed", { tier: p ? "premium" : "free" });
 
@@ -2279,9 +2202,44 @@ export function WeeklyReportScreen() {
   // signal. The legacy tabbed breakdown is preserved below as opt-in "Explore" depth.
   const signal = useMemo(() => deriveSignalState(report, progress), [report, progress]);
 
+  // Gentle, non-diagnostic early-warning signal computed from the user's own
+  // moments (client-side only). Returns nothing until there's enough data.
+  const earlySignals = useMemo(() => computeEarlySignals(recentMoments), [recentMoments]);
+  const getActionResponse = useCallback(
+    (id) => resolveActionResponse(actionResponses, id),
+    [actionResponses]
+  );
+
   // Device-based app: no sign-in. Inert no-op kept because the (now-dead) tier-aware
   // branches still reference it as a prop; premium gating uses handleUpgrade instead.
   function handleSignIn() {}
+
+  // Share your week: mint a sanitised 7-day snapshot (no notes/PII), build the
+  // public web link, and hand it to the OS share sheet. Works for device-ID
+  // (anonymous) owners — the backend keys the snapshot by deviceId.
+  const handleShareWeek = useCallback(async () => {
+    if (sharing) return;
+    tap();
+    setSharing(true);
+    try {
+      const res = await createShareSnapshot(deviceId, token);
+      const shareToken = res?.token;
+      if (!shareToken) throw new Error("no_token");
+      const url = `${getWebBaseUrl()}/share/${shareToken}`;
+      trackEvent("week_shared", {});
+      await Share.share({ message: t("report.share.message", { url }), url });
+    } catch (err) {
+      const msg = err?.message || "";
+      if (/cancel/i.test(msg)) return;
+      if (/NO_REPORT|No weekly data/i.test(msg)) {
+        Alert.alert(t("report.share.notReadyTitle"), t("report.share.notReadyBody"));
+      } else {
+        Alert.alert(t("report.share.errorTitle"), t("report.share.errorBody"));
+      }
+    } finally {
+      setSharing(false);
+    }
+  }, [deviceId, token, sharing, t]);
 
   async function handleUpgrade() {
     tap();
@@ -2381,34 +2339,30 @@ export function WeeklyReportScreen() {
                     lang={lang}
                     onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
                     onActionFeedback={handleActionFeedback}
-                    actionResponse={resolveActionResponse(actionResponses, signal?.action?.id)}
+                    getActionResponse={getActionResponse}
+                    earlySignals={earlySignals}
                   />
                 ) : activeTab === "week" ? (
-                  <WeekTab report={report} dq={dq} confidence={confidence} dominantEmotion={dominantEmotion} router={router} t={t} lang={lang} />
+                  <WeekTab report={report} dq={dq} confidence={confidence} dominantEmotion={dominantEmotion} router={router} t={t} lang={lang} onShare={handleShareWeek} sharing={sharing} />
                 ) : activeTab === "progress" ? (
                   <ProgressTab
                     progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
                     handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
                   />
                 ) : (
-                  <>
-                    <ActionsTab report={report} t={t} responses={actionResponses} onActionFeedback={handleActionFeedback} primaryActionId={signal?.action?.id} />
-                    <View style={s.forYouDivider}>
-                      <View style={s.forYouDividerLine} />
-                      <Text style={s.forYouDividerText}>✦ {t("report.moreForYou")}</Text>
-                      <View style={s.forYouDividerLine} />
-                    </View>
-                    <PremiumTab
-                      report={report} dq={dq} confidence={confidence}
-                      isSignedIn={isSignedIn} isPremium={isPremium}
-                      hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
-                      handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                      purchasing={purchasing} subscription={subscription} t={t} lang={lang}
-                      modes={modes} onModeFeedback={handleModeFeedback}
-                      dominantEmotion={dominantEmotion}
-                      onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
-                    />
-                  </>
+                  /* For You is premium-first now: the week's actions moved to the
+                     Read tab (rotating "one thing to try"). Overview here is open
+                     to all; Move/Fuel/Perspective stay premium. */
+                  <PremiumTab
+                    report={report} dq={dq} confidence={confidence}
+                    isSignedIn={isSignedIn} isPremium={isPremium}
+                    hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
+                    handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
+                    purchasing={purchasing} subscription={subscription} t={t} lang={lang}
+                    modes={modes} onModeFeedback={handleModeFeedback}
+                    dominantEmotion={dominantEmotion}
+                    onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                  />
                 )}
               </>
             ) : (
@@ -2418,7 +2372,8 @@ export function WeeklyReportScreen() {
                 lang={lang}
                 onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
                 onActionFeedback={handleActionFeedback}
-                actionResponse={resolveActionResponse(actionResponses, signal?.action?.id)}
+                getActionResponse={getActionResponse}
+                earlySignals={earlySignals}
               />
             )
           ) : null}
@@ -2567,8 +2522,10 @@ const s = StyleSheet.create({
     backgroundColor: palette.successSoft || "rgba(52,199,89,0.12)",
   },
   freqBadgeWeekly: { backgroundColor: palette.purpleSoft || "rgba(175,130,255,0.12)" },
+  freqBadgePremium: { backgroundColor: palette.purpleSoft || "rgba(175,130,255,0.16)", borderWidth: 1, borderColor: (palette.purple || "#AF82FF") + "55" },
   freqBadgeText: { color: palette.success || "#34C759", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   freqBadgeTextWeekly: { color: palette.purple || "#AF82FF" },
+  freqBadgeTextPremium: { color: palette.purple || "#AF82FF" },
   card: {
     borderRadius: radius.md, padding: 14, gap: 10,
     backgroundColor: palette.glass, borderWidth: 1, borderColor: palette.glassBorder,
@@ -2662,6 +2619,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
   },
   insightStateIcon: { fontSize: 28 },
+  modeUpsellGlow: { position: "absolute", top: -30, width: 150, height: 150, borderRadius: 75 },
   insightStateTitle: { color: palette.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
   insightStateBody: { color: palette.textSecondary, fontSize: 14, lineHeight: 21, textAlign: "center", maxWidth: 280 },
   insightFooter: { color: palette.textSecondary, fontSize: 11, fontStyle: "italic", textAlign: "right" },
@@ -3044,19 +3002,23 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: palette.glassBorder,
   },
   progressArcNode: { alignItems: "center", gap: 4, width: 88 },
+  // Column layout: the line spans the full connector width and the delta chip
+  // centres BELOW it, so the (red) deviation number gets the whole connector to
+  // render in instead of fighting the line for horizontal space and clipping.
   progressArcConnector: {
-    flex: 1, flexDirection: "row", alignItems: "center", marginHorizontal: -4,
+    flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center",
+    marginHorizontal: -4, gap: 6,
   },
-  progressArcLine: { flex: 1, height: 2, backgroundColor: palette.glassBorder },
+  progressArcLine: { width: "100%", height: 2, backgroundColor: palette.glassBorder },
   progressArcEmoji: { fontSize: 22 },
   progressArcScore: { color: palette.text, fontSize: 18, fontWeight: "800" },
   progressArcLabel: { color: palette.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase", textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   progressArcDelta: {
-    alignSelf: "center", flexDirection: "row", alignItems: "center",
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(94,230,160,0.12)", borderRadius: radius.pill,
-    paddingHorizontal: 10, paddingVertical: 4, marginTop: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
   },
-  progressArcDeltaText: { fontSize: 12, fontWeight: "700" },
+  progressArcDeltaText: { fontSize: 11.5, fontWeight: "800", textAlign: "center" },
   progressDirectionBadge: {
     alignSelf: "center", borderRadius: radius.pill,
     paddingHorizontal: 12, paddingVertical: 5, marginTop: 6,
@@ -3172,4 +3134,25 @@ const s = StyleSheet.create({
   forYouDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
   forYouDividerLine: { flex: 1, height: 1, backgroundColor: palette.glassBorder },
   forYouDividerText: { color: palette.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
+
+  /* ── Share your week ── */
+  shareCard: {
+    position: "relative", overflow: "hidden",
+    borderRadius: radius.lg, padding: 18, gap: 6,
+    backgroundColor: palette.card, borderWidth: 1, borderColor: palette.accentMedium,
+  },
+  shareGlow: {
+    position: "absolute", top: -40, right: -30, width: 160, height: 160, borderRadius: 80,
+    backgroundColor: palette.accentSoft,
+  },
+  shareKicker: { color: palette.accent, fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  shareTitle: { color: palette.text, fontSize: 18, fontWeight: "800", letterSpacing: -0.2 },
+  shareBody: { color: palette.textSecondary, fontSize: 13.5, lineHeight: 19 },
+  shareBtn: {
+    marginTop: 8, alignSelf: "flex-start",
+    paddingHorizontal: 18, paddingVertical: 11, borderRadius: radius.pill,
+    backgroundColor: palette.accent,
+  },
+  shareBtnText: { color: "#06121f", fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
+  shareNote: { color: palette.muted, fontSize: 11.5, lineHeight: 16, marginTop: 4 },
 });

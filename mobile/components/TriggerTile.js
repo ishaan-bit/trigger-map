@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { palette, radius } from "@/utils/theme";
 import { tap } from "@/utils/haptics";
@@ -82,10 +82,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(11, 17, 30, 0.5)",
     gap: 9,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.26,
-    shadowRadius: 14,
-    elevation: 4,
+    // iOS keeps the soft coloured drop-shadow. On Android, `elevation` on a
+    // translucent rounded + overflow:hidden view renders a hard RECTANGULAR
+    // black shadow behind the tile (the "square black box" behind the icons).
+    // Depth there comes from the coloured border + gradient + top highlight,
+    // so we drop the elevation entirely on Android.
+    ...Platform.select({
+      ios: { shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.26, shadowRadius: 14 },
+      android: { elevation: 0 },
+    }),
   },
   topHighlight: {
     position: "absolute",
