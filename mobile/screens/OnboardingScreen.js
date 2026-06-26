@@ -45,9 +45,11 @@ export function OnboardingScreen() {
 
   const slides = [
     { icon: "🎯", title: t("onboarding.slide1Title"), body: t("onboarding.slide1Body") },
-    { icon: "📊", title: t("onboarding.slide2Title"), body: t("onboarding.slide2Body") },
-    { icon: "🔒", title: t("onboarding.slide3Title"), body: t("onboarding.slide3Body") },
-    { icon: "🧭", title: t("onboarding.slide4Title"), body: t("onboarding.slide4Body") },
+    { icon: "✍️", title: t("onboarding.slide2Title"), body: t("onboarding.slide2Body") },
+    { icon: "🧭", title: t("onboarding.slide3Title"), body: t("onboarding.slide3Body") },
+    { icon: "🗓", title: t("onboarding.slide4Title"), body: t("onboarding.slide4Body") },
+    { icon: "📊", title: t("onboarding.slide5Title"), body: t("onboarding.slide5Body") },
+    { icon: "✨", title: t("onboarding.slide6Title"), body: t("onboarding.slide6Body") },
   ];
 
   const isLast = currentIndex === slides.length - 1;
