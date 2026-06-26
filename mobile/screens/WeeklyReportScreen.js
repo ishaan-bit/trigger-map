@@ -462,368 +462,125 @@ function DeltaChip({ value, label, inverted = false }) {
   );
 }
 
-/* ── Tab 1: Mirror (persistent identity) ── */
+/* ── Shared action-feedback resolution ──
+   Feedback is keyed by the exact action id and by `base:<id-without--rN>` so a
+   tap sticks across the periodic id rotation AND shows up in both the Read
+   "one thing to try" and the For You list. */
+function resolveActionResponse(map, actionId) {
+  if (!map || !actionId) return null;
+  if (map[actionId]) return map[actionId];
+  return map[`base:${actionId.replace(/-r\d+$/, "")}`] || null;
+}
 
-function MirrorTab({ report, dq, confidence, isSignedIn, handleSignIn, t, lang }) {
-  const bm = report?.baselineMetrics;
-  const insight = report?.aiInsight;
-  const drivers = insight?.drivers;
-  const loops = insight?.behavioralLoop;
-  const direction = insight?.actionableDirection;
-  const whereToFocus = insight?.whereToFocus;
-  const whatWorking = insight?.whatWorking;
-  const invoked = report?.invokedMetrics;
-  const compound = report?.compoundPatterns;
-  const tone = bm?.recentAverage != null ? scoreTone(bm.recentAverage, t) : null;
-  const [historyExpanded, setHistoryExpanded] = useState(false);
-  const [expandedInsight, setExpandedInsight] = useState(null);
+/* ── Tab 2: This Week — a lean, visual read of the week ──
+   One ordered spine: story → tone → connections → working/focus → heads-up,
+   with the past-insights archive demoted to the very bottom. Deliberately drops
+   the old current-state / confidence / vacuum / internal-signal / context-bleed /
+   raw-frequency / time-of-day cards — they duplicated the Read headline or read
+   as noise. What's left is what a person can actually use. */
 
+function GeneratedSummary({ text, tone, t }) {
+  const color = tone?.color || palette.accent;
+  // Reveal the generated narrative line by line so it feels alive, and let the
+  // accent track the week's emotional tone (visual ↔ text, not decoration).
+  const sentences = String(text).replace(/([.!?।])\s+/g, "$1\n").split("\n").map((x) => x.trim()).filter(Boolean);
   return (
-    <View style={s.tabContent}>
-      {/* Current State */}
-      {bm?.stateOfMind ? (
-        <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label={t("report.currentState")} badge="weekly" t={t} />
-          <View style={[s.stateOfMindCard, tone && { borderLeftColor: tone.color, borderColor: tone.color + "40" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={[s.stateOfMindText, tone && { color: tone.color }]}>{tone ? tone.emoji + " " : ""}{capitalize(bm.stateOfMind)}</Text>
-              {bm.baselineDeltas?.deltaDrift != null ? (
-                <DeltaChip value={bm.baselineDeltas.deltaDrift} />
-              ) : null}
-            </View>
-            {bm.baseline?.reliable ? (
-              <Text style={s.stateOfMindSub}>
-                {t("report.baselineText", { baselineScore: bm.baseline.score.toFixed(1), weekScore: bm.recentAverage?.toFixed(1) || "-" })}
-                {bm.drift ? ` · ${capitalize(bm.drift.label)}` : ""}
-              </Text>
-            ) : (
-              <Text style={s.stateOfMindSub}>{t("report.baselineForming")}</Text>
-            )}
-          </View>
-        </AnimatedSection>
-      ) : (
-        <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label={t("report.currentState")} badge="weekly" t={t} />
-          <View style={s.card}>
-            <Text style={s.aiSummary}>{t("report.logMoreForState")}</Text>
-          </View>
-        </AnimatedSection>
-      )}
-
-      {/* Drivers — top triggers with effect tags */}
-      {drivers?.length ? (
-        <AnimatedSection index={1} style={s.section}>
-          <SectionHeader label={t("report.drivers")} badge="weekly" t={t} />
-          <View style={s.card}>
-            {drivers.map((d, i) => {
-              const tColor = TRIGGER_COLORS[d.trigger] || palette.accent;
-              const effectColor = d.effect === "regulator" ? palette.success : d.effect === "friction" ? palette.danger : palette.muted;
-              const effectLabel = d.effect === "regulator" ? t("report.helps") : d.effect === "friction" ? t("report.friction") : t("report.neutral");
-              return (
-                <View key={i} style={[s.driverRow, i < drivers.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.glassBorder }]}>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[s.driverTrigger, { color: tColor }]}>{triggerDisplay(d.trigger, t)}</Text>
-                    {d.emotion ? <Text style={s.driverEmotion}>{t("emotions." + d.emotion) || d.emotion} · {d.effectCount ?? d.count}×</Text> : <Text style={s.driverEmotion}>{d.count}×</Text>}
-                  </View>
-                  <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
-                    <Text style={[s.effectBadgeText, { color: effectColor }]}>{effectLabel}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Behavioral Loop — trigger → emotion → recovery */}
-      {loops?.length ? (
-        <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label={t("report.behavioralLoop")} badge="weekly" t={t} />
-          {loops.map((loop, i) => {
-            const isFriction = loop.type === "friction";
-            const loopColor = isFriction ? palette.danger : palette.success;
-            const emoColor = EMOTION_COLORS[loop.emotion] || palette.textSecondary;
-            return (
-              <View key={i} style={[s.loopCard, { borderLeftColor: loopColor }]}>
-                <View style={s.loopFlow}>
-                  <View style={[s.loopNode, { backgroundColor: (TRIGGER_COLORS[loop.trigger] || palette.accent) + "20" }]}>
-                    <Text style={[s.loopNodeText, { color: TRIGGER_COLORS[loop.trigger] || palette.accent }]}>{triggerDisplay(loop.trigger, t)}</Text>
-                  </View>
-                  <Text style={s.loopArrow}>→</Text>
-                  <View style={[s.loopNode, { backgroundColor: emoColor + "20" }]}>
-                    <Text style={[s.loopNodeText, { color: emoColor }]}>{EMOTION_EMOJIS[loop.emotion] || "•"} {t("emotions." + loop.emotion) || loop.emotion}</Text>
-                  </View>
-                  {loop.recovery ? (
-                    <>
-                      <Text style={s.loopArrow}>→</Text>
-                      <View style={[s.loopNode, { backgroundColor: palette.accentSoft }]}>
-                        <Text style={[s.loopNodeText, { color: palette.accent }]}>⏱ {loop.recovery}</Text>
-                      </View>
-                    </>
-                  ) : null}
-                </View>
-                <Text style={s.loopMeta}>{t("report.xThisWeek", { count: loop.count })}</Text>
-              </View>
-            );
-          })}
-        </AnimatedSection>
-      ) : null}
-
-      {/* Invoked Signals — masking, crash risk, false recovery */}
-      {(compound?.falseRecovery || compound?.crashRisk || (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none")) ? (
-        <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label={t("report.deeperSignals")} badge="weekly" t={t} />
-          <View style={s.card}>
-            {compound?.crashRisk ? (
-              <View style={s.signalRow}>
-                <Text style={[s.signalIcon, { color: palette.danger }]}>⚠️</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.danger }]}>{t("report.crashRiskLabel")}</Text>
-                  <Text style={s.signalBody}>{t("report.crashRiskBody")}</Text>
-                </View>
-              </View>
-            ) : null}
-            {compound?.falseRecovery ? (
-              <View style={s.signalRow}>
-                <Text style={[s.signalIcon, { color: palette.warning }]}>🔄</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.warning }]}>{t("report.falseRecoveryLabel")}</Text>
-                  <Text style={s.signalBody}>{t("report.falseRecoveryBody")}</Text>
-                </View>
-              </View>
-            ) : null}
-            {invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none" ? (
-              <View style={s.signalRow}>
-                <Text style={[s.signalIcon, { color: palette.purple }]}>🎭</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.signalLabel, { color: palette.purple }]}>{t("report.maskingLevel", { level: invoked.weeklyMasking.level })}</Text>
-                  <Text style={s.signalBody}>{t("report.maskingBody")}</Text>
-                </View>
-              </View>
-            ) : null}
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Inner State — Vacuum state score + drift */}
-      {invoked?.currentVacuum != null ? (
-        <AnimatedSection index={4} style={s.section}>
-          <SectionHeader label={t("report.innerState")} badge="weekly" t={t} />
-          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.purple }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <View style={{ gap: 2 }}>
-                <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
-                  {scoreTone(invoked.currentVacuum, t).emoji} {t("report.vacuumScoreValue", { score: invoked.currentVacuum.toFixed(1) })}
-                </Text>
-                <Text style={{ color: palette.textSecondary, fontSize: 12 }}>{t("report.vacuumScore")}</Text>
-              </View>
-              {invoked.vacuumDrift != null ? (
-                <View style={{ alignItems: "flex-end", gap: 2 }}>
-                  <DeltaChip value={invoked.vacuumDrift} />
-                  <Text style={{ color: palette.muted, fontSize: 11 }}>
-                    {invoked.vacuumDrift > 0.15 ? t("report.vacuumDriftRising") : invoked.vacuumDrift < -0.15 ? t("report.vacuumDriftFalling") : t("report.vacuumDriftStable")}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={{ color: palette.muted, fontSize: 11, marginTop: 6 }}>{t("report.vacuumExplainer")}</Text>
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Context Bleed — emotional carry-over between triggers */}
-      {invoked?.contamination?.length > 0 ? (
-        <AnimatedSection index={5} style={s.section}>
-          <SectionHeader label={t("report.contextBleed")} badge="weekly" t={t} />
-          <View style={s.card}>
-            {invoked.contamination.slice(0, 3).map((c, i) => (
-              <View key={i} style={[s.signalRow, i > 0 && { borderTopWidth: 1, borderTopColor: palette.glassBorder, paddingTop: 8, marginTop: 4 }]}>
-                <Text style={{ fontSize: 16 }}>🔗</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: palette.text, fontSize: 13, fontWeight: "600" }}>
-                    {t("report.contextBleedBody", { source: triggerDisplay(c.sourceTrigger, t), target: c.affectedTriggers.map(tr => triggerDisplay(tr, t)).join(", ") })}
-                  </Text>
-                </View>
-              </View>
-            ))}
-            <Text style={{ color: palette.muted, fontSize: 11, marginTop: 6 }}>{t("report.contextBleedExplainer")}</Text>
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Actionable Direction */}
-      {direction ? (
-        <AnimatedSection index={6} style={s.section}>
-          <SectionHeader label={t("report.direction")} badge="weekly" t={t} />
-          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: tone?.color || palette.accent }]}>
-            {renderColoredText(direction, t, { color: palette.text, fontSize: 14, lineHeight: 21 })}
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* What's Working / Where to Focus */}
-      {(whatWorking?.length || whereToFocus?.length) ? (
-        <AnimatedSection index={5} style={s.section}>
-          {whatWorking?.length ? (
-            <>
-              <Text style={s.sectionTitle}>{t("report.whatWorking")}</Text>
-              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
-                {whatWorking.slice(0, 3).map((item, i) => (
-                  <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
-                ))}
-              </View>
-            </>
-          ) : null}
-          {whereToFocus?.length ? (
-            <>
-              <Text style={s.sectionTitle}>{t("report.whereToFocus")}</Text>
-              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
-                {whereToFocus.slice(0, 3).map((item, i) => (
-                  <View key={i}>{renderColoredText(item.text, t, { color: palette.text, fontSize: 13, lineHeight: 19 })}</View>
-                ))}
-              </View>
-            </>
-          ) : null}
-        </AnimatedSection>
-      ) : null}
-
-      {/* Confidence */}
-      <AnimatedSection index={6} style={s.section}>
-        <Text style={s.sectionTitle}>{t("report.confidenceLabel")}</Text>
-        <View style={s.card}>
-          <Text style={s.aiSummary}>{getConfidenceLabel(confidence, t)}</Text>
-          <Text style={{ color: palette.muted, fontSize: 11 }}>
-            {t("report.basedOnMoments", { moments: report?.mirror?.totalMoments || dq.totalMoments || 0, days: report?.mirror?.daysLogged || dq.daysLogged || 0 })}
-          </Text>
-        </View>
-      </AnimatedSection>
-
-      {/* Past Insights Archive — at bottom of Mirror tab */}
-      {report?.insightHistory?.length > 0 ? (
-        <AnimatedSection index={8} style={s.section}>
-          <SectionHeader label={t("report.prem.pastInsights")} badge="archive" t={t} />
-          <View style={s.pastInsightsList}>
-            {(historyExpanded ? report.insightHistory : report.insightHistory.slice(0, 3)).map((entry, idx) => {
-              const isOpen = expandedInsight === (entry.generatedAt || idx);
-              const preview = (entry.narrative || "").split(/\n\s*\n/)[0] || entry.narrative || "";
-              return (
-                <Pressable
-                  key={entry.generatedAt || idx}
-                  style={[s.pastInsightCard, isOpen && { borderColor: palette.accent + "60" }]}
-                  onPress={() => { tap(); setExpandedInsight(isOpen ? null : (entry.generatedAt || idx)); }}
-                  accessibilityRole="button"
-                >
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={s.pastInsightDate}>
-                      {entry.weekLabel || (entry.generatedAt ? localeDateStr(entry.generatedAt, lang) : "")}
-                    </Text>
-                    <Text style={{ color: palette.muted, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</Text>
-                  </View>
-                  {isOpen ? (
-                    <PastInsightExpanded narrative={entry.narrative} t={t} />
-                  ) : (
-                    <Text style={s.pastInsightPreview} numberOfLines={2}>{cleanText(preview)}</Text>
-                  )}
-                  {entry.sectionCount && !isOpen ? (
-                    <Text style={s.pastInsightMeta}>
-                      {entry.sectionCount} {entry.sectionCount === 1 ? "section" : "sections"}
-                    </Text>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-            {report.insightHistory.length > 3 ? (
-              <Pressable
-                style={s.pastInsightToggle}
-                onPress={() => { tap(); setHistoryExpanded((v) => !v); }}
-                accessibilityRole="button"
-              >
-                <Text style={s.pastInsightToggleText}>
-                  {historyExpanded ? t("report.prem.showLess") : t("report.prem.showMore", { count: report.insightHistory.length - 3 })}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </AnimatedSection>
-      ) : null}
+    <View style={[s.genCard, { borderLeftColor: color }]}>
+      <Pulse style={[s.genGlow, { backgroundColor: color + "22" }]} />
+      <View style={s.genTagRow}>
+        <Text style={[s.genTag, { color, borderColor: color + "55", backgroundColor: color + "14" }]}>✨ {t("report.personalised")}</Text>
+        {tone ? <Text style={s.genToneEmoji}>{tone.emoji}</Text> : null}
+      </View>
+      {sentences.map((sent, i) => (
+        <FadeInView key={i} delay={140 + i * 130}>
+          {renderColoredText(sent, t, s.genText)}
+        </FadeInView>
+      ))}
+      <Text style={s.genHint}>{t("report.generatedFromWeek")}</Text>
     </View>
   );
 }
 
-/* ── Tab 2: This Week (temporal) ── */
-
-function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) {
-  const bm = report?.baselineMetrics;
-  const deltas = report?.weeklyDeltas;
-  const triggerEntries = topEntries(report?.triggerFrequency, 9);
-  const emotionEntries = topEntries(report?.emotionFrequency, 5);
-  const triggerMax = triggerEntries[0]?.[1] || 1;
-  const emotionMax = emotionEntries[0]?.[1] || 1;
-  const timeEntries = Object.entries(report?.timeOfDayPatterns || {}).filter(([, v]) => v > 0);
-  const timeMax = Math.max(...timeEntries.map(([, v]) => v), 1);
-
+function WeekConnected({ drivers, t }) {
   return (
-    <View style={s.tabContent}>
-      {/* Weekly summary */}
-      {report?.aiInsight?.summary ? (
-        <AnimatedSection index={0} style={s.section}>
-          <SectionHeader label={t("report.weeklySummary")} badge="weekly" t={t} />
-          <View style={s.summaryCard}>
-            {renderColoredText(cleanText(report.aiInsight.summary), t, s.summaryText)}
-          </View>
-          {deltas ? (
-            <View style={[s.card, { marginTop: 6 }]}>
-              <Text style={{ color: palette.textSecondary, fontSize: 12 }}>
-                {deltas.totalMomentsDelta > 0
-                  ? (deltas.totalMomentsDelta !== 1 ? t("report.moreMomentsPlural", { count: deltas.totalMomentsDelta }) : t("report.moreMoments", { count: deltas.totalMomentsDelta }))
-                  : deltas.totalMomentsDelta < 0
-                    ? (Math.abs(deltas.totalMomentsDelta) !== 1 ? t("report.fewerMomentsPlural", { count: Math.abs(deltas.totalMomentsDelta) }) : t("report.fewerMoments", { count: Math.abs(deltas.totalMomentsDelta) }))
-                    : t("report.sameMoments")}
-              </Text>
-            </View>
-          ) : null}
-        </AnimatedSection>
-      ) : null}
-
-      {/* Internal Signal — evoked vs invoked summary */}
-      {report?.invokedMetrics?.weeklyInvokedAvg != null ? (() => {
-        const avg = report.invokedMetrics.weeklyInvokedAvg;
-        const absAvg = Math.abs(avg);
-        const signalText = absAvg > 0.4 ? t("report.internalDriven") : absAvg < 0.15 ? t("report.externalDriven") : t("report.mixedDriven");
-        const signalColor = avg > 0.3 ? palette.success : avg < -0.3 ? palette.warning : palette.accent;
-        const signalIcon = avg > 0.3 ? "🧘" : avg < -0.3 ? "⚡" : "⚖️";
+    <View style={s.card}>
+      {drivers.slice(0, 4).map((d, i) => {
+        const tColor = TRIGGER_COLORS[d.trigger] || palette.accent;
+        const eColor = EMOTION_COLORS[d.emotion] || palette.textSecondary;
+        const effectColor = d.effect === "regulator" ? palette.success : d.effect === "friction" ? palette.danger : palette.muted;
+        const effectLabel = d.effect === "regulator" ? t("report.helps") : d.effect === "friction" ? t("report.friction") : t("report.neutral");
         return (
-          <AnimatedSection index={1} style={s.section}>
-            <SectionHeader label={t("report.internalSignal")} badge="weekly" t={t} />
-            <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: signalColor }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 18 }}>{signalIcon}</Text>
-                <Text style={{ color: palette.text, fontSize: 13, lineHeight: 19, flex: 1 }}>{signalText}</Text>
-              </View>
-              <Text style={{ color: palette.muted, fontSize: 11, marginTop: 4 }}>
-                {avg > 0.3 ? "Mostly driven from within" : avg < -0.3 ? "Mostly driven by outside events" : "A mix of internal and external"}
-              </Text>
+          <AnimatedSection key={`${d.trigger}-${i}`} index={i} style={[s.connRow, i > 0 && s.connRowBorder]}>
+            <View style={s.connFlow}>
+              <Text style={[s.connTrigger, { color: tColor }]} numberOfLines={1}>{triggerDisplay(d.trigger, t)}</Text>
+              {d.emotion ? (
+                <>
+                  <Text style={s.connArrow}>→</Text>
+                  <Text style={[s.connEmotion, { color: eColor }]} numberOfLines={1}>{EMOTION_EMOJIS[d.emotion] || ""} {t("emotions." + d.emotion) || d.emotion}</Text>
+                </>
+              ) : null}
+            </View>
+            <View style={[s.effectBadge, { backgroundColor: effectColor + "18", borderColor: effectColor + "40" }]}>
+              <Text style={[s.effectBadgeText, { color: effectColor }]}>{effectLabel}</Text>
             </View>
           </AnimatedSection>
         );
-      })() : null}
+      })}
+    </View>
+  );
+}
 
-      {/* Emotional trajectory */}
-      {report.weeklyEmotionTrajectory?.length >= 1 ? (
-        <AnimatedSection index={2} style={s.section}>
+function WeekTab({ report, dq, confidence, dominantEmotion, router, t, lang }) {
+  const insight = report?.aiInsight;
+  const summary = insight?.summary ? cleanText(insight.summary) : null;
+  const drivers = insight?.drivers || [];
+  const whatWorking = insight?.whatWorking || [];
+  const whereToFocus = insight?.whereToFocus || [];
+  const bm = report?.baselineMetrics;
+  const tone = bm?.recentAverage != null ? scoreTone(bm.recentAverage, t) : null;
+  const momentsDelta = report?.weeklyDeltas?.totalMomentsDelta ?? null;
+  const compound = report?.compoundPatterns;
+  const invoked = report?.invokedMetrics;
+  const traj = report?.weeklyEmotionTrajectory || [];
+  const history = report?.insightHistory || [];
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [expandedInsight, setExpandedInsight] = useState(null);
+
+  const headsUp = [];
+  if (compound?.crashRisk) headsUp.push({ icon: "⚠️", color: palette.danger, label: t("report.crashRiskLabel"), body: t("report.crashRiskBody") });
+  if (compound?.falseRecovery) headsUp.push({ icon: "🔄", color: palette.warning, label: t("report.falseRecoveryLabel"), body: t("report.falseRecoveryBody") });
+  if (invoked?.weeklyMasking?.level && invoked.weeklyMasking.level !== "none") headsUp.push({ icon: "🎭", color: palette.purple, label: t("report.maskingLevel", { level: invoked.weeklyMasking.level }), body: t("report.maskingBody") });
+
+  const nothing = !summary && !traj.length && !drivers.length && !headsUp.length;
+
+  return (
+    <View style={s.tabContent}>
+      {/* 1 · The week, written for you (LLM narrative) */}
+      {summary ? (
+        <AnimatedSection index={0} style={s.section}>
+          <View style={s.weekHeadRow}>
+            <SectionHeader label={t("report.weekStory")} badge="weekly" t={t} />
+            {momentsDelta ? <DeltaChip value={momentsDelta} /> : null}
+          </View>
+          <GeneratedSummary text={summary} tone={tone} t={t} />
+        </AnimatedSection>
+      ) : null}
+
+      {/* 2 · Emotional tone, day by day */}
+      {traj.length >= 1 ? (
+        <AnimatedSection index={1} style={s.section}>
           <SectionHeader label={t("report.emotionalTone")} badge="live" t={t} />
           <View style={s.card}>
-            <Text style={s.trajectoryHint}>
-              {report.weeklyEmotionTrajectory.length === 1 ? t("report.toneFromDays") : t("report.toneShifted")}
-            </Text>
-            {report.trajectoryNote ? renderColoredText(cleanText(report.trajectoryNote), t, s.trajectoryNote) : null}
+            {report.trajectoryNote
+              ? renderColoredText(cleanText(report.trajectoryNote), t, s.trajectoryNote)
+              : <Text style={s.trajectoryHint}>{traj.length === 1 ? t("report.toneFromDays") : t("report.toneShifted")}</Text>}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-              {report.weeklyEmotionTrajectory.map((day) => {
-                const tone = scoreTone(day.score, t);
+              {traj.map((day) => {
+                const dtone = scoreTone(day.score, t);
                 return (
-                  <Pressable style={[s.trajectoryDay, { borderColor: tone.color + "30" }]} key={day.date} onPress={() => selection()}>
-                    <Text style={s.trajectoryEmoji}>{tone.emoji}</Text>
-                    <Text style={[s.trajectoryLabel, { color: tone.color }]}>{tone.label}</Text>
+                  <Pressable style={[s.trajectoryDay, { borderColor: dtone.color + "40", backgroundColor: dtone.color + "0f" }]} key={day.date} onPress={() => selection()}>
+                    <Text style={s.trajectoryEmoji}>{dtone.emoji}</Text>
+                    <Text style={[s.trajectoryLabel, { color: dtone.color }]}>{dtone.label}</Text>
                     <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { weekday: "short" })}</Text>
                   </Pressable>
                 );
@@ -831,176 +588,138 @@ function ThisWeekTab({ report, dq, isSignedIn, handleSignIn, router, t, lang }) 
             </ScrollView>
             {(report.positiveStreak?.days >= 2 || report.negativeStreak?.days >= 2) ? (
               <Text style={[s.trajectoryNote, { marginTop: 6 }]}>
-                {report.negativeStreak?.days >= 2
-                  ? t("report.lowStretch", { days: report.negativeStreak.days })
-                  : t("report.highStretch", { days: report.positiveStreak.days })}
+                {report.negativeStreak?.days >= 2 ? t("report.lowStretch", { days: report.negativeStreak.days }) : t("report.highStretch", { days: report.positiveStreak.days })}
               </Text>
             ) : null}
           </View>
         </AnimatedSection>
       ) : null}
 
-      {/* Drift timeline */}
-      {bm?.dailyDrift?.length >= 2 ? (
+      {/* 3 · What connected (one consolidated trigger → emotion view) */}
+      {drivers.length ? (
         <AnimatedSection index={2} style={s.section}>
-          <SectionHeader label={t("report.driftFromBaseline")} badge="live" t={t} />
-          <View style={s.card}>
-            <Text style={s.trajectoryHint}>{t("report.driftHint")}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.trajectoryScroll}>
-              {bm.dailyDrift.map((day) => {
-                const color = day.deviation >= 0.2 ? palette.success : day.deviation <= -0.2 ? palette.danger : palette.muted;
-                const icon = day.deviation >= 0.4 ? "↑↑" : day.deviation >= 0.2 ? "↑" : day.deviation <= -0.4 ? "↓↓" : day.deviation <= -0.2 ? "↓" : "—";
-                return (
-                  <View style={[s.driftDay, { borderColor: color + "40" }]} key={day.date}>
-                    <Text style={[s.driftBar, { color }]}>{icon}</Text>
-                    <Text style={s.trajectoryDate}>{new Date(day.date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { weekday: "short" })}</Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
+          <SectionHeader label={t("report.weekConnected")} badge="live" t={t} />
+          <WeekConnected drivers={drivers} t={t} />
         </AnimatedSection>
       ) : null}
 
-      {/* Emotions breakdown — circular gradient wheel + bar legend */}
-      {emotionEntries.length ? (
+      {/* 4 · What's working / where to focus (LLM, trimmed to the top two) */}
+      {(whatWorking.length || whereToFocus.length) ? (
         <AnimatedSection index={3} style={s.section}>
-          <SectionHeader label={t("report.emotionsTitle")} badge="live" t={t} extra={t("report.recorded", { count: dq.uniqueEmotions || 0 })} />
-          <View style={s.card}>
-            {emotionEntries.map(([key, value]) => (
-              <HBar key={key} label={t("emotions." + key) || key} value={value} max={emotionMax} color={EMOTION_COLORS[key] || palette.warning} icon={EMOTION_EMOJIS[key]} highlight />
-            ))}
-          </View>
+          {whatWorking.length ? (
+            <>
+              <Text style={s.sectionTitle}>{t("report.whatWorking")}</Text>
+              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.success, marginBottom: 8 }]}>
+                {whatWorking.slice(0, 2).map((item, i) => (<View key={i}>{renderColoredText(item.text, t, s.focusText)}</View>))}
+              </View>
+            </>
+          ) : null}
+          {whereToFocus.length ? (
+            <>
+              <Text style={s.sectionTitle}>{t("report.whereToFocus")}</Text>
+              <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: palette.warning }]}>
+                {whereToFocus.slice(0, 2).map((item, i) => (<View key={i}>{renderColoredText(item.text, t, s.focusText)}</View>))}
+              </View>
+            </>
+          ) : null}
         </AnimatedSection>
       ) : null}
 
-      {/* Triggers breakdown */}
-      {triggerEntries.length ? (
+      {/* 5 · Heads-up — only when genuine concern signals are present */}
+      {headsUp.length ? (
         <AnimatedSection index={4} style={s.section}>
-          <SectionHeader label={t("report.triggersTitle")} badge="live" t={t} extra={t("report.areasCount", { count: dq.uniqueTriggers || 0 })} />
-          <View style={s.card}>
-            {triggerEntries.map(([key, value]) => (
-              <HBar key={key} label={triggerDisplay(key, t)} value={value} max={triggerMax} color={TRIGGER_COLORS[key] || palette.accent} highlight />
-            ))}
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Time of day */}
-      {dq.hasEnoughForRhythm && timeEntries.length ? (
-        <AnimatedSection index={5} style={s.section}>
-          <SectionHeader label={t("report.whenLogged")} badge="live" t={t} />
-          <View style={s.card}>
-            {timeEntries.map(([key, value]) => (
-              <HBar key={key} label={t("report.times." + key) || key} value={value} max={timeMax} color={TIME_COLORS[key] || palette.warning} icon={TIME_ICONS[key]} />
-            ))}
-          </View>
-        </AnimatedSection>
-      ) : null}
-
-      {/* Correlations — free for everyone (it's the user's own data) */}
-      {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
-        <AnimatedSection index={6} style={s.section}>
-          <SectionHeader label={t("report.triggerEmotion")} badge="live" t={t} />
-          <View style={s.card}>
-            {Object.entries(report.correlations).slice(0, 5).map(([trigger, emotions]) => {
-              const tColor = TRIGGER_COLORS[trigger] || palette.accent;
-              return (
-                <View style={s.correlationRow} key={trigger}>
-                  <Text style={[s.correlationTrigger, { color: tColor }]}>{triggerDisplay(trigger, t)}</Text>
-                  <View style={s.correlationChips}>
-                    {Object.entries(emotions).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 3).map(([emo, count]) => {
-                      const emoColor = EMOTION_COLORS[emo] || palette.text;
-                      return (
-                        <View style={[s.correlationChip, { backgroundColor: emoColor + "15", borderColor: emoColor + "40" }]} key={emo}>
-                          <Text style={[s.correlationChipText, { color: emoColor }]}>{EMOTION_EMOJIS[emo] || ""} {t("emotions." + emo) || emo} ×{count}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
+          <SectionHeader label={t("report.headsUp")} badge="weekly" t={t} />
+          <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: headsUp[0].color }]}>
+            {headsUp.map((h, i) => (
+              <View key={i} style={[s.signalRow, i > 0 && { borderTopWidth: 1, borderTopColor: palette.glassBorder, paddingTop: 8, marginTop: 4 }]}>
+                <Text style={[s.signalIcon, { color: h.color }]}>{h.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.signalLabel, { color: h.color }]}>{h.label}</Text>
+                  <Text style={s.signalBody}>{h.body}</Text>
                 </View>
+              </View>
+            ))}
+          </View>
+        </AnimatedSection>
+      ) : null}
+
+      {/* 6 · Past insights — archive, demoted to the bottom */}
+      {history.length ? (
+        <AnimatedSection index={5} style={s.section}>
+          <SectionHeader label={t("report.prem.pastInsights")} badge="archive" t={t} />
+          <View style={s.pastInsightsList}>
+            {(historyExpanded ? history : history.slice(0, 3)).map((entry, idx) => {
+              const isOpen = expandedInsight === (entry.generatedAt || idx);
+              const preview = (entry.narrative || "").split(/\n\s*\n/)[0] || entry.narrative || "";
+              return (
+                <Pressable key={entry.generatedAt || idx} style={[s.pastInsightCard, isOpen && { borderColor: palette.accent + "60" }]} onPress={() => { tap(); setExpandedInsight(isOpen ? null : (entry.generatedAt || idx)); }} accessibilityRole="button">
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={s.pastInsightDate}>{entry.weekLabel || (entry.generatedAt ? localeDateStr(entry.generatedAt, lang) : "")}</Text>
+                    <Text style={{ color: palette.muted, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</Text>
+                  </View>
+                  {isOpen
+                    ? <PastInsightExpanded narrative={entry.narrative} t={t} />
+                    : <Text style={s.pastInsightPreview} numberOfLines={2}>{cleanText(preview)}</Text>}
+                </Pressable>
               );
             })}
+            {history.length > 3 ? (
+              <Pressable style={s.pastInsightToggle} onPress={() => { tap(); setHistoryExpanded((v) => !v); }} accessibilityRole="button">
+                <Text style={s.pastInsightToggleText}>{historyExpanded ? t("report.prem.showLess") : t("report.prem.showMore", { count: history.length - 3 })}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </AnimatedSection>
       ) : null}
 
       {/* Timeline CTA */}
-      <AnimatedSection index={7} style={s.section}>
+      <AnimatedSection index={6} style={s.section}>
         <Pressable style={s.ctaCard} onPress={() => { tap(); router.push("/(tabs)/timeline"); }} accessibilityRole="button">
           <Text style={s.ctaCardText}>📖 {t("report.viewTimeline")}</Text>
         </Pressable>
       </AnimatedSection>
+
+      {nothing ? (
+        <View style={s.card}><Text style={s.aiSummary}>{t("report.logMoreForState")}</Text></View>
+      ) : null}
     </View>
   );
 }
 
 /* ── Tab 3: Actions (behavioural) ── */
 
-function ActionsTab({ report, deviceId, token, onFeedback, t }) {
-  const actions = report?.actions || [];
-  const feedback = report?.actionFeedback || [];
-
-  // Build responded map from backend feedback, matching by base ID
-  // (strips epoch suffix -rN so feedback persists across rotations)
-  const backendResponded = useMemo(() => {
-    const map = {};
-    const feedbackByBase = {};
-    for (const f of feedback) {
-      map[f.actionId] = f.response;
-      const base = f.actionId.replace(/-r\d+$/, "");
-      feedbackByBase[base] = f.response;
-    }
-    // Match current actions to feedback by base ID
-    for (const action of actions) {
-      if (!map[action.id]) {
-        const actionBase = action.id.replace(/-r\d+$/, "");
-        if (feedbackByBase[actionBase]) {
-          map[action.id] = feedbackByBase[actionBase];
-        }
-      }
-    }
-    return map;
-  }, [report]);
-
-  // Local optimistic overrides (for in-flight feedback submissions)
-  const [localResponded, setLocalResponded] = useState({});
-  const responded = { ...backendResponded, ...localResponded };
+function ActionsTab({ report, t, responses, onActionFeedback, primaryActionId }) {
+  const allActions = report?.actions || [];
+  // The single most relevant action already leads the Read tab. Don't double up
+  // here — show the rest. Feedback is shared, so a tap in either place sticks.
+  const actions = allActions.filter((a) => a.id !== primaryActionId);
+  const primaryShownInRead = allActions.length !== actions.length;
 
   const [submitting, setSubmitting] = useState(null);
-  const [feedbackAck, setFeedbackAck] = useState({});
   const [errorId, setErrorId] = useState(null);
   const lastAttempt = useRef({});
 
   async function handleResponse(actionId, response) {
-    if (responded[actionId] || submitting) return;
+    if (resolveActionResponse(responses, actionId) || submitting) return;
     setSubmitting(actionId);
     setErrorId(null);
     lastAttempt.current[actionId] = response;
-    tap();
     try {
-      await submitActionFeedback(actionId, response, deviceId, token);
-      setLocalResponded((prev) => ({ ...prev, [actionId]: response }));
-      setFeedbackAck((prev) => ({ ...prev, [actionId]: response === "helped" ? t("report.markedHelpful") : t("report.adjustThis") }));
-      trackEvent("action_feedback", { actionId, response });
-      if (onFeedback) onFeedback(actionId, response);
-    } catch (err) {
-      console.error("Action feedback failed:", err?.message || err);
+      await onActionFeedback(actionId, response);
+    } catch {
       setErrorId(actionId);
     } finally {
       setSubmitting(null);
     }
   }
 
-  if (!actions.length) {
+  if (!allActions.length) {
     return (
       <View style={s.tabContent}>
         <View style={s.insightStateCard}>
           <Text style={s.insightStateIcon}>⚡</Text>
           <Text style={s.insightStateTitle}>{t("report.actionsOnWay")}</Text>
-          <Text style={s.insightStateBody}>
-            {t("report.actionsOnWayBody")}
-          </Text>
+          <Text style={s.insightStateBody}>{t("report.actionsOnWayBody")}</Text>
         </View>
       </View>
     );
@@ -1009,15 +728,17 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
   return (
     <View style={s.tabContent}>
       <AnimatedSection index={0} style={s.section}>
-        <SectionHeader label={t("report.thisWeeksActions")} badge="live" t={t} extra={actions.length !== 1 ? t("report.suggestionsCountPlural", { count: actions.length }) : t("report.suggestionsCount", { count: actions.length })} />
-        <Text style={{ color: palette.textSecondary, fontSize: 12, marginBottom: 4 }}>
-          {t("report.basedOnPatterns")}
-        </Text>
+        <SectionHeader
+          label={t("report.thisWeeksActions")}
+          badge="live"
+          t={t}
+          extra={actions.length ? (actions.length !== 1 ? t("report.suggestionsCountPlural", { count: actions.length }) : t("report.suggestionsCount", { count: actions.length })) : null}
+        />
+        <Text style={s.actionsLede}>{primaryShownInRead ? t("report.alreadyInRead") : t("report.basedOnPatterns")}</Text>
       </AnimatedSection>
 
       {actions.map((action, i) => {
-        const done = responded[action.id];
-        const ack = feedbackAck[action.id];
+        const done = resolveActionResponse(responses, action.id);
         const isBusy = submitting === action.id;
         const hasError = errorId === action.id;
         return (
@@ -1034,7 +755,7 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
               {done ? (
                 <View style={[s.actionFeedbackDone, { backgroundColor: done === "helped" ? palette.successSoft : palette.warningSoft }]}>
                   <Text style={[s.actionFeedbackDoneText, { color: done === "helped" ? palette.success : palette.warning }]}>
-                    {done === "helped" ? "✓ " : "✕ "}{ack || (done === "helped" ? t("report.markedHelpful") : t("report.adjustThis"))}
+                    {done === "helped" ? `✓ ${t("report.markedHelpful")}` : `✕ ${t("report.adjustThis")}`}
                   </Text>
                 </View>
               ) : (
@@ -1063,15 +784,17 @@ function ActionsTab({ report, deviceId, token, onFeedback, t }) {
               )}
               {hasError ? (
                 <Pressable onPress={() => handleResponse(action.id, lastAttempt.current[action.id] || "helped")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>
-                    {t("common.retryError") || "Something went wrong, tap to retry"}
-                  </Text>
+                  <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4, textAlign: "center" }}>{t("common.retryError") || "Something went wrong, tap to retry"}</Text>
                 </Pressable>
               ) : null}
             </View>
           </AnimatedSection>
         );
       })}
+
+      {!actions.length ? (
+        <View style={s.card}><Text style={s.aiSummary}>{t("report.alreadyInRead")}</Text></View>
+      ) : null}
     </View>
   );
 }
@@ -1888,9 +1611,13 @@ function ModeCards({ mode, data, t, lang, onFeedback, isPremium, dominantEmotion
     const error = feedbackError[itemId];
 
     if (given) {
+      // Colour the acknowledgement by polarity so a "not helpful" tap is clearly
+      // registered (it isn't silently treated as helpful).
+      const ok = given === "helpful";
+      const c = ok ? palette.success : palette.warning;
       return (
-        <View style={s.modeFeedbackDone}>
-          <Text style={s.modeFeedbackDoneText}>{given === "helpful" ? `✓ ${t("report.prem.mode.thanksHelpful")}` : t("report.prem.mode.thanksNot")}</Text>
+        <View style={[s.modeFeedbackDone, { alignSelf: "flex-start", borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, backgroundColor: c + "14", borderColor: c + "33" }]}>
+          <Text style={[s.modeFeedbackDoneText, { color: c }]}>{ok ? `✓ ${t("report.prem.mode.thanksHelpful")}` : `✕ ${t("report.prem.mode.thanksNot")}`}</Text>
         </View>
       );
     }
@@ -2498,13 +2225,46 @@ export function WeeklyReportScreen() {
     // are picked up on the next focus refresh.
   }, [token, deviceId]);
 
-  const handleActionFeedback = useCallback((actionId, response) => {
+  // Shared action-feedback map: the Read "one thing to try" and the For You list
+  // read the same state, so a tap in either place is reflected in both.
+  const [actionResponses, setActionResponses] = useState({});
+
+  // Seed it from the loaded report (keyed by exact id AND base id, so feedback
+  // survives action-id rotation -rN across both surfaces).
+  useEffect(() => {
+    const fb = report?.actionFeedback || [];
+    if (!fb.length) return;
+    setActionResponses((prev) => {
+      const next = { ...prev };
+      for (const f of fb) {
+        next[f.actionId] = f.response;
+        next[`base:${f.actionId.replace(/-r\d+$/, "")}`] = f.response;
+      }
+      return next;
+    });
+  }, [report]);
+
+  const handleActionFeedback = useCallback(async (actionId, response) => {
+    const baseKey = `base:${actionId.replace(/-r\d+$/, "")}`;
+    // Optimistic shared update first — both surfaces update instantly.
+    setActionResponses((prev) => ({ ...prev, [actionId]: response, [baseKey]: response }));
     trackEvent("action_feedback", { actionId, response });
-    // Only invalidate cache — do NOT reload the report here.
-    // The optimistic UI in ActionsTab already shows the feedback.
-    // Fresh actions will be fetched on next report load (new moment, tab revisit, etc).
-    invalidateCache("weeklyReport");
-  }, [invalidateCache]);
+    try {
+      // Previously this only invalidated the cache and never persisted, so Read's
+      // feedback silently did nothing. Now it actually submits.
+      await submitActionFeedback(actionId, response, deviceId, token);
+      invalidateCache("weeklyReport");
+    } catch (err) {
+      console.error("Action feedback failed:", err?.message || err);
+      setActionResponses((prev) => {
+        const next = { ...prev };
+        delete next[actionId];
+        delete next[baseKey];
+        return next;
+      });
+      throw err; // let the calling surface show its retry affordance
+    }
+  }, [deviceId, token, invalidateCache]);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
@@ -2621,12 +2381,10 @@ export function WeeklyReportScreen() {
                     lang={lang}
                     onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
                     onActionFeedback={handleActionFeedback}
+                    actionResponse={resolveActionResponse(actionResponses, signal?.action?.id)}
                   />
                 ) : activeTab === "week" ? (
-                  <>
-                    <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
-                    <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
-                  </>
+                  <WeekTab report={report} dq={dq} confidence={confidence} dominantEmotion={dominantEmotion} router={router} t={t} lang={lang} />
                 ) : activeTab === "progress" ? (
                   <ProgressTab
                     progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
@@ -2634,7 +2392,12 @@ export function WeeklyReportScreen() {
                   />
                 ) : (
                   <>
-                    <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
+                    <ActionsTab report={report} t={t} responses={actionResponses} onActionFeedback={handleActionFeedback} primaryActionId={signal?.action?.id} />
+                    <View style={s.forYouDivider}>
+                      <View style={s.forYouDividerLine} />
+                      <Text style={s.forYouDividerText}>✦ {t("report.moreForYou")}</Text>
+                      <View style={s.forYouDividerLine} />
+                    </View>
                     <PremiumTab
                       report={report} dq={dq} confidence={confidence}
                       isSignedIn={isSignedIn} isPremium={isPremium}
@@ -2655,6 +2418,7 @@ export function WeeklyReportScreen() {
                 lang={lang}
                 onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
                 onActionFeedback={handleActionFeedback}
+                actionResponse={resolveActionResponse(actionResponses, signal?.action?.id)}
               />
             )
           ) : null}
@@ -3375,4 +3139,37 @@ const s = StyleSheet.create({
   suggestionMatch: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   suggestionMatchText: { color: "#5ee6a0", fontSize: 11, fontWeight: "700" },
   suggestionCounter: { color: palette.muted, fontSize: 10, fontWeight: "600", textAlign: "right", marginTop: 4 },
+
+  /* ── This Week: generated summary + connected + dividers ── */
+  weekHeadRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  genCard: {
+    position: "relative", overflow: "hidden",
+    borderRadius: radius.md, padding: 16, gap: 4,
+    backgroundColor: palette.card, borderWidth: 1, borderColor: palette.glassBorder,
+    borderLeftWidth: 3, borderLeftColor: palette.accent,
+  },
+  genGlow: { position: "absolute", top: -50, right: -30, width: 150, height: 150, borderRadius: 75 },
+  genTagRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  genTag: {
+    alignSelf: "flex-start", overflow: "hidden",
+    paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1,
+    fontSize: 10, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase",
+  },
+  genToneEmoji: { fontSize: 18 },
+  genText: { color: palette.text, fontSize: 14.5, lineHeight: 22, marginBottom: 4 },
+  genHint: { color: palette.muted, fontSize: 11, fontStyle: "italic", marginTop: 6 },
+  focusText: { color: palette.text, fontSize: 13, lineHeight: 19 },
+
+  connRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingVertical: 9 },
+  connRowBorder: { borderTopWidth: 1, borderTopColor: palette.glassBorder },
+  connFlow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "nowrap" },
+  connTrigger: { fontSize: 13.5, fontWeight: "700", textTransform: "capitalize", flexShrink: 1 },
+  connArrow: { color: palette.muted, fontSize: 13, fontWeight: "700" },
+  connEmotion: { fontSize: 13, fontWeight: "600", textTransform: "capitalize", flexShrink: 1 },
+
+  actionsLede: { color: palette.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: 2 },
+
+  forYouDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
+  forYouDividerLine: { flex: 1, height: 1, backgroundColor: palette.glassBorder },
+  forYouDividerText: { color: palette.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
 });

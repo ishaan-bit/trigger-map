@@ -226,8 +226,11 @@ function computeLikedTriggers(feedback) {
     const parts = (entry.actionId || "").split("-");
     const trigger = parts.length >= 2 ? parts[1] : null;
     if (!trigger) continue;
-    if (entry.response === "tried") triedTriggers.add(trigger);
-    if (entry.response === "skipped") skippedTriggers.add(trigger);
+    // Accept both the app's labels ("helped"/"not_helpful") and the legacy
+    // ("tried"/"skipped") ones. Before this, app feedback was silently dropped
+    // here, so likedTriggers stayed empty and dislikes never suppressed.
+    if (entry.response === "tried" || entry.response === "helped") triedTriggers.add(trigger);
+    if (entry.response === "skipped" || entry.response === "not_helpful") skippedTriggers.add(trigger);
   }
   // Keep triggers that were tried at least once
   return [...triedTriggers];
@@ -294,7 +297,7 @@ export async function generateForOwner(ownerId, { model, apiUrl, force, signal }
 
       const newPrefs = {
         likedTriggers,
-        dislikedApproaches: feedback.filter(f => f.response === "skipped").map(f => f.actionId),
+        dislikedApproaches: feedback.filter(f => f.response === "skipped" || f.response === "not_helpful").map(f => f.actionId),
         llmActions: actions,
         llmGeneratedAt: new Date().toISOString(),
         llmModel: model,

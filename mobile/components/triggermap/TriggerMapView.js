@@ -15,7 +15,7 @@
  * presentation only. Tone stays calm and non-clinical: patterns from the user's
  * own logs, never a diagnosis.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { palette, spacing, radius, type } from "@/utils/theme";
 import { FadeInView, AppearScale, Pulse, PressableScale } from "@/components/motion";
@@ -41,15 +41,21 @@ function SectionLabel({ children, color }) {
 }
 
 /* ── One inline action ── */
-function ActionCard({ action, t, onFeedback }) {
-  const [responded, setResponded] = useState(null);
+function ActionCard({ action, t, onFeedback, response }) {
+  // Seed from the shared response so feedback given in For You shows here too.
+  const [responded, setResponded] = useState(response || null);
+  useEffect(() => { if (response) setResponded(response); }, [response]);
   if (!action) return null;
   const icon = ACTION_ICON[action.type] || "🌿";
-  const submit = (response) => {
+  const submit = async (r) => {
     if (responded) return;
     tap();
-    setResponded(response);
-    onFeedback?.(action.id, response);
+    setResponded(r); // optimistic
+    try {
+      await onFeedback?.(action.id, r); // now actually persists (and carries to For You)
+    } catch {
+      setResponded(null); // submit failed — let the user try again
+    }
   };
   return (
     <FadeInView style={styles.actionCard}>
@@ -59,7 +65,7 @@ function ActionCard({ action, t, onFeedback }) {
       </View>
       {action.reason ? <Text style={styles.actionReason}>{action.reason}</Text> : null}
       {responded ? (
-        <Text style={styles.actionThanks}>{t("triggerMap.action.thanks")}</Text>
+        <Text style={[styles.actionThanks, responded === "not_helpful" && { color: palette.warning }]}>{t("triggerMap.action.thanks")}</Text>
       ) : (
         <View style={styles.actionBtns}>
           <PressableScale style={[styles.actionBtn, styles.actionBtnYes]} onPress={() => submit("helped")}>
@@ -144,7 +150,7 @@ function StarterState({ signal, t, onLogMoment }) {
   );
 }
 
-export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback }) {
+export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback, actionResponse }) {
   if (!signal) return null;
 
   // First & second log get a real, personal map — not a half-empty shell.
@@ -220,7 +226,7 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback 
       {signal.action ? (
         <View style={styles.section}>
           <SectionLabel color={palette.accent}>{t("triggerMap.action.title")}</SectionLabel>
-          <ActionCard action={signal.action} t={t} onFeedback={onActionFeedback} />
+          <ActionCard action={signal.action} t={t} onFeedback={onActionFeedback} response={actionResponse} />
         </View>
       ) : null}
 
