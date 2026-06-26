@@ -16,13 +16,13 @@
  * own logs, never a diagnosis.
  */
 import { useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { palette, spacing, radius, type } from "@/utils/theme";
 import { FadeInView, AppearScale, Pulse, PressableScale } from "@/components/motion";
 import { tap } from "@/utils/haptics";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { buildHeadline, dormantBody, confidenceLabel, buildDrivers, buildChanges, buildWatch } from "@/utils/triggerCopy";
-import { TriggerBarometer } from "./TriggerBarometer";
+import { buildHeadline, dormantBody, confidenceLabel, buildChanges, buildWatch } from "@/utils/triggerCopy";
+import { Signal } from "./Signal";
 import { ConnectedPatterns } from "./ConnectedPatterns";
 import { SeedMap } from "./SeedMap";
 
@@ -34,33 +34,6 @@ const TONE = {
   calm: { color: palette.success, glyph: "●", pulse: false },
   neutral: { color: palette.accent, glyph: "○", pulse: false },
 };
-
-/* ── Hero ── */
-function Headline({ signal, t }) {
-  const tone = TONE[signal.headline.tone] || TONE.neutral;
-  const copy = buildHeadline(signal, t);
-  const conf = confidenceLabel(signal, t);
-  return (
-    <FadeInView style={styles.hero}>
-      <View style={styles.heroRow}>
-        <AppearScale style={styles.orbWrap}>
-          {tone.pulse ? <Pulse style={[styles.orbGlow, { backgroundColor: tone.color + "33" }]} /> : null}
-          <View style={[styles.orb, { borderColor: tone.color, backgroundColor: tone.color + "1f" }]}>
-            <Text style={[styles.orbGlyph, { color: tone.color }]}>{tone.glyph}</Text>
-          </View>
-        </AppearScale>
-        <View style={styles.heroText}>
-          <Text style={styles.kicker}>{t("triggerMap.kicker")}</Text>
-          <Text style={styles.heroTitle}>{copy.title}</Text>
-        </View>
-      </View>
-      <Text style={styles.heroBody}>{copy.body}</Text>
-      <View style={[styles.confChip, { borderColor: tone.color + "44", backgroundColor: tone.color + "14" }]}>
-        <Text style={[styles.confChipText, { color: tone.color }]}>{conf}</Text>
-      </View>
-    </FadeInView>
-  );
-}
 
 /* ── Section heading ── */
 function SectionLabel({ children, color }) {
@@ -171,30 +144,7 @@ function StarterState({ signal, t, onLogMoment }) {
   );
 }
 
-/* ── Explore (demoted depth) ── */
-function ExploreMore({ t, children }) {
-  const [open, setOpen] = useState(false);
-  if (!children) return null;
-  return (
-    <View style={styles.explore}>
-      <Pressable
-        onPress={() => { tap(); setOpen((v) => !v); }}
-        style={styles.exploreToggle}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-      >
-        <View>
-          <Text style={styles.exploreTitle}>{open ? t("triggerMap.explore.close") : t("triggerMap.explore.open")}</Text>
-          {!open ? <Text style={styles.exploreHint}>{t("triggerMap.explore.hint")}</Text> : null}
-        </View>
-        <Text style={styles.exploreChevron}>{open ? "▴" : "▾"}</Text>
-      </Pressable>
-      {open ? <FadeInView style={styles.exploreBody}>{children}</FadeInView> : null}
-    </View>
-  );
-}
-
-export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback, renderExplore }) {
+export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback }) {
   if (!signal) return null;
 
   // First & second log get a real, personal map — not a half-empty shell.
@@ -202,7 +152,6 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback,
     return (
       <View style={styles.container}>
         <SeedExperience signal={signal} t={t} onLogMoment={onLogMoment} />
-        <ExploreMore t={t}>{renderExplore?.()}</ExploreMore>
       </View>
     );
   }
@@ -212,36 +161,13 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback,
     return (
       <View style={styles.container}>
         <StarterState signal={signal} t={t} onLogMoment={onLogMoment} />
-        <ExploreMore t={t}>{renderExplore?.()}</ExploreMore>
       </View>
     );
   }
 
-  const drivers = buildDrivers(signal, t);
   const changes = buildChanges(signal, t);
   const watch = buildWatch(signal, t);
   const { friction, regulators } = signal.connected;
-
-  const barometerLabels = {
-    subtitle: t("triggerMap.barometer.subtitle"),
-    notEnough: t("triggerMap.barometer.notEnough"),
-    zones: {
-      steady: t("triggerMap.barometer.zones.steady"),
-      shifting: t("triggerMap.barometer.zones.shifting"),
-      building: t("triggerMap.barometer.zones.building"),
-    },
-    direction: {
-      easing: t("triggerMap.barometer.direction.easing"),
-      holding: t("triggerMap.barometer.direction.holding"),
-      rising: t("triggerMap.barometer.direction.rising"),
-    },
-    divergence: {
-      title: t("triggerMap.barometer.divergence.title"),
-      surface: t("triggerMap.barometer.divergence.surface"),
-      ground: t("triggerMap.barometer.divergence.ground"),
-      body: t("triggerMap.barometer.divergence.body"),
-    },
-  };
 
   const connectedLabels = {
     frictionTitle: t("triggerMap.connected.frictionTitle"),
@@ -254,9 +180,7 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback,
 
   return (
     <View style={styles.container}>
-      <Headline signal={signal} t={t} />
-
-      <TriggerBarometer barometer={signal.barometer} drivers={drivers} labels={barometerLabels} />
+      <Signal signal={signal} t={t} />
 
       {(friction.length || regulators.length) ? (
         <View style={styles.section}>
@@ -301,8 +225,6 @@ export function TriggerMapView({ signal, t, lang, onLogMoment, onActionFeedback,
       ) : null}
 
       <Text style={styles.disclaimer}>{t("triggerMap.disclaimer")}</Text>
-
-      <ExploreMore t={t}>{renderExplore?.()}</ExploreMore>
     </View>
   );
 }
@@ -385,24 +307,6 @@ const styles = StyleSheet.create({
 
   /* Disclaimer */
   disclaimer: { color: palette.muted, fontSize: 12, lineHeight: 17, textAlign: "center", marginTop: spacing.lg, opacity: 0.8 },
-
-  /* Explore */
-  explore: { marginTop: spacing.lg },
-  exploreToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: palette.glass,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  exploreTitle: { color: palette.text, fontSize: 15, fontWeight: "700" },
-  exploreHint: { color: palette.muted, fontSize: 12.5, marginTop: 2 },
-  exploreChevron: { color: palette.accent, fontSize: 16, fontWeight: "800" },
-  exploreBody: { marginTop: spacing.md },
 });
 
 export default TriggerMapView;

@@ -578,7 +578,7 @@ export function TimelineScreen() {
                 <View key={moment.id} style={styles.timelineItem}>
                   {/* Connector dot + line */}
                   <View style={styles.connectorColumn}>
-                    <View style={[styles.connectorDot, { backgroundColor: emotionColor }]} />
+                    <View style={[styles.connectorDot, { backgroundColor: emotionColor, shadowColor: emotionColor }]} />
                     {!isLast && <View style={[styles.connectorLine, { backgroundColor: `${emotionColor}40` }]} />}
                   </View>
                   <Animated.View style={[styles.timelineCardWrap, isHighlighted && {
@@ -637,12 +637,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1.4,
     textTransform: "uppercase",
+    textShadowColor: palette.accentGlow,
+    textShadowRadius: 12,
   },
   title: {
     color: palette.text,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "800",
+    letterSpacing: -0.6,
+    textShadowColor: "rgba(0,0,0,0.45)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 14,
   },
   subtitle: {
     color: palette.textSecondary,
@@ -665,9 +671,15 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   connectorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.25)",
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
   },
   connectorLine: {
     width: 2,

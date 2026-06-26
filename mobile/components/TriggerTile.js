@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { palette, radius } from "@/utils/theme";
 import { tap } from "@/utils/haptics";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -20,22 +19,6 @@ const TRIGGER_ICONS = {
   travel: "📍",
   other: "📌",
 };
-
-/* Soft luminous halo behind the icon, in the trigger's colour. */
-function IconGlow({ color, id }) {
-  return (
-    <Svg width={86} height={86} style={styles.glow} pointerEvents="none">
-      <Defs>
-        <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-          <Stop offset="0" stopColor={color} stopOpacity="0.55" />
-          <Stop offset="0.6" stopColor={color} stopOpacity="0.18" />
-          <Stop offset="1" stopColor={color} stopOpacity="0" />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={43} cy={43} r={43} fill={`url(#${id})`} />
-    </Svg>
-  );
-}
 
 export function TriggerTile({ label, onPress }) {
   const color = TRIGGER_COLORS[label] || palette.accent;
@@ -59,22 +42,24 @@ export function TriggerTile({ label, onPress }) {
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.tile, { borderColor: color + "59", shadowColor: color }]}
+        style={[styles.tile, { borderColor: color + "4d", shadowColor: color }]}
       >
         {/* Depth fill: trigger colour glass fading into deep space. */}
         <LinearGradient
-          colors={[color + "2e", color + "12", "rgba(9, 14, 26, 0.65)"]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0.15, y: 0 }}
-          end={{ x: 0.85, y: 1 }}
+          colors={[color + "29", color + "10", "rgba(9, 14, 26, 0.55)"]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
-        <View style={[styles.topHighlight, { backgroundColor: color + "66" }]} pointerEvents="none" />
+        <View style={[styles.topHighlight, { backgroundColor: color + "5e" }]} pointerEvents="none" />
 
         <View style={styles.iconArea}>
-          <IconGlow color={color} id={`tile-${label}`} />
-          <View style={[styles.iconDisc, { borderColor: color + "73", backgroundColor: color + "26" }]}>
+          {/* Soft luminous halo — plain Views (no SVG layer → no Android black box). */}
+          <View style={[styles.halo, { backgroundColor: color + "1f" }]} pointerEvents="none" />
+          <View style={[styles.haloInner, { backgroundColor: color + "2e" }]} pointerEvents="none" />
+          <View style={[styles.iconDisc, { borderColor: color + "73", shadowColor: color }]}>
             <Text style={styles.icon}>{TRIGGER_ICONS[label] || "📌"}</Text>
           </View>
         </View>
@@ -98,7 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(11, 17, 30, 0.5)",
     gap: 9,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.26,
     shadowRadius: 14,
     elevation: 4,
   },
@@ -109,15 +94,31 @@ const styles = StyleSheet.create({
     right: radius.lg,
     height: 1,
   },
-  iconArea: { width: 52, height: 52, alignItems: "center", justifyContent: "center" },
-  glow: { position: "absolute", top: -17, left: -17 },
+  iconArea: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+  halo: {
+    position: "absolute",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    opacity: 0.9,
+  },
+  haloInner: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   iconDisc: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(8, 13, 24, 0.55)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 9,
   },
   icon: { fontSize: 24 },
   label: {

@@ -381,6 +381,7 @@
   },
   "report": {
     "tabMirror": "Mirror",
+    "tabRead": "Read",
     "tabThisWeek": "This week",
     "tabActions": "Actions",
     "tabPremium": "Premium",

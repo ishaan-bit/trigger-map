@@ -19,9 +19,9 @@ import { useAppSession } from "@/hooks/useAppSession";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { submitActionFeedback, fetchModes, submitModeFeedback, fetchProgress } from "@/services/api";
 import { trackEvent } from "@/services/analyticsService";
-import { palette, radius } from "@/utils/theme";
+import { palette, radius, motion } from "@/utils/theme";
 import { ProgressRing, Gauge, Sparkline, AnimatedBar } from "@/components/graphics";
-import { CountUpText, FadeInView, Pulse } from "@/components/motion";
+import { CountUpText, FadeInView, Pulse, Reanimated, withTiming, useSharedValue, useAnimatedStyle } from "@/components/motion";
 import { tap, selection } from "@/utils/haptics";
 import { TRIGGER_COLORS, EMOTION_COLORS as DS_EMOTION_COLORS, emotionStyle, triggerStyle, STAGGER_DELAY } from "@/utils/designSystem";
 import { useEmotionalState } from "@/hooks/useEmotionalState";
@@ -401,32 +401,49 @@ function NarrativeCard({ icon, title, items, positive, t }) {
 //   week    = your state + what happened this week (Mirror + This Week merged)
 //   progress = trends over time
 //   forYou  = what to do for you (Actions + adaptive Move/Fuel/Perspective + premium)
-const TAB_KEYS = [
-  { key: "week", labelKey: "report.tabThisWeek", icon: "📅" },
-  { key: "progress", labelKey: "report.progress.tabLabel", icon: "📈" },
-  { key: "forYou", labelKey: "report.tabForYou", icon: "✨" },
+/* ── Top-level segmented control: the read + its three depth surfaces, all
+   first-class (no buried accordion). An animated indicator slides under the
+   active segment. ── */
+const SEG_TABS = [
+  { key: "read", labelKey: "report.tabRead" },
+  { key: "week", labelKey: "report.tabThisWeek" },
+  { key: "progress", labelKey: "report.progress.tabLabel" },
+  { key: "forYou", labelKey: "report.tabForYou" },
 ];
 
-function TabBar({ activeTab, onTabChange, t }) {
+function SegmentedTabs({ activeTab, onTabChange, t }) {
+  const [w, setW] = useState(0);
+  const n = SEG_TABS.length;
+  const idx = Math.max(0, SEG_TABS.findIndex((x) => x.key === activeTab));
+  const seg = w > 0 ? (w - 8) / n : 0; // 8 = 4px padding each side
+  const tx = useSharedValue(0);
+  useEffect(() => {
+    tx.value = withTiming(idx * seg, { duration: motion.duration.fast });
+  }, [idx, seg, tx]);
+  const indicatorStyle = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
-      {TAB_KEYS.map((tab) => {
-        const active = activeTab === tab.key;
+    <View style={s.segWrap} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {seg > 0 ? (
+        <Reanimated.View style={[s.segIndicator, { width: seg }, indicatorStyle]} pointerEvents="none" />
+      ) : null}
+      {SEG_TABS.map((tab) => {
+        const active = tab.key === activeTab;
         return (
           <Pressable
             key={tab.key}
-            style={[s.tab, active && s.tabActive]}
+            style={s.segItem}
             onPress={() => { tap(); onTabChange(tab.key); }}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
           >
-            <Text style={[s.tabText, active && s.tabTextActive]}>
-              {tab.icon} {t(tab.labelKey)}
+            <Text style={[s.segText, active && s.segTextActive]} numberOfLines={1}>
+              {t(tab.labelKey)}
             </Text>
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -2382,7 +2399,7 @@ export function WeeklyReportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [purchasing, setPurchasing] = useState(false);
-  const [activeTab, setActiveTab] = useState("week");
+  const [activeTab, setActiveTab] = useState("read");
   const [modes, setModes] = useState(null);
   const [progress, setProgress] = useState(null);
   const [showInsightsGuide, setShowInsightsGuide] = useState(false);
@@ -2589,50 +2606,57 @@ export function WeeklyReportScreen() {
             </>
           ) : null}
 
-          {/* ── Redesigned Trigger Map: meaning-first narrative spine ──
-              The legacy 3-tab breakdown is preserved as opt-in "Explore" depth. */}
+          {/* ── Redesigned Trigger Map ──
+              "Read" leads with the early-detection signal; This Week / Progress /
+              For You are first-class peers in a top segmented control (no buried
+              accordion). Pre-pattern users (too early) just get the focused read. */}
           {report && !error ? (
-            <TriggerMapView
-              signal={signal}
-              t={t}
-              lang={lang}
-              onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
-              onActionFeedback={handleActionFeedback}
-              renderExplore={
-                showTabs
-                  ? () => (
-                      <>
-                        <TabBar activeTab={activeTab} onTabChange={setActiveTab} t={t} />
-                        {activeTab === "week" ? (
-                          <>
-                            <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
-                            <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
-                          </>
-                        ) : activeTab === "progress" ? (
-                          <ProgressTab
-                            progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
-                            handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
-                          />
-                        ) : (
-                          <>
-                            <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
-                            <PremiumTab
-                              report={report} dq={dq} confidence={confidence}
-                              isSignedIn={isSignedIn} isPremium={isPremium}
-                              hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
-                              handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
-                              purchasing={purchasing} subscription={subscription} t={t} lang={lang}
-                              modes={modes} onModeFeedback={handleModeFeedback}
-                              dominantEmotion={dominantEmotion}
-                              onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
-                            />
-                          </>
-                        )}
-                      </>
-                    )
-                  : null
-              }
-            />
+            showTabs ? (
+              <>
+                <SegmentedTabs activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+                {activeTab === "read" ? (
+                  <TriggerMapView
+                    signal={signal}
+                    t={t}
+                    lang={lang}
+                    onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                    onActionFeedback={handleActionFeedback}
+                  />
+                ) : activeTab === "week" ? (
+                  <>
+                    <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} t={t} lang={lang} />
+                    <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} handleSignIn={handleSignIn} router={router} t={t} lang={lang} />
+                  </>
+                ) : activeTab === "progress" ? (
+                  <ProgressTab
+                    progress={progress} isSignedIn={isSignedIn} isPremium={isPremium}
+                    handleSignIn={handleSignIn} handleUpgrade={handleUpgrade} purchasing={purchasing} t={t} lang={lang}
+                  />
+                ) : (
+                  <>
+                    <ActionsTab report={report} deviceId={deviceId} token={token} t={t} onFeedback={handleActionFeedback} />
+                    <PremiumTab
+                      report={report} dq={dq} confidence={confidence}
+                      isSignedIn={isSignedIn} isPremium={isPremium}
+                      hasLlmInsight={hasLlmInsight} hasLlmTeaser={hasLlmTeaser}
+                      handleSignIn={handleSignIn} handleUpgrade={handleUpgrade}
+                      purchasing={purchasing} subscription={subscription} t={t} lang={lang}
+                      modes={modes} onModeFeedback={handleModeFeedback}
+                      dominantEmotion={dominantEmotion}
+                      onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              <TriggerMapView
+                signal={signal}
+                t={t}
+                lang={lang}
+                onLogMoment={() => { tap(); router.push("/(tabs)/log"); }}
+                onActionFeedback={handleActionFeedback}
+              />
+            )
           ) : null}
 
           {!report && !loading && !error ? (
@@ -2655,20 +2679,37 @@ const s = StyleSheet.create({
   canvas: { position: "relative", minHeight: 1 },
   content: { gap: 14 },
 
-  /* Tab bar */
-  tabBar: {
-    flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 4, paddingHorizontal: 2,
+  /* Segmented control */
+  segWrap: {
+    flexDirection: "row",
+    position: "relative",
+    backgroundColor: palette.glass,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.glassBorder,
+    padding: 4,
+    marginTop: 4,
+    marginBottom: 2,
   },
-  tab: {
-    alignItems: "center", paddingVertical: 10, paddingHorizontal: 14,
-    borderRadius: radius.sm, backgroundColor: palette.glass,
-    borderWidth: 1, borderColor: palette.glassBorder,
+  segIndicator: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: radius.sm,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accentMedium,
   },
-  tabActive: {
-    backgroundColor: palette.accentSoft, borderColor: palette.accentMedium,
+  segItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 9,
+    zIndex: 1,
   },
-  tabText: { color: palette.muted, fontSize: 12, fontWeight: "600" },
-  tabTextActive: { color: palette.accent },
+  segText: { color: palette.muted, fontSize: 12, fontWeight: "700", letterSpacing: 0.2 },
+  segTextActive: { color: palette.accent },
   tabContent: { gap: 14 },
 
   /* State of mind hero card */

@@ -1,9 +1,11 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { palette, radius } from "@/utils/theme";
 import { warning } from "@/utils/haptics";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { emotionColor as getEmotionColorFromCoords } from "@/utils/emotionModel";
 import { coordinatesToLegacy } from "@triggermap/shared/constants/emotions";
+import { TRIGGER_COLORS } from "@/utils/designSystem";
 
 const TRIGGER_ICONS = {
   work: "🏢", social: "👥", money: "💰", family: "🏠", exercise: "🏃",
@@ -25,6 +27,7 @@ const EMOTION_ICONS = {
 export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
   const { t, lang } = useLanguage();
   const triggerLabel = t("triggers." + moment.trigger) || moment.trigger;
+  const triggerColor = TRIGGER_COLORS[moment.trigger] || palette.accent;
   // New-model moments store valence/arousal and may carry no legacy `emotion`
   // string — resolve a legacy key from coordinates so the label never renders
   // as "Undefined" (mirrors the fallback in localStore.buildLocalReport).
@@ -52,9 +55,24 @@ export function TimelineGroup({ moment, onEdit, onDelete, groupCount }) {
 
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: emotionColor }]}>
+      {/* Luminous glass sheen + hairline top highlight (matches the app shell). */}
+      <LinearGradient
+        colors={["rgba(255,255,255,0.05)", "rgba(255,255,255,0.012)", "rgba(0,0,0,0)"]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={styles.topHighlight} pointerEvents="none" />
+
       <View style={styles.row}>
-        <View style={[styles.iconWrap, { backgroundColor: `${emotionColor}20` }]}>
-          <Text style={styles.icon}>{TRIGGER_ICONS[moment.trigger] || "📌"}</Text>
+        {/* Trigger-coloured icon disc + soft halo (no SVG → no Android box). */}
+        <View style={styles.iconArea}>
+          <View style={[styles.halo, { backgroundColor: triggerColor + "1f" }]} pointerEvents="none" />
+          <View style={[styles.iconDisc, { borderColor: triggerColor + "66", shadowColor: triggerColor }]}>
+            <Text style={styles.icon}>{TRIGGER_ICONS[moment.trigger] || "📌"}</Text>
+          </View>
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
@@ -114,22 +132,49 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: palette.glass,
+    backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.glassBorder,
     gap: 10,
+    overflow: "hidden",
+    position: "relative",
+  },
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: radius.md,
+    right: radius.md,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.sm,
+  iconArea: {
+    width: 46,
+    height: 46,
     alignItems: "center",
     justifyContent: "center",
+  },
+  halo: {
+    position: "absolute",
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  iconDisc: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(8, 13, 24, 0.5)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 7,
   },
   icon: {
     fontSize: 20,
