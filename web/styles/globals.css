@@ -4429,3 +4429,34 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
   border-top: 1px solid rgba(148, 180, 224, 0.14);
 }
 .editModalFooter .ghostButton, .editModalFooter .primaryButton { flex: 1; }
+
+/* ── Premium (premium = depth) ── */
+.premiumHeroNew { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 8px 0 6px; }
+.premiumTitle { margin: 4px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -0.4px; text-align: center; }
+.premiumSubtitle { margin: 0; color: #b8c8d8; font-size: 15px; line-height: 21px; text-align: center; max-width: 320px; }
+.clarityWrap { position: relative; width: 100%; max-width: 300px; height: 128px; display: flex; align-items: center; justify-content: center; margin: 4px 0; }
+.clarityGlowOrb { position: absolute; width: 190px; height: 190px; border-radius: 95px; background: rgba(86, 208, 224, 0.12); animation: clarityPulse 3400ms ease-in-out infinite; }
+@keyframes clarityPulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.16); opacity: 1; } }
+.claritySvg { position: relative; width: 100%; height: 128px; }
+.premiumSectionHeader { color: #dfe8f2; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin: 6px 0 2px; }
+.premiumOutcomeCard { gap: 5px; }
+.premiumOutcomeTitle { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+.premiumOutcomeBody { margin: 5px 0 0; color: #dfe8f2; font-size: 14px; line-height: 20px; }
+.premiumExampleRow { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(148, 180, 224, 0.18); }
+.premiumExampleDot { width: 6px; height: 6px; border-radius: 3px; background: #56d0e0; margin-top: 6px; flex-shrink: 0; }
+.premiumOutcomeExample { flex: 1; color: #56d0e0; font-size: 13px; line-height: 19px; font-style: italic; }
+.previewCard { position: relative; overflow: hidden; border-radius: 18px; padding: 18px; background: rgba(13, 20, 36, 0.94); border: 1px solid rgba(86, 208, 224, 0.3); display: flex; flex-direction: column; gap: 10px; }
+.previewTitle { margin: 0; color: #56d0e0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.previewBlur { position: relative; overflow: hidden; }
+.previewBlurText { margin: 0; color: #edf2fa; font-size: 14px; line-height: 21px; opacity: 0.85; filter: blur(0.4px); }
+.previewGradient { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(180deg, transparent, rgba(13, 20, 36, 0.92)); }
+.previewHint { margin: 0; color: #dfe8f2; font-size: 12px; font-style: italic; }
+.reassureRow { display: flex; align-items: center; gap: 8px; padding: 0 4px; margin-top: 2px; }
+.reassureIcon { font-size: 13px; }
+.reassureText { flex: 1; color: #b8c8d8; font-size: 13px; line-height: 18px; }
+.premiumActiveCard { display: flex; align-items: center; gap: 10px; border-radius: 18px; padding: 16px; background: rgba(94, 230, 160, 0.2); border: 1px solid #5ee6a0; }
+.premiumActiveIcon { color: #5ee6a0; font-size: 18px; font-weight: 700; }
+.premiumActiveText { flex: 1; color: #edf2fa; font-size: 14px; line-height: 20px; }
+.premiumCtaWrap { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 4px; }
+.premiumAppNote { width: 100%; border-radius: 18px; padding: 18px; background: rgba(13, 20, 36, 0.94); border: 1px solid rgba(148, 180, 224, 0.18); display: flex; flex-direction: column; gap: 8px; text-align: center; align-items: center; }
+.premiumAppNote strong { font-size: 16px; }
