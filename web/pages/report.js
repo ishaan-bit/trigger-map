@@ -153,8 +153,11 @@ function SectionHeader({ label, badge, extra }) {
       <div className="reportSectionHeaderLeft">
         <span className="sectionKicker">{label.toUpperCase()}</span>
         {badge ? (
-          <span className={`freqBadge ${badge === "weekly" ? "freqBadgeWeekly" : ""}`}>
-            {badge === "weekly" ? "WEEKLY" : "LIVE"}
+          <span
+            className={`freqBadge ${badge === "weekly" ? "freqBadgeWeekly" : ""}`}
+            style={badge === "premium" ? { color: "#c084fc", borderColor: "#c084fc55", background: "#c084fc18" } : undefined}
+          >
+            {badge === "weekly" ? "WEEKLY" : badge === "premium" ? "PREMIUM" : "LIVE"}
           </span>
         ) : null}
       </div>
@@ -855,12 +858,9 @@ function ProgressTab({ progress, router }) {
               <span className="muted" style={{ fontSize: 11 }}>{trajectory.weeksTracked || "-"} weeks ago</span>
             </div>
             <div className="progressArcConnector">
+              {/* The change value is shown in the direction badge below, so the
+                  in-arc delta number is intentionally omitted to avoid duplication. */}
               <div className="progressArcLine" style={{ background: trajectory.direction === "improving" ? "#5ee6a060" : trajectory.direction === "declining" ? "#ff6b7a60" : "#9eb0c940" }} />
-              {trajectory.change != null ? (
-                <span className="progressArcDelta" style={{ color: trajectory.direction === "improving" ? "#5ee6a0" : trajectory.direction === "declining" ? "#ff6b7a" : "#9eb0c9" }}>
-                  {trajectory.change > 0 ? "+" : ""}{trajectory.change.toFixed(1)}
-                </span>
-              ) : null}
             </div>
             <div className="progressArcNode">
               <span className="progressArcEmoji">{scoreTone(trajectory.present?.score || 3).emoji}</span>
@@ -1157,25 +1157,29 @@ function PremiumTab({ report, modes, isPremium, router }) {
   const triedCount = feedback.filter((f) => f.response === "tried" || f.response === "helped").length;
   const skippedCount = feedback.filter((f) => f.response === "skipped" || f.response === "not_helpful").length;
 
-  if (!isPremium) {
-    return (
-      <div className="card stack sceneIn" style={{ textAlign: "center" }}>
-        <span style={{ fontSize: 48 }}>🧭</span>
-        <strong>For You — Premium</strong>
-        <p className="muted">Premium unlocks adaptive Move / Fuel / Perspective modes, signal cards, and deeper pattern intelligence — personalised to your week.</p>
-        <button className="primaryButton inlineButton" onClick={() => router.push("/premium")} type="button">Go Premium</button>
-      </div>
-    );
-  }
-
   return (
     <div className="stack">
-      {/* Direction */}
-      {directionText ? (
+      {/* Overview is open to ALL: the client-derived read (What's shifting, Levers,
+          Behaviour Snapshot, Action Effectiveness) renders for everyone. The
+          premium-only pieces (Direction, Pattern Intelligence, Adaptive Modes)
+          gate inline with an upsell instead of walling off the whole tab. */}
+
+      {/* Direction (premium) */}
+      {isPremium && directionText ? (
         <div className="sceneIn">
           <SectionHeader label="Try this" badge="weekly" />
           <div className="card" style={{ borderLeft: `3px solid ${tone?.color || "#7bc9d8"}` }}>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>{colorizeInsightText(cleanText(directionText))}</p>
+          </div>
+        </div>
+      ) : !isPremium ? (
+        <div className="sceneIn">
+          <SectionHeader label="Try this" badge="premium" />
+          <div className="card stack" style={{ textAlign: "center", borderLeft: "3px solid #c084fc" }}>
+            <span style={{ fontSize: 32 }}>🧭</span>
+            <strong>Your weekly direction</strong>
+            <p className="muted" style={{ fontSize: 13 }}>Premium turns your patterns into a personalised direction, deeper pattern intelligence, and adaptive Move / Fuel / Perspective modes.</p>
+            <button className="primaryButton inlineButton" onClick={() => router.push("/premium")} type="button">Go Premium</button>
           </div>
         </div>
       ) : null}
@@ -1196,8 +1200,8 @@ function PremiumTab({ report, modes, isPremium, router }) {
         </div>
       ) : null}
 
-      {/* Pattern Intelligence (LLM) */}
-      {hasLlmInsight && llmSections ? (
+      {/* Pattern Intelligence (LLM) — premium */}
+      {isPremium && hasLlmInsight && llmSections ? (
         <div className="sceneIn">
           <SectionHeader label="Pattern Intelligence" badge="weekly" />
           <div className="insightCardsRow">
@@ -1303,8 +1307,9 @@ function PremiumTab({ report, modes, isPremium, router }) {
         </div>
       ) : null}
 
-      {/* Adaptive Modes */}
-      {modes && (modes.move || modes.fuel || modes.perspective) ? (
+      {/* Adaptive Modes (premium) */}
+      {isPremium ? (
+        modes && (modes.move || modes.fuel || modes.perspective) ? (
         <div className="sceneIn">
           <SectionHeader label="Adaptive Modes" badge="weekly" />
           {["move", "fuel", "perspective"].filter((k) => modes[k]?.items?.length || modes[k]?.narrative).map((modeKey) => {
@@ -1330,7 +1335,18 @@ function PremiumTab({ report, modes, isPremium, router }) {
             );
           })}
         </div>
-      ) : null}
+        ) : null
+      ) : (
+        <div className="sceneIn">
+          <SectionHeader label="Adaptive Modes" badge="premium" />
+          <div className="card stack" style={{ textAlign: "center", borderLeft: "3px solid #c084fc" }}>
+            <span style={{ fontSize: 28 }}>🏃  🍎  💡</span>
+            <strong>Move · Fuel · Perspective</strong>
+            <p className="muted" style={{ fontSize: 13 }}>Premium tailors movement, nourishment, and reframes to your week — and adapts as you mark what helps.</p>
+            <button className="primaryButton inlineButton" onClick={() => router.push("/premium")} type="button">Go Premium</button>
+          </div>
+        </div>
+      )}
 
       {/* Action Effectiveness */}
       {(triedCount > 0 || skippedCount > 0) ? (

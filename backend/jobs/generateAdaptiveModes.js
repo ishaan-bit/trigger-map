@@ -74,8 +74,12 @@ export async function runGenerateAdaptiveModes({ force = false, maxWords, ownerI
         // the oldest timestamp across all three modes — otherwise a stale
         // perspective generation made legitimately-new move/fuel feedback look
         // old (or new), so refreshes were skipped or over-fired incorrectly.
+        // All three modes count: perspective HiTL feedback must bypass the window
+        // too, or perspective-only feedback would never trigger a refresh (and,
+        // because regeneration runs all modes together, move/fuel would stay stale
+        // as well until the 24h cooldown lapsed).
         const hasNewModeFeedback = feedback.some((entry) =>
-          ["move", "fuel"].includes(entry?.mode) &&
+          ["move", "fuel", "perspective"].includes(entry?.mode) &&
           Number(entry.timestamp || 0) > (generatedAtByMode[entry.mode] || 0)
         );
 

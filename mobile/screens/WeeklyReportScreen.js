@@ -825,28 +825,14 @@ function ProgressTab({ progress, isSignedIn, isPremium, handleSignIn, handleUpgr
               </Text>
             </View>
 
-            {/* Delta connector */}
+            {/* Delta connector — the change value is shown in the direction badge
+                below, so the in-arc delta number is intentionally omitted. */}
             <View style={s.progressArcConnector}>
               <View style={[s.progressArcLine, {
                 backgroundColor: trajectory.direction === "improving" ? palette.success + "60"
                   : trajectory.direction === "declining" ? palette.danger + "60"
                   : palette.muted + "40",
               }]} />
-              {trajectory.change !== null ? (
-                <View style={[s.progressArcDelta, {
-                  backgroundColor: trajectory.direction === "improving" ? palette.successSoft
-                    : trajectory.direction === "declining" ? palette.dangerSoft
-                    : palette.glass,
-                }]}>
-                  <Text numberOfLines={1} style={[s.progressArcDeltaText, {
-                    color: trajectory.direction === "improving" ? palette.success
-                      : trajectory.direction === "declining" ? palette.danger
-                      : palette.muted,
-                  }]}>
-                    {trajectory.change > 0 ? "+" : ""}{trajectory.change.toFixed(1)}
-                  </Text>
-                </View>
-              ) : null}
             </View>
 
             {/* Present — hero gauge with count-up */}
