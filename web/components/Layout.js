@@ -6,7 +6,6 @@ import { usePWAInstall } from "../hooks/usePWAInstall";
 import { InstallModalIOS } from "./InstallModalIOS";
 
 export function Layout({ title, children, actions = null }) {
-  const { user, isSignedIn } = useSession();
   const { canInstall, isStandalone, triggerInstall, showIOSModal, setShowIOSModal } = usePWAInstall();
   const [health, setHealth] = useState({ status: "loading", message: "Checking backend" });
 
@@ -43,11 +42,7 @@ export function Layout({ title, children, actions = null }) {
             <span className={`statusBadge statusBadge${health.status.charAt(0).toUpperCase()}${health.status.slice(1)}`}>
               {health.message}
             </span>
-            {isSignedIn ? (
-              <span className="statusHint">Signed in as {user.email}</span>
-            ) : (
-              <span className="statusHint">Private local device ID keeps logs linked until you sign in.</span>
-            )}
+            <span className="statusHint">No account needed — a private device ID keeps your logs linked.</span>
           </div>
         </div>
         <div className="heroActions">
@@ -66,8 +61,8 @@ export function Layout({ title, children, actions = null }) {
         <Link href="/">Log moment</Link>
         <Link href="/timeline">Timeline</Link>
         <Link href="/report">Weekly report</Link>
+        <Link href="/premium">Premium</Link>
         <Link href="/settings">Settings</Link>
-        {!isSignedIn ? <Link href="/login" className="navLoginLink">Sign in</Link> : null}
       </nav>
 
       <section className="content">{children}</section>

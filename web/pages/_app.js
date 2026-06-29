@@ -1,5 +1,4 @@
 import Head from "next/head";
-import Script from "next/script";
 import { SessionProvider } from "../hooks/useSession";
 import "../styles/globals.css";
 
@@ -17,7 +16,6 @@ export default function App({ Component, pageProps }) {
         <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </Head>
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       <Component {...pageProps} />
     </SessionProvider>
   );

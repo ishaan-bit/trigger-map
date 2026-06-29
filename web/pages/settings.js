@@ -46,8 +46,8 @@ function Toggle({ label, hint, checked, onChange }) {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, subscription, signOut, exportLogs, deleteAllUserData, isPremium } = useSession();
-  const planLabel = isPremium ? "Premium" : user ? "Free" : "Anonymous";
+  const { subscription, exportLogs, deleteAllUserData, isPremium } = useSession();
+  const planLabel = isPremium ? "Premium" : "Free";
 
   const [dailyCheckin, setDailyCheckin] = useState(false);
   const [weeklyInsights, setWeeklyInsights] = useState(false);
@@ -79,17 +79,12 @@ export default function SettingsPage() {
           <p className="muted">Manage your account, notifications, and data.</p>
         </div>
 
-        {/* Account */}
-        <Section icon="👤" title="Account">
-          <Row label="Status" value={user ? user.email : "Anonymous"} />
-          {!user ? <p className="muted" style={{ fontSize: 13 }}>Sign in to sync your data and unlock deeper insights.</p> : null}
-          <button
-            className="ghostButton"
-            type="button"
-            onClick={user ? async () => { await signOut(); router.push("/login"); } : () => router.push("/login")}
-          >
-            {user ? "Sign out" : "Sign in"}
-          </button>
+        {/* Identity */}
+        <Section icon="👤" title="Your data">
+          <Row label="Identity" value="This device" />
+          <p className="muted" style={{ fontSize: 13 }}>
+            No account or sign-in needed. A private device ID keeps your logs linked on this device.
+          </p>
         </Section>
 
         {/* Subscription */}
@@ -99,10 +94,8 @@ export default function SettingsPage() {
           </div>
           {isPremium ? (
             <p className="muted" style={{ fontSize: 13 }}>Personalized AI insights and detailed charts unlocked.</p>
-          ) : user ? (
-            <p className="muted" style={{ fontSize: 13 }}>Upgrade to Premium for AI narrative insights and advanced analytics.</p>
           ) : (
-            <p className="muted" style={{ fontSize: 13 }}>Create a free account to sync, or go Premium for AI insights.</p>
+            <p className="muted" style={{ fontSize: 13 }}>Go Premium for AI narrative insights and deeper pattern intelligence.</p>
           )}
           <button className="ghostButton" type="button" onClick={() => router.push("/premium")}>View plans</button>
         </Section>
@@ -136,7 +129,7 @@ export default function SettingsPage() {
           }}>
             Export logs
           </button>
-          {user ? <p className="muted" style={{ fontSize: 13 }}>Exports include all synced and local moments.</p> : null}
+          <p className="muted" style={{ fontSize: 13 }}>Exports include all your logged moments.</p>
           <button className="ghostButton dangerButton" type="button" onClick={async () => {
             if (!confirm("Delete all data? This will permanently remove all your moments, reports, and insights. This cannot be undone.")) return;
             try {
