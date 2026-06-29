@@ -2,7 +2,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: "Trebuchet MS", "Avenir Next", system-ui, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background:
     radial-gradient(circle at top left, rgba(86, 208, 224, 0.06), transparent 42%),
     radial-gradient(circle at top right, rgba(167, 139, 250, 0.04), transparent 36%),
@@ -3983,4 +3983,249 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
 .iosModalClose:active {
   transform: scale(0.97);
   box-shadow: 0 4px 12px rgba(61, 142, 160, 0.18);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PARITY WAVE 2 — PRIMITIVES
+   Motion tokens · AtmosphericField · icon tab bar · app bar · spotlight/tooltip
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --dur-instant: 120ms;
+  --dur-fast: 220ms;
+  --dur-base: 360ms;
+  --dur-slow: 560ms;
+  --dur-count: 900ms;
+  --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --stagger: 70ms;
+}
+
+/* ── AtmosphericField ── */
+.atmoField {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 32%, #070c18 0%, #05080f 60%, #03050b 100%);
+}
+.atmoBlob {
+  position: absolute;
+  border-radius: 999px;
+  opacity: var(--blob-op, 0.15);
+  background: radial-gradient(circle at center, var(--blob-color, #56d0e0) 0%, transparent 70%);
+  will-change: transform, filter;
+}
+.atmoBlobA { width: 95vmax; height: 95vmax; top: -22vmax; left: -26vmax; animation: atmoDriftA 26s ease-in-out infinite; }
+.atmoBlobB { width: 80vmax; height: 80vmax; top: 4vmax; right: -26vmax; animation: atmoDriftB 33s ease-in-out infinite 1.4s; }
+.atmoBlobC { width: 108vmax; height: 108vmax; bottom: -28vmax; left: -12vmax; animation: atmoDriftC 39s ease-in-out infinite 0.7s; }
+.atmoBlobD { width: 62vmax; height: 62vmax; bottom: -12vmax; right: -16vmax; animation: atmoDriftD 30s ease-in-out infinite 2.1s; }
+.atmoVignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 34%, transparent 50%, rgba(3, 5, 11, 0.82) 100%);
+}
+@keyframes atmoDriftA {
+  0%, 100% { transform: translate(0, 0) scale(1); filter: opacity(0.62); }
+  50% { transform: translate(14%, 7%) scale(1.18); filter: opacity(1); }
+}
+@keyframes atmoDriftB {
+  0%, 100% { transform: translate(0, 0) scale(1); filter: opacity(0.62); }
+  50% { transform: translate(-12%, 6%) scale(1.22); filter: opacity(1); }
+}
+@keyframes atmoDriftC {
+  0%, 100% { transform: translate(0, 0) scale(1); filter: opacity(0.62); }
+  50% { transform: translate(10%, -7%) scale(1.12); filter: opacity(1); }
+}
+@keyframes atmoDriftD {
+  0%, 100% { transform: translate(0, 0) scale(1); filter: opacity(0.62); }
+  50% { transform: translate(-14%, 5%) scale(1.28); filter: opacity(1); }
+}
+
+/* ── App bar ── */
+.appBar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.appBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  color: #edf2fa;
+}
+.appBrandDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #5ee6a0;
+  box-shadow: 0 0 8px rgba(94, 230, 160, 0.7);
+}
+.appBrandDot[data-health="loading"] { background: #ffb347; box-shadow: 0 0 8px rgba(255, 179, 71, 0.7); }
+.appBrandDot[data-health="offline"] { background: #ff6b7a; box-shadow: 0 0 8px rgba(255, 107, 122, 0.7); }
+.appBarActions { display: flex; align-items: center; gap: 8px; }
+
+.contentTabbed { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+
+/* ── Bottom icon tab bar ── */
+.tabBar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 4px;
+  padding: 8px max(10px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-right, 0px));
+  background: rgba(8, 12, 20, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid rgba(148, 180, 224, 0.14);
+  z-index: 50;
+}
+.tabItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px 4px;
+  border-radius: 14px;
+  transition: background var(--dur-fast) ease;
+}
+.tabItem:active { transform: scale(0.96); }
+.tabItemActive { background: rgba(255, 255, 255, 0.045); }
+.tabLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
+
+/* ── SpotlightOverlay ── */
+.spotlightOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+}
+.spotlightOverlayVisible { opacity: 1; }
+.spotlightBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(4, 8, 16, 0.82);
+  cursor: pointer;
+}
+.spotlightSkip {
+  position: absolute;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  right: 20px;
+  z-index: 1001;
+  background: none;
+  border: 0;
+  color: #dfe8f2;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.spotlightCard {
+  position: absolute;
+  left: 50%;
+  width: min(460px, calc(100% - 48px));
+  transform: translateX(-50%) scale(0.92);
+  padding: 32px 24px;
+  border-radius: 24px;
+  background: rgba(14, 22, 40, 0.96);
+  border: 1px solid rgba(148, 180, 224, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  transition: transform var(--dur-base) var(--ease-emphasized);
+}
+.spotlightCardIn { transform: translateX(-50%) scale(1); }
+.spotlightCardCenter { top: 30vh; }
+.spotlightCardTop { top: 12vh; }
+.spotlightCardBottom { bottom: 15vh; }
+.spotlightEmoji { font-size: 40px; }
+.spotlightMessage { margin: 0; color: #edf2fa; font-size: 18px; line-height: 26px; font-weight: 600; }
+.spotlightSecondary { margin: 0; color: #dfe8f2; font-size: 14px; line-height: 20px; }
+.spotlightCta {
+  margin-top: 4px;
+  padding: 12px 32px;
+  border: 0;
+  border-radius: 12px;
+  background: #56d0e0;
+  color: #060a12;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── GuidedTooltip ── */
+.guidedTooltip {
+  margin-top: 6px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.guidedTooltipAbove { margin-top: 0; margin-bottom: 6px; }
+.guidedTooltipIn { opacity: 1; transform: translateY(0); }
+.guidedTooltipInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 1px solid rgba(86, 208, 224, 0.3);
+  border-radius: 12px;
+  background: rgba(13, 20, 36, 0.92);
+  cursor: pointer;
+}
+.guidedTooltipText { flex: 1; color: #56d0e0; font-size: 13px; line-height: 18px; text-align: left; }
+.guidedTooltipDismiss { color: #edf2fa; font-weight: 700; }
+
+/* ── One-time Tooltip ── */
+.tmTooltip { opacity: 0; transition: opacity var(--dur-base) ease; }
+.tmTooltipIn { opacity: 1; }
+.tmTooltipInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 1px solid rgba(86, 208, 224, 0.3);
+  border-radius: 12px;
+  background: rgba(13, 20, 36, 0.9);
+}
+.tmTooltipText { flex: 1; color: #56d0e0; font-size: 13px; line-height: 18px; }
+.tmTooltipDismiss { background: none; border: 0; color: #edf2fa; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+/* ── Motion utilities ── */
+@keyframes tmRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.tmRise { animation: tmRise var(--dur-base) var(--ease-emphasized) both; }
+@keyframes tmFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.tmFade { animation: tmFade var(--dur-base) ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .atmoBlob { animation: none !important; filter: opacity(0.85); }
+  .tmRise, .tmFade { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .spotlightCard, .guidedTooltip, .tmTooltip, .spotlightOverlay { transition: none !important; }
 }
