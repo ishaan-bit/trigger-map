@@ -5,6 +5,7 @@ import { GuideModal } from "../components/GuideModal";
 import { useSession } from "../hooks/useSession";
 import { useI18n } from "../lib/i18n";
 import { saveNotificationPrefs } from "../lib/api";
+import { enableWebPush } from "../lib/webpush";
 
 const APP_VERSION = "1.0.17";
 
@@ -74,13 +75,17 @@ export default function SettingsPage() {
       localStorage.setItem("tm_notification_prefs", JSON.stringify(prefs));
     } catch {}
 
-    if (value && typeof Notification !== "undefined" && Notification.permission === "default") {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === "denied") setNotifBlocked(true);
-      } catch {}
+    if (value) {
+      // Subscribe to Web Push (requests permission, registers the push token when
+      // a VAPID key is configured; falls back to a bare permission request).
+      const res = await enableWebPush();
+      if (res.reason === "denied" && typeof Notification !== "undefined" && Notification.permission === "denied") {
+        setNotifBlocked(true);
+      } else if (res.reason === "no_vapid" && typeof Notification !== "undefined" && Notification.permission === "default") {
+        try { const perm = await Notification.requestPermission(); if (perm === "denied") setNotifBlocked(true); } catch {}
+      }
     }
-    // Map UI toggles → backend prefs (daily/weekly/nudge).
+    // Map UI toggles → backend prefs (daily/weekly/nudge), keyed by deviceId.
     saveNotificationPrefs({ daily: next.dailyCheckin, weekly: next.weeklyInsights, nudge: next.gentleNudges }).catch(() => null);
   }
 

@@ -145,20 +145,39 @@ export function SessionProvider({ children }) {
       ensureDeviceIdentity();
       const cached = getCached("timeline");
       if (cached) return cached;
-      const response = await fetchTimelineApi();
-      const moments = response.moments || [];
-      setCache("timeline", moments);
-      return moments;
+      try {
+        const response = await fetchTimelineApi();
+        const moments = response.moments || [];
+        setCache("timeline", moments);
+        try { window.localStorage.setItem("triggermap.web.timeline", JSON.stringify(moments)); } catch {}
+        return moments;
+      } catch (e) {
+        // Offline fallback: last-known timeline for the installed PWA.
+        try {
+          const raw = window.localStorage.getItem("triggermap.web.timeline");
+          if (raw) return JSON.parse(raw);
+        } catch {}
+        throw e;
+      }
     },
 
     async loadWeeklyReport(lang) {
       ensureDeviceIdentity();
       const cached = getCached("weeklyReport");
       if (cached) return cached;
-      const response = await fetchWeeklyReportApi(lang);
-      const report = response.report || null;
-      setCache("weeklyReport", report);
-      return report;
+      try {
+        const response = await fetchWeeklyReportApi(lang);
+        const report = response.report || null;
+        setCache("weeklyReport", report);
+        try { window.localStorage.setItem("triggermap.web.report", JSON.stringify(report)); } catch {}
+        return report;
+      } catch (e) {
+        try {
+          const raw = window.localStorage.getItem("triggermap.web.report");
+          if (raw) return JSON.parse(raw);
+        } catch {}
+        throw e;
+      }
     },
 
     async loadProgress() {
