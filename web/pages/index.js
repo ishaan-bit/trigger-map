@@ -2,19 +2,28 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { TRIGGERS } from "@triggermap/shared/constants/triggers";
 import {
-  createEmotionCoordinates,
-  EMOTION_AXIS_STEPS,
   emotionRegionKey,
   derivedEmotionLabel,
   coordinatesToLegacy,
 } from "@triggermap/shared/constants/emotions";
-import { REGION_TAGS, MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
+import { MAX_TAGS_PER_MOMENT } from "@triggermap/shared/constants/tags";
+import {
+  buildContributionTagMeta,
+  getContributionSuggestions,
+} from "@triggermap/shared/constants/contributions";
 import { Layout } from "../components/Layout";
 import { useSession } from "../hooks/useSession";
+import { useEmotionalState } from "../hooks/useEmotionalState";
+import { useOnboarding } from "../hooks/useOnboarding";
+import { useI18n } from "../lib/i18n";
 import { StreakOrb } from "../components/StreakOrb";
 import { MoodWeather } from "../components/MoodWeather";
 import { FeedbackCard } from "../components/FeedbackCard";
-import { EMOTION_COLORS, REGION_COLORS, colorForLabel } from "../lib/designSystem";
+import { EmotionPad } from "../components/EmotionPad";
+import { SpotlightOverlay, GuidedTooltip } from "../components/SpotlightOverlay";
+import { Tooltip } from "../components/Tooltip";
+import { getRelevantContributionSuggestionsSync, recordTagUsage } from "../lib/adaptiveTags";
+import { emotionColor } from "../lib/emotionModel";
 
 const TRIGGER_EMOJIS = {
   work: "\u{1F3E2}", family: "\u{1F3E0}", partner: "\u{1F49B}", social: "\u{1F465}",
@@ -22,74 +31,55 @@ const TRIGGER_EMOJIS = {
   sleep: "\u{1F634}", other: "\u{1F4CC}",
 };
 
-const FEEL_LABELS = ["Rough", "Off", "Okay", "Good", "Great"];
-const ENERGY_LABELS = ["Drained", "Low", "Steady", "Alert", "Wired"];
-
-const PROMPTS = ["What just happened?", "What pulled you here?", "What\u2019s on your mind?"];
-
-function getPrompt(count) {
-  if (count >= 3) return "Back again, good habit.";
-  return PROMPTS[count % PROMPTS.length];
+function vibrate(ms) {
+  try {
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
+  } catch {
+    // ignore (iOS Safari)
+  }
 }
 
-/** Compute dominant emotion from recent moments (supports both old and new format) */
-function computeDominant(moments) {
-  if (!moments?.length) return { label: null, trigger: null, trend: null, color: null, count: 0 };
-  const now = Date.now();
-  const recent = moments.filter((m) => now - new Date(m.timestamp).getTime() < 48 * 3600000);
-  if (!recent.length) return { label: null, trigger: null, trend: null, color: null, count: 0 };
-
-  // Average valence of recent moments
-  let totalW = 0, vSum = 0;
-  for (const m of recent) {
-    const ageH = (now - new Date(m.timestamp).getTime()) / 3600000;
-    const w = ageH < 2 ? 1.5 : ageH < 6 ? 1.2 : 1.0;
-    const v = m.valence ?? (m.emotion === "calm" ? 0.5 : m.emotion === "energized" ? 0.5 : m.emotion === "neutral" ? 0 : -0.5);
-    vSum += v * w;
-    totalW += w;
+function getPrompt(count, dominantEmotion, t) {
+  if (count >= 3) return t("log.prompts.returning");
+  if (dominantEmotion) {
+    const key = `log.prompts.${dominantEmotion}`;
+    const v = t(key);
+    if (v && v !== key) return v;
   }
-  const avgV = vSum / totalW;
-  const label = avgV >= 0.3 ? "calm" : avgV >= -0.15 ? "neutral" : "uneasy";
-  const color = colorForLabel(label);
+  return t(`log.prompts.default${count % 3}`);
+}
 
-  // Dominant trigger (week)
-  const weekMs = 7 * 24 * 3600000;
-  const weekMoments = moments.filter((m) => m.trigger && now - new Date(m.timestamp).getTime() < weekMs);
-  let trigger = null;
-  if (weekMoments.length >= 3) {
-    const tc = {};
-    for (const m of weekMoments) tc[m.trigger] = (tc[m.trigger] || 0) + 1;
-    trigger = Object.entries(tc).sort(([, a], [, b]) => b - a)[0]?.[0] || null;
-  }
-
-  // Trend
-  const day = 86400000;
-  const r3 = moments.filter((m) => now - new Date(m.timestamp).getTime() < 3 * day);
-  const o3 = moments.filter((m) => { const a = now - new Date(m.timestamp).getTime(); return a >= 3 * day && a < 7 * day; });
-  let trend = null;
-  if (r3.length >= 2 && o3.length >= 2) {
-    const av = (arr) => arr.reduce((s, m) => s + (m.valence ?? 0), 0) / arr.length;
-    const d = av(r3) - av(o3);
-    trend = d > 0.2 ? "improving" : d < -0.2 ? "declining" : "stable";
-  }
-
-  return { label, trigger, trend, color, count: moments.length };
+function translateLabel(t, key) {
+  return t(`emotions.${key}`, key.replace(/_/g, " "));
 }
 
 export default function HomePage() {
   const router = useRouter();
   const { saveMoment, loadTimeline } = useSession();
+  const { dominantEmotion, dominantTrigger, emotionalTrend, emotionColor: stateColor, momentCount, refresh } = useEmotionalState();
+  const { state: obState, advance, skip, isCompleted, markNudgeSeen, isNudgeSeen } = useOnboarding();
+  const { t, lang } = useI18n();
+
+  const isFirstLog = obState === "framing_shown";
+  const isSecondLog = obState === "first_log_done";
+
   const [step, setStep] = useState("trigger");
   const [trigger, setTrigger] = useState(null);
-  const [feel, setFeel] = useState(0);
-  const [energy, setEnergy] = useState(0);
-  const [note, setNote] = useState("");
+  const [coords, setCoords] = useState({ valence: 0, arousal: 0, intensity: 0 });
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [todayCount, setTodayCount] = useState(0);
-  const [moments, setMoments] = useState([]);
+  const [adaptiveTags, setAdaptiveTags] = useState([]);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [todayCount, setTodayCount] = useState(0);
+  const [moments, setMoments] = useState([]);
+
+  const [showFraming, setShowFraming] = useState(false);
+  const [showTriggerHint, setShowTriggerHint] = useState(false);
+  const [showEmotionHint, setShowEmotionHint] = useState(false);
+  const [showInsightsNudge, setShowInsightsNudge] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -101,43 +91,124 @@ export default function HomePage() {
         setTodayCount(all.filter((x) => new Date(x.timestamp).toDateString() === today).length);
       })
       .catch(() => {});
-  }, []);
+  }, [loadTimeline]);
 
-  const dominant = useMemo(() => computeDominant(moments), [moments]);
+  // FTUE framing overlay on first visit after the onboarding carousel.
+  useEffect(() => {
+    if (obState === "framing_shown") {
+      const tm = setTimeout(() => setShowFraming(true), 400);
+      return () => clearTimeout(tm);
+    }
+    return undefined;
+  }, [obState]);
 
-  // Derived emotion values
-  const coords = useMemo(() => createEmotionCoordinates(feel, energy), [feel, energy]);
-  const region = useMemo(() => emotionRegionKey(coords.valence, coords.arousal), [coords]);
-  const derivedLabel = useMemo(() => derivedEmotionLabel(coords.valence, coords.arousal), [coords]);
-  const labelColor = useMemo(() => colorForLabel(derivedLabel), [derivedLabel]);
-  const regionTags = useMemo(() => REGION_TAGS[region] || [], [region]);
+  useEffect(() => {
+    if (obState === "framing_shown" && !showFraming) setShowTriggerHint(true);
+  }, [obState, showFraming]);
 
-  function reset() {
+  // Progressive nudge: suggest insights once there's enough data.
+  useEffect(() => {
+    if (!isCompleted || momentCount < 5) return;
+    if (!isNudgeSeen("insights_ready")) setShowInsightsNudge(true);
+  }, [isCompleted, momentCount, isNudgeSeen]);
+
+  // ── Derived emotion values ──
+  const regionKey = useMemo(() => emotionRegionKey(coords.valence, coords.arousal), [coords.valence, coords.arousal]);
+  const legacyEmotion = useMemo(() => coordinatesToLegacy(coords.valence, coords.arousal), [coords.valence, coords.arousal]);
+  const derivedKey = useMemo(() => derivedEmotionLabel(coords.valence, coords.arousal), [coords.valence, coords.arousal]);
+  const derivedLabel = translateLabel(t, derivedKey);
+  const accentColor = emotionColor(coords.valence, coords.arousal);
+
+  const contextForTags = useMemo(() => ({
+    emotion: legacyEmotion,
+    regionKey,
+    valence: coords.valence,
+    arousal: coords.arousal,
+    intensity: coords.intensity,
+    emotionLabel: derivedKey,
+  }), [legacyEmotion, regionKey, coords.valence, coords.arousal, coords.intensity, derivedKey]);
+
+  const suggestionSet = useMemo(() => getContributionSuggestions({
+    domain: trigger,
+    valence: coords.valence,
+    arousal: coords.arousal,
+    intensity: coords.intensity,
+    emotionLabel: derivedKey,
+  }), [trigger, coords.valence, coords.arousal, coords.intensity, derivedKey]);
+
+  const selectedMeta = useMemo(
+    () => buildContributionTagMeta(selectedTags, [...adaptiveTags, ...suggestionSet.all]),
+    [selectedTags, adaptiveTags, suggestionSet.all]
+  );
+
+  // Refresh adaptive tag pool when the user crosses an emotion region.
+  useEffect(() => {
+    if (!hasInteracted || !trigger) {
+      setAdaptiveTags([]);
+      return;
+    }
+    setAdaptiveTags(getRelevantContributionSuggestionsSync(trigger, contextForTags));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionKey, hasInteracted, trigger]);
+
+  function handleEmotionChange(valence, arousal, intensity) {
+    setHasInteracted(true);
+    setCoords((prev) => (prev.valence === valence && prev.arousal === arousal && prev.intensity === intensity
+      ? prev
+      : { valence, arousal, intensity }));
+  }
+
+  function toggleTag(tag) {
+    vibrate(6);
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) return prev.filter((x) => x !== tag);
+      if (prev.length >= MAX_TAGS_PER_MOMENT) return prev;
+      return [...prev, tag];
+    });
+  }
+
+  function goToEmotion(tr) {
+    setTrigger(tr);
+    setStep("emotion");
+    setShowTriggerHint(false);
+    if (isFirstLog) setShowEmotionHint(true);
+    vibrate(6);
+  }
+
+  function backToTrigger() {
     setStep("trigger");
     setTrigger(null);
-    setFeel(0);
-    setEnergy(0);
-    setNote("");
+    setCoords({ valence: 0, arousal: 0, intensity: 0 });
+    setHasInteracted(false);
     setSelectedTags([]);
-    setSaved(false);
-    setFeedback(null);
+    setAdaptiveTags([]);
+    setNote("");
   }
 
   async function handleSave() {
-    if (!trigger || loading) return;
+    if (!hasInteracted || saving || saved) return;
     try {
-      setLoading(true);
+      setSaving(true);
       const payload = {
         trigger,
         valence: coords.valence,
         arousal: coords.arousal,
         intensity: coords.intensity,
-        emotion: coordinatesToLegacy(coords.valence, coords.arousal),
+        emotion: legacyEmotion,
+        emotionPoint: { valence: coords.valence, arousal: coords.arousal, x: coords.valence, y: coords.arousal },
+        emotionLabel: derivedKey,
+        emotionSubtitle: derivedLabel,
+        emotionQuadrant: suggestionSet.emotionQuadrant,
+        emotionIntensity: suggestionSet.intensityBand,
         note,
         notes: note,
+        lang,
+        tags: selectedTags,
+        contributionTags: selectedTags,
+        contributionTagMeta: selectedMeta,
       };
-      if (selectedTags.length > 0) payload.tags = selectedTags;
       const response = await saveMoment(payload);
+      if (selectedTags.length > 0) recordTagUsage(trigger, contextForTags, selectedTags);
       setTodayCount((c) => c + 1);
       setSaved(true);
       setFeedback({
@@ -145,37 +216,56 @@ export default function HomePage() {
         smartReflectionPrompt: response?.smartReflectionPrompt || null,
         pairCount: response?.pairCount || 0,
       });
-      timerRef.current = setTimeout(() => { router.push("/timeline"); }, 3000);
+      vibrate([0, 30, 40, 30]);
+      refresh?.();
+
+      // Onboarding-aware redirect.
+      if (isFirstLog) {
+        advance("first_log_done");
+        timerRef.current = setTimeout(() => router.push("/timeline"), 3000);
+      } else if (isSecondLog) {
+        advance("second_log_done");
+        timerRef.current = setTimeout(() => router.push("/report"), 3000);
+      } else {
+        timerRef.current = setTimeout(() => router.push("/timeline"), 3000);
+      }
     } catch {
       setSaved(false);
       setFeedback(null);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  // ── Post-log: feedback with ripple rings ──
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  // ── Post-log scene ──
   if (saved && feedback) {
+    const title = isFirstLog ? t("ftue.firstDataPoint") : isSecondLog ? t("ftue.patternsForming") : t("emotion.heardYou", "Heard you.");
+    const subtext = isFirstLog ? t("ftue.firstDataPointSub") : isSecondLog ? t("ftue.patternsFormingSub") : null;
+    const btnLabel = isFirstLog ? t("ftue.seeTimeline") : isSecondLog ? t("ftue.seeInsights") : t("emotion.goTimeline", "View on timeline");
+    const dest = isSecondLog ? "/report" : "/timeline";
     return (
-      <Layout title="Heard you.">
-        <div className="stateGlow" style={{ "--state-color": labelColor }} />
+      <Layout title={title} emotion={dominantEmotion}>
+        <div className="stateGlow" style={{ "--state-color": accentColor }} />
         <section className="postLogScene sceneIn">
-          <div className="rippleRing rippleRing1" style={{ "--ripple-color": labelColor }} />
-          <div className="rippleRing rippleRing2" style={{ "--ripple-color": labelColor }} />
-          <div className="rippleRing rippleRing3" style={{ "--ripple-color": labelColor }} />
-          <div className="postLogOrb" style={{ "--orb-color": labelColor }}>
+          <div className="rippleRing rippleRing1" style={{ "--ripple-color": accentColor }} />
+          <div className="rippleRing rippleRing2" style={{ "--ripple-color": accentColor }} />
+          <div className="rippleRing rippleRing3" style={{ "--ripple-color": accentColor }} />
+          <div className="postLogOrb" style={{ "--orb-color": accentColor }}>
             <div className="postLogOrbInner">
-              <span className="postLogEmoji" style={{ fontSize: 18, fontWeight: 700, color: labelColor }}>{derivedLabel}</span>
+              <span className="postLogEmoji" style={{ fontSize: 18, fontWeight: 700, color: accentColor }}>{derivedLabel}</span>
             </div>
           </div>
-          <h2 className="postLogTitle" style={{ color: labelColor }}>Heard you.</h2>
-          <FeedbackCard feedback={feedback} trigger={trigger} emotion={derivedLabel} />
+          <h2 className="postLogTitle" style={{ color: accentColor }}>{title}</h2>
+          <FeedbackCard feedback={feedback} trigger={trigger} emotion={legacyEmotion || "neutral"} />
+          {subtext ? <p className="postLogReflection" style={{ textAlign: "center", maxWidth: 280 }}>{subtext}</p> : null}
           <button
             className="goTimelineBtn"
             type="button"
-            onClick={() => { clearTimeout(timerRef.current); router.push("/timeline"); }}
+            onClick={() => { clearTimeout(timerRef.current); router.push(dest); }}
           >
-            View on timeline {"\u2192"}
+            {btnLabel} {"→"}
           </button>
         </section>
       </Layout>
@@ -183,188 +273,186 @@ export default function HomePage() {
   }
 
   return (
-    <Layout title="Log a moment">
-      {/* ── Step 1: Trigger selection ── */}
+    <Layout title={t("tabs.log", "Log")} emotion={dominantEmotion}>
       {step === "trigger" ? (
         <section className="sceneIn stack">
           <article className="card cardFeature stack">
-            <p className="sectionKicker">Quick log</p>
-            <h2>{getPrompt(todayCount)}</h2>
+            <p className="sectionKicker">{t("log.kicker")}</p>
+            <h2>{getPrompt(todayCount, dominantEmotion, t)}</h2>
             <p className="muted">
               {todayCount > 0
-                ? `${todayCount} moment${todayCount !== 1 ? "s" : ""} logged today`
-                : "Tap a trigger to start logging"}
+                ? (todayCount !== 1 ? t("log.momentCountPlural", { count: todayCount }) : t("log.momentCount", { count: todayCount }))
+                : t("log.tapToStart")}
             </p>
+            <p className="muted" style={{ fontSize: 12 }}>{t("log.valueStatement")}</p>
           </article>
 
           <MoodWeather moments={moments} />
           <StreakOrb moments={moments} />
 
-          {dominant.label && dominant.count >= 3 ? (
-            <div className="patternNudge" style={{ borderLeftColor: dominant.color }}>
-              <div className="nudgeDot" style={{ backgroundColor: dominant.color }} />
+          {dominantEmotion && momentCount >= 3 ? (
+            <div className="patternNudge" style={{ borderLeftColor: stateColor }}>
+              <div className="nudgeDot" style={{ backgroundColor: stateColor }} />
               <div className="nudgeContent">
                 <p className="nudgeLabel">
-                  Trending {dominant.label}{dominant.trend === "improving" ? " \u2191" : dominant.trend === "declining" ? " \u2193" : ""}
+                  {t("log.trending", { emotion: translateLabel(t, dominantEmotion) })}
+                  {emotionalTrend === "improving" ? " ↑" : emotionalTrend === "declining" ? " ↓" : ""}
                 </p>
                 <p className="nudgeBody">
-                  {dominant.trigger
-                    ? `${dominant.trigger} has been your most logged trigger this week.`
-                    : dominant.trend === "improving"
-                      ? "Your emotional tone has been shifting positively."
-                      : dominant.trend === "declining"
-                        ? "Things have felt heavier lately. Name what\u2019s contributing."
-                        : "Your patterns are building. Keep logging for sharper insights."}
+                  {dominantTrigger
+                    ? t("log.nudgeTrigger", { trigger: t(`triggers.${dominantTrigger}`, dominantTrigger) })
+                    : emotionalTrend === "improving"
+                      ? t("log.nudgeImproving")
+                      : emotionalTrend === "declining"
+                        ? t("log.nudgeDeclining")
+                        : t("log.nudgeBuildPatterns")}
                 </p>
               </div>
             </div>
           ) : null}
 
+          <Tooltip id="log_tooltip" text={t("log.tooltip")} hidden={obState === "framing_shown"} />
+          <GuidedTooltip
+            visible={showInsightsNudge}
+            text={t("nudge.insightsReady")}
+            onDismiss={() => { setShowInsightsNudge(false); markNudgeSeen("insights_ready"); }}
+            duration={6000}
+            delay={800}
+          />
+          <GuidedTooltip
+            visible={showTriggerHint}
+            text={t("ftue.whatHappened")}
+            onDismiss={() => setShowTriggerHint(false)}
+            duration={5000}
+          />
+
           <div className="tileGrid">
-            {TRIGGERS.map((t) => (
-              <button
-                key={t}
-                className="triggerTile"
-                data-trigger={t}
-                onClick={() => { setTrigger(t); setStep("emotion"); }}
-                type="button"
-              >
-                <span className="triggerTileEmoji">{TRIGGER_EMOJIS[t] || "\u{1F4CC}"}</span>
-                <span className="triggerTileLabel">{t}</span>
+            {TRIGGERS.map((tr) => (
+              <button key={tr} className="triggerTile" data-trigger={tr} onClick={() => goToEmotion(tr)} type="button">
+                <span className="triggerTileEmoji">{TRIGGER_EMOJIS[tr] || "\u{1F4CC}"}</span>
+                <span className="triggerTileLabel">{t(`triggers.${tr}`, tr)}</span>
               </button>
             ))}
           </div>
 
-          <div className="bottomCard" style={dominant.label ? { borderColor: `${dominant.color}40` } : undefined}>
+          <div className="bottomCard" style={dominantEmotion ? { borderColor: `${stateColor}40` } : undefined}>
             <span className="bottomCardEmoji">
-              {moments.length >= 10 ? "\u{1F31F}" : todayCount >= 3 ? "\u2728" : todayCount > 0 ? "\u{1F525}" : "\u{1F331}"}
+              {moments.length >= 10 ? "\u{1F31F}" : todayCount >= 3 ? "✨" : todayCount > 0 ? "\u{1F525}" : "\u{1F331}"}
             </span>
             <span className="bottomCardText">
-              {moments.length >= 10 && dominant.trigger
-                ? `Strong data this week. ${dominant.trigger} and your patterns are becoming clear.`
+              {moments.length >= 10 && dominantTrigger
+                ? t("log.bottomStrong", { trigger: t(`triggers.${dominantTrigger}`, dominantTrigger), emotion: dominantEmotion ? translateLabel(t, dominantEmotion) : t("log.nudgeBuildPatterns") })
                 : moments.length >= 10
-                  ? "Strong week so far. Your patterns are getting sharper."
+                  ? t("log.bottomStrongGeneral")
                   : todayCount >= 3
-                    ? "Nice pattern data building up. Check your report later."
+                    ? t("log.bottom3Today")
                     : moments.length >= 5
-                      ? "Good momentum this week. Keep going for richer insights."
+                      ? t("log.bottomGoodWeek")
                       : todayCount > 0
-                        ? `${3 - todayCount} more today to strengthen this week\u2019s observations.`
-                        : "Each moment you log sharpens your weekly pattern report."}
+                        ? t("log.bottomMoreToday", { count: 3 - todayCount })
+                        : t("log.bottomDefault")}
             </span>
           </div>
         </section>
       ) : null}
 
-      {/* ── Step 2: Two-Slider Emotion + Tags ── */}
       {step === "emotion" ? (
         <section className="sceneIn stack">
-          <button className="backButton" type="button" onClick={() => { setStep("trigger"); setFeel(0); setEnergy(0); setNote(""); setSelectedTags([]); }}>
-            {"\u2190"} Back
-          </button>
+          <button className="backButton" type="button" onClick={backToTrigger}>{"←"} {t("common.back", "Back")}</button>
 
           <div className="emotionHeader">
-            <p className="sectionKicker" style={{ color: labelColor }}>{trigger}</p>
-            <h2>How did it affect you?</h2>
-            <p className="muted">Slide to describe how it felt</p>
+            <p className="sectionKicker" style={{ color: accentColor }}>{t(`triggers.${trigger}`, trigger)}</p>
+            <h2>{t("emotion.prompt")}</h2>
           </div>
 
-          {/* Feel slider */}
-          <div className="sliderGroup">
-            <label className="sliderLabel">How does this feel?</label>
-            <input
-              type="range"
-              className="axisSlider axisSliderFeel"
-              min={-1}
-              max={1}
-              step={0.01}
-              value={feel}
-              onChange={(e) => setFeel(parseFloat(e.target.value))}
-            />
-            <div className="sliderStepLabels">
-              {FEEL_LABELS.map((l, i) => (
-                <span key={l} className={`sliderStepLabel ${Math.abs(feel - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
-              ))}
-            </div>
-          </div>
+          <EmotionPad
+            value={coords}
+            onChange={handleEmotionChange}
+            accentColor={accentColor}
+            derivedLabel={derivedLabel}
+            t={t}
+          />
 
-          {/* Energy slider */}
-          <div className="sliderGroup">
-            <label className="sliderLabel">{"What\u2019s your energy like?"}</label>
-            <input
-              type="range"
-              className="axisSlider axisSliderEnergy"
-              min={-1}
-              max={1}
-              step={0.01}
-              value={energy}
-              onChange={(e) => setEnergy(parseFloat(e.target.value))}
-            />
-            <div className="sliderStepLabels">
-              {ENERGY_LABELS.map((l, i) => (
-                <span key={l} className={`sliderStepLabel ${Math.abs(energy - EMOTION_AXIS_STEPS[i]) < 0.15 ? "sliderStepLabelActive" : ""}`}>{l}</span>
-              ))}
-            </div>
-          </div>
+          <GuidedTooltip
+            visible={showEmotionHint && !hasInteracted}
+            text={t("ftue.howAffected")}
+            onDismiss={() => setShowEmotionHint(false)}
+            duration={5000}
+            delay={600}
+          />
 
-          {/* Live summary card */}
-          <div className="summaryCardLive sceneIn" style={{ borderColor: `${labelColor}40`, "--summary-color": labelColor }}>
-            <div className="summaryDot" style={{ backgroundColor: labelColor }} />
-            <div className="summaryContent">
-              <span className="summaryLabel" style={{ color: labelColor }}>{derivedLabel}</span>
-              <span className="summaryCoords">
-                feel {coords.valence > 0 ? "+" : ""}{coords.valence} · energy {coords.arousal > 0 ? "+" : ""}{coords.arousal}
-              </span>
-            </div>
-          </div>
-
-          {/* Adaptive tags */}
-          {regionTags.length > 0 ? (
+          {hasInteracted && adaptiveTags.length > 0 ? (
             <div className="tagSection sceneIn">
-              <p className="tagLabel">What about this felt <em style={{ color: labelColor }}>{derivedLabel}</em>?</p>
+              <div className="tagHeaderRow">
+                <p className="tagLabel">{t("emotion.whatContributed")}</p>
+                <div className="tagDots">
+                  {Array.from({ length: MAX_TAGS_PER_MOMENT }).map((_, i) => (
+                    <span key={i} className={`tagDot${i < selectedTags.length ? " tagDotActive" : ""}`} style={i < selectedTags.length ? { backgroundColor: accentColor } : undefined} />
+                  ))}
+                </div>
+              </div>
+
+              {selectedTags.some((tag) => !adaptiveTags.some((item) => item.label === tag)) ? (
+                <div className="pinnedRow">
+                  <p className="pinnedLabel">{t("emotion.selected", "Selected")}</p>
+                  <div className="tagChipRow">
+                    {selectedTags.filter((tag) => !adaptiveTags.some((item) => item.label === tag)).map((tag) => (
+                      <button key={`sel-${tag}`} type="button" className="tagChip tagChipActive" style={{ borderColor: accentColor }} onClick={() => toggleTag(tag)}>{tag}</button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="tagChipRow">
-                {regionTags.map((tag) => {
+                {adaptiveTags.map((item) => {
+                  const tag = item.label;
                   const active = selectedTags.includes(tag);
                   const atMax = selectedTags.length >= MAX_TAGS_PER_MOMENT && !active;
                   return (
                     <button
                       key={tag}
                       type="button"
-                      className={`tagChip ${active ? "tagChipActive" : ""}`}
+                      className={`tagChip${active ? " tagChipActive" : ""}`}
+                      style={active ? { borderColor: accentColor } : undefined}
                       disabled={atMax}
-                      onClick={() => setSelectedTags((prev) =>
-                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                      )}
+                      onClick={() => toggleTag(tag)}
                     >
                       {tag}
                     </button>
                   );
                 })}
               </div>
-              <p className="tagHint">Optional, up to {MAX_TAGS_PER_MOMENT}</p>
+              <p className="tagHint">{t("emotion.tagHint")}</p>
             </div>
           ) : null}
 
           <div className="noteCard">
-            <label className="noteLabel">Note (optional)</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="What happened right before this?"
-            />
+            <label className="noteLabel">{t("emotion.noteLabel")}</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t("emotion.notePlaceholder")} />
           </div>
 
           <button
             className="primaryButton saveButton"
-            disabled={loading}
+            disabled={!hasInteracted || saving}
             onClick={handleSave}
             type="button"
+            style={hasInteracted && !saving ? { backgroundColor: accentColor } : undefined}
           >
-            {loading ? "Saving..." : "Log moment"}
+            {saving ? t("emotion.saving") : t("emotion.saveMoment")}
           </button>
         </section>
       ) : null}
+
+      <SpotlightOverlay
+        visible={showFraming}
+        emoji={"\u{1F3AF}"}
+        message={t("ftue.framingMessage")}
+        cta={t("ftue.logFirstMoment")}
+        onDismiss={() => setShowFraming(false)}
+        skipLabel={t("ftue.skipGuide")}
+        onSkip={() => { setShowFraming(false); skip(); }}
+        position="center"
+      />
     </Layout>
   );
 }

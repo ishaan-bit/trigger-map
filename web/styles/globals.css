@@ -4228,4 +4228,104 @@ button, a, select, .emotionChip, .tagChip, .triggerTile, .momentActionBtn {
   .atmoBlob { animation: none !important; filter: opacity(0.85); }
   .tmRise, .tmFade { animation: none !important; opacity: 1 !important; transform: none !important; }
   .spotlightCard, .guidedTooltip, .tmTooltip, .spotlightOverlay { transition: none !important; }
+  .emoPadCursor, .emoPadGlow { transition: none !important; }
 }
+
+/* ── EmotionPad (Log step 2) ── */
+.emoPad {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(13, 20, 36, 0.94);
+  border: 1px solid rgba(148, 180, 224, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.emoPadStateRow { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+.emoPadDot { width: 12px; height: 12px; border-radius: 6px; flex-shrink: 0; }
+.emoPadStateCopy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.emoPadLabel { font-size: 20px; line-height: 24px; font-weight: 800; text-transform: capitalize; }
+.emoPadLabelPop { animation: emoPadPop 280ms var(--ease-emphasized); }
+@keyframes emoPadPop { from { transform: scale(0.88); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+.emoPadSummary { color: #dfe8f2; font-size: 13px; line-height: 18px; font-weight: 500; }
+
+.emoPadOuter { position: relative; padding: 22px 6px; }
+.emoPadAnchor {
+  position: absolute;
+  color: #b8c8d8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  z-index: 2;
+}
+.emoPadAnchorTop { top: 4px; left: 0; right: 0; text-align: center; }
+.emoPadAnchorBottom { bottom: 4px; left: 0; right: 0; text-align: center; }
+.emoPadAnchorLeft { top: 50%; left: 0; transform: translateY(-50%); }
+.emoPadAnchorRight { top: 50%; right: 0; transform: translateY(-50%); }
+
+.emoPadSurface {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(6, 10, 18, 0.64);
+  border: 1px solid rgba(148, 180, 224, 0.1);
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+.emoPadQuadTop {
+  position: absolute; left: 0; right: 0; top: 0; height: 50%;
+  background: linear-gradient(90deg, rgba(255, 107, 122, 0.12), rgba(86, 208, 224, 0.12));
+}
+.emoPadQuadBottom {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 50%;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.12), rgba(94, 230, 160, 0.12));
+}
+.emoPadGridH { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(148, 180, 224, 0.15); }
+.emoPadGridV { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(148, 180, 224, 0.15); }
+.emoPadFlashH { position: absolute; top: 50%; left: 0; right: 0; height: 2px; margin-top: -1px; background: rgba(148, 180, 224, 0.5); opacity: 0; transition: opacity 380ms ease; }
+.emoPadFlashV { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(148, 180, 224, 0.5); opacity: 0; transition: opacity 380ms ease; }
+.emoPadFlashOn { opacity: 1; transition: opacity 0ms; }
+.emoPadCenterDot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 4px; background: rgba(184, 200, 216, 0.4); }
+.emoPadTrail { position: absolute; width: 6px; height: 6px; border-radius: 3px; transform: translate(-50%, -50%); pointer-events: none; }
+.emoPadGlow {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 60px;
+  pointer-events: none;
+  filter: blur(2px);
+}
+.emoPadCursor {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  border-radius: 20px;
+  background: #0d1424;
+  border: 2.5px solid #56d0e0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+  transition: transform 60ms linear;
+}
+.emoPadCursorDrag { transform: translate(-50%, -50%) scale(1.1); }
+.emoPadCursorCore { width: 16px; height: 16px; border-radius: 8px; }
+
+.emoPadSliders { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.emoPadSliderLabel { display: flex; flex-direction: column; gap: 4px; color: #b8c8d8; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+.emoPadSliderLabel input[type="range"] { width: 100%; accent-color: #56d0e0; }
+
+/* ── Adaptive tag progress + pinned row ── */
+.tagHeaderRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tagDots { display: flex; gap: 6px; align-items: center; }
+.tagDot { width: 8px; height: 8px; border-radius: 4px; background: rgba(148, 180, 224, 0.25); }
+.tagDotActive { background: #56d0e0; }
+.pinnedRow { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.pinnedLabel { color: #dfe8f2; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin: 0; }
