@@ -1,9 +1,23 @@
 import Head from "next/head";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 import { LanguageProvider } from "../lib/i18n";
 import { SessionProvider } from "../hooks/useSession";
 import { EmotionalStateProvider } from "../hooks/useEmotionalState";
-import { OnboardingProvider } from "../hooks/useOnboarding";
+import { OnboardingProvider, useOnboarding } from "../hooks/useOnboarding";
 import "../styles/globals.css";
+
+// First-run gate: send brand-new visitors to the onboarding carousel.
+function OnboardingGate() {
+  const router = useRouter();
+  const { ready, isNotStarted } = useOnboarding();
+  useEffect(() => {
+    if (ready && isNotStarted && router.pathname !== "/onboarding") {
+      router.replace("/onboarding");
+    }
+  }, [ready, isNotStarted, router]);
+  return null;
+}
 
 export default function App({ Component, pageProps }) {
   return (
@@ -11,6 +25,7 @@ export default function App({ Component, pageProps }) {
       <SessionProvider>
         <EmotionalStateProvider>
           <OnboardingProvider>
+            <OnboardingGate />
             <Head>
               <title>TriggerMap</title>
               <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
