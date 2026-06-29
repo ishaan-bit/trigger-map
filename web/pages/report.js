@@ -198,11 +198,11 @@ const TRIGGER_COLORS = {
 };
 
 const TAB_KEYS = [
-  { key: "mirror", label: "Mirror", icon: "🪞" },
+  { key: "mirror", label: "Read", icon: "🔮" },
   { key: "week", label: "This Week", icon: "📅" },
   { key: "progress", label: "Progress", icon: "📈" },
   { key: "actions", label: "Actions", icon: "⚡" },
-  { key: "premium", label: "Premium", icon: "💎" },
+  { key: "premium", label: "For You", icon: "🧭" },
 ];
 
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
@@ -247,7 +247,7 @@ function TabBar({ activeTab, onTabChange }) {
 }
 
 /* ── Mirror Tab ── */
-function MirrorTab({ report, dq, confidence, isSignedIn, router }) {
+function MirrorTab({ report, dq, confidence, router }) {
   const bm = report?.baselineMetrics;
   const insight = report?.aiInsight;
   const drivers = insight?.drivers;
@@ -263,7 +263,7 @@ function MirrorTab({ report, dq, confidence, isSignedIn, router }) {
     return (
       <div className="card stack sceneIn" style={{ textAlign: "center" }}>
         <span className="emptyOrb">🪞</span>
-        <strong>{isSignedIn ? "Mirror forming" : "Start tracking to see your mirror"}</strong>
+        <strong>{report?.totalMoments ? "Your mirror is forming" : "Start tracking to see your mirror"}</strong>
         <p className="muted">Log at least 3 moments this week for your pattern mirror to take shape.</p>
         <a className="primaryButton inlineButton" href="/">Log a moment</a>
       </div>
@@ -489,7 +489,41 @@ function MirrorTab({ report, dq, confidence, isSignedIn, router }) {
 }
 
 /* ── This Week Tab ── */
-function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
+function ShareWeekCard({ shareWeek, report }) {
+  const [status, setStatus] = useState("idle");
+  if (!report?.totalMoments) return null;
+  async function onShare() {
+    setStatus("sharing");
+    try {
+      const res = await shareWeek();
+      const token = res?.token || res?.shareToken || res?.snapshot?.token;
+      const url = token ? `${window.location.origin}/share/${token}` : window.location.origin;
+      if (navigator.share) {
+        await navigator.share({ title: "My week on TriggerMap", text: "Here's my emotional week.", url });
+        setStatus("done");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setStatus("done");
+      } else {
+        window.open(url, "_blank");
+        setStatus("done");
+      }
+    } catch {
+      setStatus("idle");
+    }
+  }
+  return (
+    <div className="card stack sceneIn shareWeekCard">
+      <strong>Share your week</strong>
+      <p className="muted" style={{ fontSize: 13 }}>A private snapshot of your week — yours to share, no account needed.</p>
+      <button className="primaryButton inlineButton" type="button" onClick={onShare} disabled={status === "sharing"}>
+        {status === "sharing" ? "Preparing…" : status === "done" ? "Link ready ✓" : "Share my week"}
+      </button>
+    </div>
+  );
+}
+
+function ThisWeekTab({ report, dq, confidence, isPremium, shareWeek, router }) {
   const topEmotion = deriveTopEmotion(report);
   const stateColor = EMOTION_COLORS[topEmotion] || "#7bc9d8";
 
@@ -510,11 +544,9 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
     return (
       <div className="card stack sceneIn" style={{ textAlign: "center" }}>
         <span className="emptyOrb">🌱</span>
-        <strong>{isSignedIn ? "A few more moments to go" : "Start tracking to see patterns"}</strong>
+        <strong>{report?.totalMoments ? "A few more moments to go" : "Start tracking to see patterns"}</strong>
         <p className="muted">
-          {isSignedIn
-            ? "Log at least 3 moments this week for your pattern report to take shape."
-            : "Log at least 3 moments to see your first patterns. Sign in to unlock personalised AI insights."}
+          Log at least 3 moments this week for your pattern report to take shape.
         </p>
         <a className="primaryButton inlineButton" href="/">Log a moment</a>
       </div>
@@ -523,6 +555,7 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
 
   return (
     <div className="stack">
+      <ShareWeekCard shareWeek={shareWeek} report={report} />
       {/* Hero summary */}
       <div className="card cardFeature stack sceneIn" style={{ borderTop: `2px solid ${stateColor}30` }}>
         <p className="sectionKicker" style={{ color: stateColor }}>Weekly patterns</p>
@@ -618,12 +651,8 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
         </>
       ) : null}
 
-      {/* Correlations, Energy, Stability, Trajectory - gated on sign-in */}
-      {!isSignedIn && confidence !== "low" ? (
-        <LockedSection title="Patterns and pairings" teaser="Create a free account to see emotional correlations, energy flow, and weekly trajectory." ctaLabel="Sign in to unlock" onAction={() => router.push("/login")}>
-          <div className="card"><p className="muted">Deeper correlations appear here once you sign in.</p></div>
-        </LockedSection>
-      ) : (
+      {/* Correlations, Energy, Stability, Trajectory — all client-derived, always shown */}
+      {true ? (
         <>
           {dq.hasEnoughForPairings && Object.keys(report.correlations || {}).length ? (
             <>
@@ -710,7 +739,7 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
             </>
           ) : null}
         </>
-      )}
+      ) : null}
 
       {/* Micro-experiment */}
       {report.aiInsight?.microExperiment ? (
@@ -722,19 +751,20 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
 
       {/* Weekly Insight (LLM) */}
       {(() => {
-        if (!isSignedIn) {
+        if (!isPremium && (hasLlmInsight || hasLlmTeaser)) {
           return (
             <div className="insightSection sceneIn">
-              <SectionHeader label="Insights" badge="weekly" />
+              <SectionHeader label="Insights" badge="premium" />
               <div className="insightStateCard" style={{ borderColor: `${stateColor}20` }}>
                 <span className="insightStateIcon">🔒</span>
-                <strong className="insightStateTitle">Unlock deeper insights</strong>
-                <p className="insightStateBody">Sign in for free to get personalised pattern analysis.</p>
-                <button className="primaryButton inlineButton" onClick={() => router.push("/login")} type="button">Sign in to unlock</button>
+                <strong className="insightStateTitle">Unlock the AI narrative</strong>
+                <p className="insightStateBody">Premium turns your patterns into a personalised weekly read. All the signals above stay free.</p>
+                <button className="primaryButton inlineButton" onClick={() => router.push("/premium")} type="button">Go Premium</button>
               </div>
             </div>
           );
         }
+        if (!isPremium) return null;
         if (hasLlmInsight || hasLlmTeaser) {
           const narrativeSource = report.llmInsight?.narrative || report.llmTeaser?.narrative;
           const sections = parseLlmSections(narrativeSource);
@@ -796,7 +826,7 @@ function ThisWeekTab({ report, dq, confidence, isSignedIn, router }) {
 }
 
 /* ── Progress Tab ── */
-function ProgressTab({ progress, isSignedIn, router }) {
+function ProgressTab({ progress, router }) {
   if (!progress) {
     return (
       <div className="card stack sceneIn" style={{ textAlign: "center" }}>
@@ -991,7 +1021,7 @@ function ProgressTab({ progress, isSignedIn, router }) {
 }
 
 /* ── Actions Tab ── */
-function ActionsTab({ report, token, sendActionFeedback }) {
+function ActionsTab({ report, sendActionFeedback }) {
   const actions = report?.actions || [];
   const feedback = report?.actionFeedback || [];
   const [responded, setResponded] = useState(() => {
@@ -1078,7 +1108,7 @@ function ActionsTab({ report, token, sendActionFeedback }) {
 }
 
 /* ── Premium Tab ── */
-function PremiumTab({ report, modes, isSignedIn, isPremium, router }) {
+function PremiumTab({ report, modes, isPremium, router }) {
   const bm = report?.baselineMetrics;
   const invoked = report?.invokedMetrics;
   const compound = report?.compoundPatterns;
@@ -1127,13 +1157,13 @@ function PremiumTab({ report, modes, isSignedIn, isPremium, router }) {
   const triedCount = feedback.filter((f) => f.response === "tried" || f.response === "helped").length;
   const skippedCount = feedback.filter((f) => f.response === "skipped" || f.response === "not_helpful").length;
 
-  if (!isSignedIn) {
+  if (!isPremium) {
     return (
       <div className="card stack sceneIn" style={{ textAlign: "center" }}>
-        <span style={{ fontSize: 48 }}>💎</span>
-        <strong>Premium Insights</strong>
-        <p className="muted">Sign in to access adaptive modes, signal cards, pattern intelligence, and deeper behavioural analysis.</p>
-        <button className="primaryButton inlineButton" onClick={() => router.push("/login")} type="button">Sign in to unlock</button>
+        <span style={{ fontSize: 48 }}>🧭</span>
+        <strong>For You — Premium</strong>
+        <p className="muted">Premium unlocks adaptive Move / Fuel / Perspective modes, signal cards, and deeper pattern intelligence — personalised to your week.</p>
+        <button className="primaryButton inlineButton" onClick={() => router.push("/premium")} type="button">Go Premium</button>
       </div>
     );
   }
@@ -1327,7 +1357,7 @@ function PremiumTab({ report, modes, isSignedIn, isPremium, router }) {
 
 export default function ReportPage() {
   const router = useRouter();
-  const { loadWeeklyReport, loadProgress, loadModes, sendActionFeedback, isSignedIn, isPremium, token } = useSession();
+  const { loadWeeklyReport, loadProgress, loadModes, sendActionFeedback, shareWeek, isPremium } = useSession();
   const [report, setReport] = useState(null);
   const [progress, setProgress] = useState(null);
   const [modes, setModes] = useState(null);
@@ -1350,19 +1380,20 @@ export default function ReportPage() {
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
-  // Load progress data when switching to progress tab
+  // Load progress data when switching to progress tab (device-ID, no gating).
   useEffect(() => {
-    if (activeTab === "progress" && !progress && isSignedIn) {
+    if (activeTab === "progress" && !progress) {
       loadProgress().then((data) => setProgress(data)).catch((err) => console.error("Progress fetch failed:", err?.message));
     }
-  }, [activeTab, progress, isSignedIn, loadProgress]);
+  }, [activeTab, progress, loadProgress]);
 
-  // Load modes when switching to premium tab
+  // Load modes when switching to the For You tab — only when premium (matches
+  // mobile; avoids churning rule-based fallbacks for free users).
   useEffect(() => {
-    if (activeTab === "premium" && !modes && isSignedIn) {
+    if (activeTab === "premium" && !modes && isPremium) {
       loadModes().then((data) => setModes(data)).catch((err) => console.error("Modes fetch failed:", err?.message));
     }
-  }, [activeTab, modes, isSignedIn, loadModes]);
+  }, [activeTab, modes, isPremium, loadModes]);
 
   const dq = report?.dataQuality || {};
   const confidence = dq.confidence || "too_early";
@@ -1391,11 +1422,11 @@ export default function ReportPage() {
         <div className="reportStack">
           <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {activeTab === "mirror" ? <MirrorTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} router={router} /> : null}
-          {activeTab === "week" ? <ThisWeekTab report={report} dq={dq} confidence={confidence} isSignedIn={isSignedIn} router={router} /> : null}
-          {activeTab === "progress" ? <ProgressTab progress={progress} isSignedIn={isSignedIn} router={router} /> : null}
-          {activeTab === "actions" ? <ActionsTab report={report} token={token} sendActionFeedback={sendActionFeedback} /> : null}
-          {activeTab === "premium" ? <PremiumTab report={report} modes={modes} isSignedIn={isSignedIn} isPremium={isPremium} router={router} /> : null}
+          {activeTab === "mirror" ? <MirrorTab report={report} dq={dq} confidence={confidence} router={router} /> : null}
+          {activeTab === "week" ? <ThisWeekTab report={report} dq={dq} confidence={confidence} isPremium={isPremium} shareWeek={shareWeek} router={router} /> : null}
+          {activeTab === "progress" ? <ProgressTab progress={progress} router={router} /> : null}
+          {activeTab === "actions" ? <ActionsTab report={report} sendActionFeedback={sendActionFeedback} /> : null}
+          {activeTab === "premium" ? <PremiumTab report={report} modes={modes} isPremium={isPremium} router={router} /> : null}
 
           {/* Footer */}
           {report.totalMoments ? (
